@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "screener": {
+      "command": "uvx",
+      "args": ["screener-mcp"],
+      "env": {
+        "SCREENER_USERNAME": "${SCREENER_USERNAME:-}",
+        "SCREENER_PASSWORD": "${SCREENER_PASSWORD:-}"
+      }
+    }
+  }
+}
