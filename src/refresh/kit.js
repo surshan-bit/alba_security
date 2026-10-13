@@ -631,7 +631,6 @@ async function takeOver() {
     queue.slice(1).forEach(queuedItem);
     showResuming();
     await persistNow();   // claims the run: the other dashboards see a fresh heartbeat from this one
-    notice({ tone: "ok", title: "Refresh continuing", text: "Carrying on with " + jobs.map((j) => KIND_LABEL[j.kind] + " · " + j.keys.length + " left").join(", ") + ".", section: sectionOf(jobs[0].source) });
     setTimeout(pump, 1000);
   } finally { taking = false; }
 }
@@ -680,7 +679,6 @@ async function resumeSaved(saved) {
   clearRemote();
   queue.slice(1).forEach(queuedItem);
   showResuming();
-  notice({ tone: "ok", title: "Refresh continuing", text: "Carrying on with " + jobs.map((j) => KIND_LABEL[j.kind] + " · " + j.keys.length + " left").join(", ") + ".", section: sectionOf(jobs[0].source) });
   setTimeout(pump, 1500);
 }
 
