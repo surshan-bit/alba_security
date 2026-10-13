@@ -13,7 +13,7 @@ A single-page dashboard published as a claude.ai artifact. This file explains ho
 
 ```
 index.html                    page shell. Stamped by tools/build.js with a build id and modulepreload links (do not edit the stamped parts)
-styles/main.css               the style sources: @imports of styles/01-... to 16-... in cascade order (the ORDER is the cascade)
+styles/main.css               the style sources: @imports of styles/base.css ... late-global.css, one file per screen/component, in cascade order (the ORDER is the cascade)
 styles.css                    BUILD OUTPUT: styles/ bundled and minified. Never edit by hand
 partials/*.html               static page text (Help, Data Refresh, Knowledge Base), fetched by src/boot/partials.js
 js/loader.js                  the only classic script: imports app.js and shows "Could not start" with Retry if that fails
@@ -24,6 +24,7 @@ src/                          THE APPLICATION: ES modules, one responsibility pe
   sections/                   the pages that load on first use: refreshlog, strategies, business, tradelog
 app.js, chunks/*.js           BUILD OUTPUT (ES modules, code-split, hashed chunk names). Never edit by hand
 tools/build.js                bundles src/ and styles/ with esbuild and stamps index.html
+tools/css-snapshot.js         proves a styles/ change did not change the page (see "Changing styles" below)
 tools/lint.js                 structure checks (undefined names, start-up order, unused code, mutable exports, import graph)
 tests/run.js                  regression harness (jsdom; bundles the same sources into one script, as jsdom cannot run ES modules)
 tests/check.js                the pre-publish check: build, syntax, lint, harness vs tests/golden.json, Chromium suites
@@ -65,7 +66,7 @@ tests/fixtures/stocks.json    anonymised sample of the stock list used by the ha
 - **A module cannot assign to another module's variable.** Shared state that several modules change lives behind accessors and named actions, not exported variables: see `core/store.js` (private `state`; `getDb()`, `replaceTradeLog(...)`, `togglePinnedTicker(...)` and so on). Prefer that for new shared state. Exporting a `let`/`var`, or a `set_<name>` function, is a lint error: use a getter (`getX()`) and a setter or action (`setX(v)`) in the owner. State that only one module uses stays private in that module.
 - **Start-up code lives in an `init_<module>()` function** and is called from `src/main.js` in a fixed order (before the data arrives: from `src/boot/boot.js`). Code for a page that loads on demand is started by that page's `init()` in `src/sections/`. Module-level code should only declare things. Do not read another module's value at module level unless that module is evaluated first (lint checks this).
 - **No unused code.** Lint (`--strict`, used by `check`) fails on a declaration or export nobody uses.
-- **Grid standard.** Every data grid (Analysis, Strategies, Business) uses the one set of rules at the top of `styles/15-strategies.css`: header 0.72rem uppercase muted, 9px (header) / 11px (cell) by 8px padding (phones: 9px / 12px by 5px, in `styles/19-phone.css`), one line per cell, columns as wide as their content (`width:max-content`), right-aligned numbers, hover, green/red changes, no visible divider lines (transparent borders keep the spacing). A new grid reuses `.strat-table` (or is added to that selector list) and builds its columns from the shared cells (`STRATEGY_COLUMN_IDS`, `analysisLbCell`, `columnHeaderHtml`); page CSS may only add behaviour such as a sticky first column or a highlight.
+- **Grid standard.** Every data grid (Analysis, Strategies, Business) uses the one set of rules at the top of `styles/strategies.css`: header 0.72rem uppercase muted, 9px (header) / 11px (cell) by 8px padding (phones: 9px / 12px by 5px, in `styles/phone.css`), one line per cell, columns as wide as their content (`width:max-content`), right-aligned numbers, hover, green/red changes, no visible divider lines (transparent borders keep the spacing). A new grid reuses `.strat-table` (or is added to that selector list) and builds its columns from the shared cells (`STRATEGY_COLUMN_IDS`, `analysisLbCell`, `columnHeaderHtml`); page CSS may only add behaviour such as a sticky first column or a highlight.
 - Page-wide globals that are allowed (browser globals and `claude`, the claude.ai runtime; `window.__alba` is the one debug/test handle) are listed in `tools/lint.js`.
 
 ## Working on it
@@ -100,3 +101,18 @@ Does not cover: the real claude.ai runtime, the real database, and real TradingV
 ## Release history note
 
 The delivery was restructured: one classic `js/loader.js` imports an ES-module `app.js` that loads code-split `chunks/`; `styles.css` is built from `styles/`. `js/identity.js` and `js/boot.js` no longer exist (now `src/identity/` and `src/boot/`).
+
+## Changing styles
+
+`styles/main.css` lists the files in cascade order: the order is part of the cascade, so a rule moved between files can change which one wins. One file per screen or component (`shell.css`, `analysis.css`, `strategies.css` ...), then `phone.css` (narrow screens), `theme-light.css` (everything the Light theme changes), `refresh-kit.css` and `late-global.css` (global rules that must come after the components). Put a new rule in the file of the screen it belongs to; do not add a "fixes" file at the end.
+
+`npm run check` does not look at CSS, so prove a styles change with the snapshot tool (about 6 minutes for the quick run):
+
+```
+node tools/css-snapshot.js snap /tmp/before --quick --states      # on the unchanged code
+# change styles/, then: npm run build
+node tools/css-snapshot.js snap /tmp/after --quick --states
+node tools/css-snapshot.js compare /tmp/before /tmp/after          # no difference = nothing visible changed
+```
+
+It records every element's resolved style and box (plus ::before/::after/::placeholder/::marker) for both themes, every screen width and the main screens and open states, and with `--states` the forced :hover/:focus/:active styles. Take both snapshots in the same hour: the page shows time-based text, so an old snapshot will differ for reasons that have nothing to do with CSS. `--only=dark-1280` runs one theme and width (30 seconds) while editing.

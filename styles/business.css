@@ -1,0 +1,91 @@
+/* Business screen. */
+/* Business page (industries and their news). The grids themselves follow the grid standard in 15-strategies.css. */
+.biz-controls{display:flex;flex-wrap:wrap;}
+.biz-scroll{overflow-x:auto;container-type:inline-size;}
+@media (min-width:700px){
+.biz-table > tbody > .biz-row > .biz-name{position:sticky;left:0;z-index:1;}
+.biz-table > thead > tr > th:first-child{position:sticky;left:0;z-index:1;}
+}
+.biz-table > tbody > .biz-row.open > .biz-name{font-weight:700;}
+.biz-na{color:var(--muted);}
+.biz-warn{color:var(--avoid);}
+.biz-breadth{display:inline-flex;width:70px;height:6px;border-radius:3px;background:var(--line);overflow:hidden;vertical-align:middle;margin-right:6px;}
+.biz-breadth i{display:block;height:100%;}
+.biz-breadth .up{background:var(--buy);}
+.biz-breadth .down{background:var(--avoid);}
+.biz-table > tbody > .biz-detail > td{padding:0;border-bottom:1px solid var(--line);padding-bottom:6px;}
+.biz-detail-box{position:sticky;left:0;box-sizing:border-box;width:100cqw;margin-right:-100cqw;padding:10px;}
+/* the negative right margin cancels the width, so an opened industry does not widen the columns above it; the box carries the shade, so it reaches the end of the grid inside it */
+/* an opened industry is as wide as the screen and stays in view while the table scrolls sideways; its grid scrolls on its own */
+.biz-detail h3{font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+.biz-news{list-style:none;margin:0;padding:0;}
+.biz-news-meta,.biz-news-date{color:var(--muted);font-size:.74rem;}
+.biz-news li{padding:5px 0;line-height:1.4;}
+.biz-news a{color:var(--text);}
+.biz-expand{border:1px solid var(--line);color:var(--text);cursor:pointer;font-family:inherit;}
+.biz-expand:hover{border-color:var(--accent);}
+.biz-expand.on{border-color:var(--accent);color:var(--accent);}
+.biz-matchcount{color:var(--accent);}
+.strat-row.biz-match > td{background:color-mix(in srgb, var(--accent) 16%, transparent);}
+.strat-row.biz-match:hover > td{background:color-mix(in srgb, var(--accent) 28%, transparent);}
+.strat-row.biz-match > td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+.biz-newsbtn[disabled]{opacity:.5;cursor:default;}
+.biz-newsstatus{margin:6px 0;}
+/* The News block of an industry starts closed: its heading is the switch. */
+.biz-news-toggle{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;}
+.biz-news-toggle:hover{color:var(--text);}
+/* v1.111: row number ("#") in front of the industry name, counted in the order shown (sorting renumbers). CSS counter, so no data or JS change. */
+.biz-table > tbody{counter-reset:bizrow;}
+.biz-table > tbody > .biz-row{counter-increment:bizrow;}
+.biz-table > tbody > .biz-row > .biz-name::before,.biz-table > thead > tr > th:first-child::before{display:inline-block;width:2.4em;margin-right:.2em;color:var(--muted);font-variant-numeric:tabular-nums;text-indent:0;}
+.biz-table > tbody > .biz-row > .biz-name::before{content:counter(bizrow);}
+.biz-table > thead > tr > th:first-child::before{content:"#";}
+/* v1.112: on laptops and tablets long industry names wrap onto a second line (width capped); the number hangs to the left so wrapped lines line up with the name. Phones have their own rule in 19-phone.css. */
+@media (min-width:601px){
+.biz-table > tbody > .biz-row > .biz-name{white-space:normal;width:300px;min-width:220px;max-width:300px;padding-left:calc(8px + 2.6em);text-indent:-2.6em;overflow-wrap:anywhere;line-height:1.3;}
+.biz-table > thead > tr > th:first-child{padding-left:calc(8px + 2.6em);text-indent:-2.6em;}
+}
+#section-help a,#section-knowledgebase a{color:var(--accent);}
+#detail .fund-cell-research .fund-research-list li{margin-bottom:6px;line-height:1.4;}
+/* Chip text is centred vertically: the small label and the bold value share the middle line. */
+/* Peers use the Analysis / Strategies columns and grid look; the open stock is marked in its row. */
+.strat-row.peers-self > td{background:var(--panel2);}
+.strat-row.peers-self > td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+.strat-row.peers-self .analysis-lb-name::after{font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);content:"This stock";margin-left:10px;padding:1px 7px;border:1px solid var(--accent);border-radius:999px;font-size:.6rem;vertical-align:1px;}
+/* Industry screen: no filled panel; the page background shows through. The sticky first column uses the page colour so scrolled cells still hide behind it. */
+#section-business .analysis-panel,#section-business .biz-expand{background:transparent;}
+.biz-table > tbody > .biz-row > .biz-name,.biz-table > thead > tr > th:first-child{background:var(--bg);}
+.biz-table > tbody > .biz-row:hover > .biz-name,.biz-table > tbody > .biz-row:focus > .biz-name{background:linear-gradient(var(--row-hover),var(--row-hover)),var(--bg);}
+.biz-table > tbody > .biz-detail > td,.biz-detail-box{background:transparent;}
+.biz-side .biz-controls{display:flex;flex-direction:column;align-items:stretch;gap:14px;margin:0;}
+.biz-side .biz-expand{width:100%;}
+.biz-stocks-head h3,.biz-stocks-head .upload-hint{margin:0;}
+.biz-news-bar .biz-newsbtn{margin:0;}
+/* Explorer: an opened industry is highlighted across the whole row (name cell included, which is sticky and so needs an opaque colour). */
+.biz-table > tbody > .biz-row.open > td{border-top:1px solid var(--line);background:color-mix(in srgb, var(--accent) 16%, var(--bg));}
+/* News line: heading and button share one centre line; the button is filled so it reads as an action. */
+.biz-detail-box .biz-news-bar{display:flex;align-items:center;gap:12px;}
+.biz-detail-box .biz-news-bar h3.biz-news-head{margin:0 !important;line-height:1;padding:0;}
+.biz-detail-box .biz-news-bar .biz-newsbtn{background:transparent !important;border:1px solid var(--line) !important;color:var(--accent) !important;font-weight:600;height:30px;padding:0 14px;display:inline-flex;align-items:center;line-height:1;}
+.biz-detail-box .biz-news-bar .biz-newsbtn:hover:not(:disabled){border-color:var(--accent) !important;background:rgba(255,255,255,.04) !important;}
+.biz-detail-box .biz-news-bar .biz-newsbtn:disabled{opacity:.5;cursor:default;}
+.biz-news-bar .biz-newsstatus{margin:0;font-size:.8rem;}
+.pcs-chg.up{background:color-mix(in srgb,var(--buy) 13%,transparent);}
+.pcs-chg.up .pcs-val{color:var(--buy);}
+.pcs-chg.down{background:color-mix(in srgb,var(--avoid) 13%,transparent);}
+.pcs-chg.down .pcs-val{color:var(--avoid);}
+.pcs-rsi.hot .pcs-val{color:var(--hold);}
+.pcs-rsi.cold .pcs-val{color:var(--buy);}
+.pcs-sig.sig-buy .pcs-val{color:var(--buy);}
+.pcs-sig.sig-mbuy .pcs-val{color:var(--mbuy);}
+.pcs-sig.sig-hold .pcs-val{color:var(--hold);}
+.pcs-sig.sig-avoid .pcs-val{color:var(--avoid);}
+/* Stock names are links (right-click -> open in a new tab) but look like plain text. */
+a.stock-link{color:inherit;text-decoration:none;}
+.biz-toolbar .biz-expand{margin:0;width:auto;height:36px;padding:8px 16px;box-sizing:border-box;border-radius:6px;font-size:.78rem;font-weight:400;}
+.biz-main.biz-full .biz-scroll{flex:1 1 auto;min-height:360px;overflow:auto;}
+.biz-main.biz-full .biz-table thead th{position:sticky;top:0;z-index:2;background:var(--bg);}
+/* The industries grid spans the full width, so the button above it lines up with the grid's right edge. */
+.biz-table{width:100%;min-width:max-content;}
+.biz-table > tbody > .biz-row.open > .biz-name{background:color-mix(in srgb, var(--accent) 16%, var(--bg));box-shadow:inset 3px 0 0 var(--accent);}
+.biz-table > tbody > .biz-row.open:hover > td{background:color-mix(in srgb, var(--accent) 24%, var(--bg));}

@@ -46,7 +46,7 @@
           <tr><td><code>live/ticker.js</code></td><td>Live prices: while the market is open, the open stock first and then the rows on screen (up to 50, in grid order) refresh every 20 seconds, with W % chg and M % chg measured against last week's and last month's close read from TradingView's weekly and monthly bars. The Live switch is in the top bar on every screen size.</td></tr>
           <tr><td><code>ui/fullscreen.js</code></td><td>Full screen for the big grids: the button label, the browser's own full screen and Esc handling, shared by Analysis and Explorer.</td></tr>
           <tr><td><code>ui/activity.js</code></td><td>The notification bell: running refreshes and finished notices.</td></tr>
-          <tr><td><code>styles/19-phone.css</code></td><td>Everything phone-specific (up to 600px) in one file, loaded last, with its sizes as three variables at the top (<code>--ph-ctl</code>, <code>--ph-gap</code>, <code>--ph-fs</code>).</td></tr>
+          <tr><td><code>styles/phone.css</code></td><td>Everything phone-specific (up to 600px) in one file, loaded last, with its sizes as three variables at the top (<code>--ph-ctl</code>, <code>--ph-gap</code>, <code>--ph-fs</code>).</td></tr>
         </tbody>
       </table></div>
       <h3>Rules the code follows</h3>
@@ -278,7 +278,7 @@
               <li><b>Live prices:</b> W % chg and M % chg are now this week's and this month's change (against last week's and last month's close, from TradingView's weekly and monthly bars). The ticker keeps up to 50 rows live, in grid order. The Live switch is also in the top bar on phones.</li>
               <li><b>Strategies:</b> Strategy, Goal and Rules are collapsible and start closed. A green or grey dot shows published or not. The qualifying list has tick boxes only for <i>Track these picks</i>; the refresh cards work like Analysis. The old "Qualifying stocks" label is gone.</li>
               <li><b>Explorer:</b> Full screen, All / Matched and Expand all match the Analysis buttons; the News block of an industry starts closed.</li>
-              <li><b>Phones:</b> a full phone layout (<code>styles/19-phone.css</code>): side margins used, compact leaderboard header, Filters folded into one line, strategies as a row of chips, tidy rule rows, three-line Track record cards, side-by-side import buttons, a wider and slimmer search box, no floating Back button on a stock page, and a notification panel that opens (and shows "Nothing running" when empty).</li>
+              <li><b>Phones:</b> a full phone layout (<code>styles/phone.css</code>): side margins used, compact leaderboard header, Filters folded into one line, strategies as a row of chips, tidy rule rows, three-line Track record cards, side-by-side import buttons, a wider and slimmer search box, no floating Back button on a stock page, and a notification panel that opens (and shows "Nothing running" when empty).</li>
               <li><b>Behind the scenes:</b> shared limits in <code>core/config.js</code>, one batch cursor and card painter for all three screens, shared full screen labels, dead code and styles removed; new unit tests for batches and Chromium tests for the new screens. The Knowledge Base architecture and release sections were rewritten.</li>
             </ul>
             <h3>v1.109 &middot; 2026-10-12</h3>

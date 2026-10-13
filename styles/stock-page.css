@@ -1,0 +1,337 @@
+/* Stock page: panels and layout. */
+/* Stock page panels: fundamentals, global factors, peers, technical, valuation. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
+.tech-badge{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.78rem;font-weight:600;padding:4px 11px;border-radius:20px;letter-spacing:.2px;display:inline-flex;align-items:center;gap:6px;}
+.tb-insufficient_data{background:var(--panel2);color:var(--muted);}
+/* The stock detail view has four boxed-panel sections, always in this order:
+     Valuation (.val-panel) → Fundamental Score (.fund-panel) →
+     Technical Score (.tech-panel) → Global & Macro Information (.global-panel). Valuation
+     leads because it's the first thing to check on any stock; the rest follow in the
+     order they were originally built. All four deliberately share one design language
+     (boxed panel, uppercase eyebrow title, card grid) so they read as one consistent
+     system rather than four bolted-together UIs; their CSS is kept in that same order
+     below to make each one easy to find. */
+.val-panel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.val-panel-head{display:flex;align-items:center;justify-content:flex-start;gap:10px 14px;flex-wrap:wrap;}
+.val-grid{display:grid;}
+.val-cell-value{font-weight:700;}
+.val-cell-value.fs-buy{color:var(--buy);}
+.val-cell-value.fs-mbuy{color:var(--mbuy);}
+.val-cell-value.fs-hold{color:var(--hold);}
+.val-cell-value.fs-avoid{color:var(--avoid);}
+.val-cell-value.fs-pending{color:var(--muted);}
+.val-cell-sub{color:var(--text);line-height:1.5;}
+.fund-panel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.fund-panel-head{display:flex;align-items:center;justify-content:flex-start;gap:10px 14px;flex-wrap:wrap;}
+.fund-panel-head-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-start;}
+.fund-grid{display:grid;}
+.fund-cell-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+.fund-cell-label{color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+.proxy-tag{display:inline-block;margin-left:7px;font-size:.62rem;font-weight:700;text-transform:none;letter-spacing:0;color:var(--hold);background:rgba(201,162,39,.18);border:1px solid var(--hold);border-radius:10px;padding:1px 7px;vertical-align:middle;text-decoration:none;cursor:pointer;}
+.incomplete-tag{display:inline-block;margin-left:7px;font-size:.62rem;font-weight:700;text-transform:none;letter-spacing:0;color:var(--muted);background:rgba(127,127,127,.14);border:1px dashed var(--muted);border-radius:10px;padding:1px 7px;vertical-align:middle;cursor:help;}
+.data-chip.chip-na{opacity:.55;}
+.proxy-tag-link:hover{background:rgba(201,162,39,.15);}
+/* On-demand research of the Data-proxy factors (Moat, Governance), added 2026-10-06 — mirrors the
+     the stock-level "Research this stock" button. Once researched, the dashed "proxy" card turns
+     solid and the amber tag is replaced by a green "Researched" tag plus the findings and sources. */
+.fund-cell-research{margin:0 0 10px;font-size:.82rem;line-height:1.5;color:var(--text);}
+.fund-research-stale{margin:0 0 6px;padding:4px 8px;border-radius:6px;font-size:.74rem;font-weight:600;background:rgba(217,119,6,.14);color:#b45309;}
+.fund-research-summary{margin:0 0 6px;}
+.fund-research-list{margin:6px 0 0;padding-left:18px;}
+.fund-research-list li{margin-bottom:3px;}
+.fund-research-list.pos li::marker{color:var(--buy);}
+.fund-research-list.neg li::marker{color:var(--avoid);}
+.fund-research-sources{margin-top:8px;font-size:.7rem;color:var(--muted);font-style:italic;line-height:1.5;}
+.fund-research-sources a{color:var(--accent);text-decoration:none;}
+.fund-research-sources a:hover{text-decoration:underline;}
+.fund-cell-score{font-size:.92rem;font-weight:700;white-space:nowrap;}
+.fund-cell-score .fund-cell-max{font-size:.72rem;font-weight:500;color:var(--muted);}
+.fund-cell-score.fs-buy{color:var(--buy);}
+.fund-cell-score.fs-mbuy{color:var(--mbuy);}
+.fund-cell-score.fs-hold{color:var(--hold);}
+.fund-cell-score.fs-avoid{color:var(--avoid);}
+.fund-cell-score.fs-pending{color:var(--muted);}
+.fund-cell-bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;}
+.fund-cell-bar i{display:block;height:100%;}
+.fund-cell-bar i.fs-buy{background:var(--buy);}
+.fund-cell-bar i.fs-mbuy{background:var(--mbuy);}
+.fund-cell-bar i.fs-hold{background:var(--hold);}
+.fund-cell-bar i.fs-avoid{background:var(--avoid);}
+.fund-cell-bar i.fs-pending{background:var(--muted);}
+.fund-cell-note{font-size:.82rem;color:var(--text);line-height:1.5;margin-bottom:8px;}
+.fund-cell-business{font-size:.88rem;font-weight:600;line-height:1.4;margin-bottom:6px;}
+.fund-pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+@media (max-width:520px){
+.fund-pros-cons{grid-template-columns:1fr;}
+}
+.fund-pc-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px;}
+.fund-pc-title-pros{color:var(--buy);}
+.fund-pc-title-cons{color:var(--avoid);}
+.fund-pros-cons ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+.fund-pros-cons li{font-size:.85rem;line-height:1.4;padding-left:16px;position:relative;color:var(--text);}
+.fund-pc-dot{position:absolute;left:0;top:.5em;width:7px;height:7px;border-radius:50%;}
+.fund-pc-dot.fs-buy{background:var(--buy);}
+.fund-pc-dot.fs-mbuy{background:var(--mbuy);}
+.fund-pc-dot.fs-avoid{background:var(--avoid);}
+.fund-pc-empty{color:var(--muted);font-style:italic;padding-left:0;}
+.fund-cell-flags{display:flex;flex-direction:column;gap:5px;margin-bottom:9px;}
+.fund-flag{display:flex;gap:6px;font-size:.78rem;line-height:1.35;padding:6px 9px;border-radius:6px;font-weight:600;}
+.fund-flag.fs-avoid{background:rgba(193,82,74,.16);color:var(--avoid);border:1px solid rgba(193,82,74,.4);}
+.fund-flag.fs-hold{background:rgba(201,162,39,.16);color:var(--hold);border:1px solid rgba(201,162,39,.4);}
+.fund-proxy-mark{cursor:help;font-size:.7em;opacity:.8;margin-left:1px;}
+.fund-pc-footnote{grid-column:1/-1;font-size:.72rem;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
+.fund-subsection-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px;}
+.fund-subsection-title{font-weight:700;}
+.tech-panel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.tech-panel-head{display:flex;align-items:center;justify-content:flex-start;gap:10px 14px;flex-wrap:wrap;}
+.tech-news-note{display:flex;gap:8px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--tech-sell);border-radius:8px;padding:10px 12px;margin:0 0 14px;font-size:.82rem;color:var(--text);line-height:1.5;}
+.tech-news-label{color:var(--muted);font-weight:700;text-transform:uppercase;font-size:.68rem;letter-spacing:.04em;flex-shrink:0;margin-top:2px;white-space:nowrap;}
+/* Industry Peers panel — last section of the stock detail view (added 2026-10-06). Lists every
+     stock sharing this stock's exact industry within its Industry Group (the Fundamental Score's peer set, with fallback). */
+/* Layout fix (2026-10-06): a grid item's default min-width is its content width, so the Industry Peers
+     table's no-wrap numeric columns stretched the whole detail pane past the phone screen. min-width:0
+     lets the pane (and panel) shrink to the screen so .peers-scroll scrolls sideways inside its own box. */
+.detail,.tech-panel{min-width:0;}
+.peers-sub{font-size:.8rem;color:var(--muted);line-height:1.5;margin:0 0 12px;}
+/* Horizontal scroll (2026-10-06): the table keeps its natural column widths and, on a narrow screen,
+     scrolls sideways inside .peers-scroll (no columns are pinned — pinned columns ate most of a phone's width). */
+.peers-hint{display:none;font-size:.72rem;color:var(--muted);margin:6px 2px 0;}
+@media (max-width:700px){
+.peers-hint{display:block;}
+}
+.peers-scroll{max-width:100%;max-height:420px;overflow:auto;-webkit-overflow-scrolling:touch;}
+.peers-table{border-spacing:0;}
+.peers-table tr:last-child td{border-bottom:none;}
+.peers-table tbody tr{cursor:pointer;}
+.peers-table tbody tr:hover{background:var(--row-hover);}
+.peers-table tr.peers-self{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent);}
+.peers-table .chg-down{color:var(--avoid);font-weight:700;}
+.peers-empty{color:var(--muted);font-style:italic;}
+/* Weekly/Monthly RSI value + Tech Rating badge rows inside the Technical Score card's
+     Past Week / Past Month cells (added 2026-10-06) — same RSI number and same rating label
+     (techRatingInfo) as the Analysis section leaderboard's Weekly RSI / Tech Rating W columns. */
+.tech-empty{color:var(--muted);font-size:.86rem;}
+/* Positive and Negative sit side by side and share rows: the cards on the same row stretch to the tallest one (subgrid).
+     When the panel is narrow they stack instead (see the container query below). */
+.global-panel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;container-type:inline-size;}
+.global-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.global-panel-sub{font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.5;max-width:90ch;}
+.global-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:16px;}
+.global-col{display:grid;grid-row:1 / span calc(var(--n) + 1);grid-template-rows:subgrid;min-width:0;}
+.global-col .global-list{display:contents;}
+.global-col .global-col-title{margin-bottom:0;}
+.global-col .global-item{height:100%;box-sizing:border-box;}
+@container (max-width:600px){
+.global-cols{display:block;}
+.global-col{display:block;}
+.global-col + .global-col{margin-top:16px;}
+.global-col .global-col-title{margin-bottom:8px;}
+.global-col .global-list{display:flex;flex-direction:column;gap:10px;}
+.global-col .global-item{height:auto;}
+}
+.global-col-title{font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.global-col-title.pos{color:var(--buy);}
+.global-col-title.neg{color:var(--avoid);}
+.global-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+.global-item{font-size:.86rem;line-height:1.55;color:var(--text);text-wrap:pretty;overflow-wrap:anywhere;}
+.global-item-source{display:block;font-size:.7rem;color:var(--muted);margin-top:4px;font-style:italic;}
+.global-item-source a{color:var(--accent);text-decoration:none;}
+.global-item-source a:hover{text-decoration:underline;}
+@media (max-width:640px){
+.global-cols{grid-template-columns:1fr;}
+/* Analysis section (added 2026-09-30): a standalone app-section, not part of the per-stock
+     detail panel, so it doesn't follow the Fundamental/Technical/Valuation/Global four-panel
+     naming — but it deliberately reuses the same boxed-panel visual language (var(--panel2)
+     background, uppercase eyebrow title) so it reads as part of the same product. */
+}
+.detail-jump-name{font-weight:700;font-size:.95rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.detail-jump-ticker{font-size:.78rem;color:var(--muted);white-space:nowrap;}
+.detail-jump-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-right:2px;}
+.detail-jump .jump-preview.fs-buy{color:var(--buy);}
+.detail-jump .jump-preview.fs-mbuy{color:var(--mbuy);}
+.detail-jump .jump-preview.fs-hold{color:var(--hold);}
+.detail-jump .jump-preview.fs-avoid{color:var(--avoid);}
+.detail-jump .jump-preview.fs-pending{color:var(--muted);}
+.filter-label{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+/* Flat, list-style stock page (all widths). The boxes inside boxes (panel > factor card > metric chips) are replaced by
+   hairline dividers and larger section headings, so the information gets the width. On wide screens the stock page keeps its one
+   outer card; on phones that card goes too. */
+.val-panel,.fund-panel,.tech-panel,.global-panel{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;padding:20px 0 4px;}
+.val-panel-title,.fund-panel-title,.tech-panel-title,.global-panel-title{font-weight:700;text-transform:none;letter-spacing:0;}
+.fund-subsection-title{font-size:1rem;}
+.global-panel-sub{margin-bottom:10px;}
+/* rows instead of cards: each cell is a line-topped block */
+.val-cell,.fund-cell,.global-item,.fund-overall-summary,.fund-cell-research{background:transparent;border:0;border-radius:0;border-top:1px solid var(--line);}
+.fund-cell-proxy{border-style:none;border-top:1px solid var(--line);}
+.global-cols{row-gap:0;}
+.global-list{gap:0;}
+.fund-cell-label{font-size:.78rem;font-weight:600;}
+/* Peers table: thin scrollbar. */
+.peers-scroll{border:0;border-radius:0;background:transparent;scrollbar-width:thin;scrollbar-color:var(--line) transparent;}
+@media (max-width:640px){
+.val-grid > :first-child,.fund-grid > :first-child,.global-list > :first-child{border-top:0;}
+.global-col .global-list{gap:0;}
+/* Phones: the filters fold into one "Filters" line (with what is selected) and start collapsed. */
+}
+.filters-toggle{display:none;}
+@media (max-width:900px){
+.filters-toggle .ft-label{font-weight:700;}
+.filters-toggle .ft-summary{flex:1;min-width:0;color:var(--muted);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.filters-toggle .ft-caret{color:var(--muted);transition:transform .15s;}
+.filters-toggle[aria-expanded="true"] .ft-caret{transform:rotate(180deg);}
+}
+.pc-keytoggle{margin-left:auto;background:transparent;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:.72rem;font-weight:600;padding:3px 10px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.pc-keytoggle:hover{color:var(--text);border-color:var(--muted);}
+/* ---- One look for every screen (the stock page is the reference): tinted panels with no outline, no divider lines inside a panel,
+   thin dark scroll bars. Borders are made transparent rather than removed, so spacing stays exactly as it was. Controls
+   (buttons, inputs, chips, toggles) keep their outline. ---- */
+html{scrollbar-color:var(--line) transparent;}
+*{scrollbar-width:thin;}
+#section-analysis table th,#section-analysis table td,#section-strategies table th,#section-strategies table td,#section-help table th,#section-help table td,#section-knowledgebase table th,#section-knowledgebase table td,#section-trackrecord table th,#section-trackrecord table td{border-color:transparent;}
+/* the quick links sit on their own line under the title, clear of the Back button */
+#detail .detail-meta-links{font-size:.84rem;gap:6px 26px;padding-left:2px;}
+#detail .val-panel-title,#detail .fund-panel-title,#detail .tech-panel-title,#detail .global-panel-title{font-size:1.1rem;}
+#detail .val-panel-head,#detail .fund-panel-head,#detail .tech-panel-head,#detail .global-panel-head{margin-bottom:6px;}
+#detail .fund-overall-summary{padding:8px 0;margin:2px 0 6px;}
+#detail .fund-subsection{margin-bottom:10px;}
+#detail .fund-subsection .fund-cell-bar{margin-bottom:6px;}
+#detail .fund-cell-head{margin-bottom:4px;}
+#detail .fund-pc-footnote{margin-top:4px;padding-top:4px;}
+#detail .fund-pros-cons ul{gap:4px;}
+#detail .fund-cell-flags{margin-bottom:6px;}
+/* Critical news & world events: items sit in columns (as many as fit), the Helps / Hurts / Mixed tag is coloured, the explanation is smaller, and the source goes on the same line as it. */
+#detail .global-events .global-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px 28px;}
+/* Header breathing space: room above the name, between name, ticker, links and the Jump to bar, and between the links themselves. */
+#detail{padding-top:16px;}
+#detail .val-cell,#detail .fund-cell,#detail .global-item,#detail .fund-cell-research,#detail .fund-subsection .fund-cell{padding:11px 0;}
+/* Global & Macro: each column is its own compact list (no row pairing across columns), tighter text, source on the line of its text. */
+#detail .global-cols{column-gap:36px;row-gap:0;align-items:start;}
+#detail .global-col{display:block;grid-row:auto;}
+/* Global & Macro reads like the Strengths / Watch-outs lists: a coloured bullet per item, more room between items and under the headings. */
+#detail .global-col .global-list{display:flex;flex-direction:column;gap:10px;}
+#detail .global-col .global-item{height:auto;position:relative;padding:0 0 0 20px;font-size:.9rem;line-height:1.45;}
+#detail .global-col .global-col-title{margin-bottom:10px;}
+#detail .global-col .global-item::before{content:"";position:absolute;left:0;top:.5em;width:8px;height:8px;border-radius:50%;background:var(--muted);}
+#detail .global-col:first-child .global-item::before{background:var(--buy);}
+#detail .global-col:nth-child(2) .global-item::before{background:var(--avoid);}
+#detail .global-panel-head{margin-bottom:14px;}
+#detail .val-panel .val-cell{padding:2px 0 4px;}
+#detail .val-panel .val-panel-head{margin-bottom:4px;}
+#detail .val-panel .val-cell-sub{font-size:.88rem;}
+#detail .fund-cell-research{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));column-gap:32px;align-items:start;}
+#detail .fund-cell-research > *{margin:0;}
+#detail .fund-cell-research > .fund-research-stale,#detail .fund-cell-research > .fund-research-sources,#detail .fund-cell-research > .fund-research-summary{grid-column:1/-1;}
+#detail .fund-cell-research .fund-research-list{padding-left:20px;}
+#detail .fund-cell-research .fund-research-sources{margin-top:4px;}
+/* a section with a single card (e.g. Valuation & Margin of Safety) already has its title and score in the section heading, so the card does not repeat them */
+#detail .fund-subsection .fund-cell:only-child > .fund-cell-head,#detail .fund-subsection .fund-cell:only-child > .fund-cell-bar{display:none;}
+/* Heading colour: every section and sub-section heading on the stock page is amber. */
+:root{--hd:#e0b04a;}
+:root[data-theme="light"],:root[data-theme="indigo"]{--hd:#98680a;}
+#detail .val-panel-title,#detail .global-panel-title,#detail .fund-panel-title,#detail .tech-panel-title,#detail .fund-subsection-title{color:var(--hd);}
+.pc-psum{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;}
+.tech-fallback{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+/* Chart header figures: three matching chips in the order Change, RSI, Signal; a small muted label and a bold value, coloured where it carries meaning. */
+/* Price charts, tight: the Legend button sits on the Technical Score heading line (top right) instead of its own row, and the gaps around the two charts are smaller. */
+#detail .tech-panel{position:relative;}
+#detail .pc-keytoggle{margin:0;}
+/* A little air between the Technical Score heading, the chart headers, the charts and between the two charts. */
+#detail .tech-panel .tech-panel-head{margin-bottom:16px;}
+.analysis-chart-block{margin:16px 0 16px;flex:none;}
+/* Industry heat map */
+.hm-wrap{position:relative;width:100%;margin-top:12px;border-radius:6px;overflow:hidden;}
+.hm-tile{position:absolute;box-sizing:border-box;border:1px solid var(--bg);padding:4px 6px;margin:0;overflow:hidden;cursor:pointer;color:var(--text);font:inherit;text-align:left;display:flex;flex-direction:column;justify-content:flex-start;gap:1px;}
+.hm-tile:hover,.hm-tile:focus-visible{outline:2px solid var(--text);outline-offset:-2px;z-index:1;}
+.hm-name{font-size:1em;font-weight:700;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;word-break:break-word;hyphens:auto;}
+.hm-chg{font-size:1em;font-weight:700;font-variant-numeric:tabular-nums;}
+.hm-n{font-size:.85em;opacity:.8;}
+.hm-legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:.74rem;color:var(--muted);}
+.hm-bar{display:inline-block;width:120px;height:8px;border-radius:4px;background:linear-gradient(90deg,color-mix(in srgb,var(--avoid) 90%,var(--bg)),color-mix(in srgb,var(--avoid) 18%,var(--bg)),color-mix(in srgb,var(--buy) 18%,var(--bg)),color-mix(in srgb,var(--buy) 90%,var(--bg)));}
+.hm-note{margin-left:8px;}
+/* Industry: controls in a side column, like the Analysis filters. */
+.biz-layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start;}
+.biz-main,.biz-side{min-width:0;}
+@media (max-width:900px){
+.biz-layout{grid-template-columns:minmax(0,1fr);gap:12px;}
+.biz-side{order:-1;}
+}
+.biz-stocks-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 6px;}
+/* Industry detail: the news button sits on the News heading line; each opened industry is closed off with a line. */
+.biz-news-bar{margin-top:10px;}
+/* Top-bar stock search */
+.topbar-search{flex-shrink:1;}
+.topbar-search-input{width:100%;box-sizing:border-box;border-radius:999px;border:1px solid var(--line);background:transparent;font:inherit;padding:0 32px 0 14px;font-size:.92rem;height:40px;}
+.topbar-search-input:focus{outline:none;border-color:var(--accent);}
+.topbar-search-clear{display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--muted);font-size:1.1rem;line-height:1;cursor:pointer;padding:2px 6px;}
+.sg-empty{padding:10px 12px;color:var(--muted);font-size:.84rem;}
+@media (max-width:600px){
+.topbar-search{min-width:0;}
+/* Top-bar search: centred, wide enough for the whole suggestion list. */
+}
+.topbar-search{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;width:520px;max-width:calc(100vw - 460px);}
+@media (max-width:1000px){
+.topbar-search{position:relative;left:auto;top:auto;transform:none;margin-left:auto;width:340px;max-width:50vw;}
+}
+@media (max-width:600px){
+.topbar-search{width:auto;flex:1;max-width:none;}
+}
+.hd-ico{width:1.05em;height:1.05em;margin-right:.45em;vertical-align:-.14em;flex-shrink:0;}
+/* Chart header figures: one connected strip (Change | RSI | Signal), label above value, with an RSI gauge and a signal dot. */
+.pc-psum .pcs{display:inline-flex;align-items:stretch;border:1px solid var(--line);overflow:hidden;background:var(--panel2);border-radius:8px;}
+.pcs-cell{display:flex;flex-direction:column;justify-content:center;min-width:96px;position:relative;}
+.pcs-cell + .pcs-cell{border-left:1px solid var(--line);}
+.pcs-key{font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);line-height:1;font-size:.56rem;}
+.pcs-val{display:flex;align-items:center;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;font-size:.9rem;gap:5px;}
+.pcs-arrow{font-style:normal;line-height:1;font-size:.54rem;}
+.pcs-gauge{position:relative;display:block;border-radius:2px;margin-top:1px;background:linear-gradient(90deg,color-mix(in srgb,var(--buy) 55%,transparent) 0 30%,var(--line) 30% 70%,color-mix(in srgb,var(--hold) 65%,transparent) 70% 100%);height:3px;}
+.pcs-dot{border-radius:50%;flex-shrink:0;width:7px;height:7px;}
+.pcs-sig.sig-buy{background:color-mix(in srgb,var(--buy) 13%,transparent);}
+.pcs-sig.sig-buy .pcs-dot{background:var(--buy);}
+.pcs-sig.sig-mbuy{background:color-mix(in srgb,var(--mbuy) 13%,transparent);}
+.pcs-sig.sig-mbuy .pcs-dot{background:var(--mbuy);}
+.pcs-sig.sig-hold{background:color-mix(in srgb,var(--hold) 13%,transparent);}
+.pcs-sig.sig-hold .pcs-dot{background:var(--hold);}
+.pcs-sig.sig-avoid{background:color-mix(in srgb,var(--avoid) 13%,transparent);}
+.pcs-sig.sig-avoid .pcs-dot{background:var(--avoid);}
+@media (max-width:520px){
+.pcs-cell{min-width:0;}
+}
+.pcs-chg{box-sizing:border-box;width:96px;}
+.pcs-rsi{box-sizing:border-box;width:80px;}
+.pcs-sig{box-sizing:border-box;width:116px;}
+/* Chart header strip: a notch smaller. */
+.pcs-cell{padding:5px 12px;gap:2px;}
+@media (max-width:520px){
+.pcs-cell{padding:5px 8px;}
+.pcs-val{font-size:.84rem;}
+.pcs-chg{width:80px;}
+.pcs-rsi{width:66px;}
+.pcs-sig{width:96px;}
+/* Technical refresh under an industry's stocks. */
+}
+.biz-refresh{margin:10px 0 4px;}
+/* Live prices: the topbar switch, the open stock's live price and the brief flash when a number changes. */
+.live-toggle{flex:none;height:30px;margin-left:auto;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:transparent;font:inherit;font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;}
+.live-toggle:hover{border-color:var(--accent);}
+.live-toggle.live{color:var(--accent);border-color:var(--accent);}
+.live-toggle.live::first-letter{animation:livePulse 1.6s ease-in-out infinite;}
+@keyframes livePulse{50%{opacity:.35;}}
+.live-px{margin-left:10px;padding:1px 9px;border:1px solid var(--line);border-radius:999px;font-size:.74rem;font-weight:600;color:var(--accent);}
+.live-flash{animation:liveFlash 1.2s ease-out;}
+@keyframes liveFlash{0%{background:rgba(76,175,114,.35);}100%{background:transparent;}}
+@media (max-width:1000px){
+.live-toggle{margin-left:10px;}
+}
+@media (max-width:700px){
+.live-toggle{margin-left:0;}
+/* The links under the stock's name: icon in front, vertically centred with the text, same gap for all three. */
+}
+#detail .detail-meta-links a{display:inline-flex;align-items:center;gap:7px;line-height:1.2;}
+#detail .detail-meta-links .link-ico{flex:none;width:14px;height:14px;}
+/* Expand all / Collapse all sits at the right end of the grid, on the line above it. */
+.biz-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:0 0 8px;}
+.biz-toolbar .biz-showing{margin:0 auto 0 0;}
+.biz-toolbar .biz-match-toggle{height:36px;box-sizing:border-box;align-items:center;}
+/* Explorer full screen: the table fills the window, headings stay in view while the rows scroll. */
+.biz-main.biz-full{position:fixed;inset:0;z-index:70;margin:0;padding:12px 20px 16px;background:var(--bg);display:flex;flex-direction:column;overflow:auto;}
+.biz-main.biz-full .biz-toolbar{flex:none;}
+.biz-main.biz-full .biz-refresh{display:none;}

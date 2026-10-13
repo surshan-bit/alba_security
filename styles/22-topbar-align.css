@@ -1,9 +1,0 @@
-/* Top bar alignment (v1.113), all themes. The burger is drawn on whole pixels (three 2px bars, 6px apart, in a 36px square) so the middle bar
-   cannot land between pixels and look thicker than the others, and the burger, the page name, the dot and the search box share one centre line. */
-.menu-toggle{position:relative;display:block;width:36px;height:36px;padding:0;margin:-8px;flex-shrink:0;}
-.menu-toggle span{position:absolute;left:8px;width:20px;height:2px;border-radius:1px;}
-.menu-toggle span:nth-child(1){top:11px;}
-.menu-toggle span:nth-child(2){top:17px;}
-.menu-toggle span:nth-child(3){top:23px;}
-.topbar-title{align-items:center;line-height:1.2;}
-.topbar-brand,.topbar-section{line-height:1.2;}

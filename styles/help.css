@@ -1,0 +1,81 @@
+/* Help and Knowledge Base. */
+/* Help and Knowledge Base. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
+.help-panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 22px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:none;}
+.help-panel h2{font-size:1.05rem;scroll-margin-top:20px;margin:20px 0 6px;}
+.help-panel h2:first-of-type{margin-top:0;}
+.help-panel h3{font-size:.92rem;margin:18px 0 8px;color:var(--muted);}
+.help-toc{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:.82rem;flex-direction:row;flex-wrap:wrap;gap:6px 18px;padding:10px 14px;margin-bottom:18px;}
+.help-toc a{text-decoration:none;}
+.help-toc a:hover{text-decoration:underline;}
+.help-panel p{font-size:.86rem;line-height:1.55;color:var(--text);margin:0 0 12px;}
+.help-panel ul{margin:0 0 12px;padding-left:20px;}
+.help-panel li{font-size:.86rem;line-height:1.55;color:var(--text);margin-bottom:4px;}
+.help-table-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:10px 0 16px;border-radius:8px;}
+/* Help and Knowledge Base tables: size to their content instead of stretching across the page, so short tables have no wide empty gaps. */
+.help-table{border-collapse:collapse;margin:0;font-size:.82rem;width:auto;min-width:0;max-width:100%;}
+.help-table th{color:var(--muted);font-weight:700;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
+.help-table td{border-bottom:1px solid var(--line);vertical-align:top;line-height:1.45;}
+.help-table tr:last-child td{border-bottom:none;}
+.help-formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre-wrap;word-break:break-word;}
+.help-disclaimer{font-style:italic;}
+.glossary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:10px 0 16px;}
+.glossary-item{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
+.glossary-term{font-weight:700;font-size:.82rem;margin-bottom:3px;}
+.glossary-def{font-size:.78rem;color:var(--muted);line-height:1.5;}
+.diff-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.diff-stat{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:8px 14px;font-size:.78rem;color:var(--muted);}
+.diff-stat b{display:block;font-size:1.15rem;color:var(--text);font-weight:700;font-family:inherit;}
+.upload-hint{font-size:.78rem;color:var(--muted);line-height:1.5;margin-top:2px;}
+.upload-error{font-size:.82rem;color:var(--avoid);}
+@media (max-width:900px){
+.analysis-layout{grid-template-columns:minmax(0,1fr);gap:0;}
+.analysis-layout .analysis-panel{margin-top:16px;}
+.filters{position:static;display:block;}
+.filter-group{display:block;}
+.filter-group-row{display:flex;}
+.filters h2{display:block;font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin:0 0 6px;padding:0 0 0 2px;white-space:normal;}
+.filter-btn{width:auto;white-space:nowrap;flex-shrink:0;}
+.filter-n{display:none;}
+/* The Analysis section's filter panel (.filters + .analysis-filters-panel) sits inline at
+       full section width now, not in the 190px sidebar column the plain .filters rules above are
+       tuned for — so it doesn't need that sidebar treatment's capped 132px inner scrollbox (that
+       was producing an extra, confusing scroll area on top of the page's own scroll on mobile).
+       Give it its own mobile layout instead: a normal block card, full height, groups stacked. */
+.analysis-filters-panel{max-height:none;overflow:visible;display:block;border:1px solid var(--line);border-radius:10px;border-bottom:1px solid var(--line);padding:0;}
+.analysis-filters-panel .filter-group{display:block;min-width:0;flex:none;margin-bottom:10px;padding:0;}
+.analysis-filters-panel .filter-group:last-child{margin-bottom:0;}
+.analysis-filters-panel .filter-group-row{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding-bottom:2px;}
+.detail{margin-top:18px;}
+.help-panel{padding:16px 14px;max-width:100%;}
+.help-table th,.help-table td{font-size:.78rem;}
+.glossary-grid,.fund-grid,.val-grid{grid-template-columns:1fr 1fr;}
+}
+@media (max-width:480px){
+.glossary-grid,.fund-grid,.val-grid{grid-template-columns:1fr;}
+/* Layout tweaks for the stock page, Help and phones. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
+/* Traditional / Buffett-style analysis: two cards per row for easier reading, with a little more breathing room. */
+}
+.fund-subsection .fund-grid{align-items:stretch;}
+.fund-subsection .fund-grid > .fund-cell:only-child{grid-column:1 / -1;}
+.detail-jump a{display:inline-block;border:0;border-radius:999px;background:var(--panel2);color:var(--accent);font-size:.8rem;font-weight:600;text-decoration:none;white-space:nowrap;}
+.detail-jump a:hover{border-color:var(--accent);}
+.help-panel h2,.help-panel h3{break-after:avoid;}
+.help-table-wrap,.help-formula,.glossary-item,.diff-stat{break-inside:avoid;}
+.help-table th,.help-table td{padding:7px 24px 7px 10px;}
+.help-table td:last-child,.help-table th:last-child{padding-right:10px;}
+.val-grid,.fund-grid,.fund-subsection .fund-grid{row-gap:0;}
+/* The stock page has no outer box on any screen size: no border, no panel colour, tight padding. */
+.detail{background:transparent;border:0;border-radius:0;padding:8px 4px 22px;min-height:0;}
+@media (max-width:640px){
+.detail{padding:12px 6px;}
+.val-grid,.fund-grid,.fund-subsection .fund-grid{gap:0;}
+}
+@media (max-width:900px){
+.analysis-filters-panel .filters-toggle{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--text);font:inherit;font-size:.9rem;padding:10px 0;cursor:pointer;text-align:left;}
+.analysis-filters-panel .filter-groups{padding-top:8px;}
+.analysis-filters-panel.filters-collapsed .filter-groups{display:none;}
+}
+.filters.analysis-filters-panel{border-color:transparent;background:transparent;}
+#detail .fund-grid,#detail .val-grid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));column-gap:28px;}
+.biz-strategy-panel{margin-top:6px;padding:0;min-width:0;max-width:100%;position:static;}
+.biz-strategy-panel .filter-group{min-width:0;}

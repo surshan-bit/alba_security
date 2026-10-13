@@ -1,0 +1,96 @@
+/* Price history charts and valuation. */
+/* Price history charts and valuation figures. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
+.val-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.val-text{flex:1 1 260px;min-width:0;text-align:left;}
+.val-text .val-cell-sub{margin-top:6px;}
+.val-cell-value.val-iv{font-size:.95rem;}
+#glossary-data-proxy{grid-column:1/-1;}
+.glossary-def ul{margin:4px 0 0;padding-left:18px;}
+.glossary-def li{font-size:inherit;line-height:inherit;margin-bottom:3px;color:inherit;}
+/* ---- Price history chart inside the Technical Score panel (experimental) ---- */
+.pc-block{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
+.pc-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;margin-bottom:6px;}
+.pc-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.74rem;color:var(--muted);margin-bottom:10px;}
+.pc-legend i{display:inline-block;width:9px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-2px;}
+.pc-legend i.pc-vol{background:var(--muted);opacity:.45;}
+.pc-panels{display:flex;flex-direction:column;gap:12px;}
+.pc-panel{min-width:0;}
+.pc-ph{display:flex;flex-wrap:wrap;margin-bottom:2px;}
+.pc-ptitle small{color:var(--muted);}
+.pc-pills{display:flex;gap:4px;}
+.pc-pill{appearance:none;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-size:.74rem;padding:2px 9px;border-radius:99px;cursor:pointer;}
+.pc-pill[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:600;}
+.pc-chart{position:relative;width:100%;touch-action:pan-y;}
+.pc-chart svg{display:block;width:100%;height:auto;overflow:visible;}
+.pc-chart svg text{font-size:11px;fill:var(--muted);}
+.pc-grid{stroke:var(--line);stroke-width:1;opacity:.7;}
+/* Event tags under the price charts */
+.pc-evlegend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-4px 0 10px;font-size:.74rem;color:var(--muted);}
+.pc-evlegend-label{margin-right:2px;}
+.pc-evtoggle{display:inline-flex;align-items:center;gap:5px;padding:2px 9px 2px 3px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--text);font:inherit;cursor:pointer;}
+.pc-evtoggle[aria-pressed="false"]{opacity:.45;}
+.pc-evk{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:16px;height:16px;border-radius:4px;font-size:.66rem;font-weight:700;line-height:1;color:#fff;background:#7d8590;}
+.pc-evk-news{border-radius:50%;background:#8e4ec6;}
+.pc-evk-corp{background:#3f7cc4;}
+.pc-evk-trade{background:var(--buy);}
+.pc-evk-trade.sell{background:var(--avoid);}
+.pc-evk-res{background:#2a9d8f;}
+.pc-chart svg .pc-ev rect,.pc-chart svg .pc-ev circle{fill:#7d8590;}
+.pc-chart svg .pc-evk-news circle{fill:#8e4ec6;}
+.pc-chart svg .pc-evk-corp rect{fill:#3f7cc4;}
+.pc-chart svg .pc-evk-trade.buy rect{fill:var(--buy);}
+.pc-chart svg .pc-evk-trade.sell rect{fill:var(--avoid);}
+.pc-chart svg .pc-evk-res rect{fill:#2a9d8f;}
+.pc-chart svg .pc-ev text{fill:#fff;font-size:9px;font-weight:700;}
+.pc-chart svg .pc-evk-news.s-pos circle{fill:var(--buy);}
+.pc-chart svg .pc-evk-news.s-neg circle{fill:var(--avoid);}
+.pc-chart svg .pc-evk-news.s-mix circle{fill:var(--hold);}
+.pc-chart svg .pc-evk-news.s-neu circle{fill:#7d8590;}
+.pc-evk-news.s-pos{background:var(--buy);}
+.pc-evk-news.s-neg{background:var(--avoid);}
+.pc-evk-news.s-neu{background:#7d8590;}
+.pc-evkey{display:inline-flex;align-items:center;gap:4px;margin-left:6px;}
+.pc-evkey i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:6px;background:#8e4ec6;}
+.pc-evkey i.s-pos{background:var(--buy);}
+.pc-evkey i.s-neg{background:var(--avoid);}
+.pc-evkey i.s-mix{background:var(--hold);}
+.pc-evkey i.s-neu{background:#7d8590;}
+.pc-tip .evmove{margin-top:5px;opacity:.85;}
+.pc-tip{max-width:300px;position:absolute;pointer-events:none;background:var(--text);color:var(--bg);border-radius:8px;padding:8px 10px;font-size:.76rem;line-height:1.5;min-width:150px;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;transition:opacity .08s;z-index:3;}
+.pc-tip .evs{margin-top:6px;padding-top:6px;border-top:1px solid rgba(128,128,128,.4);}
+.pc-tip .ev{display:flex;gap:6px;align-items:flex-start;margin-top:3px;white-space:normal;}
+.pc-tip .ev small{display:block;opacity:.65;font-size:.68rem;}
+.pc-tip .ev.more{opacity:.7;}
+.pc-volbar{fill:var(--muted);opacity:.38;}
+.pc-bandrect{fill:var(--accent);opacity:.2;}
+.pc-xh{stroke:var(--muted);stroke-dasharray:3 3;}
+.pc-tip b{display:block;font-weight:600;margin-bottom:2px;}
+.pc-tip .r{display:flex;justify-content:space-between;gap:14px;}
+.pc-tip .r span:first-child{opacity:.7;}
+/* ---- In-page fundamental import (v1.19) ---- */
+.detail-jump .jump-preview b{font-weight:700;}
+/* Stock detail: no divider lines inside a panel. Only the five main headings (Valuation, Global & Macro, Fundamental Score,
+   Technical Score, Peers) keep their top line. Borders are made transparent, not removed, so spacing stays the same. */
+#detail .val-cell,#detail .fund-overall-summary,#detail .fund-pc-footnote,#detail .fund-cell,#detail .data-chip,#detail .pc-block,#detail .global-list > *,#detail .peers-scroll th,#detail .peers-scroll td,#detail .jump-preview{border-color:transparent;}
+/* Price history: the colour key and the event-tag buttons start hidden; the Legend button shows them. */
+.pc-block:not(.show-key) .pc-legend,.pc-block:not(.show-key) .pc-evlegend{display:none;}
+/* Price history: the Weekly / Monthly (Daily) charts have no box around them. */
+.pc-panel{background:transparent;border:0;border-radius:0;padding:6px 0 4px;}
+/* Valuation: the intrinsic value and the price comparison share one line, with less space above and below. */
+#detail .val-panel .val-text{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 20px;}
+/* Technical Score: each timeframe is one line, "Weekly  +10.31%  Bullish  RSI (70.9)"; the trend sentence is the hover text. */
+/* Each price chart's header carries that timeframe's figures: "Weekly 261 bars   +10.31%  Bullish  RSI (70.9)   [6M 1Y All]". */
+/* Chart header: one baseline, even sizes, and the same column positions for Weekly and Monthly so the figures line up. */
+/* Chart header, compact: title, change, rating and RSI close together; RSI is a small label with its value in bold. */
+.pc-ph{justify-content:flex-start;align-items:center;gap:6px 16px;}
+.pc-ph .pc-pills{margin-left:auto;}
+.pc-ptitle{display:flex;align-items:baseline;gap:8px;font-size:1.05rem;font-weight:700;min-width:0;}
+.pc-ptitle small{margin:0;font-size:.8rem;font-weight:400;}
+#detail .tech-panel .pc-block{margin-top:0;padding-top:0;border-top:0;}
+#detail .tech-panel .pc-head{position:absolute;top:16px;right:0;margin:0;}
+#detail .pc-panel{padding:2px 0 0;}
+#detail .pc-legend{margin:0 0 6px;}
+#detail .pc-evlegend{margin:0 0 6px;}
+#detail .pc-panels{gap:22px;}
+#detail .pc-ph{margin-bottom:8px;}
+.pcs-gauge i{position:absolute;top:50%;border-radius:50%;background:var(--text);border:2px solid var(--panel2);transform:translate(-50%,-50%);box-sizing:content-box;margin:0;width:7px;height:7px;}

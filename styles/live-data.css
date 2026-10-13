@@ -1,3 +1,4 @@
+/* Live data and live prices. */
 /* Live Data Refresh buttons and bars. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
 /* Live Data Refresh (v1.22): two buttons with progress bars at the top of a stock's detail view */
 .live-refresh{margin:0 0 20px;padding:0 0 20px;border-bottom:1px solid var(--line);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;flex-direction:column;gap:12px;}
@@ -23,19 +24,32 @@
 .live-status{font-size:.76rem;line-height:1.5;color:var(--muted);overflow-wrap:anywhere;}
 .live-status.is-error{color:var(--avoid);}
 .live-refresh :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-@media (prefers-reduced-motion:reduce){.live-progress-fill{transition:none;}
-}
+@media (prefers-reduced-motion:reduce){
+.live-progress-fill{transition:none;}
 /* The same panel on the Analysis and Strategies screens (several stocks at once): a tick count and hint above the two cards. */
-.live-refresh.live-panel{margin:0 0 16px;padding:0 0 16px;}
+}
 .fund-pc-dot.fs-hold{background:var(--hold);}
 .fund-research-list.pts li::marker{color:var(--muted);}
-
-.global-events{margin-top:14px;padding-top:12px;border-top:1px solid var(--border,rgba(128,128,128,.25))}
-.global-event{border-left:3px solid var(--hold,#c9a227);padding-left:10px}
-.global-event.ev-positive{border-left-color:var(--buy,#2e9e5b)}
-.global-event.ev-negative{border-left-color:var(--avoid,#d64545)}
-.global-event .ev-tag{font-size:.72rem;font-weight:700;opacity:.8;margin-left:6px}
-
-.analysis-toggles{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end}
-
-
+.global-events{margin-top:14px;padding-top:12px;border-top:1px solid var(--border,rgba(128,128,128,.25));}
+.global-event{border-left:3px solid var(--hold,#c9a227);padding-left:10px;}
+.global-event.ev-positive{border-left-color:var(--buy,#2e9e5b);}
+.global-event.ev-negative{border-left-color:var(--avoid,#d64545);}
+.global-event .ev-tag{font-size:.72rem;font-weight:700;opacity:.8;margin-left:6px;}
+.analysis-toggles{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;}
+#detail .live-refresh{margin:0;border:0;}
+#detail .live-refresh + .val-panel{margin-top:0;}
+#detail .global-event{padding:2px 0 2px 10px;font-size:.86rem;line-height:1.4;}
+#detail .global-event strong{font-size:.9rem;}
+#detail .global-event > div{font-size:.82rem;color:var(--muted);display:block;margin-top:3px;}
+#detail .global-event .global-item-source{white-space:nowrap;}
+/* News items: the Helps / Hurts / Mixed tag comes first, then the headline, then the explanation on its own lines with the source after it. */
+#detail .global-event .ev-tag{display:inline-block;padding:0 7px;border-radius:999px;font-size:.66rem;text-transform:uppercase;letter-spacing:.03em;opacity:1;background:rgba(201,162,39,.18);color:var(--hold);margin:0 8px 0 0;vertical-align:1px;}
+#detail .global-event.ev-positive .ev-tag{background:rgba(46,158,91,.18);color:var(--buy);}
+#detail .global-event.ev-negative .ev-tag{background:rgba(214,69,69,.18);color:var(--avoid);}
+#detail .val-panel,#detail .fund-panel,#detail .tech-panel,#detail .global-panel{padding-top:18px;margin-top:20px;}
+#detail .global-item .global-item-source{display:inline;margin:0 0 0 6px;white-space:nowrap;}
+#detail .global-events{margin-top:16px;padding-top:14px;}
+#detail .global-event .global-item-source{display:block;margin:3px 0 0;}
+.biz-refresh .live-refresh-item{max-width:560px;}
+.strat-refresh .live-refresh-item,.analysis-refresh .live-refresh-item{max-width:560px;}
+#section-refreshlog :is(.refreshlog-freshness-summary,.refreshlog-freshness-row,.refreshlog-run-stats,.upload-hint,.fi-step,.fi-result,.fi-prompt-msg,.fi-pct,.live-status,.help-tab-link){font-size:.9rem;}
