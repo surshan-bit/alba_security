@@ -225,6 +225,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.143 &middot; 2026-10-13</h3>
+            <ul>
+              <li><b>Last file loaded now updates after an import:</b> the upload record is saved the same way it is created, so the card changes to "Imported" once an import finishes. If the record cannot be saved, the import result says so instead of staying silent.</li>
+              <li><b>Warning for partial files:</b> the Fundamental import now asks before going ahead when the file covers fewer than 1,500 stocks (a filtered or single-stock export), as the Technical import already did.</li>
+            </ul>
+
             <h3>v1.142 &middot; 2026-10-13</h3>
             <ul>
               <li><b>Last file loaded:</b> the Fundamental Score and Technical Score sections on Data Refresh now show the last file uploaded, when, and what became of it: waiting to be imported, imported (with the refresh date set on the stocks), or not imported because the last attempt failed or was cancelled, with the reason.</li>

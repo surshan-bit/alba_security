@@ -1,8 +1,7 @@
 // Fundamental Score import: steps, backups, restore and database writes.
-import { fundamentalCsvUploadLog, getDb } from '../core/store.js';
+import { fundamentalCsvUploadLog } from '../core/store.js';
 import { formatBytes, formatUploadTimestamp } from '../core/util.js';
-import { pruneLogCollection } from '../joblogs/panels.js';
-import { recordAttempt, renderLastFile } from './last-file.js';
+import { recordAttempt, saveRecord } from './last-file.js';
 import { fiAsk, fiEl, fiReset, fiSet, fiShowResult, getFiState, setFiPfx } from './panel.js';
 import { albaApplyFundamental } from './fund-engine.js';
 import { albaTiRunImport } from './tech-import.js';
@@ -309,16 +308,8 @@ async function albaFiRunImport(){
     const mixAfter = res.verdictMix;
     const note = 'Imported in the page: ' + res.rescored + ' rescored, ' + res.onboarded.length + ' new, ' + res.dropped.length + ' left unchanged (not in the file). Strong ' + (mixBefore.buy || 0) + '→' + (mixAfter.buy || 0) + ', Good ' + (mixBefore.mbuy || 0) + '→' + (mixAfter.mbuy || 0) + ', Hold ' + (mixBefore.hold || 0) + '→' + (mixAfter.hold || 0) + ', Avoid ' + (mixBefore.avoid || 0) + '→' + (mixAfter.avoid || 0) + '.';
     fiSet('verify', 'running', 'Updating the upload history…', 0.7);
-    try {
-      const upd = { status: 'processed', processedAt: new Date().toISOString(), processedNote: note };
-      Object.assign(rec, upd); fundamentalCsvUploadLog.put(recId, rec);
-      const logDb = getDb();
-      if(logDb){
-        await logDb.collection('fundamentalCsvUploadLog').doc(recId).update(upd);
-        await pruneLogCollection(logDb, 'fundamentalCsvUploadLog', fundamentalCsvUploadLog, 'uploadedAt');
-      }
-    } catch(e){ console.error('Could not update the upload log', e); }
-    renderLastFile('fund');
+    const upd = { status: 'processed', processedAt: new Date().toISOString(), processedNote: note };
+    const logErr = await saveRecord('fund', recId, Object.assign({}, rec, upd), db);
     await albaFiRetry(() => job.set({ status: 'done', finishedAt: new Date().toISOString(), note })); locked = false;
     fiSet('verify', 'done', 'data v' + dataVer);
     const lines = [
@@ -328,10 +319,11 @@ async function albaFiRunImport(){
       { text: chk.moved + ' stocks moved by 1.0 point or more (largest move ' + chk.maxMove.toFixed(2) + ').' }
     ];
     if(res.onboarded.length) lines.push({ text: 'New: ' + res.onboarded.slice(0, 15).join(', ') + (res.onboarded.length > 15 ? ' … +' + (res.onboarded.length - 15) : '') + '. They use the default Screener.in link and ' + (res.bseOnly.length ? 'have no TradingView chart mapping yet (BSE-only: ' + res.bseOnly.slice(0, 10).join(', ') + (res.bseOnly.length > 10 ? ' …' : '') + ').' : 'need no chart mapping.'), cls: 'fi-line fi-line-muted' });
+    if(logErr) lines.push({ text: 'The data is saved, but the upload record could not be marked as imported (' + logErr + '), so the Last file loaded card may still say "not imported".' });
     fiShowResult('ok', lines);
   } catch(e){
     console.error('Fundamental import failed', e);
-    recordAttempt('fund', rec, recId, e);
+    recordAttempt('fund', rec, recId, e, db);
     const st = getFiState(); if(st){ st.error = e; if(current && st.status[current] !== 'done') fiSet(current, 'error', ''); }
     const msg = (e && e.message) ? e.message : String(e);
     fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);

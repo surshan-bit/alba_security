@@ -1,8 +1,7 @@
 // Technical Score import: apply and run.
-import { getDb, technicalCsvUploadLog } from '../core/store.js';
+import { technicalCsvUploadLog } from '../core/store.js';
 import { formatBytes, formatUploadTimestamp } from '../core/util.js';
-import { pruneLogCollection } from '../joblogs/panels.js';
-import { recordAttempt, renderLastFile } from './last-file.js';
+import { recordAttempt, saveRecord } from './last-file.js';
 import { ALBA_FI, ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 import { AlbaTechEngine } from './tech-engine.js';
@@ -159,16 +158,8 @@ async function albaTiRunImport(){
     if(out.nothing) fiSet('write', 'done', 'nothing changed');
     const note = 'Imported in the page: ' + res.rescored + ' rescored, ' + res.kept.length + ' kept (curated), ' + res.priced + ' prices refreshed, ' + res.frozen + ' without a valuation anchor. Average technical score ' + avgBefore.toFixed(2) + '→' + avgAfter.toFixed(2) + '.';
     fiSet('verify', 'running', 'Updating the upload history…', 0.7);
-    try {
-      const upd = { status: 'processed', processedAt: new Date().toISOString(), processedNote: note };
-      Object.assign(rec, upd); technicalCsvUploadLog.put(recId, rec);
-      const logDb = getDb();
-      if(logDb){
-        await logDb.collection('technicalCsvUploadLog').doc(recId).update(upd);
-        await pruneLogCollection(logDb, 'technicalCsvUploadLog', technicalCsvUploadLog, 'uploadedAt');
-      }
-    } catch(e){ console.error('Could not update the upload log', e); }
-    renderLastFile('tech');
+    const upd = { status: 'processed', processedAt: new Date().toISOString(), processedNote: note };
+    const logErr = await saveRecord('tech', recId, Object.assign({}, rec, upd), db);
     await albaFiRetry(() => job.set({ status: 'done', finishedAt: new Date().toISOString(), note, kind: 'technical' })); locked = false;
     fiSet('verify', 'done', 'data v' + dataVer);
     const lines = [
@@ -180,10 +171,11 @@ async function albaTiRunImport(){
     ];
     if(res.kept.length) lines.push({ text: 'Kept (a component is missing from the file but was present before): ' + res.kept.slice(0, 12).join(', ') + (res.kept.length > 12 ? ' … +' + (res.kept.length - 12) : '') + '.', cls: 'fi-line fi-line-muted' });
     if(res.missingColumns.length) lines.push({ text: 'Columns not found in this export: ' + res.missingColumns.join(', ') + '.', cls: 'fi-line fi-line-muted' });
+    if(logErr) lines.push({ text: 'The data is saved, but the upload record could not be marked as imported (' + logErr + '), so the Last file loaded card may still say "not imported".' });
     fiShowResult('ok', lines);
   } catch(e){
     console.error('Technical import failed', e);
-    recordAttempt('tech', rec, recId, e);
+    recordAttempt('tech', rec, recId, e, db);
     if(getFiState()){ getFiState().error = e; if(current && getFiState().status[current] !== 'done') fiSet(current, 'error', ''); }
     const msg = (e && e.message) ? e.message : String(e);
     fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);

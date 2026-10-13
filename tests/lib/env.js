@@ -46,7 +46,8 @@ function startServer(){
 function installStub(cfg){
   const store = new Map(), listeners = new Map(), colListeners = new Map(), gets = [], sets = [], uploads = [];
   const clone = x => x === undefined ? undefined : JSON.parse(JSON.stringify(x));
-  const snap = (id, d) => ({ id, exists: d !== undefined, data: () => clone(d) });
+  const deepFreeze = o => { if(o && typeof o === 'object' && !Object.isFrozen(o)){ Object.freeze(o); for(const v of Object.values(o)) deepFreeze(v); } return o; };
+  const snap = (id, d) => ({ id, exists: d !== undefined, data: () => d && d.uploadedAt ? deepFreeze(clone(d)) : clone(d) });   // the real runtime hands out records that cannot be changed in place (the upload logs rely on that being respected)
   const notify = p => {
     for(const cb of listeners.get(p) || []) cb(snap(p.split('/').pop(), store.get(p)));
     if(cfg.liveCollections){ const parent = p.slice(0, p.lastIndexOf('/')); for(const cb of colListeners.get(parent) || []) cb(colSnap(parent)); }

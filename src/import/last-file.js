@@ -1,7 +1,8 @@
 // "Last file loaded" card of the Fundamental and Technical sections on the Data Refresh page: which file was uploaded last,
 // when, and what became of it (waiting to be imported, imported, or the last attempt failed / was cancelled).
-import { getDb, fundamentalCsvUploadLog, technicalCsvUploadLog } from '../core/store.js';
+import { fundamentalCsvUploadLog, technicalCsvUploadLog } from '../core/store.js';
 import { escapeHtml, formatUploadTimestamp } from '../core/util.js';
+import { pruneLogCollection } from '../joblogs/panels.js';
 
 const KINDS = {
   fund: { log: fundamentalCsvUploadLog, collection: 'fundamentalCsvUploadLog', el: 'fundamentalLastFile', stamps: 'Fundamental refresh date' },
@@ -48,15 +49,27 @@ function renderLastFile(kind){
 }
 function renderAllLastFiles(){ renderLastFile('fund'); renderLastFile('tech'); }
 
-// Records the outcome of an import attempt on the file's upload record (it stays 'uploaded', so it can be tried again).
-async function recordAttempt(kind, rec, recId, e){
-  if(!rec || !recId) return;
+// Writes a whole upload record back (the same way it was created, which is known to work) and redraws the card.
+// Returns null, or the reason it could not be saved.
+async function saveRecord(kind, recId, record, db){
   const k = KINDS[kind];
-  const lastAttempt = { at: new Date().toISOString(), outcome: e && e.cancelled ? 'cancelled' : 'failed', message: String((e && e.message) || e || '').slice(0, 300) };
-  rec.lastAttempt = lastAttempt; k.log.put(recId, rec);
-  try { const db = getDb(); if(db) await db.collection(k.collection).doc(recId).update({ lastAttempt }); }
-  catch(x){ console.error('Could not save the import attempt', x); }
+  k.log.put(recId, record);
   renderLastFile(kind);
+  try {
+    await db.collection(k.collection).doc(recId).set(record);
+    await pruneLogCollection(db, k.collection, k.log, 'uploadedAt');
+    return null;
+  } catch(e){
+    console.error('Could not save the upload record', e);
+    return String((e && (e.message || e.code)) || e);
+  }
 }
 
-export { recordAttempt, renderAllLastFiles, renderLastFile };
+// Records the outcome of a failed or cancelled import attempt on the file's upload record (it stays 'uploaded', so it can be tried again).
+async function recordAttempt(kind, rec, recId, e, db){
+  if(!rec || !recId || !db) return;
+  const lastAttempt = { at: new Date().toISOString(), outcome: e && e.cancelled ? 'cancelled' : 'failed', message: String((e && e.message) || e || '').slice(0, 300) };
+  await saveRecord(kind, recId, Object.assign({}, rec, { lastAttempt }), db);
+}
+
+export { recordAttempt, renderAllLastFiles, saveRecord };
