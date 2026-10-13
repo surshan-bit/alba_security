@@ -2,6 +2,7 @@
 import { getDb, technicalCsvUploadLog } from '../core/store.js';
 import { formatBytes, formatUploadTimestamp } from '../core/util.js';
 import { pruneLogCollection } from '../joblogs/panels.js';
+import { recordAttempt, renderLastFile } from './last-file.js';
 import { ALBA_FI, ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 import { AlbaTechEngine } from './tech-engine.js';
@@ -77,6 +78,7 @@ async function albaTiRunImport(){
   if(!db || !assets){ fiReset('Import data'); fiShowResult('err', [{ text: 'File storage or the database is not available in this view, so the import cannot run here.' }]); return; }
   setFiRunning(true); fiSetButtons(); fiReset('Importing technical data');
   const job = db.doc('importJobs/fundamental'); let locked = false, current = 'read';
+  let rec = null, recId = null;
   try {
     const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
     if(ld && ld.status === 'running' && Date.now() - (Date.parse(ld.startedAt) || 0) < ALBA_FI.STALE_MS) throw new Error('another import is already running (started ' + formatUploadTimestamp(ld.startedAt) + '). Try again in a few minutes.');
@@ -84,7 +86,6 @@ async function albaTiRunImport(){
 
     // 1. the uploaded file (always the one recorded in the upload log, never a cached copy)
     current = 'read'; fiSet('read', 'running', '', 0.3);
-    let rec = null, recId = null;
     for(const [id, r] of technicalCsvUploadLog.entries()){ if(r.status === 'uploaded' && (!rec || String(r.uploadedAt) > String(rec.uploadedAt))){ rec = r; recId = id; } }
     if(!rec) throw new Error('there is no uploaded file waiting. Use "Browse CSV…" to upload the TradingView Growth List export first.');
     const resp = await fetch('/_blob/' + rec.assetId);
@@ -167,6 +168,7 @@ async function albaTiRunImport(){
         await pruneLogCollection(logDb, 'technicalCsvUploadLog', technicalCsvUploadLog, 'uploadedAt');
       }
     } catch(e){ console.error('Could not update the upload log', e); }
+    renderLastFile('tech');
     await albaFiRetry(() => job.set({ status: 'done', finishedAt: new Date().toISOString(), note, kind: 'technical' })); locked = false;
     fiSet('verify', 'done', 'data v' + dataVer);
     const lines = [
@@ -181,6 +183,7 @@ async function albaTiRunImport(){
     fiShowResult('ok', lines);
   } catch(e){
     console.error('Technical import failed', e);
+    recordAttempt('tech', rec, recId, e);
     if(getFiState()){ getFiState().error = e; if(current && getFiState().status[current] !== 'done') fiSet(current, 'error', ''); }
     const msg = (e && e.message) ? e.message : String(e);
     fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);

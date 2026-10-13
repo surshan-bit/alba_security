@@ -8,6 +8,7 @@ import { init_import_fund_import } from '../import/fund-import.js';
 import '../import/tech-engine.js';
 import '../import/tech-import.js';
 import '../import/wlsync.js';
+import { renderAllLastFiles } from '../import/last-file.js';
 import { init_joblogs_freshness } from '../joblogs/freshness.js';
 import { renderWatchlistSyncLogPanel } from '../joblogs/panels.js';
 
@@ -15,7 +16,8 @@ function init(){
   init_joblogs_freshness();
   init_import_csv_upload();
   init_import_fund_import();
+  renderAllLastFiles();
 }
-function render(){ renderWatchlistSyncLogPanel(); }
+function render(){ renderWatchlistSyncLogPanel(); renderAllLastFiles(); }
 
 export { init, render };

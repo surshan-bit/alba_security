@@ -123,6 +123,7 @@ function init_sync_subscriptions(){
         snap.docs.forEach(d => {
           if(d.exists) fundamentalCsvUploadLog.put(d.id, d.data());
         });
+        renderLoadedPart('refreshlog');
       },
       (err) => console.error('Fundamental CSV upload log sync error', err)
     );
@@ -136,6 +137,7 @@ function init_sync_subscriptions(){
         snap.docs.forEach(d => {
           if(d.exists) technicalCsvUploadLog.put(d.id, d.data());
         });
+        renderLoadedPart('refreshlog');
       },
       (err) => console.error('Technical CSV upload log sync error', err)
     );

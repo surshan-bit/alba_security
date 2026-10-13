@@ -2,6 +2,7 @@
 import { fundamentalCsvUploadLog, getDb } from '../core/store.js';
 import { formatBytes, formatUploadTimestamp } from '../core/util.js';
 import { pruneLogCollection } from '../joblogs/panels.js';
+import { recordAttempt, renderLastFile } from './last-file.js';
 import { fiAsk, fiEl, fiReset, fiSet, fiShowResult, getFiState, setFiPfx } from './panel.js';
 import { albaApplyFundamental } from './fund-engine.js';
 import { albaTiRunImport } from './tech-import.js';
@@ -14,7 +15,7 @@ import { albaWlRunSync } from './wlsync.js';
 // written to the database with a progress bar, and a one-click Restore puts a backup back.
 // Owner only (writing stock data and the asset store need the artifact's write bit).
 // ====================================================================================================
-const ALBA_FI = { HARD: 240000, SOFT: 200000, KEEP: 5, STALE_MS: 20 * 60 * 1000 };
+const ALBA_FI = { HARD: 240000, SOFT: 200000, KEEP: 2, STALE_MS: 20 * 60 * 1000 };
 const ALBA_FI_COLUMNS = ['Name','BSE Code','NSE Code','ISIN Code','Industry Group','Industry','Current Price','Intrinsic Value','Book value','Profit growth','Profit growth 3Years','Profit growth 5Years','Sales growth 3Years','Return on invested capital','Return on capital employed','Return on equity','OPM','Price to Earning','Industry PE','PEG Ratio','Pledged percentage','Interest Coverage','Debt to equity','Change in promoter holding','Piotroski score','Quick ratio','Altman Z Score','Current ratio','Contingent liabilities','Average return on equity 7Years','Average return on equity 10Years','Median return on capital employed 10Years','Free cash flow 3years','Free cash flow 5years','Operating cash flow 3years','Operating cash flow 5years','CROIC','Graham','Change in FII holding 3Years','Change in DII holding 3Years','Historical PE 5Years','Average debtor days 3years','NCAVPS','Number of Shareholders'];
 const ALBA_FI_PUBLISHED = 'The new data had already been saved when this failed, so it is live. Check the stock list, or restore a backup below.';
 const albaFiSleep = ms => new Promise(r => setTimeout(r, ms));
@@ -252,6 +253,7 @@ async function albaFiRunImport(){
   setFiPfx('');
   fiRunning = true; fiSetButtons(); fiReset('Importing fundamental data');
   const job = db.doc('importJobs/fundamental'); let locked = false, current = 'read';
+  let rec = null, recId = null;
   try {
     // one import at a time (a lock older than 20 minutes is treated as abandoned)
     const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
@@ -260,7 +262,6 @@ async function albaFiRunImport(){
 
     // 1. the uploaded file
     current = 'read'; fiSet('read', 'running', '', 0.3);
-    let rec = null, recId = null;
     for(const [id, r] of fundamentalCsvUploadLog.entries()){ if(r.status === 'uploaded' && (!rec || String(r.uploadedAt) > String(rec.uploadedAt))){ rec = r; recId = id; } }
     if(!rec) throw new Error('there is no uploaded file waiting. Use "Browse CSV…" to upload the screener.in export first.');
     const resp = await fetch('/_blob/' + rec.assetId);
@@ -316,6 +317,7 @@ async function albaFiRunImport(){
         await pruneLogCollection(logDb, 'fundamentalCsvUploadLog', fundamentalCsvUploadLog, 'uploadedAt');
       }
     } catch(e){ console.error('Could not update the upload log', e); }
+    renderLastFile('fund');
     await albaFiRetry(() => job.set({ status: 'done', finishedAt: new Date().toISOString(), note })); locked = false;
     fiSet('verify', 'done', 'data v' + dataVer);
     const lines = [
@@ -328,6 +330,7 @@ async function albaFiRunImport(){
     fiShowResult('ok', lines);
   } catch(e){
     console.error('Fundamental import failed', e);
+    recordAttempt('fund', rec, recId, e);
     const st = getFiState(); if(st){ st.error = e; if(current && st.status[current] !== 'done') fiSet(current, 'error', ''); }
     const msg = (e && e.message) ? e.message : String(e);
     fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);

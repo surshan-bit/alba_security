@@ -225,6 +225,8 @@ async function fundScenarios(){
     const rec = a.fundLog[0]; ok(rec.status === 'processed' && /^Imported in the page: 1999 rescored, 3 new, 5 left unchanged/.test(rec.processedNote), 'upload record marked processed: ' + rec.status + ' ' + (rec.processedNote || '').slice(0, 80));
     ok(a.job.status === 'done' && a.job.finishedAt, 'lock released: ' + JSON.stringify(a.job));
     ok(await page.evaluate(() => !document.getElementById('importFundamentalDataBtn').disabled && document.getElementById('importFundamentalDataBtn').textContent === 'Import data'), 'the button is usable again');
+    const lf = await page.evaluate(() => document.getElementById('fundamentalLastFile').innerText);
+    ok(/may\.csv/.test(lf) && /Imported/.test(lf) && !/not imported/i.test(lf), 'the last-file card says the file was imported: ' + lf.replace(/\s+/g, ' ').slice(0, 160));
     const rows1 = await backupsInfo(page); ok(rows1.length === 1 && rows1[0].btn && /Before importing may\.csv/.test(rows1[0].title), 'backups list shows it with a Restore button');
 
     // ---- the same file again: the three new companies now count as peers, so some ranks move once; the engine output is the oracle
@@ -243,23 +245,23 @@ async function fundScenarios(){
     const r3 = await run(page, 'fund');
     ok(r3.cls === 'ok' && /the file produced no changes/.test(r3.text), 'a repeat of a repeat reports no changes: ' + r3.lines[0]);
     const a2b = await readDb(page);
-    eq(a2b.meta.version, 7, 'no version bump when nothing changed'); eq(a2b.backups.length, 3, 'still backs up first');
+    eq(a2b.meta.version, 7, 'no version bump when nothing changed'); eq(a2b.backups.length, 2, 'still backs up first, and only the newest two are kept');
     eq(await page.evaluate(() => window.__sets.filter(p => p.startsWith('stockData/')).length), writes.length + writes2.length, 'no chunk is written');
     sameStocks(a2b.stocks, exp2.list, 'data unchanged');
 
-    // ---- restore the very first backup (the original data)
-    eq((await backupsInfo(page)).length, 3, 'three backups listed');
+    // ---- restore the older of the two kept backups (the data as it was after the first import)
+    eq((await backupsInfo(page)).length, 2, 'two backups listed');
     await page.locator('#fiBackups .fi-restore-btn').last().click();
     const ask = await waitPrompt(page, 'fund');
-    ok(/^Restore the stock data saved on .* \(2004 stocks\)\? Today's data is backed up first, so this can be undone\.$/.test(ask.prompt), 'restore asks first: ' + ask.prompt);
+    ok(/^Restore the stock data saved on .* \(2007 stocks\)\? Today's data is backed up first, so this can be undone\.$/.test(ask.prompt), 'restore asks first: ' + ask.prompt);
     await answer(page, 'fund', true);
     const rr = await waitResult(page, 'fund');
-    ok(rr.cls === 'ok' && rr.lines[0] === 'Restore complete.' && /\(2,004 stocks\)/.test(rr.text), 'restore result: ' + rr.text.slice(0, 160));
+    ok(rr.cls === 'ok' && rr.lines[0] === 'Restore complete.' && /\(2,007 stocks\)/.test(rr.text), 'restore result: ' + rr.text.slice(0, 160));
     const a3 = await readDb(page);
-    sameStocks(a3.stocks, DS.stocks, 'after the restore the original list is back');
-    ok(orig.meta.chunks.every(c => a3.chunkDocs[c] && canon(a3.chunkDocs[c]) === canon(orig.chunkDocs[c])) && JSON.stringify(a3.meta.chunks) === JSON.stringify(orig.meta.chunks), 'after the restore every chunk document is exactly as it was');
-    eq(a3.meta.version, 8, 'restore bumps the version (so open pages reload)'); eq(a3.meta.count, 2004, 'count back to 2004');
-    eq(a3.backups.length, 4, "restore backs up today's data first"); const last = a3.backups[a3.backups.length - 1];
+    sameStocks(a3.stocks, exp.list, 'after the restore the list from after the first import is back');
+    ok(a.meta.chunks.every(c => a3.chunkDocs[c] && canon(a3.chunkDocs[c]) === canon(a.chunkDocs[c])) && JSON.stringify(a3.meta.chunks) === JSON.stringify(a.meta.chunks), 'after the restore every chunk document is exactly as it was');
+    eq(a3.meta.version, 8, 'restore bumps the version (so open pages reload)'); eq(a3.meta.count, 2007, 'count back to 2007');
+    eq(a3.backups.length, 2, "restore backs up today's data first (and the oldest backup is dropped)"); const last = a3.backups[a3.backups.length - 1];
     ok(/^Before restoring the backup of/.test(last.label), 'the restore backup is labelled: ' + last.label);
     ok(page.blobs.get(last.assetId) === JSON.stringify([].concat(...a2b.meta.chunks.map(c => a2b.chunkDocs[c].stocks))), 'that backup holds the data that was live before the restore');
     ok(a3.job.status === 'done', 'lock released after the restore');
@@ -332,6 +334,9 @@ async function fundScenarios(){
     ok(r.cls === 'err' && /integrity check failed, nothing was written:\n?• only \d+ stocks in the result/.test(r.text.replace(/\n/g, '\n')) || (r.cls === 'err' && /integrity check failed, nothing was written/.test(r.text) && /only \d+ stocks in the result/.test(r.text)), 'message: ' + r.text.slice(0, 260));
     ok(r.steps.find(x => x[1] === 'Run integrity checks')[0] === 'error', 'the check step is the failed one');
     const a = await readDb(page); ok(a.meta.version === 3 && !(await page.evaluate(() => window.__sets.some(p => p.startsWith('stockData/')))), 'no stock data written'); eq(a.backups.length, 1, 'the backup is taken before the checks');
+    ok(a.fundLog[0].status === 'uploaded' && a.fundLog[0].lastAttempt && a.fundLog[0].lastAttempt.outcome === 'failed', 'the failed attempt is recorded on the file: ' + JSON.stringify(a.fundLog[0].lastAttempt));
+    const lf = await page.evaluate(() => document.getElementById('fundamentalLastFile').innerText);
+    ok(/tiny\.csv/.test(lf) && /last attempt failed/.test(lf) && /only \d+ stocks/.test(lf), 'the last-file card shows the failure: ' + lf.replace(/\s+/g, ' ').slice(0, 200));
   });
   await runScenario('fund import: a file that moves many scores asks first (cancel, then go ahead)', {}, async page => {
     const csv = fundFileShaken(); await upload(page, 'fund', 'shaken.csv', csv);
@@ -347,14 +352,14 @@ async function fundScenarios(){
     const g = await waitResult(page, 'fund'); ok(g.cls === 'ok', 'second time, "Import anyway" goes through: ' + g.text.slice(0, 120));
     a = await readDb(page); sameStocks(a.stocks, exp.list, 'imported list equals the engine output'); eq(a.meta.version, 6, 'version bumped');
   });
-  await runScenario('fund import: only the newest five backups are kept', { docs: Object.fromEntries([1, 2, 3, 4, 5].map(i => ['backupLog/old' + i, { kind: 'stocks-backup', format: 'stocks.json', label: 'old ' + i, createdAt: '2026-08-0' + i + 'T00:00:00.000Z', stockCount: 10, bytes: 5, assetId: 'oldasset' + i, assetUrl: '/_blob/oldasset' + i, dataVersion: i }])) }, async page => {
-    await page.waitForFunction(() => document.querySelectorAll('#fiBackups .fi-backup-row').length === 5, null, { timeout: 15000 });
+  await runScenario('fund import: only the newest two backups are kept', { docs: Object.fromEntries([1, 2, 3, 4, 5].map(i => ['backupLog/old' + i, { kind: 'stocks-backup', format: 'stocks.json', label: 'old ' + i, createdAt: '2026-08-0' + i + 'T00:00:00.000Z', stockCount: 10, bytes: 5, assetId: 'oldasset' + i, assetUrl: '/_blob/oldasset' + i, dataVersion: i }])) }, async page => {
+    await page.waitForFunction(() => document.querySelectorAll('#fiBackups .fi-backup-row').length === 2, null, { timeout: 15000 });
     await upload(page, 'fund', 'may.csv', fundFileChanged().csv);
     const r = await run(page, 'fund'); ok(r.cls === 'ok', 'import ok');
     const a = await readDb(page);
-    eq(a.backups.map(b => b.label.replace(/ \(data.*/, '')), ['old 2', 'old 3', 'old 4', 'old 5', 'Before importing may.csv'], 'the oldest backup is gone, newest five remain');
-    eq(await page.evaluate(() => window.__deletedAssets), ['oldasset1'], 'its file was deleted from storage too');
-    eq((await backupsInfo(page)).length, 5, 'the list on the page shows five');
+    eq(a.backups.map(b => b.label.replace(/ \(data.*/, '')), ['old 5', 'Before importing may.csv'], 'older backups are gone, the newest two remain');
+    eq((await page.evaluate(() => window.__deletedAssets)).slice().sort(), ['oldasset1', 'oldasset2', 'oldasset3', 'oldasset4'], 'their files were deleted from storage too');
+    eq((await backupsInfo(page)).length, 2, 'the list on the page shows two');
   });
 }
 const BTN_FUND = '#importFundamentalDataBtn';

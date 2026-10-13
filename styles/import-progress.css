@@ -37,3 +37,9 @@
 }
 #section-refreshlog :is(.upload-title,.refreshlog-runs-title,.refreshlog-freshness-title,.fi-backup-title,.refreshlog-run-time){font-size:1.05rem;}
 #section-refreshlog :is(.fi-detail,.fi-line-muted,.data-chip,.data-chip b,.refreshlog-run-status){font-size:.82rem;}
+.last-file .lf-file{margin-top:8px;font-weight:600;color:var(--text);word-break:break-word;}
+.last-file .lf-status{margin-top:8px;font-weight:700;}
+.last-file .lf-line{margin-top:4px;}
+.last-file .lf-ok{color:var(--buy);}
+.last-file .lf-err{color:var(--avoid);}
+.last-file .lf-warn{color:var(--hold);}

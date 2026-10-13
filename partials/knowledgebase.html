@@ -197,7 +197,7 @@
           <tr><td>techFetchLog</td><td>Retired weekday TradingView fetch history (kept for the record).</td></tr>
           <tr><td>watchlistSyncLog</td><td>Watchlist rebuild history (status, counts, tickers). Manual runs only; the 3 most recent are kept.</td></tr>
           <tr><td>globalFactorsLog</td><td>Global &amp; Macro refresh history. Manual runs only.</td></tr>
-          <tr><td>backupLog</td><td>Safety backups of the stock data taken before each refresh. The 5 most recent are kept; restore the newest if a publish goes wrong.</td></tr>
+          <tr><td>backupLog</td><td>Safety backups of the stock data taken before each refresh. The 2 most recent are kept; restore the newest if a publish goes wrong.</td></tr>
           <tr><td>devTools</td><td>Maintenance scripts. <code>precheck</code> is the pre-publish checker that must pass before any refresh is published.</td></tr>
           <tr><td>priceHistory</td><td>Written by the page's "Refresh price &amp; technicals" button (TradingView connector) and by Claude research. Weekly and monthly price bars per stock (doc id = exchange, symbol and timeframe, e.g. NSE_OCCLLTD_1W; bars as [t, open, high, low, close, volume]). Read by the price chart in the Technical Score panel.</td></tr>
           <tr><td>stockMeta, stockData</td><td>The stock list itself: stockMeta/main is the index (version, chunk ids, ticker-to-chunk map) and stockData/cNNN hold the stocks in chunks of about 200 KB. The page loads them when it opens and keeps a copy in the browser, so a repeat visit only downloads the data again after a refresh bumps the version. CSV refreshes and bulk jobs write here; nothing needs republishing.</td></tr>
@@ -225,6 +225,15 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.142 &middot; 2026-10-13</h3>
+            <ul>
+              <li><b>Last file loaded:</b> the Fundamental Score and Technical Score sections on Data Refresh now show the last file uploaded, when, and what became of it: waiting to be imported, imported (with the refresh date set on the stocks), or not imported because the last attempt failed or was cancelled, with the reason.</li>
+              <li><b>Two backups kept:</b> the safety backups taken before each import are now trimmed to the newest two (was five).</li>
+              <li><b>Analysis:</b> when the Strategy filter counts are lower than Explorer's, a short note under the buttons says how many stocks are hidden and why (no valuation, no weekly or monthly reading, or outside the RSI ranges).</li>
+              <li><b>Clearer errors:</b> saving or deleting tracked picks and removing a Trade Log entry now tell you when the change could not be saved.</li>
+              <li><b>Behind the scenes:</b> the stylesheet was reorganised into 19 files with 10% less CSS and no visible change, a type check and readable test diffs were added, and the import panels and refresh code were tidied.</li>
+            </ul>
+
             <h3>v1.141 &middot; 2026-10-13</h3>
             <ul>
               <li><b>Analysis counts now agree with the list:</b> the number beside <b>All</b> and each strategy (for example Weekly Positive) counts only the stocks the list will actually show, after the MoS rating, MoS range and RSI range filters. Before, the sidebar could say 49 while the list showed 40.</li>
@@ -625,7 +634,7 @@
             <h3>v1.19 &middot; 2026-10-09</h3>
             <ul>
               <li><b>Fundamental import without Claude chat:</b> on the Data Refresh page, upload the screener.in CSV and press <b>Import data</b>. The page scores every stock itself with the same v3 engine and shows a progress bar (read file, load data, back up, score, check, write, verify). Nothing is copied into a Claude conversation.</li>
-              <li><b>Safety:</b> the current data is backed up automatically before each import (the newest 5 are kept) and any backup can be restored with one click. If anything fails part-way, the previous data is put back. Only the dashboard owner can import or restore.</li>
+              <li><b>Safety:</b> the current data is backed up automatically before each import (the newest 2 are kept) and any backup can be restored with one click. If anything fails part-way, the previous data is put back. Only the dashboard owner can import or restore.</li>
               <li><b>New tickers:</b> added automatically with safe defaults (the standard Screener.in link and no TradingView chart mapping yet for BSE-only codes).</li>
             </ul>
             <h3>v1.18 &middot; 2026-10-09</h3>
