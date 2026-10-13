@@ -15,7 +15,7 @@ const myBuild = () => {
 const tried = () => { try { return window.sessionStorage.getItem(KEY); } catch(e){ return null; } };
 const markTried = (b) => { try { window.sessionStorage.setItem(KEY, b); } catch(e){ /* the banner is the fallback */ } };
 const typing = () => {
-  const a = document.activeElement;
+  const a = /** @type {HTMLInputElement | null} */ (document.activeElement);
   return !!(a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.type !== 'checkbox' && a.type !== 'radio' && a.type !== 'button')) && a.value && a.id !== 'globalSearch');
 };
 

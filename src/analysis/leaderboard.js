@@ -51,7 +51,7 @@ function leaderboardHtml(chartBlock){
       ${renderAnalysisColumnsPanel(headerColOrder)}
       <div class="strat-table-wrap">
         <table class="strat-table">
-          <thead><tr>${kit ? kit.headCell('analysis', 'analysis') : ''}${headerColOrder.map(columnHeaderHtml).join('')}</tr></thead>
+          <thead><tr>${kit ? kit.headCell() : ''}${headerColOrder.map(columnHeaderHtml).join('')}</tr></thead>
           <tbody id="analysisLeaderboardBody"></tbody>
         </table>
       </div>
@@ -77,7 +77,7 @@ function leaderboardRowHtml(s, i, colOrder){
   const ctx = analysisRowContext(s, i, idx);
   return `
             <tr class="analysis-lb-row${pinned ? ' pinned' : ''}" data-idx="${idx}">
-              ${kit ? kit.rowCell(s, 'analysis') : ''}${colOrder.map(id => analysisLbCell(id, ctx)).join('')}
+              ${kit ? kit.rowCell() : ''}${colOrder.map(id => analysisLbCell(id, ctx)).join('')}
             </tr>
           `;
 }

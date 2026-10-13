@@ -1,5 +1,6 @@
 // Applies saved research (stockResearch) on top of the base stock data.
 import { stocks } from '../core/stocks.js';
+import { renderLoadedPart } from '../core/lazy.js';
 import { applyFundamentalConfidence } from '../core/fundscore.js';
 import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { renderAnalysisSection } from '../analysis/section.js';
@@ -111,6 +112,18 @@ function applyResearchOverlay(docs){
   rerenderDetail();
   const analysisSectionEl = document.getElementById('section-analysis');
   if(analysisSectionEl && analysisSectionEl.classList.contains('active')) renderAnalysisSection();
+  redrawStrategiesSoon();
+}
+// The Strategies table shows "Research done" too: redraw it as saved research arrives, so it fills in while a refresh runs.
+let strategiesRedrawTimer = null;
+function redrawStrategiesSoon(){
+  const sec = document.getElementById('section-strategies');
+  if(!sec || !sec.classList.contains('active') || strategiesRedrawTimer) return;
+  strategiesRedrawTimer = setTimeout(() => {
+    strategiesRedrawTimer = null;
+    const el = document.getElementById('section-strategies');
+    try { if(el && el.classList.contains('active')) renderLoadedPart('strategies'); } catch(e){ /* repaints when opened again */ }
+  }, 1200);
 }
 
 export { applyResearchOverlay, stockByDocId };

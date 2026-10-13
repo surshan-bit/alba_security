@@ -3,6 +3,7 @@
 // stock list and an in-memory stand-in for the artifact database, drives common actions (filters, sort, search, selection,
 // Analysis, theme, Trade Log, the top-bar stock search, lazy price history, the Live Data Refresh with a stubbed Claude and TradingView),
 // and writes DOM snapshots + console output. tests/check.js compares their hashes with tests/golden.json.
+process.env.TZ = 'UTC';   // the snapshots hold dates ("Today", "3 days ago"): fix the time zone so every machine and GitHub produce the same text
 const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
 const { JSDOM, VirtualConsole } = require('jsdom');
 

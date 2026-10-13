@@ -32,7 +32,7 @@ function resultsHtml(matches, selected){
   const rows = sorted.slice(0, ROW_CAP).map((s, i) => {
     const idx = stockIndex.get(s), ctx = analysisRowContext(s, i, idx);
     return `<tr class="strat-row" data-idx="${idx}" tabindex="0">
-      <td class="strat-selcell"><input type="checkbox" class="strat-sel" data-sym="${escapeHtml(tickerSymbol(s))}"${selected.has(tickerSymbol(s)) ? ' checked' : ''} aria-label="Select ${escapeHtml(s.name)} to track">${kit.rowBtn(s, 'strat')}</td>
+      <td class="strat-selcell"><input type="checkbox" class="strat-sel" data-sym="${escapeHtml(tickerSymbol(s))}"${selected.has(tickerSymbol(s)) ? ' checked' : ''} aria-label="Select ${escapeHtml(s.name)} to track">${kit.rowBtn()}</td>
       ${cols.map(id => analysisLbCell(id, ctx)).join('')}
     </tr>`;
   }).join('');

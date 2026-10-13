@@ -310,16 +310,8 @@ function barInner(id) {
 function barHtml(id) {
   return '<span class="rk-bar" data-rk-bar="' + esc(id) + '">' + barInner(id) + "</span>";
 }
-function headCell(selName, scopeId) {
-  return "";  // no checkbox column on Analysis and Explorer: it had nothing to do there
-
-  return '<th class="rk-cell"><input type="checkbox" class="rk-chk-all" data-rk-sel="' + esc(selName) + '" data-rk-scope="' + esc(scopeId) + '" aria-label="Select every row in this table for refresh"></th>';
-}
-function rowButton(s, selName) {
-  return "";  // per-row refresh button removed from the grids
-  return '<button type="button" class="rk-row-btn" data-rk-row="' + esc(pcTickerKey(s)) + '" data-rk-sel="' + esc(selName) + '" aria-haspopup="menu" aria-label="Refresh ' + esc(s.name) + '" title="Refresh this stock">↻</button>';
-}
-function rowBtn(s, selName) { return rowButton(s, selName); }
+function headCell() { return ""; }   // no checkbox column on Analysis and Explorer: it had nothing to do there
+function rowBtn() { return ""; }     // no per-row refresh button in the grids
 const choices = new Map();     // id -> () => { head, note, items: [{ label, small, off, run }] }
 function defineChoices(id, fn) { choices.set(id, fn); }
 function choiceBtn(id, off, title) {
@@ -336,12 +328,7 @@ let menuChoices = [];
 function stockBtn(s) {
   return '<button type="button" class="rk-row-btn rk-stockbtn" data-rk-row="' + esc(pcTickerKey(s)) + '" data-rk-sel="stock" aria-haspopup="menu" title="Refresh Fundamental or Technical info for this stock">↻ Refresh ▾</button>';
 }
-function rowCell(s, selName) {
-  return "";  // no checkbox column on Analysis and Explorer: it had nothing to do there
-
-  const key = pcTickerKey(s), on = selKeys(selName).has(key);
-  return '<td class="rk-cell"><input type="checkbox" class="rk-chk" data-rk-key="' + esc(key) + '" data-rk-sel="' + esc(selName) + '"' + (on ? " checked" : "") + ' aria-label="Select ' + esc(s.name) + ' for refresh">' + rowButton(s, selName) + "</td>";
-}
+function rowCell() { return ""; }   // no checkbox column on Analysis and Explorer: it had nothing to do there
 function selbarInner(name) {
   const n = selKeys(name).size;
   if (!n) return "";
@@ -369,7 +356,7 @@ function repaint() {
       if (el.__rk !== html) { el.__rk = html; el.innerHTML = html; }
     });
     const busy = isBusy() ? "1" : "0";
-    document.querySelectorAll(".rk-toolbtn,.rk-choicebtn,.rk-barbtn").forEach((b) => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".rk-toolbtn,.rk-choicebtn,.rk-barbtn")).forEach((b) => {
       if (b.dataset.rkBusy === busy) return;
       b.dataset.rkBusy = busy; b.innerHTML = refreshLabel();
     });

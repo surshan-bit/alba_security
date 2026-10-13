@@ -90,11 +90,11 @@ async function resumeTests(){
   const { ctx, page, errs } = await open('resume', { seedUrl: base + '/__seed/' + srvSeed + '.json' }, { realClock: true });
   try {
     let titles = [];
-    for(let i = 0; i < 70 && !titles.some(x => /continuing|still running/.test(x)); i++){
+    for(let i = 0; i < 70 && !titles.some(x => /refresh finished/.test(x)); i++){
       await page.waitForTimeout(1000);
       titles = await page.evaluate(q => { const d = window.__store.get(q); return d ? (d.notices || []).map(n => n.title) : []; }, QUEUE);
     }
-    ok(titles.some(x => /Refresh continuing/.test(x)), 'a saved refresh whose other copy went quiet is carried on: ' + JSON.stringify(titles));
+    ok(titles.some(x => /refresh finished/.test(x)) && !titles.some(x => /Refresh continuing/.test(x)), 'a saved refresh whose other copy went quiet is carried on and finishes, with no leftover "continuing" note: ' + JSON.stringify(titles));
     ok(!titles.some(x => /running in another window/.test(x)), 'the old "running in another window" notice is gone: ' + JSON.stringify(titles));
     ok(errs.length === 0, 'resume: errors in the page: ' + errs.slice(0, 2).join(' | '));
   } finally { await ctx.close(); }
