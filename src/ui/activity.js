@@ -13,6 +13,7 @@ var noticeSeq = 0;
 var panelOpen = false;
 var shownSignature = null;   // which items the panel was last built for; text and bars are updated in place, so a click is never lost to a redraw
 var lastUnread = 0;
+var onDismiss = null;        // told when the viewer removes notices: (list of notices) => void
 
 const byId = (id) => document.getElementById(id);
 
@@ -116,6 +117,14 @@ function activityNotify(info){
   render();
 }
 
+// Removes notices without telling the dismiss handler (used when another device already dismissed them).
+function activityDropWhere(test){
+  const before = notices.length;
+  notices = notices.filter(n => !test(n));
+  if(notices.length !== before) render();
+}
+function setNoticeDismissHandler(fn){ onDismiss = fn; }
+
 function init_ui_activity(){
   const bell = byId('activityBell'), panel = byId('activityPanel');
   if(!bell || !panel) return;
@@ -124,12 +133,12 @@ function init_ui_activity(){
     const btn = e.target.closest('[data-act]');
     if(!btn) return;
     const item = btn.closest('.activity-item'), act = btn.dataset.act;
-    if(act === 'clearall'){ notices = []; render(); return; }
+    if(act === 'clearall'){ const gone = notices; notices = []; render(); if(onDismiss) onDismiss(gone); return; }
     if(!item) return;
     const id = item.dataset.id;
     if(act === 'view'){ openSection(item.dataset.section); setOpen(false); }
     else if(act === 'stop'){ const r = running.get(id); if(r && r.onStop) r.onStop(); }
-    else if(act === 'close'){ notices = notices.filter(n => n.id !== id); render(); }
+    else if(act === 'close'){ const gone = notices.filter(n => n.id === id); notices = notices.filter(n => n.id !== id); render(); if(onDismiss) onDismiss(gone); }
   });
   document.addEventListener('mousedown', (e) => { if(panelOpen && !e.target.closest('#activityWrap')) setOpen(false); });
   // Esc closes the panel first (capture phase, and marked handled so "Back to ..." does not also act on it).
@@ -142,4 +151,4 @@ function init_ui_activity(){
   render();
 }
 
-export { activityEnd, activityNotify, activityRun, init_ui_activity };
+export { activityDropWhere, activityEnd, activityNotify, activityRun, init_ui_activity, setNoticeDismissHandler };

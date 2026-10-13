@@ -7,7 +7,7 @@
 // it stopped when the dashboard is opened again (it still needs an open dashboard to run: TradingView and Claude are reached
 // through the page).
 import { LD_BATCH_MAX, getLdBatch, ldBatchStart, ldBatchStop } from '../livedata/batch.js';
-import { activityEnd, activityNotify, activityRun } from '../ui/activity.js';
+import { activityDropWhere, activityEnd, activityNotify, activityRun, setNoticeDismissHandler } from '../ui/activity.js';
 import { pcTickerKey } from '../prices/store.js';
 import { tvMcp } from '../tv/connector.js';
 import { escapeHtml } from '../core/util.js';
@@ -60,7 +60,16 @@ let remote = null;           // a refresh that another device is running: { jobs
 let lastRemoteData = null, starting = true, taking = false;
 const remoteIds = new Set(); // bell items drawn for the other device's jobs
 const seen = new Set();      // notices already in the bell, by time and title
+let dismissed = [];          // keys of notices the viewer removed: they never come back, on any device
 const noticeKey = (n) => (n.at || 0) + "|" + (n.title || "");
+const isDismissed = (n) => dismissed.includes(noticeKey(n));
+function dismissNotices(list) {
+  const keys = (list || []).map(noticeKey);
+  if (!keys.length) return;
+  dismissed = keys.concat(dismissed.filter((k) => !keys.includes(k))).slice(0, 200);
+  history = history.filter((n) => !keys.includes(noticeKey(n)));
+  persistNow();
+}
 const hbAge = (d) => Date.now() - (Date.parse(d && d.heartbeatAt) || 0);
 const remoteBusy = () => !!(remote && remote.jobs.length);
 const isBusy = () => queue.length > 0 || remoteBusy();
@@ -73,7 +82,7 @@ function jobView(j) {
   return { id: j.id, kind: j.kind, keys: j.keys.slice(progressed), total: j.total, done: j.done + progressed, source: j.source, label: j.label, createdAt: j.createdAt };
 }
 function docData() {
-  return { v: 1, jobs: queue.map(jobView), notices: history.slice(0, 10), progress: activeJob ? progress : null, owner: queue.length ? tabId : null, heartbeatAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  return { v: 1, jobs: queue.map(jobView), notices: history.filter((n) => !isDismissed(n)).slice(0, 10), dismissed, progress: activeJob ? progress : null, owner: queue.length ? tabId : null, heartbeatAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
 }
 async function writeNow() {
   persistTimer = null;
@@ -82,7 +91,7 @@ async function writeNow() {
   lastSaved = sig;
   const ref = userRef("data/users/{uid}/refreshQueue");
   try {
-    if (ref && !queue.length && remoteBusy()) await ref.update({ notices: data.notices, updatedAt: data.updatedAt });   // another device owns the run: only add our notices
+    if (ref && !queue.length && remoteBusy()) await ref.update({ notices: data.notices, dismissed, updatedAt: data.updatedAt });   // another device owns the run: only add our notices
     else if (ref) await ref.set(data);
     else localStorage.setItem(LS_KEY, JSON.stringify(data));
   } catch (e) { console.error("Could not save the refresh queue", e); }
@@ -102,7 +111,7 @@ function notice(n) {
   const item = { tone: n.tone, title: n.title, text: n.text, section: n.section || "", at: Date.now() };
   history.unshift(item); seen.add(noticeKey(item));
   history = history.slice(0, 10);
-  activityNotify(n);
+  activityNotify(Object.assign({}, n, { at: item.at }));
   persistNow();
 }
 function queuedItem(j) {
@@ -559,9 +568,14 @@ function clearRemote() {
 function applyRemote(d) {
   lastRemoteData = d;
   if (!d || d.v !== 1) { clearRemote(); return; }
+  if (Array.isArray(d.dismissed)) {   // notices removed on another device disappear here too
+    const gone = d.dismissed.filter((k) => !dismissed.includes(k));
+    dismissed = d.dismissed.concat(dismissed.filter((k) => !d.dismissed.includes(k))).slice(0, 200);
+    if (gone.length) { history = history.filter((n) => !isDismissed(n)); activityDropWhere((n) => isDismissed(n)); }
+  }
   // notices written by another device (or an earlier visit) that this device has not shown yet
   (Array.isArray(d.notices) ? d.notices : []).slice().reverse().forEach((n) => {
-    if (!n || !n.title || seen.has(noticeKey(n))) return;
+    if (!n || !n.title || seen.has(noticeKey(n)) || isDismissed(n)) return;
     seen.add(noticeKey(n));
     history.unshift({ tone: n.tone || "ok", title: n.title, text: n.text || "", section: n.section || "", at: n.at || Date.now() });
     activityNotify({ tone: n.tone || "ok", title: n.title, text: n.text || "", section: n.section || "", at: n.at || Date.now() });
@@ -619,11 +633,13 @@ function watchRemote() {
 // ---------- start-up: restore the saved queue and carry on ----------
 export async function init() {
   installListeners();
+  setNoticeDismissHandler(dismissNotices);
   registerBusy(() => queue.length > 0 || engineBusy());
   try { await dbCapabilityPromise; } catch (e) { /* no database: the browser copy is used */ }
   const saved = await loadSaved();
   if (saved && saved.v === 1) {
-    history = (Array.isArray(saved.notices) ? saved.notices : []).slice(0, 10);
+    dismissed = Array.isArray(saved.dismissed) ? saved.dismissed.slice(0, 200) : [];
+    history = (Array.isArray(saved.notices) ? saved.notices : []).filter((n) => !isDismissed(n)).slice(0, 10);
     history.slice().reverse().forEach((n) => { seen.add(noticeKey(n)); activityNotify({ tone: n.tone || "ok", title: n.title || "", text: n.text || "", section: n.section || "", at: n.at || Date.now(), read: true, silent: true }); });
   }
   watchRemote();
