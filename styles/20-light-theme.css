@@ -1,0 +1,79 @@
+/* Light theme polish (v1.113). Applies only to the Light theme (internal key "indigo", and the retired Red key "light" which now maps to it).
+   The colour tokens live in 01-theme-and-base.css; this file fixes what a light page needs that the dark-first rules do not give it:
+   readable text and clear surfaces, buttons with white text on the purple accent, clearer input borders, banded grid rows, the same font as Dark.
+   Reference: the Screener site (warm sand page, cream cards, purple accent). Kept last in the cascade so it wins ties.
+   Every selector starts with the same prefix, so nothing here can touch the Dark theme. */
+
+:root:is([data-theme="indigo"],[data-theme="light"]){color-scheme:light;}
+
+/* Type: the Light theme uses the same font as Dark (set in 01-theme-and-base.css); no override here. */
+
+/* Top bar: cream like the cards, with a clear line under it; the brand reads as text, not as a faded label. */
+:root:is([data-theme="indigo"],[data-theme="light"]) .topbar{background:var(--panel);border-bottom-color:var(--line);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .topbar-brand{color:var(--text);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .sidebar{box-shadow:0 0 40px rgba(25,55,100,.18);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .sidebar-overlay{background:rgba(15,35,70,.35);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .nav-item:hover,
+:root:is([data-theme="indigo"],[data-theme="light"]) .nav-item.active{background:color-mix(in srgb,var(--accent) 9%,var(--panel));}
+:root:is([data-theme="indigo"],[data-theme="light"]) .nav-item.active{color:var(--accent);}
+
+/* Cards: only the real cards get the soft shadow. The wrapper panels of the flat layout (filters, Analysis / Explorer / Strategies panels,
+   the Settings and Data Refresh wrappers) are deliberately outline-free with no padding, so they must stay flat. */
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.help-panel,.settings-row,.upload-panel,.refreshlog-run,.activity-panel,.alba-confirm-card,#section-trackrecord .analysis-panel){
+  box-shadow:0 1px 2px rgba(25,55,100,.06),0 6px 20px rgba(25,55,100,.07);
+}
+
+/* Text that was too faint: muted is now a darker grey, and small labels, hints and headers use it at full strength. */
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.strat-table th,.biz-table > thead > tr > th){color:#454b54;}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.upload-hint,.analysis-panel-sub,.settings-row-sub,.sub){color:#3d444e;}
+
+/* Links and company names in the accent colour, as on the Screener. */
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.help-panel a,.help-toc a,.analysis-lb-link,.detail-meta a,.tv-chart-link,.fund-research-sources a,.global-item-source a){color:var(--accent);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .analysis-lb-name{color:var(--accent);}
+
+/* Buttons. Filled (primary) buttons: white text on purple. Outlined buttons: dark text, a visible edge, purple on hover. */
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.browse-btn,.tl-btn-primary,.lm-tab.on,.alba-confirm-ok,.section-load-error button){background:var(--accent);color:#fff;border-color:var(--accent);}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.sort-select,.detail-back,.lm-tab):not(.tl-btn-primary):not(.on){
+  background:#fbfdff;color:var(--text);border-color:#9db2c9;
+}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.lm-tab):not(.tl-btn-primary):not(.on):hover{
+  color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,#fbfdff);
+}
+:root:is([data-theme="indigo"],[data-theme="light"]) .select-mode-btn.active{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,#fbfdff);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .refresh-pending{background:rgba(201,162,39,.16);border-color:rgba(138,109,12,.45);}
+
+/* Inputs: near-white fill, a border you can see on cream, and a purple ring when focused. */
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){
+  background:#fbfdff;color:var(--text);border-color:#9db2c9;
+}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea):focus{
+  outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent);
+}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(input,select,textarea)::placeholder{color:#4a515b;opacity:1;}
+:root:is([data-theme="indigo"],[data-theme="light"]) .search-suggest{box-shadow:0 10px 28px rgba(25,55,100,.18);}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.sg-item.active,.sg-item:hover,.filter-btn:hover,.filter-btn.active,.strat-card:hover,.strat-card.active){background:color-mix(in srgb,var(--accent) 8%,var(--panel));}
+
+/* Segmented switches (theme, Cards / Table, Weekly / Monthly): the selected side is the purple pill with white text. */
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.theme-toggle,.tl-view-toggle,.analysis-color-toggle-btns){background:#e3edf8;border-color:#c3d3e6;}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.theme-toggle-btn,.tl-view-btn,.analysis-color-btn){color:#4b515a;}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.theme-toggle-btn.active,.tl-view-btn.active,.analysis-color-btn.active){background:var(--accent);color:#fff;}
+
+/* Grids: every other row is a faint warm band (as on the Screener); hover and pinned rows stay visible over the band. */
+:root:is([data-theme="indigo"],[data-theme="light"]) .strat-table tbody tr:nth-child(odd) > td{background:#f1f6fc;}
+:root:is([data-theme="indigo"],[data-theme="light"]) .strat-table tbody tr:hover > td,
+:root:is([data-theme="indigo"],[data-theme="light"]) .strat-row:focus > td{background:color-mix(in srgb,var(--accent) 10%,#fafcff);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .strat-table tbody tr.pinned > td{background:rgba(201,162,39,.2);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .strat-table tbody tr.pinned:hover > td{background:rgba(201,162,39,.3);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .help-table td,
+:root:is([data-theme="indigo"],[data-theme="light"]) .help-table th{border-bottom-color:var(--line);}
+
+/* Chips, tags and badges: the tinted fills are a touch stronger so the label stays readable on cream. */
+:root:is([data-theme="indigo"],[data-theme="light"]) .b-buy{background:rgba(31,122,84,.16);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .b-mbuy{background:rgba(86,111,41,.17);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .b-hold{background:rgba(138,109,12,.17);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .b-avoid{background:rgba(168,63,56,.15);}
+:root:is([data-theme="indigo"],[data-theme="light"]) .brand-version{background:#e3edf8;color:#4b515a;}
+
+/* Scroll bars: a visible thumb on the sand page. */
+:root:is([data-theme="indigo"],[data-theme="light"]),
+:root:is([data-theme="indigo"],[data-theme="light"]) .peers-scroll{scrollbar-color:#a9bdd3 transparent;}

@@ -1,0 +1,41 @@
+/* Live Data Refresh buttons and bars. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
+/* Live Data Refresh (v1.22): two buttons with progress bars at the top of a stock's detail view */
+.live-refresh{margin:0 0 20px;padding:0 0 20px;border-bottom:1px solid var(--line);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;flex-direction:column;gap:12px;}
+.live-refresh-head{display:flex;align-items:baseline;gap:6px 12px;flex-wrap:wrap;}
+.live-refresh-toggle{background:none;border:none;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%;}
+.live-refresh-toggle:hover .live-refresh-title{color:var(--accent);}
+.live-refresh-caret{font-size:.8rem;color:var(--muted);width:12px;flex:none;}
+.live-refresh-chip{margin-left:auto;font-size:.74rem;font-weight:600;color:var(--accent);}
+.live-refresh-chip.is-error{color:var(--avoid);}
+.live-refresh-chip:empty{display:none;}
+.live-refresh-grid[hidden]{display:none;}
+.live-refresh-title{font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text);}
+.live-refresh-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;}
+.live-refresh-item{display:flex;flex-direction:column;gap:8px;min-width:0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);}
+.live-refresh-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.live-refresh-actions .refresh-btn:disabled{opacity:.6;cursor:progress;}
+.live-stop{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:.74rem;font-weight:600;cursor:pointer;}
+.live-stop:hover{color:var(--text);border-color:var(--muted);}
+.live-progress{height:8px;border-radius:4px;background:var(--panel2);overflow:hidden;border:1px solid var(--line);}
+.live-progress-fill{height:100%;width:0;background:var(--accent);transition:width .35s ease;}
+.live-progress-fill.is-ok{background:var(--buy);}
+.live-progress-fill.is-error{background:var(--avoid);}
+.live-status{font-size:.76rem;line-height:1.5;color:var(--muted);overflow-wrap:anywhere;}
+.live-status.is-error{color:var(--avoid);}
+.live-refresh :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media (prefers-reduced-motion:reduce){.live-progress-fill{transition:none;}
+}
+/* The same panel on the Analysis and Strategies screens (several stocks at once): a tick count and hint above the two cards. */
+.live-refresh.live-panel{margin:0 0 16px;padding:0 0 16px;}
+.fund-pc-dot.fs-hold{background:var(--hold);}
+.fund-research-list.pts li::marker{color:var(--muted);}
+
+.global-events{margin-top:14px;padding-top:12px;border-top:1px solid var(--border,rgba(128,128,128,.25))}
+.global-event{border-left:3px solid var(--hold,#c9a227);padding-left:10px}
+.global-event.ev-positive{border-left-color:var(--buy,#2e9e5b)}
+.global-event.ev-negative{border-left-color:var(--avoid,#d64545)}
+.global-event .ev-tag{font-size:.72rem;font-weight:700;opacity:.8;margin-left:6px}
+
+.analysis-toggles{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end}
+
+

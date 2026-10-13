@@ -1,0 +1,99 @@
+    <header>
+      <h1>Data Refresh</h1>
+      
+    </header>
+
+    <div class="refreshlog-panel">
+      <div class="refreshlog-job">
+        <h2 class="refreshlog-job-title">Fundamental Score</h2>
+
+        <div class="refreshlog-freshness">
+          <div class="refreshlog-freshness-title">Fundamental data age</div>
+          <div class="refreshlog-freshness-summary" id="fundFreshnessSummary" aria-live="polite">Loading…</div>
+          <div class="refreshlog-freshness-bars" id="fundFreshnessBars"></div>
+        </div>
+
+        <div class="upload-panel">
+          <div class="upload-row">
+            <div class="upload-text">
+              <div class="upload-title">Screener.in export (.csv)</div>
+            </div>
+            <div class="browse-wrap">
+              <button type="button" class="browse-btn" tabindex="-1">Browse CSV…</button>
+              <input type="file" id="fundamentalCsvInput" class="csv-file-input" accept=".csv,text/csv">
+            </div>
+            <button type="button" class="select-mode-btn fi-btn-primary" id="importFundamentalDataBtn" title="Scores the uploaded CSV and updates the stock data, right here on this page" disabled>Import data</button>
+          </div>
+          <div class="upload-result" id="fundamentalUploadResult"></div>
+        </div>
+
+        <div class="upload-panel fi-panel" id="fundImportPanel" hidden aria-live="polite">
+          <div class="fi-head"><div class="upload-title" id="fiTitle">Import</div><div class="fi-pct" id="fiPct">0%</div></div>
+          <div class="fi-bar" id="fiBar" role="progressbar" aria-label="Import progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fi-bar-fill" id="fiBarFill"></div></div>
+          <ol class="fi-steps" id="fiSteps"></ol>
+          <div id="fiPrompt"></div>
+          <div class="fi-result" id="fiResult"></div>
+        </div>
+
+        <div class="upload-panel" id="fiBackups" hidden aria-live="polite"></div>
+
+      </div>
+
+      <hr class="refreshlog-divider">
+
+      <div class="refreshlog-job">
+        <h2 class="refreshlog-job-title">Technical Score</h2>
+
+        <div class="refreshlog-freshness">
+          <div class="refreshlog-freshness-title">Technical data age</div>
+          <div class="refreshlog-freshness-summary" id="techFreshnessSummary" aria-live="polite">Loading…</div>
+          <div class="refreshlog-freshness-bars" id="techFreshnessBars"></div>
+        </div>
+
+        <div class="upload-panel">
+          <div class="upload-row">
+            <div class="upload-text">
+              <div class="upload-title">TradingView Growth List (.csv)</div>
+            </div>
+            <div class="browse-wrap">
+              <button type="button" class="browse-btn" tabindex="-1">Browse CSV…</button>
+              <input type="file" id="technicalCsvInput" class="csv-file-input" accept=".csv,text/csv">
+            </div>
+            <button type="button" class="select-mode-btn fi-btn-primary" id="importTechnicalDataBtn" title="Scores the uploaded Growth List and updates the technical data, right here on this page" disabled>Import data</button>
+          </div>
+          <div class="upload-result" id="technicalUploadResult"></div>
+        </div>
+
+        <div class="upload-panel fi-panel" id="ti_fundImportPanel" hidden aria-live="polite">
+          <div class="fi-head"><div class="upload-title" id="ti_fiTitle">Import</div><div class="fi-pct" id="ti_fiPct">0%</div></div>
+          <div class="fi-bar" id="ti_fiBar" role="progressbar" aria-label="Import progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fi-bar-fill" id="ti_fiBarFill"></div></div>
+          <ol class="fi-steps" id="ti_fiSteps"></ol>
+          <div id="ti_fiPrompt"></div>
+          <div class="fi-result" id="ti_fiResult"></div>
+        </div>
+
+        <div class="upload-panel" id="ti_fiBackups" hidden aria-live="polite"></div>
+
+      </div>
+
+      <hr class="refreshlog-divider">
+
+      <div class="refreshlog-job">
+        <h2 class="refreshlog-job-title">TradingView Watchlist Sync</h2>
+
+        <div class="refreshlog-manual">
+          <button type="button" class="select-mode-btn fi-btn-primary" id="refreshWatchlistBtn" title="Rebuilds the four Alba watchlists in TradingView from the current verdicts, right here on this page" disabled>Sync now</button>
+        </div>
+
+        <div class="upload-panel fi-panel" id="wl_fundImportPanel" hidden aria-live="polite">
+          <div class="fi-head"><div class="upload-title" id="wl_fiTitle">Sync</div><div class="fi-pct" id="wl_fiPct">0%</div></div>
+          <div class="fi-bar" id="wl_fiBar" role="progressbar" aria-label="Sync progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fi-bar-fill" id="wl_fiBarFill"></div></div>
+          <ol class="fi-steps" id="wl_fiSteps"></ol>
+          <div id="wl_fiPrompt"></div>
+          <div class="fi-result" id="wl_fiResult"></div>
+        </div>
+
+        <div class="refreshlog-runs-title">Recent runs</div>
+        <div id="watchlistSyncLogRuns" aria-live="polite"><p class="upload-hint">Loading…</p></div>
+      </div>
+    </div>

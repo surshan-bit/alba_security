@@ -1,0 +1,5 @@
+/* Dark theme: more prominent text (v1.118). Brighter body and secondary text (tokens in 01), placeholders at full strength (browsers dim
+   them with opacity), and a clearer outline on the search and form fields. The Light theme sets its own placeholder colour and borders. */
+:root:not([data-theme="indigo"]):not([data-theme="light"]) :is(input,select,textarea)::placeholder{color:#cdc6bb;opacity:1;}
+:root:not([data-theme="indigo"]):not([data-theme="light"]) :is(.topbar-search-input,.search-input){border-color:#5c574f;color:var(--text);}
+:root:not([data-theme="indigo"]):not([data-theme="light"]) :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){color:var(--text);}

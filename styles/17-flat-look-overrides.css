@@ -1,0 +1,375 @@
+/* Late overrides: the flat, one-look styling across screens (these must stay last). Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
+#analysisStrategyFilter .filter-btn,#strategyFilterRow .filter-btn{white-space:nowrap;}
+.filter-label{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+
+/* Flat, list-style stock page (all widths). The boxes inside boxes (panel > factor card > metric chips) are replaced by
+   hairline dividers and larger section headings, so the information gets the width. On wide screens the stock page keeps its one
+   outer card; on phones that card goes too. */
+.val-panel,.fund-panel,.tech-panel,.global-panel{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;padding:20px 0 4px;margin-top:22px;}
+.val-panel-title,.fund-panel-title,.tech-panel-title,.global-panel-title{font-size:1.2rem;font-weight:700;text-transform:none;letter-spacing:0;color:var(--text);}
+.fund-subsection-title{font-size:1rem;}
+.global-panel-sub{margin-bottom:10px;}
+/* rows instead of cards: each cell is a line-topped block */
+.val-cell,.fund-cell,.global-item,.fund-overall-summary,.fund-cell-research{background:transparent;border:0;border-radius:0;border-top:1px solid var(--line);padding:14px 0;}
+.fund-subsection .fund-cell{padding:14px 0;}
+.fund-cell-proxy{border-style:none;border-top:1px solid var(--line);}
+.val-grid,.fund-grid,.fund-subsection .fund-grid{column-gap:32px;row-gap:0;}
+.global-cols{row-gap:0;}
+.global-list{gap:0;}
+.fund-overall-summary{margin:6px 0 4px;padding:14px 0;}
+.fund-cell-label{font-size:.78rem;font-weight:600;}
+/* metric chips become label / value rows */
+.data-chips{flex-direction:column;gap:0;}
+.data-chip{display:flex;justify-content:space-between;gap:12px;background:transparent;border:0;border-radius:0;border-top:1px solid var(--line);padding:8px 0;font-size:.82rem;}
+.data-chip.chip-na{border-style:solid;}
+.peers-scroll{border:0;border-radius:0;background:transparent;}
+#detail .live-refresh{margin:0;padding:12px 0;border:0;}
+#detail .detail-jump{margin-bottom:0;}
+#detail .live-refresh + .val-panel{margin-top:0;}
+/* The stock page has no outer box on any screen size: no border, no panel colour, tight padding. */
+.detail{background:transparent;border:0;border-radius:0;padding:8px 4px 22px;min-height:0;}
+@media(max-width:640px){
+  .detail{padding:12px 6px;}
+  .val-grid,.fund-grid,.fund-subsection .fund-grid{gap:0;}
+  .val-grid > :first-child,.fund-grid > :first-child,.global-list > :first-child{border-top:0;}
+  .global-col .global-list{gap:0;}
+}
+
+/* Phones: the filters fold into one "Filters" line (with what is selected) and start collapsed. */
+.filters-toggle{display:none;}
+@media(max-width:900px){
+  .filters-toggle .ft-label{font-weight:700;}
+  .filters-toggle .ft-summary{flex:1;min-width:0;color:var(--muted);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .filters-toggle .ft-caret{color:var(--muted);transition:transform .15s;}
+  .filters-toggle[aria-expanded="true"] .ft-caret{transform:rotate(180deg);}
+  .analysis-filters-panel .filters-toggle{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--text);font:inherit;font-size:.9rem;padding:10px 0;cursor:pointer;text-align:left;}
+  .analysis-filters-panel .filter-groups{padding-top:8px;}
+  .analysis-filters-panel.filters-collapsed .filter-groups{display:none;}
+  .analysis-filters-panel{padding:0;border-color:transparent;background:transparent;}
+}
+/* Stock detail: no divider lines inside a panel. Only the five main headings (Valuation, Global & Macro, Fundamental Score,
+   Technical Score, Peers) keep their top line. Borders are made transparent, not removed, so spacing stays the same. */
+#detail .val-cell,#detail .fund-overall-summary,#detail .fund-pc-footnote,#detail .fund-cell,#detail .data-chip,#detail .pc-block,#detail .global-list > *,#detail .peers-scroll th,#detail .peers-scroll td,
+#detail .jump-preview{border-color:transparent;}
+/* Peers table: thin scrollbar. */
+.peers-scroll{scrollbar-width:thin;scrollbar-color:var(--line) transparent;}
+/* Price history: the colour key and the event-tag buttons start hidden; the Legend button shows them. */
+.pc-block:not(.show-key) .pc-legend,.pc-block:not(.show-key) .pc-evlegend{display:none;}
+.pc-keytoggle{margin-left:auto;background:transparent;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:.72rem;font-weight:600;padding:3px 10px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.pc-keytoggle:hover{color:var(--text);border-color:var(--muted);}
+
+/* ---- One look for every screen (the stock page is the reference): tinted panels with no outline, no divider lines inside a panel,
+   thin dark scroll bars. Borders are made transparent rather than removed, so spacing stays exactly as it was. Controls
+   (buttons, inputs, chips, toggles) keep their outline. ---- */
+html{scrollbar-color:var(--line) transparent;}
+*{scrollbar-width:thin;}
+.analysis-panel,.upload-panel,.help-panel,.help-toc,.help-formula,.glossary-item,.settings-row,.sr-row,.strat-panel,.refreshlog-panel,
+.refreshlog-freshness,.fi-panel,.live-refresh.live-panel{border-color:transparent;}
+.filters.analysis-filters-panel{border-color:transparent;background:transparent;}
+.refreshlog-divider{background:transparent;}
+#section-analysis table th,#section-analysis table td,#section-strategies table th,#section-strategies table td,
+#section-help table th,#section-help table td,#section-knowledgebase table th,#section-knowledgebase table td,
+#section-trackrecord table th,#section-trackrecord table td{border-color:transparent;}
+.strat-card,.strat-card.active{border-color:transparent;}
+.strat-card-n{border-color:transparent;background:var(--panel2);}
+#section-help a,#section-knowledgebase a{color:var(--accent);}
+/* Analysis and Strategies: the Live Data Refresh line sits between two lines, as on the stock page. */
+.live-refresh.live-panel{margin:0;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);border-left:0;border-right:0;}
+/* Strategies rules: the rows have no outline any more, so they take no side padding and line up with the heading and the + Add a rule box. */
+.sr-row{padding-left:0;padding-right:0;background:transparent;}
+/* Stock page, compact: less padding and spacing everywhere, so more fits on screen and the page scrolls less. Same content, same order. */
+#detail .detail-top{gap:4px 22px;margin-bottom:12px;}   /* room for the sticky Jump to bar's 10px cover above it, which otherwise clips the ticker line */
+#detail .detail-top .detail-meta{flex:0 0 100%;margin:0;}   /* the quick links sit on their own line under the title, clear of the Back button */
+#detail .detail-meta-links{gap:4px 16px;font-size:.84rem;}
+#detail .detail-jump{padding:5px 0;gap:6px;}
+#detail .detail-jump a{padding:3px 10px;}
+#detail .live-refresh{padding:6px 0;}
+#detail .val-panel,#detail .fund-panel,#detail .tech-panel,#detail .global-panel{padding-top:12px;margin-top:12px;}
+#detail .val-panel-title,#detail .fund-panel-title,#detail .tech-panel-title,#detail .global-panel-title{font-size:1.1rem;}
+#detail .val-panel-head,#detail .fund-panel-head,#detail .tech-panel-head,#detail .global-panel-head{margin-bottom:6px;}
+#detail .val-cell,#detail .fund-cell,#detail .global-item,#detail .fund-cell-research{padding:8px 0;}
+#detail .fund-subsection .fund-cell{padding:8px 0;}
+#detail .fund-overall-summary{padding:8px 0;margin:2px 0 6px;}
+#detail .fund-subsection{margin-bottom:10px;}
+#detail .fund-subsection .fund-cell-bar{margin-bottom:6px;}
+#detail .fund-cell-head{margin-bottom:4px;}
+#detail .fund-grid,#detail .val-grid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));column-gap:28px;}
+#detail .data-chip{padding:3px 0;}
+#detail .fund-pc-footnote{margin-top:4px;padding-top:4px;}
+#detail .fund-pros-cons ul{gap:4px;}
+#detail .fund-cell-flags{margin-bottom:6px;}
+/* Critical news & world events: items sit in columns (as many as fit), the Helps / Hurts / Mixed tag is coloured, the explanation is smaller, and the source goes on the same line as it. */
+#detail .global-events{margin-top:8px;padding-top:8px;}
+#detail .global-events .global-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:8px 28px;}
+#detail .global-event{padding:2px 0 2px 10px;font-size:.86rem;line-height:1.4;}
+#detail .global-event strong{font-size:.9rem;}
+#detail .global-event > div{font-size:.82rem;color:var(--muted);margin-top:2px;display:inline;}
+#detail .global-event .global-item-source{display:inline;margin:0 0 0 6px;white-space:nowrap;}
+#detail .global-event .ev-tag{display:inline-block;padding:0 7px;border-radius:999px;font-size:.66rem;text-transform:uppercase;letter-spacing:.03em;opacity:1;background:rgba(201,162,39,.18);color:var(--hold);}
+#detail .global-event.ev-positive .ev-tag{background:rgba(46,158,91,.18);color:var(--buy);}
+#detail .global-event.ev-negative .ev-tag{background:rgba(214,69,69,.18);color:var(--avoid);}
+/* Header breathing space: room above the name, between name, ticker, links and the Jump to bar, and between the links themselves. */
+#detail{padding-top:16px;}
+#detail .detail-top{margin-bottom:14px;row-gap:10px;}
+#detail .detail-title .detail-ticker{margin-top:8px;}
+#detail .detail-meta-links{gap:6px 26px;padding-left:2px;}
+#detail .detail-jump{padding:10px 0;gap:8px;}
+#detail .detail-jump a{padding:5px 12px;}
+#detail .live-refresh{padding:12px 0;}
+#detail .val-panel,#detail .fund-panel,#detail .tech-panel,#detail .global-panel{padding-top:18px;margin-top:20px;}
+#detail .val-cell,#detail .fund-cell,#detail .global-item,#detail .fund-cell-research,#detail .fund-subsection .fund-cell{padding:11px 0;}
+#detail .data-chip{padding:5px 0;}
+/* Global & Macro: each column is its own compact list (no row pairing across columns), tighter text, source on the line of its text. */
+#detail .global-cols{column-gap:36px;row-gap:0;align-items:start;}
+#detail .global-col{display:block;grid-row:auto;}
+#detail .global-col .global-list{display:flex;flex-direction:column;gap:6px;}
+#detail .global-col .global-col-title{margin-bottom:6px;}
+#detail .global-col .global-item{height:auto;padding:0;font-size:.84rem;line-height:1.4;}
+#detail .global-item .global-item-source{display:inline;margin:0 0 0 6px;white-space:nowrap;}
+/* Global & Macro reads like the Strengths / Watch-outs lists: a coloured bullet per item, more room between items and under the headings. */
+#detail .global-col .global-list{gap:10px;}
+#detail .global-col .global-col-title{margin-bottom:10px;}
+#detail .global-col .global-item{position:relative;padding:0 0 0 20px;font-size:.9rem;line-height:1.45;}
+#detail .global-col .global-item::before{content:"";position:absolute;left:0;top:.5em;width:8px;height:8px;border-radius:50%;background:var(--muted);}
+#detail .global-col:first-child .global-item::before{background:var(--buy);}
+#detail .global-col:nth-child(2) .global-item::before{background:var(--avoid);}
+#detail .global-panel-head{margin-bottom:14px;}
+#detail .global-events{margin-top:16px;padding-top:14px;}
+#detail .global-events .global-list{gap:12px 28px;}
+/* Price history: the Weekly / Monthly (Daily) charts have no box around them. */
+.pc-panel{background:transparent;border:0;border-radius:0;padding:6px 0 4px;}
+/* Valuation: the intrinsic value and the price comparison share one line, with less space above and below. */
+#detail .val-panel .val-text{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 20px;}
+#detail .val-panel .val-cell{padding:2px 0 4px;}
+#detail .val-panel .val-panel-head{margin-bottom:4px;}
+#detail .val-panel .val-cell-sub{font-size:.88rem;}
+/* Factor cards: metric rows flow into as many columns as fit (label left, value right) instead of one long column; research bullets (neutral / positive / negative) sit side by side. */
+#detail .data-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));column-gap:32px;}
+#detail .fund-cell-research{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));column-gap:32px;align-items:start;}
+#detail .fund-cell-research > *{margin:0;}
+#detail .fund-cell-research > .fund-research-stale,#detail .fund-cell-research > .fund-research-sources,#detail .fund-cell-research > .fund-research-summary{grid-column:1/-1;}
+#detail .fund-cell-research .fund-research-list{padding-left:20px;}
+#detail .fund-cell-research .fund-research-list li{margin-bottom:6px;line-height:1.4;}
+#detail .fund-cell-research .fund-research-sources{margin-top:4px;}
+/* a section with a single card (e.g. Valuation & Margin of Safety) already has its title and score in the section heading, so the card does not repeat them */
+#detail .fund-subsection .fund-cell:only-child > .fund-cell-head,#detail .fund-subsection .fund-cell:only-child > .fund-cell-bar{display:none;}
+/* News items: the Helps / Hurts / Mixed tag comes first, then the headline, then the explanation on its own lines with the source after it. */
+#detail .global-event .ev-tag{margin:0 8px 0 0;vertical-align:1px;}
+#detail .global-event > div{display:block;margin-top:3px;}
+#detail .global-event .global-item-source{display:block;margin:3px 0 0;}
+/* Heading colour: every section and sub-section heading on the stock page is amber. */
+:root{--hd:#e0b04a;}
+:root[data-theme="light"],:root[data-theme="indigo"]{--hd:#98680a;}
+#detail .val-panel-title,#detail .global-panel-title,#detail .fund-panel-title,#detail .tech-panel-title,#detail .fund-subsection-title{color:var(--hd);}
+/* Technical Score: each timeframe is one line, "Weekly  +10.31%  Bullish  RSI (70.9)"; the trend sentence is the hover text. */
+/* Each price chart's header carries that timeframe's figures: "Weekly 261 bars   +10.31%  Bullish  RSI (70.9)   [6M 1Y All]". */
+.pc-ph{justify-content:flex-start;gap:6px 18px;}
+.pc-ph .pc-pills{margin-left:auto;}
+.pc-psum{display:flex;align-items:center;gap:4px 14px;flex-wrap:wrap;}
+.tech-fallback{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+/* Chart header: one baseline, even sizes, and the same column positions for Weekly and Monthly so the figures line up. */
+.pc-ph{align-items:center;gap:6px 22px;}
+.pc-ptitle{display:flex;align-items:baseline;gap:8px;min-width:170px;font-size:1.05rem;font-weight:700;}
+.pc-ptitle small{margin:0;font-size:.8rem;font-weight:400;}
+.pc-psum{gap:4px 20px;}
+.pc-psum .badge{min-width:76px;text-align:center;padding:2px 10px !important;font-size:.76rem !important;}
+/* Chart header, compact: title, change, rating and RSI close together; RSI is a small label with its value in bold. */
+.pc-ph{gap:6px 16px;}
+.pc-ptitle{min-width:0;}
+.pc-psum{gap:4px 14px;}
+.pc-psum .badge{min-width:0;}
+/* Chart header figures: three matching chips in the order Change, RSI, Signal; a small muted label and a bold value, coloured where it carries meaning. */
+/* Price charts, tight: the Legend button sits on the Technical Score heading line (top right) instead of its own row, and the gaps around the two charts are smaller. */
+#detail .tech-panel{position:relative;}
+#detail .tech-panel .pc-block{margin-top:0;padding-top:0;border-top:0;}
+#detail .tech-panel .pc-head{position:absolute;top:16px;right:0;margin:0;}
+#detail .pc-keytoggle{margin:0;}
+#detail .pc-panels{gap:6px;}
+#detail .pc-panel{padding:2px 0 0;}
+#detail .pc-ph{margin-bottom:0;}
+#detail .pc-legend{margin:0 0 6px;}
+#detail .pc-evlegend{margin:0 0 6px;}
+/* A little air between the Technical Score heading, the chart headers, the charts and between the two charts. */
+#detail .tech-panel .tech-panel-head{margin-bottom:16px;}
+#detail .pc-panels{gap:22px;}
+#detail .pc-ph{margin-bottom:8px;}
+/* Chip text is centred vertically: the small label and the bold value share the middle line. */
+/* Peers use the Analysis / Strategies columns and grid look; the open stock is marked in its row. */
+.strat-row.peers-self > td{background:var(--panel2);}
+.strat-row.peers-self > td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+.strat-row.peers-self .analysis-lb-name::after{content:"This stock";margin-left:10px;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);}
+/* Peers grid: same text size, but even spacing, headers lined up with their cells, and a clear marker for the open stock. */
+.peers-table.strat-table{width:100%;}
+.peers-table.strat-table th,.peers-table.strat-table td{padding:10px 16px;vertical-align:middle;line-height:1.3;}
+.peers-table.strat-table th{background:var(--panel);position:sticky;top:0;z-index:1;border-bottom:1px solid var(--line);}
+.peers-table.strat-table th:first-child,.peers-table.strat-table td:first-child{text-align:center;width:48px;min-width:48px;padding-left:12px;padding-right:12px;}
+.peers-table.strat-table th.num,.peers-table.strat-table td.num{min-width:84px;}
+.peers-table.strat-table td.analysis-lb-score{text-align:right;}
+.peers-table.strat-table td:has(> .badge){min-width:96px;}
+.peers-table.strat-table .analysis-lb-ticker{margin-left:8px;}
+.strat-row.peers-self .analysis-lb-name::after{content:"This stock";margin-left:10px;padding:1px 7px;border:1px solid var(--accent);border-radius:999px;font-size:.6rem;vertical-align:1px;}
+/* Analysis screen: no filled panel behind the chart, filters and leaderboard; the page background shows through. */
+#section-analysis .analysis-panel,#section-analysis .analysis-columns-panel{background:transparent;}
+#section-analysis .analysis-color-toggle-btns{background:transparent;}
+/* The RSI Quadrant (sliders, axis choices, chart) lives inside the leaderboard and shows when "Show chart" is opened. */
+.analysis-leaderboard.chart-hidden .analysis-chart-block{display:none;}
+.analysis-chart-block{margin:16px 0 16px;flex:none;}
+.analysis-leaderboard.lb-full .analysis-refresh{display:none;}
+/* Industry screen: no filled panel; the page background shows through. The sticky first column uses the page colour so scrolled cells still hide behind it. */
+#section-business .analysis-panel,#section-business .biz-expand{background:transparent;}
+.biz-table > tbody > .biz-row > .biz-name,.biz-table > thead > tr > th:first-child{background:var(--bg);}
+.biz-table > tbody > .biz-row:hover > .biz-name,.biz-table > tbody > .biz-row:focus > .biz-name{background:linear-gradient(var(--row-hover),var(--row-hover)),var(--bg);}
+.biz-table > tbody > .biz-row.open > .biz-name{background:var(--bg);}
+.biz-table > tbody > .biz-detail > td,.biz-detail-box{background:transparent;}
+/* Industry heat map */
+.hm-wrap{position:relative;width:100%;margin-top:12px;border-radius:6px;overflow:hidden;}
+.hm-tile{position:absolute;box-sizing:border-box;border:1px solid var(--bg);padding:4px 6px;margin:0;overflow:hidden;cursor:pointer;color:var(--text);font:inherit;text-align:left;display:flex;flex-direction:column;justify-content:flex-start;gap:1px;}
+.hm-tile:hover,.hm-tile:focus-visible{outline:2px solid var(--text);outline-offset:-2px;z-index:1;}
+.hm-name{font-size:1em;font-weight:700;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;word-break:break-word;hyphens:auto;}
+.hm-chg{font-size:1em;font-weight:700;font-variant-numeric:tabular-nums;}
+.hm-n{font-size:.85em;opacity:.8;}
+.hm-legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:.74rem;color:var(--muted);}
+.hm-bar{display:inline-block;width:120px;height:8px;border-radius:4px;background:linear-gradient(90deg,color-mix(in srgb,var(--avoid) 90%,var(--bg)),color-mix(in srgb,var(--avoid) 18%,var(--bg)),color-mix(in srgb,var(--buy) 18%,var(--bg)),color-mix(in srgb,var(--buy) 90%,var(--bg)));}
+.hm-note{margin-left:8px;}
+/* Strategies screen: no filled panels; the page background shows through. */
+#section-strategies .analysis-panel,#section-strategies .strat-panel{background:transparent;}
+/* Industry: controls in a side column, like the Analysis filters. */
+.biz-layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start;}
+.biz-main,.biz-side{min-width:0;}
+.biz-side .biz-controls{display:flex;flex-direction:column;align-items:stretch;gap:14px;margin:0;}
+.biz-side .tl-view-toggle{display:flex;width:100%;box-sizing:border-box;}
+.biz-side .tl-view-toggle .tl-view-btn{flex:1;text-align:center;}
+.biz-side .biz-expand{width:100%;}
+@media(max-width:900px){.biz-layout{grid-template-columns:minmax(0,1fr);gap:12px;}.biz-side{order:-1;}
+}
+.biz-strategy-panel{margin-top:6px;padding:0;min-width:0;max-width:100%;}
+.biz-strategy-panel .filter-group{min-width:0;}
+.biz-stocks-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 6px;}
+.biz-stocks-head h3,.biz-stocks-head .upload-hint{margin:0;}
+/* Industry detail: the news button sits on the News heading line; each opened industry is closed off with a line. */
+.biz-news-bar{margin-top:10px;align-items:center;}
+.biz-news-bar .biz-newsbtn{margin:0;}
+.biz-table > tbody > .biz-detail > td{border-bottom:1px solid var(--line);padding-bottom:6px;}
+.biz-table > tbody > .biz-row.open > td{border-top:1px solid var(--line);}
+.biz-news-bar .biz-news-head{margin:0;}
+.biz-strategy-panel{position:static;}
+/* News line: heading and button share one centre line; the button is filled so it reads as an action. */
+.biz-detail-box .biz-news-bar{display:flex;align-items:center;gap:12px;}
+.biz-detail-box .biz-news-bar h3.biz-news-head{margin:0 !important;line-height:1;padding:0;}
+.biz-detail-box .biz-news-bar .biz-newsbtn{background:transparent !important;border:1px solid var(--line) !important;color:var(--accent) !important;font-weight:600;height:30px;padding:0 14px;display:inline-flex;align-items:center;line-height:1;}
+.biz-detail-box .biz-news-bar .biz-newsbtn:hover:not(:disabled){border-color:var(--accent) !important;background:rgba(255,255,255,.04) !important;}
+.biz-detail-box .biz-news-bar .biz-newsbtn:disabled{opacity:.5;cursor:default;}
+.biz-news-bar .biz-newsstatus{margin:0;font-size:.8rem;}
+/* Top-bar stock search */
+.topbar-search{position:relative;margin-left:auto;width:300px;max-width:45vw;flex-shrink:1;}
+.topbar-search-input{width:100%;box-sizing:border-box;height:34px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--text);font:inherit;font-size:.86rem;padding:0 32px 0 14px;}
+.topbar-search-input:focus{outline:none;border-color:var(--accent);}
+.topbar-search-clear{display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--muted);font-size:1.1rem;line-height:1;cursor:pointer;padding:2px 6px;}
+.topbar-search-clear.show{display:block;}
+.topbar-search .search-suggest{top:calc(100% + 6px);left:auto;right:0;width:360px;max-width:92vw;text-align:left;}
+.sg-empty{padding:10px 12px;color:var(--muted);font-size:.84rem;}
+@media(max-width:600px){.topbar-search{width:auto;flex:1;max-width:none;min-width:0;}.topbar-title{display:none;}
+}
+/* Top-bar search: centred, wide enough for the whole suggestion list. */
+.topbar-search{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;width:520px;max-width:calc(100vw - 460px);}
+.topbar-search-input{height:38px;font-size:.92rem;}
+.topbar-search .search-suggest{left:0;right:0;width:auto;max-width:none;}
+@media(max-width:1000px){.topbar-search{position:relative;left:auto;top:auto;transform:none;margin-left:auto;width:340px;max-width:50vw;}
+}
+@media(max-width:600px){.topbar-search{width:auto;flex:1;max-width:none;}
+}
+.topbar-search .search-suggest{max-height:min(520px,calc(100vh - 90px));}
+.topbar{padding-top:17px;padding-bottom:17px;}
+.topbar-search-input{height:40px;}
+.analysis-lb-industry .ind-w{font-weight:700;font-variant-numeric:tabular-nums;margin-right:6px;}
+.analysis-lb-industry .chg-up{color:var(--buy);}
+.analysis-lb-industry .chg-down{color:var(--avoid);}
+.hd-ico{width:1.05em;height:1.05em;margin-right:.45em;vertical-align:-.14em;flex-shrink:0;}
+/* Chart header figures: one connected strip (Change | RSI | Signal), label above value, with an RSI gauge and a signal dot. */
+.pc-psum .pcs{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel2);}
+.pcs-cell{display:flex;flex-direction:column;justify-content:center;gap:3px;padding:7px 16px;min-width:96px;position:relative;}
+.pcs-cell + .pcs-cell{border-left:1px solid var(--line);}
+.pcs-key{font-size:.62rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);line-height:1;}
+.pcs-val{display:flex;align-items:center;gap:6px;font-size:1.08rem;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--text);}
+.pcs-arrow{font-style:normal;font-size:.62rem;line-height:1;}
+.pcs-chg.up{background:color-mix(in srgb,var(--buy) 13%,transparent);} .pcs-chg.up .pcs-val{color:var(--buy);}
+.pcs-chg.down{background:color-mix(in srgb,var(--avoid) 13%,transparent);} .pcs-chg.down .pcs-val{color:var(--avoid);}
+.pcs-gauge{position:relative;display:block;height:4px;border-radius:2px;margin-top:1px;background:linear-gradient(90deg,color-mix(in srgb,var(--buy) 55%,transparent) 0 30%,var(--line) 30% 70%,color-mix(in srgb,var(--hold) 65%,transparent) 70% 100%);}
+.pcs-gauge i{position:absolute;top:50%;width:9px;height:9px;border-radius:50%;background:var(--text);border:2px solid var(--panel2);transform:translate(-50%,-50%);box-sizing:content-box;margin:0;}
+.pcs-rsi.hot .pcs-val{color:var(--hold);} .pcs-rsi.cold .pcs-val{color:var(--buy);}
+.pcs-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+.pcs-sig.sig-buy{background:color-mix(in srgb,var(--buy) 13%,transparent);} .pcs-sig.sig-buy .pcs-val{color:var(--buy);} .pcs-sig.sig-buy .pcs-dot{background:var(--buy);}
+.pcs-sig.sig-mbuy{background:color-mix(in srgb,var(--mbuy) 13%,transparent);} .pcs-sig.sig-mbuy .pcs-val{color:var(--mbuy);} .pcs-sig.sig-mbuy .pcs-dot{background:var(--mbuy);}
+.pcs-sig.sig-hold{background:color-mix(in srgb,var(--hold) 13%,transparent);} .pcs-sig.sig-hold .pcs-val{color:var(--hold);} .pcs-sig.sig-hold .pcs-dot{background:var(--hold);}
+.pcs-sig.sig-avoid{background:color-mix(in srgb,var(--avoid) 13%,transparent);} .pcs-sig.sig-avoid .pcs-val{color:var(--avoid);} .pcs-sig.sig-avoid .pcs-dot{background:var(--avoid);}
+@media(max-width:520px){.pcs-cell{min-width:0;padding:6px 10px;}.pcs-val{font-size:.95rem;}
+}
+.pcs-chg{width:116px;box-sizing:border-box;}.pcs-rsi{width:96px;box-sizing:border-box;}.pcs-sig{width:140px;box-sizing:border-box;}
+@media(max-width:520px){.pcs-chg{width:92px;}.pcs-rsi{width:76px;}.pcs-sig{width:110px;}
+}
+/* Chart header strip: a notch smaller. */
+.pcs-cell{padding:5px 12px;gap:2px;}
+.pcs-key{font-size:.56rem;}
+.pcs-val{font-size:.9rem;gap:5px;}
+.pcs-arrow{font-size:.54rem;}
+.pcs-gauge{height:3px;}
+.pcs-gauge i{width:7px;height:7px;}
+.pcs-dot{width:7px;height:7px;}
+.pc-psum .pcs{border-radius:8px;}
+.pcs-chg{width:96px;}.pcs-rsi{width:80px;}.pcs-sig{width:116px;}
+@media(max-width:520px){.pcs-cell{padding:5px 8px;}.pcs-val{font-size:.84rem;}.pcs-chg{width:80px;}.pcs-rsi{width:66px;}.pcs-sig{width:96px;}
+}
+/* Grids everywhere: a line under the heading row only; no lines between the rows. */
+.app-section table thead th{border-bottom:1px solid var(--line) !important;}
+.app-section table tbody > tr:not(.biz-detail) > td{border-bottom-color:transparent;}
+
+/* Stock names are links (right-click -> open in a new tab) but look like plain text. */
+a.stock-link{color:inherit;text-decoration:none;}
+a.stock-link:hover .analysis-lb-name{text-decoration:underline;}
+
+/* Technical refresh under an industry's stocks. */
+.biz-refresh{margin:10px 0 4px;}
+.biz-refresh .live-refresh-item{max-width:560px;}
+.strat-refresh,.analysis-refresh{margin:14px 0 4px;display:flex;flex-direction:column;gap:12px;}
+.strat-refresh .live-refresh-item,.analysis-refresh .live-refresh-item{max-width:560px;}
+
+/* Live prices: the topbar switch, the open stock's live price and the brief flash when a number changes. */
+.live-toggle{flex:none;height:30px;margin-left:auto;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;}
+.live-toggle:hover{border-color:var(--accent);}
+.live-toggle.on{color:var(--text);}
+.live-toggle.live{color:var(--accent);border-color:var(--accent);}
+.live-toggle.live::first-letter{animation:livePulse 1.6s ease-in-out infinite;}
+@keyframes livePulse{50%{opacity:.35;}}
+.live-px{margin-left:10px;padding:1px 9px;border:1px solid var(--line);border-radius:999px;font-size:.74rem;font-weight:600;color:var(--accent);}
+.live-flash{animation:liveFlash 1.2s ease-out;}
+@keyframes liveFlash{0%{background:rgba(76,175,114,.35);}100%{background:transparent;}}
+@media (max-width:1000px){.live-toggle{margin-left:10px;}
+}
+@media (max-width:700px){.live-toggle{margin-left:0;}
+}
+
+/* The links under the stock's name: icon in front, vertically centred with the text, same gap for all three. */
+#detail .detail-meta-links a{display:inline-flex;align-items:center;gap:7px;line-height:1.2;}
+#detail .detail-meta-links .link-ico{flex:none;width:14px;height:14px;}
+
+/* Expand all / Collapse all sits at the right end of the grid, on the line above it. */
+.biz-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:0 0 8px;}
+.biz-toolbar .biz-showing{margin:0 auto 0 0;}
+.biz-toolbar .biz-expand{margin:0;width:auto;height:36px;padding:8px 16px;box-sizing:border-box;border-radius:6px;font-size:.78rem;font-weight:400;}
+.biz-toolbar .biz-match-toggle{height:36px;box-sizing:border-box;align-items:center;}
+.biz-toolbar .biz-match-toggle .tl-view-btn{height:28px;padding:0 14px;font-size:.78rem;}
+/* Explorer full screen: the table fills the window, headings stay in view while the rows scroll. */
+.biz-main.biz-full{position:fixed;inset:0;z-index:70;margin:0;padding:12px 20px 16px;background:var(--bg);display:flex;flex-direction:column;overflow:auto;}
+.biz-main.biz-full .biz-toolbar{flex:none;}
+.biz-main.biz-full .biz-scroll{flex:1 1 auto;min-height:360px;overflow:auto;}
+.biz-main.biz-full .biz-table thead th{position:sticky;top:0;z-index:2;background:var(--bg);}
+.biz-main.biz-full .biz-refresh{display:none;}
+body.biz-full-open{overflow:hidden;}
+.biz-match-toggle .tl-view-btn:disabled{opacity:.45;cursor:not-allowed;}
+/* The industries grid spans the full width, so the button above it lines up with the grid's right edge. */
+.biz-table{width:100%;min-width:max-content;}
+
+/* Explorer: an opened industry is highlighted across the whole row (name cell included, which is sticky and so needs an opaque colour). */
+.biz-table > tbody > .biz-row.open > td{background:color-mix(in srgb, var(--accent) 16%, var(--bg));}
+.biz-table > tbody > .biz-row.open > .biz-name{background:color-mix(in srgb, var(--accent) 16%, var(--bg));box-shadow:inset 3px 0 0 var(--accent);}
+.biz-table > tbody > .biz-row.open:hover > td{background:color-mix(in srgb, var(--accent) 24%, var(--bg));}

@@ -1,0 +1,23 @@
+{
+  "name": "alba-stock-analyzer",
+  "private": true,
+  "description": "Alba Securities - Stock Analyzer: source modules (src/), build (tools/) and regression tests (tests/).",
+  "scripts": {
+    "build": "node tools/build.js",
+    "lint": "node tools/lint.js",
+    "check": "node tests/check.js",
+    "browser": "node tests/browser.js",
+    "state": "node tests/state.js",
+    "ticker": "node tests/ticker.js",
+    "imports": "node tests/imports.js",
+    "platform": "node tests/platform.mjs",
+    "update-golden": "node tests/check.js --update"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "eslint-scope": "9.1.2",
+    "espree": "11.2.0",
+    "estraverse": "5.3.0",
+    "jsdom": "29.1.1"
+  }
+}

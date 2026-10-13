@@ -1,0 +1,10 @@
+/* Heavier grid text on every theme (v1.115). Thin strokes read poorly, so grid cells use a medium weight and column headings a bold one.
+   Applies at every screen width (the phone layout uses the same grids). Weights are for all themes; the darker text colours are Light only. */
+:is(.biz-table,.strat-table) > tbody > tr > td,
+.biz-table > tbody > .biz-row > .biz-name{font-weight:500;}
+:is(.biz-table,.strat-table) > thead > tr > th{font-weight:700;}
+.biz-table > tbody > .biz-row > .biz-name::before,
+.biz-table > thead > tr > th:first-child::before{font-weight:600;}
+:is(.biz-table,.strat-table) .sub{font-weight:500;}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.biz-table,.strat-table) > thead > tr > th{color:#2c333c;}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.biz-table > tbody > .biz-row > .biz-name,.biz-table > thead > tr > th:first-child)::before{color:#3d4550;}

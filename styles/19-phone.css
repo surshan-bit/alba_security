@@ -1,0 +1,150 @@
+/* Phone sizing in one place: the height of a control, the gap between neighbours, the body text size in editors.
+   --ph-ctl-lg and --ph-space are the roomier sizes used by the list screens (Explorer, Strategies, Analysis): taller buttons and more air between bars. */
+:root{--ph-ctl:32px;--ph-gap:6px;--ph-fs:.9rem;--ph-ctl-lg:40px;--ph-space:10px;}
+/* Phones (up to 600px wide): less side padding, a compact leaderboard header (the sort choice on its own line, the three buttons sharing the next one)
+   and a tighter grid, so more of the screen is used by the stocks themselves. Loaded last so it wins over the desktop rules above. */
+@media (max-width:600px){
+  .wrap{padding:0 10px 48px;}
+  /* The panel behind each screen's content carried 18px of padding and a border on each side: on a phone the grids use that width instead. */
+  .app-section .analysis-panel{padding:4px 0;border-width:0;}
+  /* The boxed panels of Trade Log, Data Refresh, Help and the Knowledge Base keep their frame but with less inside padding. */
+  .app-section .upload-panel,.app-section .refreshlog-freshness,.app-section .help-panel{padding:10px;}
+  .help-toc{padding-left:10px;padding-right:10px;}
+  /* A stock's page: the floating "Back to ..." button goes (the phone's own Back does the job) and the room kept for it under the name is released. */
+  .detail-back-bar{display:none;}
+  .detail-back-bar ~ .detail-jump .detail-jump-who{padding-right:0;min-height:0;}
+  /* Data Refresh: each import box is the title on one line and the two buttons side by side, sharing the width, on the next. */
+  .upload-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:stretch;}
+  .upload-row .upload-text{grid-column:1 / 3;min-width:0;}
+  .upload-row .upload-title{margin-bottom:0;font-size:.88rem;}
+  .upload-row .browse-wrap{display:flex;}
+  .upload-row .browse-wrap .browse-btn,.upload-row > .select-mode-btn{width:100%;box-sizing:border-box;height:36px;padding:0 10px;font-size:.84rem;white-space:nowrap;}
+  .topbar{padding:6px 4px 6px 6px;gap:4px;}
+  .topbar .topbar-search-input{height:var(--ph-ctl);font-size:.86rem;padding-left:12px;}
+  .topbar .activity-wrap{margin-left:0;}
+  .topbar .activity-bell{width:34px;height:var(--ph-ctl);}
+  /* The Live switch stays in the top bar on a phone: a small pill with a one-word state (Live off, Live, Closed, Paused) between the search box and the bell. */
+  .live-toggle{display:inline-flex;align-items:center;height:26px;padding:0 7px;font-size:0;}
+  .live-toggle::before{content:attr(data-short);font-size:.7rem;}
+  .live-toggle.live::before{content:"\25CF " attr(data-short);}
+  .live-toggle.live{animation:none;}
+  .live-toggle.live::before{animation:livePulse 1.6s ease-in-out infinite;}
+  .analysis-leaderboard-head{gap:var(--ph-space) !important;margin-bottom:12px !important;}
+  .analysis-leaderboard-head > div:last-child{width:100%;gap:var(--ph-space) !important;}
+  .analysis-leaderboard-head .analysis-filter-label{flex:1 1 100%;font-size:0;gap:0 !important;}
+  .analysis-leaderboard-head .sort-select{width:100%;height:var(--ph-ctl-lg);font-size:.84rem;}
+  .analysis-leaderboard-head .analysis-reset-btn{flex:1 1 0;height:var(--ph-ctl-lg);padding:0 6px;font-size:.76rem;white-space:nowrap;}
+  .analysis-leaderboard-head .analysis-panel-title{font-size:.84rem;}
+  /* Grids on a phone: sideways room is scarce (the grid scrolls), so the extra air is added above and below each row. */
+  .strat-table:not(.peers-table) th{padding:9px 5px;font-size:.62rem;letter-spacing:.03em;}
+  .strat-table:not(.peers-table) td{padding:12px 5px;font-size:.8rem;line-height:1.35;}
+  .analysis-leaderboard .analysis-lb-ticker{display:none;}
+  .analysis-leaderboard .pin-btn{padding:0 2px;}
+  /* Bands between blocks: modest, so the Filters line, the toolbar and the grid read as separate groups instead of one packed block. */
+  .topbar{margin-bottom:6px;}
+  .app-section .analysis-main > .analysis-panel,.app-section > .analysis-panel{margin-top:8px;}
+  .analysis-leaderboard{margin-top:0;}
+  .analysis-filters-panel,.analysis-filters-panel .filters-toggle{margin-bottom:0;}
+  .app-section .analysis-filters-panel .filters-toggle,.app-section .biz-filters-toggle{padding:13px 0;}
+  .biz-showing{margin:12px 0;font-size:.8rem;line-height:1.4;}
+  .app-section .biz-toolbar{margin:8px 0 14px;}
+  .app-section .biz-side{margin-bottom:0;}
+  .app-section .biz-layout,.app-section .analysis-layout{gap:0;row-gap:8px;}
+  .app-section .analysis-filters-panel{margin-bottom:0;}
+
+  .analysis-leaderboard.lb-full{padding:8px 8px 12px;}
+  .biz-main.biz-full{padding:8px 8px 12px;}
+}
+
+/* Strategies editor on phones: the goal reads as a sentence on two lines, and each rule is a tidy block: the field and the condition side by side
+   with the remove button, the value below, and the "N pass" count at the end. */
+@media (max-width:600px){
+  .strat-goal{gap:6px 8px;margin-bottom:18px;}
+  .strat-goal > span:first-child{flex:1 1 100%;}
+  .strat-goal-in{width:64px;padding:4px 8px;}
+  .strat-goal .strat-btn{flex:1 1 100%;margin:4px 0 0;}
+  .sr-rules{gap:0;}
+  .sr-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 28px;gap:10px;align-items:center;padding:14px 0;border-width:0 0 1px;border-style:solid;border-color:var(--line);}
+  .sr-row select,.sr-row input,.sr-opt,.sr-row .sr-val > span,.strat-goal,.strat-goal-in,.strat-goal .strat-btn,.strat-note{font-size:var(--ph-fs);}
+  .sr-count{font-size:.8rem;}
+  .sr-row select{width:100%;min-width:0;box-sizing:border-box;}
+  .sr-field{grid-column:1;grid-row:1;}
+  .sr-op{grid-column:2;grid-row:1;}
+  .sr-del{grid-column:3;grid-row:1;padding:0;text-align:center;}
+  .sr-val{grid-column:1 / 4;grid-row:2;min-width:0;}
+  .sr-val:has(.sr-opts){grid-column:1 / 4;}
+  .sr-count{grid-column:1 / 4;grid-row:3;margin:-2px 0 0;text-align:left;white-space:nowrap;}
+  .sr-add{width:100%;box-sizing:border-box;margin-top:14px;}
+  .strat-result-head{gap:var(--ph-space);}
+  .strat-result-title{margin-right:0;flex:1 1 100%;}
+  .strat-total{flex:1 1 100%;display:flex;flex-wrap:nowrap;align-items:center;gap:var(--ph-space);min-width:0;}
+  .strat-total .strat-btn,.strat-total .sort-select{height:var(--ph-ctl-lg);}
+  .strat-total .strat-btn{flex:0 0 auto;white-space:nowrap;padding:0 12px;font-size:.82rem;}
+  .strat-total .strat-sort{flex:1 1 0;min-width:0;justify-content:flex-end;font-size:.78rem;}
+  .strat-total .strat-sort select{flex:1 1 0;min-width:0;max-width:100%;font-size:.82rem;}
+  .strat-total .strat-sort{flex:1 1 0;}
+  /* Strategies: the list of strategies becomes one scrolling row of chips and the editor header shrinks, so the rules and results are what you see. */
+  #stratList{display:flex;flex-direction:row;flex-wrap:nowrap;gap:var(--ph-space);overflow-x:auto;padding:4px 0 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+  #stratList::-webkit-scrollbar{display:none;}
+  #stratList .strat-card{flex:0 0 auto;width:auto;gap:8px;padding:8px 12px;font-size:.82rem;white-space:nowrap;border:1px solid var(--line);}
+  #stratList .strat-card.active{border-color:var(--muted);}
+  #stratList .strat-card-n{padding:0 7px;font-size:.7rem;}
+  #stratList .strat-new,#stratList .strat-restore{flex:0 0 auto;padding:8px 12px;font-size:.76rem;white-space:nowrap;}
+  .strat-layout{gap:10px;}
+  .strat-name{padding:8px 10px;font-size:.95rem;}
+  .strat-head{margin-bottom:10px;}
+  .strat-actions{display:flex;gap:var(--ph-space);}
+  .strat-actions .strat-btn{padding:7px 12px;font-size:.76rem;}
+  .strat-note{padding:8px 10px;font-size:.78rem;margin-bottom:12px;}
+  .strat-fold > summary{font-size:.8rem;margin-bottom:2px;padding:8px 0;gap:8px;}
+  .strat-fold-sum{font-size:.74rem;}
+  .strat-fold{margin-bottom:4px;}
+  .strat-panel .analysis-panel-title{font-size:.84rem;}
+  .strat-result-title{flex-direction:row;align-items:baseline;gap:8px;white-space:nowrap;overflow:hidden;}
+  .strat-result-title .analysis-panel-title{flex:0 0 auto;}
+  .strat-result-title .strat-count{font-size:.76rem;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+  /* Track record: each saved list takes three lines (date, hit/open/missed and remove button; the goal; the state) instead of five. */
+  .trk-goalline{display:none;}   /* the goal is already in the Goal line above and on each saved list */
+  .trk-summary{margin:8px 0 12px;}
+  .trk-run{padding:10px 12px;margin-bottom:10px;}
+  .trk-run-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"tog chips del" "goal goal goal" "state state state";gap:6px 8px;align-items:center;font-size:.76rem;}
+  .trk-toggle{grid-area:tog;font-size:.82rem;white-space:nowrap;}
+  .trk-chips{grid-area:chips;gap:4px;flex-wrap:nowrap;white-space:nowrap;min-width:0;justify-content:flex-end;}
+  .trk-status{padding:0 7px;font-size:.68rem;}
+  .trk-del{grid-area:del;padding:0 2px;font-size:1.1rem;}
+  .trk-goal{grid-area:goal;color:var(--muted);}
+  .trk-state{grid-area:state;margin-left:0;font-size:.72rem;}
+
+  #stratMain .strat-panel{margin-top:10px;padding-top:4px;padding-bottom:4px;}
+  #stratMain .strat-panel + .strat-panel{margin-top:18px;}
+  .strat-head{gap:8px;}
+  .strat-name{min-width:0;flex:1 1 100%;}
+}
+
+/* Explorer on phones: the controls fold into one "Filters" line (closed at first, like the Analysis filters); the toolbar and grid are tighter. */
+.biz-filters-toggle{display:none;}
+@media (max-width:900px){
+  .biz-filters-toggle{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--text);font:inherit;font-size:var(--ph-fs);padding:10px 0;cursor:pointer;text-align:left;}
+  .biz-filters-toggle .ft-label{font-weight:700;}
+  .biz-filters-toggle .ft-summary{flex:1;min-width:0;color:var(--muted);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .biz-filters-toggle .ft-caret{color:var(--muted);transition:transform .15s;}
+  .biz-filters-toggle[aria-expanded="true"] .ft-caret{transform:rotate(180deg);}
+  .biz-side.filters-collapsed .biz-controls{display:none;}
+  .biz-side:not(.filters-collapsed) .biz-controls{padding-top:10px;}
+}
+@media (max-width:600px){
+  .biz-toolbar{flex-wrap:wrap;gap:var(--ph-space);justify-content:flex-start;}
+  .biz-toolbar .biz-showing{flex:1 1 100%;margin:0;}
+  .biz-toolbar .biz-expand{height:var(--ph-ctl-lg);padding:0 12px;font-size:.76rem;white-space:nowrap;}
+  .biz-toolbar .biz-match-toggle{height:var(--ph-ctl-lg);}
+  .biz-toolbar .biz-match-toggle .tl-view-btn{height:32px;padding:0 12px;font-size:.76rem;white-space:nowrap;}
+  .biz-detail-box{padding:10px 0;}
+  .biz-detail h3{margin:6px 0 10px;}
+  .biz-table > thead > tr > th{padding:9px 5px;font-size:.62rem;letter-spacing:.03em;}
+  .biz-table > tbody > tr > td{padding:12px 5px;font-size:.8rem;line-height:1.35;}
+}
+/* v1.111: Explorer industry names wrap onto a second line; the number hangs to the left so wrapped lines align with the name */
+@media (max-width:600px){
+  .biz-table > tbody > .biz-row > .biz-name{white-space:normal;width:62vw;min-width:150px;max-width:62vw;padding-left:calc(5px + 2.6em);text-indent:-2.6em;overflow-wrap:anywhere;line-height:1.3;}
+  .biz-table > thead > tr > th:first-child{padding-left:calc(5px + 2.6em);text-indent:-2.6em;}
+}

@@ -1,0 +1,150 @@
+// Renders the stock detail page and wires its buttons.
+import { LINK_ICON } from './icons.js';
+import { detailEl } from '../core/dom.js';
+import { stocks } from '../core/stocks.js';
+import { getDb, getRefreshRequest } from '../core/store.js';
+import { isPinned, togglePin } from '../core/pins.js';
+import { escapeHtml, formatRequestedAt, sanitizeDocId, screenerUrl, tickerSymbol } from '../core/util.js';
+import { cancelRefreshRequest, requestRefresh } from '../core/refreshrequests.js';
+import { scoreDelta } from '../list/metrics.js';
+import { renderValuationPanel } from './valuation.js';
+import { renderFundamentals } from './fundamentals.js';
+import { renderTvChart } from '../tv/links.js';
+import { renderTechPanel } from './technical.js';
+import { renderStockResearchBar } from './pending.js';
+import { renderGlobalFactorsPanel } from './globalfactors.js';
+import { renderPeersPanel } from './peers.js';
+import { SHOW_CHANGE_NOTE, SHOW_REQUEST_REFRESH, bindDetailJumpNav, renderDetailJumpNav } from './jumpnav.js';
+import { loadPriceBarsFor } from '../prices/store.js';
+import { initPriceChart } from '../prices/chart.js';
+import { bindLiveDataBar } from '../livedata/bar.js';
+import { showSection } from '../ui/navigation.js';
+import { copyText, stockShareLink, syncStockHash } from '../ui/deeplink.js';
+
+// Set when a stock is opened from the Analysis screen (chart dot or leaderboard row), so the detail
+// view can offer a one-tap "Back to Analysis" that returns to the same filters and scroll position.
+let detailBackTo = null;
+function detailBackToAnalysis(){
+  if(!detailBackTo) return;
+  if(detailBackTo.onBack){ const back = detailBackTo.onBack; detailBackTo = null; back(); return; }
+  const y = detailBackTo.scroll, to = detailBackTo.section || 'analysis';
+  detailBackTo = null;
+  showSection(to);
+  requestAnimationFrame(()=>{ window.scrollTo(0, y); });
+}
+// The stock the detail panel is showing right now (opened from Analysis, Strategies, Explorer or the search box).
+let shownIdx = -1;
+function getShownIndex(){ return shownIdx; }
+// Redraws whatever stock is open, e.g. after saved research or a pin change; does nothing if none is open.
+function rerenderDetail(){ if(stocks[shownIdx]) renderDetail(shownIdx); }
+function renderDetail(idx){
+  shownIdx = idx;
+  const s = stocks[idx];
+  const delta = scoreDelta(s);
+  const pinned = isPinned(s);
+  detailEl.innerHTML = `
+    ${detailBackTo ? `<div class="detail-back-bar"><button type="button" class="detail-back" id="detailBackBtn" title="Back (Esc)">&larr; Back to ${detailBackTo.label || 'Analysis'}<span class="detail-back-key">Esc</span></button></div>` : ''}
+    <div class="detail-top">
+      <div class="detail-title">
+        <button type="button" class="detail-star${pinned?' pinned':''}" id="detailPinBtn" aria-pressed="${pinned?'true':'false'}" aria-label="${pinned?'Unpin from top':'Pin to top'}" title="${pinned?'Pinned — click to unpin':'Pin to top'}">${pinned?'★':'☆'}</button>
+        <div class="detail-title-text"><div class="detail-name">${s.name}</div><div class="detail-ticker">${s.ticker}</div></div>
+      </div>
+    <div class="detail-meta">
+     ${SHOW_REQUEST_REFRESH ? `<div class="detail-meta-row">
+      ${(() => {
+        const reqId = sanitizeDocId(tickerSymbol(s));
+        const pending = getRefreshRequest(reqId);
+        if(pending){
+          return `<button type="button" class="refresh-pending" id="cancelRefreshBtn" title="Click to cancel this request">⏳ Refresh requested ${escapeHtml(formatRequestedAt(pending.requestedAt))} ✕</button>`;
+        }
+        if(!getDb()) return '';
+        return `<button type="button" class="refresh-btn" id="requestRefreshBtn">↻ Request refresh</button>`;
+      })()}
+     </div>` : ''}
+     <div class="detail-meta-row detail-meta-links">
+      <a href="${screenerUrl(s)}" target="_blank" rel="noopener noreferrer">${LINK_ICON}<span>View on screener.in</span></a>
+      ${renderTvChart(s)}
+      <a href="#" id="copyStockLinkBtn" class="share-link-btn" title="Copy a link that opens this stock"><svg class="link-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg><span class="share-link-label">Share link</span></a>
+     </div>
+    </div>
+    </div>
+    ${renderDetailJumpNav(s)}
+    ${renderStockResearchBar(s)}
+    ${SHOW_CHANGE_NOTE && delta !== 0 && s.changeNote ? `<div class="change-note"><span class="change-note-label">What changed</span><span>${s.changeNote}</span></div>` : ''}
+    ${renderValuationPanel(s)}
+    ${renderGlobalFactorsPanel(s)}
+    ${renderFundamentals(s)}
+    ${renderTechPanel(s)}
+    ${renderPeersPanel(s, idx)}
+  `;
+
+  initPriceChart(s);
+  loadPriceBarsFor(s, idx);
+  bindDetailJumpNav(detailEl);
+  const peersPanel = document.getElementById('peersPanel');
+  if(peersPanel){
+    peersPanel.querySelectorAll('tbody tr[data-idx]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const i = Number(tr.dataset.idx);
+        if(i !== idx){ renderDetail(i); syncStockHash(stocks[i]); }
+      });
+    });
+    const scroller = peersPanel.querySelector('.peers-scroll');
+    const selfRow = peersPanel.querySelector('tr.peers-self');
+    if(scroller && selfRow){
+      scroller.scrollTop = Math.max(0, selfRow.offsetTop - scroller.clientHeight / 2 + selfRow.offsetHeight / 2);
+    }
+  }
+
+  const howCalculatedLink = document.getElementById('howCalculatedLink');
+  if(howCalculatedLink){
+    howCalculatedLink.addEventListener('click', (e)=>{
+      e.preventDefault();
+      showSection('knowledgebase');
+      document.getElementById('kb-fundamental')?.scrollIntoView({block:'start'});
+    });
+  }
+
+  detailEl.querySelectorAll('.proxy-tag-link').forEach(tag => {
+    tag.addEventListener('click', (e)=>{
+      e.preventDefault();
+      showSection('help');
+      document.getElementById('glossary-data-proxy')?.scrollIntoView({block:'start'});
+    });
+  });
+
+  const copyLinkBtn = document.getElementById('copyStockLinkBtn');
+  if(copyLinkBtn){
+    copyLinkBtn.onclick = (e) => {
+      e.preventDefault();
+      const shareLabel = copyLinkBtn.querySelector('.share-link-label') || copyLinkBtn;
+      copyText(stockShareLink(s)).then(() => { shareLabel.textContent = 'Link copied ✓'; }, () => { shareLabel.textContent = stockShareLink(s); })
+        .then(() => setTimeout(() => { shareLabel.textContent = 'Share link'; }, 2500));
+    };
+  }
+  const detailPinBtn = document.getElementById('detailPinBtn');
+  if(detailPinBtn){
+    detailPinBtn.onclick = () => togglePin(s.ticker);
+  }
+
+  const requestRefreshBtn = document.getElementById('requestRefreshBtn');
+  if(requestRefreshBtn){
+    requestRefreshBtn.onclick = () => {
+      requestRefreshBtn.disabled = true;
+      requestRefreshBtn.textContent = 'Requesting…';
+      requestRefresh(s);
+    };
+  }
+
+  const cancelRefreshBtn = document.getElementById('cancelRefreshBtn');
+  if(cancelRefreshBtn){
+    cancelRefreshBtn.onclick = () => cancelRefreshRequest(sanitizeDocId(tickerSymbol(s)));
+  }
+
+  bindLiveDataBar(s);   // Live Data Refresh buttons (js/livedata.js)
+
+}
+
+function setDetailBackTo(v){ detailBackTo = v; }
+
+export { detailBackToAnalysis, getShownIndex, renderDetail, rerenderDetail, setDetailBackTo };

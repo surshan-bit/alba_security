@@ -1,0 +1,264 @@
+    <header>
+      <h1>Help</h1>
+      <div class="sub">How the Fundamental and Technical Scores are calculated.</div>
+    </header>
+
+    <div class="help-panel">
+      <div class="help-toc">
+        <a href="#help-f1">Fundamental Score</a>
+        <a href="#help-technical">Technical Score</a>
+        <a href="#help-glossary">Glossary</a>
+      </div>
+
+      <h2 id="help-f1">The Fundamental Score &mdash; 9 factors, step by step</h2>
+      <ul>
+        <li>Every stock is scored on <b>nine factors</b> in three categories.</li>
+        <li>The factor weights add up to exactly <b>10</b>, so the Overall Score is simply the sum of the nine factor scores.</li>
+        <li>Each factor looks at several screener.in fields, to reduce single-year noise:
+          <ul>
+            <li><b>Financial Health:</b> adds Altman Z Score, Current Ratio and Debtor Days.</li>
+            <li><b>Profitability:</b> blends this year's ROCE/ROE 50/50 with the long-run average.</li>
+            <li><b>Growth:</b> adds a cash-flow check (Free Cash Flow and Operating Cash Flow).</li>
+            <li><b>Valuation Metrics:</b> compares P/E with the stock's own 5-year P/E.</li>
+            <li><b>Governance:</b> adds a small adjustment for FII/DII holding change.</li>
+            <li><b>Capital Reinvestment:</b> uses CROIC, falling back to ROIC if CROIC is missing.</li>
+          </ul>
+        </li>
+        <li>Contingent Liabilities, Graham Number and NCAVPS appear next to the relevant factor as cross-checks. They are <i>not</i> part of the score.</li>
+      </ul>
+
+      <h3>Step 1 &mdash; the nine factors and their weights</h3>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>Category</th><th>Factor</th><th>Weight</th><th>What it looks at</th></tr></thead>
+        <tbody>
+          <tr><td>Traditional</td><td>Financial Health &amp; Balance Sheet</td><td>1.8</td><td>Leverage, interest coverage, working-capital efficiency.</td></tr>
+          <tr><td>Traditional</td><td>Profitability &amp; Capital Efficiency</td><td>1.8</td><td>ROE and ROCE against the 15% quality bar.</td></tr>
+          <tr><td>Traditional</td><td>Growth &amp; Cash Flow Generation</td><td>1.125</td><td>Profit growth, and whether free cash flow backs it up.</td></tr>
+          <tr><td>Traditional</td><td>Valuation Metrics (vs. industry)</td><td>1.125</td><td>P/E and P/B against the return profile: cheap, fair or expensive.</td></tr>
+          <tr><td>Buffett</td><td>Moat &amp; Competitive Advantage</td><td>0.9</td><td>Market position and how defensible it is.</td></tr>
+          <tr><td>Buffett</td><td>Management &amp; Governance</td><td>0.9</td><td>Promoter holding trend, pledging, related-party flags.</td></tr>
+          <tr><td>Buffett</td><td>Earnings Predictability</td><td>0.675</td><td>How steady profit growth has been, not one spiky year.</td></tr>
+          <tr><td>Buffett</td><td>Capital Reinvestment Efficiency</td><td>0.675</td><td>Are retained earnings reinvested at a good return?</td></tr>
+          <tr><td>Valuation</td><td>Valuation &amp; Margin of Safety (Screener.in Intrinsic Value)</td><td>1.0</td><td>Screener.in's Intrinsic Value vs. current price, ranked against every other stock.</td></tr>
+        </tbody>
+      </table></div>
+      <p class="help-formula">1.8 + 1.8 + 1.125 + 1.125 + 0.9 + 0.9 + 0.675 + 0.675 + 1.0 = <b>10</b></p>
+
+      <h3>Step 2 &mdash; score each factor from 0 up to its own weight</h3>
+      <ul>
+        <li>Each factor is scored on its own scale, e.g. Financial Health runs from 0 to 1.8.</li>
+        <li>Full weight means top marks on that dimension; 0 means it failed the check entirely.</li>
+        <li>If one input metric is missing, the factor is scored on the metrics that are present.</li>
+      </ul>
+
+      <h3>Step 3 &mdash; add up the nine factor scores</h3>
+      <p class="help-formula">Overall Score = Financial Health + Profitability + Growth + Valuation Metrics + Moat + Governance + Earnings Predictability + Capital Reinvestment Efficiency + Margin of Safety</p>
+      <ul><li>The weights already sum to 10, so the total lands on a 0&ndash;10 scale with no rescaling.</li></ul>
+
+      <h3>Step 4 &mdash; roll factors up into three Subscores</h3>
+      <ul>
+        <li>Each stock also shows a 0&ndash;10 Subscore per category.</li>
+        <li>A solid Overall Score can hide one weak category; the split makes that visible.</li>
+      </ul>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>Subscore</th><th>Built from</th><th>Formula</th></tr></thead>
+        <tbody>
+          <tr><td>Traditional Subscore</td><td>Financial Health, Profitability, Growth, Valuation Metrics</td><td>(sum of those 4 factor scores) &divide; 5.85 &times; 10</td></tr>
+          <tr><td>Buffett Subscore</td><td>Moat, Governance, Earnings Predictability, Capital Reinvestment Efficiency</td><td>(sum of those 4 factor scores) &divide; 3.15 &times; 10</td></tr>
+          <tr><td>Valuation Subscore</td><td>Margin of Safety (alone)</td><td>(that factor's score) &divide; 1.0 &times; 10</td></tr>
+        </tbody>
+      </table></div>
+      <ul><li>5.85 and 3.15 are just each category's own weights added up (1.8+1.8+1.125+1.125 and 0.9+0.9+0.675+0.675).</li></ul>
+
+      <h3>Step 5 &mdash; score becomes a verdict</h3>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>Overall Score</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td>8.0 and above</td><td><span class="badge b-buy">Strong</span></td></tr>
+          <tr><td>6.0 &ndash; 7.99</td><td><span class="badge b-mbuy">Good</span></td></tr>
+          <tr><td>5.0 &ndash; 5.99</td><td><span class="badge b-hold">Hold</span></td></tr>
+          <tr><td>Below 5.0</td><td><span class="badge b-avoid">Avoid</span></td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Step 6 &mdash; worked example: Great Eastern Shipping (GESHIP)</h3>
+      <p>Real published numbers from the 2026-09-30 reprocessing:</p>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>Category</th><th>Factor</th><th>Score</th><th>Weight</th></tr></thead>
+        <tbody>
+          <tr><td>Traditional</td><td>Financial Health &amp; Balance Sheet</td><td>1.72</td><td>1.8</td></tr>
+          <tr><td>Traditional</td><td>Profitability &amp; Capital Efficiency</td><td>0.81</td><td>1.8</td></tr>
+          <tr><td>Traditional</td><td>Growth &amp; Cash Flow Generation</td><td>0.32</td><td>1.125</td></tr>
+          <tr><td>Traditional</td><td>Valuation Metrics</td><td>0.72</td><td>1.125</td></tr>
+          <tr><td>Buffett</td><td>Moat &amp; Competitive Advantage</td><td>0.74</td><td>0.9</td></tr>
+          <tr><td>Buffett</td><td>Management &amp; Governance</td><td>0.90</td><td>0.9</td></tr>
+          <tr><td>Buffett</td><td>Earnings Predictability</td><td>0.18</td><td>0.675</td></tr>
+          <tr><td>Buffett</td><td>Capital Reinvestment Efficiency</td><td>0.44</td><td>0.675</td></tr>
+          <tr><td>Valuation</td><td>Margin of Safety (vs. Screener.in Intrinsic Value)</td><td>0.81</td><td>1.0</td></tr>
+        </tbody>
+      </table></div>
+      <p class="help-formula">Overall Score = 1.72 + 0.81 + 0.32 + 0.72 + 0.74 + 0.90 + 0.18 + 0.44 + 0.81 = <b>6.64</b> &rarr; 6.0&ndash;7.99 band &rarr; verdict: Good
+
+Traditional Subscore = (1.72 + 0.81 + 0.32 + 0.72) &divide; 5.85 &times; 10 = 3.57 &divide; 5.85 &times; 10 = <b>6.10</b>
+Buffett Subscore = (0.74 + 0.90 + 0.18 + 0.44) &divide; 3.15 &times; 10 = 2.26 &divide; 3.15 &times; 10 = <b>7.17</b>
+Valuation Subscore = 0.81 &divide; 1.0 &times; 10 = <b>8.10</b></p>
+      <ul><li>These match the numbers on GESHIP's own card.</li></ul>
+
+      <h3>Where the data comes from</h3>
+      <ul>
+        <li><b>Source:</b> screener.in, cross-checked against filings and third-party research (Simply Wall St, TipRanks, Equitymaster, CARE Ratings, MoneyWorks4Me).</li>
+        <li><b>Peer ranking:</b> most factors rank a stock's metrics as a percentile against its exact peers, not against fixed thresholds.
+          <ul>
+            <li>Peers are stocks in the same Industry Group <i>and</i> the same industry, e.g. Commodity Chemicals within Chemicals &amp; Petrochemicals.</li>
+            <li>If that industry has fewer than 10 stocks, the comparison widens to the Industry Group, then to the whole ~2,000-stock universe.</li>
+            <li>The Industry Peers panel at the bottom of each stock lists the exact peers.</li>
+          </ul>
+        </li>
+        <li><b>Margin of Safety</b> is the exception: it is always ranked against the entire dataset, since a bargain is a bargain market-wide.</li>
+        <li><b>Intrinsic Value</b> is Screener.in's own published figure, the single source of truth used everywhere in this app.
+          <ul>
+            <li>It is a growth/ROCE-adjusted Graham Number: &radic;(EPS &times; Book Value &times; Max P/E &times; Max P/BV).</li>
+            <li>Max P/E = 5-year median sales growth &times; 1.5 (capped 8&ndash;100). Max P/BV = 5-year ROCE &divide; 8 (capped 1&ndash;10).</li>
+            <li>It is not a full discounted cash flow model, and Screener calls it "a very subjective ratio".</li>
+          </ul>
+        </li>
+        <li><b>Cross-checks:</b> Graham Number and NCAVPS come straight from the screener.in export. A big gap from Intrinsic Value, or a price below NCAVPS, is flagged on the factor card but never changes the score.</li>
+        <li><b>Verify it yourself:</b> each stock shows a "Last verified" date, a screener.in link and a TradingView chart link.</li>
+      </ul>
+
+      <h2 id="help-technical">The Technical Score &mdash; how it's calculated</h2>
+      <ul>
+        <li>A single <b>0&ndash;10</b> score for the stock's price momentum, built from five components.</li>
+        <li>It uses <b>MACD(12,26,9)</b> and <b>RSI(14)</b> on the monthly and weekly charts, plus a valuation input.</li>
+        <li>It's plain arithmetic on a TradingView Growth List export. There is no research or judgment involved, and no buy/sell labels.</li>
+      </ul>
+
+      <h3>Step 1 &mdash; the five components and their maximum points</h3>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>Component</th><th>Max points</th><th>What it looks at</th></tr></thead>
+        <tbody>
+          <tr><td>Monthly MACD</td><td>2.5</td><td>Is the long-term trend bullish, and is it above or below zero?</td></tr>
+          <tr><td>Weekly MACD</td><td>1.5</td><td>The same check on the weekly chart.</td></tr>
+          <tr><td>Monthly RSI</td><td>2.0</td><td>Which momentum zone the monthly RSI sits in.</td></tr>
+          <tr><td>Weekly RSI</td><td>2.0</td><td>The same check on the weekly RSI.</td></tr>
+          <tr><td>Valuation</td><td>2.0</td><td>The stock's valuation score &divide; 10 &times; 2.0.</td></tr>
+        </tbody>
+      </table></div>
+      <p class="help-formula">2.5 + 1.5 + 2.0 + 2.0 + 2.0 = <b>10</b></p>
+
+      <h3>Step 2 &mdash; score the MACD components</h3>
+      <ul>
+        <li>Points = the component's weight &times; a fraction based on where MACD sits against its signal line and zero:</li>
+      </ul>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>MACD position</th><th>Fraction of weight</th></tr></thead>
+        <tbody>
+          <tr><td>Bullish, above zero</td><td>1</td></tr>
+          <tr><td>Bearish, above zero</td><td>0.5</td></tr>
+          <tr><td>Bullish, below zero</td><td>1/3</td></tr>
+          <tr><td>Bearish, below zero</td><td>0</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Step 3 &mdash; score the RSI components</h3>
+      <ul><li>Each timeframe is scored by the zone its RSI falls in:</li></ul>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>RSI</th><th>Zone</th><th>Points</th></tr></thead>
+        <tbody>
+          <tr><td>55 &ndash; 70</td><td>Strong</td><td>2.0</td></tr>
+          <tr><td>45 &ndash; 55</td><td>Neutral</td><td>1.2</td></tr>
+          <tr><td>70 and above</td><td>Overbought</td><td>0.8</td></tr>
+          <tr><td>30 &ndash; 45</td><td>Weak</td><td>0.4</td></tr>
+          <tr><td>Below 30</td><td>Oversold</td><td>0</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Step 4 &mdash; add them up</h3>
+      <p class="help-formula">Technical Score = Monthly MACD + Weekly MACD + Monthly RSI + Weekly RSI + Valuation points</p>
+      <ul>
+        <li>The result is rounded to 2 decimals.</li>
+        <li>The five maximums add up to 10, so no rescaling is needed when every component is present.</li>
+      </ul>
+
+      <h3>Reading the colour-coded labels</h3>
+      <p><b>Technical Score</b> &mdash; the badge next to the score uses the same bands and colours as the Fundamental Score:</p>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>Technical Score</th><th>Label</th></tr></thead>
+        <tbody>
+          <tr><td>8.0 and above</td><td><span class="badge b-buy">Strong</span></td></tr>
+          <tr><td>6.0 &ndash; 7.99</td><td><span class="badge b-mbuy">Good</span></td></tr>
+          <tr><td>5.0 &ndash; 5.99</td><td><span class="badge b-hold">Hold</span></td></tr>
+          <tr><td>Below 5.0</td><td><span class="badge b-avoid">Avoid</span></td></tr>
+        </tbody>
+      </table></div>
+      <p><b>Weekly Rating</b> and <b>Monthly Rating</b> &mdash; the badge on the Weekly and Monthly cells reads that timeframe's MACD:</p>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>Rating</th><th>MACD position</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge b-buy">Bullish</span></td><td>Bullish, above zero</td><td>Trending upward.</td></tr>
+          <tr><td><span class="badge b-mbuy">Turning Up</span></td><td>Bullish, below zero</td><td>Starting to turn up, but still below its longer-term level.</td></tr>
+          <tr><td><span class="badge b-hold">Weakening</span></td><td>Bearish, above zero</td><td>Losing steam, but still above its longer-term level.</td></tr>
+          <tr><td><span class="badge b-avoid">Bearish</span></td><td>Bearish, below zero</td><td>Trending downward.</td></tr>
+        </tbody>
+      </table></div>
+      <ul>
+        <li>A dash (&mdash;) means that timeframe's MACD was missing from the export.</li>
+        <li>The Weekly and Monthly cells also show the price change for that period: green for a gain, red for a fall.</li>
+        <li>The RSI value beside each rating is the plain number. Its zone (Strong, Neutral, Overbought, Weak, Oversold) only decides the points in Step 3.</li>
+        <li>The Analysis leaderboard shows the same ratings as "W Tech Rating" and "M Tech Rating".</li>
+      </ul>
+
+      <h3>When data is missing</h3>
+      <ul>
+        <li>TradingView sometimes leaves a component blank, often the monthly figures for newer stocks. That component is left out of the sum.</li>
+        <li>The score is then rescaled to 0&ndash;10 over the components that are present.
+          <ul>
+            <li>Example: weekly MACD + weekly RSI + Valuation have a combined weight of 1.5 + 2.0 + 2.0 = 5.5.</li>
+            <li>The score is then (points earned &divide; 5.5) &times; 10.</li>
+          </ul>
+        </li>
+        <li>The stock's data-completeness badge (e.g. "3/5 signals") shows how many components were available.</li>
+        <li>If a stock has no row in the latest upload, its previous Technical Score is kept unchanged.</li>
+      </ul>
+
+      <h3>Where the data comes from</h3>
+      <ul>
+        <li>A TradingView Growth List export (.csv), uploaded on the Data Refresh page. It's the only source, and updates are manual.</li>
+        <li>Each upload also refreshes the stock's current price, and with it the Margin of Safety.</li>
+        <li>More detail is in <a href="#kb-technical">Knowledge Base §4</a>.</li>
+      </ul>
+
+      <h2 id="help-glossary">Glossary</h2>
+      <p>Quick definitions for the less obvious terms.</p>
+      <div class="glossary-grid">
+        <div class="glossary-item"><div class="glossary-term">Altman Z Score</div><div class="glossary-def">A bankruptcy-risk score. Higher is safer; low flags financial-distress risk.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Capital Reinvestment Efficiency</div><div class="glossary-def">When earnings are retained, are they reinvested at a strong return, or left idle?</div></div>
+        <div class="glossary-item"><div class="glossary-term">CROIC (Cash Return on Invested Capital)</div><div class="glossary-def">Free cash flow as a % of invested capital. Cash-based, so harder to flatter than ROIC. Preferred in Capital Reinvestment.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Current Ratio</div><div class="glossary-def">Current assets &divide; current liabilities. Can the company cover near-term bills?</div></div>
+        <div class="glossary-item"><div class="glossary-term">D/E (Debt-to-Equity)</div><div class="glossary-def">Total debt &divide; equity. Lower means less reliance on borrowing.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Earnings Predictability</div><div class="glossary-def">How steady profit growth has been. A smooth compounder scores higher than an erratic one.</div></div>
+        <div class="glossary-item"><div class="glossary-term">FII / DII Holding Change</div><div class="glossary-def">3-year change in foreign and domestic institutional ownership. Shows whether big investors are accumulating or exiting. Small, capped effect on Governance.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Factors badge (for example 5/9)</div><div class="glossary-def">Next to the Fundamental Score: how many of the nine factors had usable data. A note such as "4 researched, data unavailable" means those factors were researched but the figures could not be found.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Free Cash Flow</div><div class="glossary-def">Cash left after capital spending. Real cash, not accounting profit.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Graham Number</div><div class="glossary-def">Benjamin Graham's fair value: &radic;(22.5 &times; EPS &times; Book Value). Shown as a cross-check, not scored.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Incomplete data (tag)</div><div class="glossary-def">Appears on a factor card when some of its figures are missing. The factor is scored on whatever was available. Refresh Fundamental Info tries to fill the gaps.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Interest Coverage</div><div class="glossary-def">Operating profit &divide; interest expense. How many times over the interest bill is covered.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Intrinsic Value (Screener.in)</div><div class="glossary-def">Screener.in's own fair-value estimate, used for Margin of Safety, the MoS Rating filter and the Analysis section. A growth/ROCE-adjusted Graham Number, so treat it as one reasoned estimate, not a guarantee.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Margin of Safety</div><div class="glossary-def">(Intrinsic Value &minus; Current Price) &divide; Intrinsic Value. Positive = trades below intrinsic value; negative = above. Scored as a percentile against all stocks.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Moat</div><div class="glossary-def">A durable advantage (brand, scale, niche) that protects profits from competitors.</div></div>
+        <div class="glossary-item"><div class="glossary-term">NCAVPS (Net Current Asset Value Per Share)</div><div class="glossary-def">(Current assets &minus; total liabilities) &divide; shares. Graham's "liquidation value". A price below it is a deep-value "net-net" signal, shown as a flag.</div></div>
+        <div class="glossary-item"><div class="glossary-term">P/B (Price-to-Book)</div><div class="glossary-def">Share price &divide; book value per share. Below 1 can mean cheap relative to net assets.</div></div>
+        <div class="glossary-item"><div class="glossary-term">P/E (Price-to-Earnings)</div><div class="glossary-def">Share price &divide; earnings per share. Higher means more growth expected, or an expensive stock.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Piotroski F-Score</div><div class="glossary-def">A 0&ndash;9 checklist of profitability, leverage and efficiency signals. Higher means a stronger, improving business. Proxy for Governance.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Pledged Shares</div><div class="glossary-def">Promoter shares used as loan collateral. High pledging is a governance risk.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Promoter Holding</div><div class="glossary-def">% owned by the founders/promoters. A falling trend is worth watching.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Quick Ratio</div><div class="glossary-def">(Current assets &minus; inventory) &divide; current liabilities. A stricter liquidity test than the current ratio.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Researched (tag)</div><div class="glossary-def">The card was refreshed with company-specific research (plain-language bullets and sources) by Refresh Fundamental Info. The date of the last refresh is shown in the Live Data Refresh section, not on the card.</div></div>
+        <div class="glossary-item"><div class="glossary-term">ROCE (Return on Capital Employed)</div><div class="glossary-def">Operating profit as a % of total capital (equity + debt). How efficiently all capital is used.</div></div>
+        <div class="glossary-item"><div class="glossary-term">ROE (Return on Equity)</div><div class="glossary-def">Net profit as a % of shareholders' equity. How well owners' money is turned into profit.</div></div>
+        <div class="glossary-item"><div class="glossary-term">ROIC (Return on Invested Capital)</div><div class="glossary-def">Operating profit as a % of invested capital. Used only when CROIC is missing.</div></div>
+        <div class="glossary-item"><div class="glossary-term">Subscore</div><div class="glossary-def">A 0&ndash;10 score for one category (Traditional, Buffett or Valuation), so categories can be compared side by side.</div></div>
+      </div>
+
+      <p class="help-disclaimer">This is not investment advice &mdash; it's a structured way to organize public data for your own research.</p>
+    </div>

@@ -1,0 +1,760 @@
+    <header>
+      <h1>Knowledge Base</h1>
+      <div class="sub">The stack behind this screener and where each section's data comes from. For how a score is calculated, see <a href="#help-f1">Help</a>.</div>
+    </header>
+
+    <div class="help-panel">
+      <div class="help-toc">
+        <a href="#kb-arch">1. Architecture at a glance</a>
+        <a href="#kb-maintenance">2. How this screener stays up to date</a>
+        <a href="#kb-fundamental">3. Fundamental Score &mdash; stack &amp; sources</a>
+        <a href="#kb-technical">4. Technical Score &mdash; stack &amp; sources</a>
+        <a href="#kb-valuation">5. Valuation &mdash; stack &amp; sources</a>
+        <a href="#kb-global">6. Global &amp; Macro Information &mdash; stack &amp; sources</a>
+        <a href="#kb-db">7. Shared database (brief)</a>
+        <a href="#kb-pipeline">8. Build, test and release</a>
+        <a href="#kb-versions">9. Version history</a>
+      </div>
+
+      <h2 id="kb-arch">1. Architecture at a glance</h2>
+      <p>A single-page dashboard published as a claude.ai Artifact. The source is plain ES modules; a small build step turns them into a few static files that the Artifact serves. There is no server of our own: the page talks to the shared database, to Claude and to TradingView through the Artifact's built-in connectors.</p>
+      <ul>
+        <li><b>Source:</b> <code>src/</code> (JavaScript modules, one responsibility per file), <code>styles/</code> (CSS in cascade order, imported from <code>styles/main.css</code>), <code>partials/</code> (Help, Data Refresh and Knowledge Base text) and <code>index.html</code> (the page shell).</li>
+        <li><b>Build:</b> <code>node tools/build.js</code> bundles the source with esbuild into <code>app.js</code> (the small start-up file), hashed <code>chunks/</code> (code-split, so Data Refresh, Strategies, Explorer and Trade Log download only when first opened) and <code>styles.css</code>. These outputs are never edited by hand.</li>
+        <li><b>Start-up:</b> <code>js/loader.js</code> imports <code>app.js</code>, which loads the stock data from the database (a copy is kept in the browser, so repeat visits only download after a refresh), fetches the partials, then loads the application chunk. Every build gets an id so old and new files never mix.</li>
+        <li><b>Data:</b> the stock list lives in the shared database (<code>stockMeta</code> and <code>stockData</code>), with researched factors and technical updates layered on top on load (&sect;7). Nothing needs republishing when data is refreshed.</li>
+        <li><b>Hosting:</b> every release is a new version of the same Artifact URL; only changed files are uploaded.</li>
+      </ul>
+      <h3>Screens and where they live</h3>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>Screen</th><th>Code</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Analysis</td><td><code>src/analysis/</code></td><td>Leaderboard (sort, columns with drag-and-drop order, Show chart for the RSI Quadrant and its filters, Full screen) with the Live Data Refresh cards below the grid.</td></tr>
+          <tr><td>Strategies</td><td><code>src/strategies/</code></td><td>Strategy list (green dot = published, grey = not), collapsible Strategy / Goal / Rules blocks that start closed, qualifying stocks with tick boxes that only choose what <i>Track these picks</i> saves, refresh cards, Track record and the why-in-or-out lookup.</td></tr>
+          <tr><td>Explorer</td><td><code>src/business/</code></td><td>Industry table with All / Matched, Expand all, Full screen; each opened industry has its grid, refresh cards and a News block that starts closed.</td></tr>
+          <tr><td>Stock page</td><td><code>src/detail/</code></td><td>Valuation, fundamentals, technicals, global factors, peers; opens inside the screen you came from.</td></tr>
+          <tr><td>Data Refresh, Trade Log</td><td><code>src/joblogs/</code>, <code>src/import/</code>, <code>src/tradelog/</code></td><td>CSV imports, freshness, logs; real positions.</td></tr>
+        </tbody>
+      </table></div>
+      <h3>Shared building blocks (one place to change each)</h3>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>Module</th><th>What it centralises</th></tr></thead>
+        <tbody>
+          <tr><td><code>core/config.js</code></td><td>The shared limits: <code>BATCH_ROWS</code> (50: stocks per refresh press and rows kept live), the live ticker's interval, back-off and parallelism, and the Strategies table row cap.</td></tr>
+          <tr><td><code>livedata/cursor.js</code></td><td>The place a refresh card has reached: ranks 1&ndash;50, then 51&ndash;100 and so on, then back to the top. Pure code, unit-tested.</td></tr>
+          <tr><td><code>livedata/rounds.js</code>, <code>panel.js</code>, <code>batch.js</code></td><td>The two refresh cards (markup, labels, tooltips) and the batch runner, used identically by Analysis, Strategies and every Explorer industry.</td></tr>
+          <tr><td><code>live/ticker.js</code></td><td>Live prices: while the market is open, the open stock first and then the rows on screen (up to 50, in grid order) refresh every 20 seconds, with W % chg and M % chg measured against last week's and last month's close read from TradingView's weekly and monthly bars. The Live switch is in the top bar on every screen size.</td></tr>
+          <tr><td><code>ui/fullscreen.js</code></td><td>Full screen for the big grids: the button label, the browser's own full screen and Esc handling, shared by Analysis and Explorer.</td></tr>
+          <tr><td><code>ui/activity.js</code></td><td>The notification bell: running refreshes and finished notices.</td></tr>
+          <tr><td><code>styles/19-phone.css</code></td><td>Everything phone-specific (up to 600px) in one file, loaded last, with its sizes as three variables at the top (<code>--ph-ctl</code>, <code>--ph-gap</code>, <code>--ph-fs</code>).</td></tr>
+        </tbody>
+      </table></div>
+      <h3>Rules the code follows</h3>
+      <ul>
+        <li>Imports are explicit; a module cannot assign to another module's variable; start-up code lives in <code>init_*()</code> functions called from <code>src/main.js</code>; unused code fails the lint.</li>
+        <li>Screens share behaviour through the modules above rather than copies, so a change to refresh batches, full screen or the phone layout is made once.</li>
+        <li>Tests: engine unit tests (CSV engines and refresh batches), a jsdom regression harness compared with stored snapshots, and four Chromium suites (smoke and layout including phone sizes, state, live ticker, imports).</li>
+      </ul>
+
+      <h2 id="kb-maintenance">2. How this screener stays up to date</h2>
+      <p>The page is static and can't call outside services, so the Claude conversation that maintains it acts as the backend.</p>
+      <ul>
+        <li><b>Fundamental Score:</b> upload a screener.in CSV in the Fundamental job's panel on the Data Refresh page.
+          <ul>
+            <li>The file is saved in the artifact's asset store, with a record in <code>fundamentalCsvUploadLog</code> (&sect;7), so a later conversation can score it without re-attaching.</li>
+            <li>Claude runs the 9-factor mechanical model every time.</li>
+            <li>Researched factors are kept separately in <code>stockResearch</code> and layered on top, so a refresh never overwrites them.</li>
+            <li><b>This is the only way a new stock enters the dashboard.</b> A first-time ticker gets full onboarding.</li>
+          </ul>
+        </li>
+        <li><b>Technical Score:</b> upload a TradingView Growth List CSV in the Technical job's panel.
+          <ul>
+            <li>It is the sole source, and is pure arithmetic on RSI/MACD/price data.</li>
+            <li>It never onboards a new stock; unmatched symbols are skipped.</li>
+            <li>The old live TradingView fetch was retired on 2026-09-29.</li>
+          </ul>
+        </li>
+        <li><b>Fundamental/Valuation research pass:</b> retired 2026-09-29. These now update only from a fresh screener.in CSV.</li>
+        <li><b>Global &amp; Macro Factors:</b> its own manual "Refresh Data" button, limited to Strong/Good stocks. See <a href="#kb-global">Knowledge Base §6</a>.</li>
+        <li><b>Manual refresh queue:</b> the &#8635; button on a stock writes a timestamped request to the database; Claude clears it when asked.</li>
+        <li><b>TradingView Watchlist Sync:</b> manual only, no schedule. Rebuilds four lists from scratch on every run:
+          <ul>
+            <li><b>Alba Securities:</b> every Strong or Good stock.</li>
+            <li><b>Alba - Green:</b> Margin of Safety &ge; 0%.</li>
+            <li><b>Alba - Orange:</b> &minus;25% &le; MoS &lt; 0%.</li>
+            <li><b>Alba - Red:</b> MoS &lt; &minus;25%.</li>
+            <li>Strong/Good stocks with no valuation data are left out of the three MoS lists.</li>
+            <li>Lists are deleted and recreated each run, so a stock can never linger after leaving its band.</li>
+          </ul>
+        </li>
+      </ul>
+
+      <h2 id="kb-fundamental">3. Fundamental Score &mdash; stack &amp; sources</h2>
+      <p>Combines financial health, profitability, growth, valuation and governance into one score.</p>
+      <ul>
+        <li><b>Model:</b> 9 factors, weights summing to 10. Full breakdown and worked example in <a href="#help-f1">Help §1</a>.</li>
+        <li><b>Source:</b> a screener.in export CSV, uploaded on the Data Refresh page (&sect;2). It is the sole, always-on source; there's no scraper or data-provider API.</li>
+        <li><b>Computed from the CSV:</b> Financial Health, Profitability, Growth, Valuation, Earnings Predictability, Capital Reinvestment and Margin of Safety.</li>
+        <li><b>Proxies:</b> Moat uses industry-relative capital efficiency; Governance uses Piotroski F-Score percentile plus pledge and holding changes. Both are pending individual research.</li>
+        <li><b>Peer set (v3, 2026-10-06):</b>
+          <ul>
+            <li>Same Industry Group and same industry (the label after the &middot; in the ticker field).</li>
+            <li>Falls back per metric to the Industry Group, then to all stocks, when fewer than 10 peers have data.</li>
+            <li>Margin of Safety always ranks against all stocks.</li>
+          </ul>
+        </li>
+        <li><b>Engine:</b> kept in the asset store as <code>engine_v3.js</code>.</li>
+        <li><b>Upload panel:</b> shows new and dropped tickers before you commit. If the file browser doesn't open on your phone, open the page in your phone's own browser instead of inside the Claude app.</li>
+      </ul>
+
+      <h2 id="kb-technical">4. Technical Score &mdash; stack &amp; sources</h2>
+      <ul>
+        <li><b>Refresh:</b> manual only. Upload a Growth List CSV in the Technical job's panel; there's no schedule or live fetch (removed 2026-09-29).</li>
+        <li><b>Source:</b> a TradingView Growth List export with 1-week/1-month price change, RSI(14) and MACD(12,26,9) level and signal.</li>
+        <li><b>BSE-only tickers:</b> the dashboard stores a numeric BSE code as a placeholder. The <code>tradingview-watchlist-symbol-mapping</code> skill maps it to the TradingView alpha symbol so the row can be matched.</li>
+        <li><b>Computation:</b> a deterministic 0&ndash;10 composite, with no buy/sell bucket labels (removed 2026-09-29).
+          <ul>
+            <li><b>MACD points:</b> monthly weight 2.5, weekly weight 1.5, each &times; a fraction: 1 bullish above zero, 0.5 bearish above zero, 1/3 bullish below zero, 0 bearish below zero.</li>
+            <li><b>RSI points (per timeframe):</b> 2.0 for 55&ndash;70, 1.2 for 45&ndash;55, 0.8 for 70 and above, 0.4 for 30&ndash;45, 0 below 30.</li>
+            <li><b>Valuation points:</b> (<code>pillars.val</code> &divide; 10) &times; 2.0. Never touch or delete <code>pillars.val</code>.</li>
+            <li><b>Composite:</b> the sum, rounded to 2 decimals.</li>
+          </ul>
+        </li>
+        <li><b>Partial data:</b> a blank component (often monthly MACD/RSI for newer tickers) is left out, and the sum is rescaled to 0&ndash;10 over the weights present.
+          <ul>
+            <li>Example: weekly MACD + weekly RSI + Valuation = 5.5 weight, so composite = (points &divide; 5.5) &times; 10.</li>
+            <li>With every component present this equals the plain sum.</li>
+            <li><code>technical.reason</code> names what was missing.</li>
+          </ul>
+        </li>
+        <li><b>Left untouched:</b> a stock's existing <code>technical</code> block stays as is when it has no row in the CSV, or when <code>pillars.val</code> is missing.</li>
+        <li><b>No onboarding:</b> symbols not already on the dashboard are skipped. New stocks come only from the Fundamental CSV (&sect;3).</li>
+        <li><b>Price refresh:</b> each import also updates matched stocks' current price (see v1.9).</li>
+        <li><b>Price history chart (optional, per stock):</b> Weekly and Monthly candlestick bars from TradingView, shown in the Technical Score panel.
+          <ul>
+            <li>Pulled only when you want it: <b>Refresh Technical Info</b> in the stock's Live Data Refresh section (or in bulk from the Analysis screen). It fetches only the new weekly and monthly bars when history is already stored.</li>
+            <li>Refreshes fetch only the delta: when bars are already stored, just the bars since the last stored one are pulled (plus 3 of overlap), merged into the stored history and cross-checked against it. If the overlap no longer matches (for example after a split), it falls back to a full re-download. The first run for a stock still fetches the full 5 years.</li>
+            <li>Ticked on its own (nothing else flagged), the request only refreshes the price bars and needs no republish.</li>
+            <li>Up to 5 years of history or everything since listing, validated and stored in the <code>priceHistory</code> collection (&sect;7). It never changes a score.</li>
+          </ul>
+        </li>
+        <li><b>Upload panel:</b> shows new and dropped tickers and a refresh scope preview, and saves the file to the asset store (&sect;7).</li>
+      </ul>
+      <p class="help-disclaimer">History: from 2026-09-22 to 2026-09-29 the score came mainly from a live daily TradingView fetch. That scheduled task was deleted to save resources, and CSV upload is again the only mechanism.</p>
+
+      <h2 id="kb-valuation">5. Valuation &mdash; stack &amp; sources</h2>
+      <ul>
+        <li><b>Source:</b> one "Intrinsic Value" column from the uploaded screener.in CSV, carried through as is, not recomputed. Analyst price targets were removed 2026-09-29.</li>
+        <li><b>Margin of Safety</b> = (Intrinsic Value &minus; Current Price) &divide; Intrinsic Value.</li>
+        <li><b>Drives:</b> the MoS %, the MoS badge on rows, and the green/orange/red MoS Rating filter.</li>
+        <li><b>Not a DCF:</b> it has no discount-rate assumptions, and it is weakest for cyclical, asset-heavy businesses (shipping, dry bulk, commodities) where one year's EPS isn't representative.</li>
+        <li><b>Graham Number is a different figure.</b> It comes from a separate CSV column.
+          <ul>
+            <li>It is shown read-only on the Margin of Safety factor card as a cross-check, and feeds no filter or score.</li>
+            <li>The two disagree by over 30% on 1,078 of 1,718 stocks that carry both (checked 2026-09-30). On OCCL, the Graham Number (&#8377;172) implies fair value while Screener's figure (&#8377;354.91) implies ~50% undervaluation.</li>
+            <li>Treat them as two independent opinions.</li>
+          </ul>
+        </li>
+        <li><b>Refresh:</b> tied 1:1 to the Fundamental CSV upload (&sect;3). There's no separate research pass.</li>
+        <li><b>Retired 2026-09-30:</b> a second "Computed Intrinsic Value" (a cyclical-normalized Graham Number) was dropped once Screener's own method proved more sophisticated. See &sect;9.</li>
+        <li><b>Removed 2026-09-30:</b> the 12-Month Price Target and FII Ownership Trend cells, including their fields and render code.</li>
+      </ul>
+
+      <h2 id="kb-global">6. Global &amp; Macro Information &mdash; stack &amp; sources</h2>
+      <ul>
+        <li><b>What it is:</b> a curated, sourced list of macro, commodity, currency and trade-policy linkages that can move the stock. No scoring.</li>
+        <li><b>Sources:</b> sector-level web research for most stocks, individual research for large or newsworthy names.</li>
+        <li><b>Scope (since 2026-09-30):</b> Strong or Good stocks only, about 487 of them, the same set the Watchlist Sync targets.
+          <ul>
+            <li>Hold and Avoid stocks keep an empty record until they reach Strong or Good.</li>
+            <li>The reason is the shared web-search quota (&sect;2).</li>
+          </ul>
+        </li>
+        <li><b>Bulk refresh:</b> its own manual trigger on the Data Refresh page, independent of the Fundamental CSV, and needed less often since these linkages move slowly.
+          <ul>
+            <li>Prioritizes in-scope stocks with no research, then the most out of date, or a subset you name.</li>
+            <li>Updates each stock's <code>globalFactors</code> lists and sources in the database; no republish.</li>
+            <li>Never touches Fundamental, Valuation or Technical Score.</li>
+          </ul>
+        </li>
+        <li><b>Single stock:</b> <b>Refresh Fundamental Info</b> in the stock's Live Data Refresh section, in scope or not. It runs inside the page (no Claude chat) and refreshes the macro linkages and a new <b>Critical news &amp; world events</b> block: up to 4 events (wars, sanctions, oil or commodity shocks, tariffs, policy, currency) tagged Helps, Hurts or Mixed with a one-line plain reason and a source.
+          <ul>
+            <li>It is context only and never changes a score. It sits above the Technical Score panel.</li>
+            <li>Events come from the TradingView headlines the refresh reads plus Claude's own knowledge (to about mid-2026). There is no live web search, so events from Claude's knowledge are labelled "may be dated".</li>
+          </ul>
+        </li>
+      </ul>
+
+      <h2 id="kb-db">7. Shared database (brief)</h2>
+      <p>A few collections cover what must sync across devices or survive a republish. Nothing scoring-related lives here.</p>
+      <div class="help-table-wrap"><table class="help-table">
+        <thead><tr><th>Collection / doc</th><th>Holds</th></tr></thead>
+        <tbody>
+          <tr><td>users/&lt;id&gt;</td><td>One small record per signed-in user (id, first and last seen). Ids only, no names or emails. Readable by editors only.</td></tr>
+          <tr><td>data/users/&lt;id&gt;/prefs, pins, portfolio/trades</td><td>Each user's private preferences (theme, Analysis filters and sort, Trade Log view), pinned tickers and Trade Log. Nobody else can read these, not even the owner.</td></tr>
+          <tr><td>refreshRequests</td><td>Pending manual "Request refresh" tickers, cleared once processed.</td></tr>
+          <tr><td>deepRefreshLog</td><td>Retired weekend deep-refresh history (kept for the record).</td></tr>
+          <tr><td>techFetchLog</td><td>Retired weekday TradingView fetch history (kept for the record).</td></tr>
+          <tr><td>watchlistSyncLog</td><td>Watchlist rebuild history (status, counts, tickers). Manual runs only; the 3 most recent are kept.</td></tr>
+          <tr><td>globalFactorsLog</td><td>Global &amp; Macro refresh history. Manual runs only.</td></tr>
+          <tr><td>backupLog</td><td>Safety backups of the stock data taken before each refresh. The 5 most recent are kept; restore the newest if a publish goes wrong.</td></tr>
+          <tr><td>devTools</td><td>Maintenance scripts. <code>precheck</code> is the pre-publish checker that must pass before any refresh is published.</td></tr>
+          <tr><td>priceHistory</td><td>Written by the page's "Refresh price &amp; technicals" button (TradingView connector) and by Claude research. Weekly and monthly price bars per stock (doc id = exchange, symbol and timeframe, e.g. NSE_OCCLLTD_1W; bars as [t, open, high, low, close, volume]). Read by the price chart in the Technical Score panel.</td></tr>
+          <tr><td>stockMeta, stockData</td><td>The stock list itself: stockMeta/main is the index (version, chunk ids, ticker-to-chunk map) and stockData/cNNN hold the stocks in chunks of about 200 KB. The page loads them when it opens and keeps a copy in the browser, so a repeat visit only downloads the data again after a refresh bumps the version. CSV refreshes and bulk jobs write here; nothing needs republishing.</td></tr>
+          <tr><td>stockUpdates</td><td>Technical block (Part B) and company-level Global &amp; Macro items (Part C) per stock (doc id = ticker). Layered on top of the stock list on load, so research runs never need to republish the page. Delete a document to revert that stock.</td></tr>
+          <tr><td>stockResearch</td><td>Researched factors per stock (doc id = ticker). Layered on top of the stock list, so CSV refreshes can't overwrite them. Delete a document to revert that stock.</td></tr>
+          <tr><td>fundamentalCsvUploadLog</td><td>Fundamental CSV upload history (filename, size, row/new/dropped counts, asset id).</td></tr>
+          <tr><td>technicalCsvUploadLog</td><td>Growth List CSV upload history (same fields).</td></tr>
+        </tbody>
+      </table></div>
+      <ul>
+        <li>The CSV files themselves live in the artifact's asset store, a separate file-storage area (the <code>assets</code> capability), not in the database.</li>
+        <li>The two upload logs hold only the metadata and a pointer to the stored file.</li>
+      </ul>
+
+      <h2 id="kb-pipeline">8. Build, test and release</h2>
+      <ol>
+        <li>Edit only <code>src/</code>, <code>styles/</code>, <code>partials/</code> and <code>index.html</code>. The built files are generated.</li>
+        <li><code>npm run check</code> does everything before a release: build, "built files are up to date", syntax check, strict lint (undefined names, start-up order, unused code), the engine unit tests, the jsdom regression harness against <code>tests/golden.json</code>, and the Chromium suites. After a reviewed, intended change, <code>npm run update-golden</code> accepts the new snapshots.</li>
+        <li>Bump the version badge in <code>index.html</code>, add a Version History entry here, and rebuild.</li>
+        <li>Publish with the Artifact tool: the page shell plus only the files that changed (the hashed chunk files change on every build, so the old names are removed). Stock data, research and logs live in the database and never need republishing.</li>
+      </ol>
+
+      <h2 id="kb-versions">9. Version history</h2>
+      <ul>
+        <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
+        <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
+      </ul>
+            <h3>v1.120 &middot; 2026-10-13</h3>
+            <ul>
+              <li><b>Light theme in blue:</b> the Light theme now uses a blue palette: a deeper blue top bar, buttons, links and selected switches, with cool pale-blue pages and white cards. Text is darker and the grid text heavier (Dark has the heavier grid text and brighter text too), so everything is easier to read. Light uses the same fonts as Dark.</li>
+              <li><b>Strategies:</b> Strategy, Goal and Rules are now one &ldquo;Strategy setup&rdquo; heading that opens and closes together. Open, each part has its label on the left and fewer divider lines; on phones the heading and its one-line summary are laid out to fit the width.</li>
+              <li><b>Explorer:</b> the explanatory note under the industry list (about the average change and the news) is gone.</li>
+              <li><b>Tests:</b> the automatic test steps are switched back on in the pre-publish check.</li>
+            </ul>
+            <h3>v1.113 &middot; 2026-10-13</h3>
+            <ul>
+              <li><b>New Light theme:</b> the purple (Indigo) theme is now called Light and follows the Screener look: a warm sand page, cream cards, dark text, purple buttons and links, faint banded rows in the grids and clearer borders on inputs and buttons, so everything is easier to read than before. The Red theme is gone; anyone who had chosen it now sees Light.</li>
+              <li><b>Purple top bar, white grids:</b> in the Light theme the top bar is purple with white text, and each screen is one white card on the sand page (Explorer, Analysis, Strategies, Trade Log): the filters or strategy list and the grid sit together in it, so the numbers are easier to read and every screen looks the same.</li>
+              <li><b>Settings:</b> Themes now offers Dark and Light.</li>
+              <li><b>Data Refresh:</b> larger text throughout, in the same sizes as the Help page (headings, sub-headings, descriptions, the data-age lines and the backup list), so it is easier to read.</li>
+              <li><b>Tests paused:</b> the automatic test steps are switched off for now while the Light theme is tested by eye; the build, syntax and lint checks still run. They can be switched back on later.</li>
+            </ul>
+            <h3>v1.112 &middot; 2026-10-13</h3>
+            <ul>
+              <li><b>Explorer industry list:</b> a # column numbers the industries in the order shown (it renumbers when you sort), and on phones long industry names wrap onto a second line instead of running off the edge. On laptops and tablets long industry names wrap too (the column is capped at a sensible width), so the numbers beside them stay close and easy to read.</li>
+            </ul>
+            <h3>v1.111 &middot; 2026-10-13</h3>
+            <ul>
+              <li><b>More breathing space in the lists:</b> Explorer, Strategies and Analysis have taller rows and more room under each column heading, and more space between the Filters line, the buttons and the grid.</li>
+              <li><b>On phones:</b> the side margins are a little wider, the buttons above the lists are taller and easier to tap, the strategy chips, the rule rows and the Track record cards have more room, and the Goal / Rules lines are no longer packed together.</li>
+            </ul>
+            <h3>v1.110 &middot; 2026-10-12</h3>
+            <ul>
+              <li><b>Analysis:</b> Full screen for the leaderboard (Esc to leave; the refresh cards are hidden in full screen). Show chart sits beside Columns and Full screen and holds the RSI Quadrant with its filters, closed at first. Columns are reordered by dragging a row by its handle (or the arrow keys). Live Data Refresh sits below the grid, as in Explorer, with no tick boxes: each press refreshes the next 50 shown stocks (1&ndash;50, then 51&ndash;100, and so on).</li>
+              <li><b>Live prices:</b> W % chg and M % chg are now this week's and this month's change (against last week's and last month's close, from TradingView's weekly and monthly bars). The ticker keeps up to 50 rows live, in grid order. The Live switch is also in the top bar on phones.</li>
+              <li><b>Strategies:</b> Strategy, Goal and Rules are collapsible and start closed. A green or grey dot shows published or not. The qualifying list has tick boxes only for <i>Track these picks</i>; the refresh cards work like Analysis. The old "Qualifying stocks" label is gone.</li>
+              <li><b>Explorer:</b> Full screen, All / Matched and Expand all match the Analysis buttons; the News block of an industry starts closed.</li>
+              <li><b>Phones:</b> a full phone layout (<code>styles/19-phone.css</code>): side margins used, compact leaderboard header, Filters folded into one line, strategies as a row of chips, tidy rule rows, three-line Track record cards, side-by-side import buttons, a wider and slimmer search box, no floating Back button on a stock page, and a notification panel that opens (and shows "Nothing running" when empty).</li>
+              <li><b>Behind the scenes:</b> shared limits in <code>core/config.js</code>, one batch cursor and card painter for all three screens, shared full screen labels, dead code and styles removed; new unit tests for batches and Chromium tests for the new screens. The Knowledge Base architecture and release sections were rewritten.</li>
+            </ul>
+            <h3>v1.109 &middot; 2026-10-12</h3>
+            <ul>
+              <li><b>Live prices now move the weekly and monthly change too:</b> while the market is open, the W % chg and M % chg cells of the stocks on screen update every 20 seconds together with Price and MoS, in Analysis, Strategies and Explorer. The figures are TradingView&rsquo;s own weekly and monthly performance, read in the same request as the price, so they show how the current price is changing the weekly and monthly picture. Sorting and filters use the same new numbers. If TradingView leaves one out, the earlier figure stays. Like the live price, nothing is saved: Live Data Refresh still stores prices and bars.</li>
+              <li><b>Behind the scenes:</b> a new automatic test covers the live prices in a real browser.</li>
+            </ul>
+            <h3>v1.108 &middot; 2026-10-12</h3>
+            <ul>
+              <li><b>Suggested Rules:</b> the button in Strategies opens a pop-up with Short term, Medium term and Long term tabs. Each asks Claude for common screening approaches (written with the strategy's own rule fields) with how many stocks qualify today, and "Use these rules" applies one. A fourth tab keeps the search of past prices. Claude cannot browse, so the approaches come from its general knowledge and are starting points, not advice.</li>
+              <li><b>Publish / Unpublish:</b> each strategy can be published or unpublished. Only published strategies are offered in Explorer and the Analysis strategy filter; the Strategies screen lists all. New strategies and copies start unpublished.</li>
+              <li><b>Strategies:</b> the Goal section is back, with the Track record showing the goal each list is judged by. Live Data Refresh sits below the results, rule choices have colour tags, and the results show "Showing N of M stocks" under the heading.</li>
+              <li><b>Explorer:</b> an All / Matched toggle, and the count reads "Mapped N of M stocks".</li>
+              <li><b>Grids and labels:</b> every stock grid uses the column order set in Analysis. The RSI and rating columns are named W RSI, M RSI, W Tech Rating and M Tech Rating everywhere.</li>
+              <li><b>Behind the scenes:</b> the automatic tests were brought up to date with these changes.</li>
+            </ul>
+            <h3>v1.107 &middot; 2026-10-11</h3>
+            <ul>
+              <li><b>Screener removed:</b> the Screener page and its filters, list, sort and search box are gone, along with the code and styles behind them. Analysis, Strategies and Explorer are unchanged, and a stock still opens its detail page in place (also from the top-bar search and from a link). A saved &ldquo;last page&rdquo; of Screener now opens Analysis.</li>
+              <li><b>Refresh keeps your page:</b> a stock code left in the address bar (from a shared link or a stock you had open) no longer reopens that stock on every browser refresh; the page you were last on is shown. A link still opens its stock once.</li>
+              <li><b>Explorer:</b> an opened industry is highlighted across its whole row. On a phone, the Strategy buttons no longer push the page sideways.</li>
+              <li><b>Clean-up:</b> unused styles and code were removed, and the automatic tests were brought up to date with the current screens (Explorer, pins on the stock page, address links).</li>
+            </ul>
+            <h3>v1.106 &middot; 2026-10-11</h3>
+            <ul>
+              <li><b>Critical news &amp; world events:</b> shown in columns, with the coloured Helps / Hurts / Mixed tag first, then the headline, a smaller explanation below it and the source under that.</li>
+              <li><b>Global &amp; Macro:</b> the Positive and Negative lists are independent columns with a green / red bullet per item (like Strengths and Watch-outs), the source on the same line and comfortable spacing.</li>
+              <li><b>Price charts:</b> the Legend button now sits on the Technical Score heading line, and the spacing around the charts is tighter.</li>
+              <li><b>Price history:</b> the Weekly and Monthly charts no longer sit in boxes.</li>
+              <li><b>Valuation:</b> the intrinsic value and the current-price comparison now share one line, so the panel is shorter.</li>
+              <li><b>Fundamental factor cards:</b> metric rows flow into several columns, research bullets sit side by side, and a section with a single card (Valuation &amp; Margin of Safety) no longer repeats its title and score bar.</li>
+              <li><b>Industry Peers grid:</b> now shows the same columns as the Analysis and Strategies grids (rank, score, MoS, stock, weekly and monthly change, RSI, tech ratings, news, research, price and links) in the same grid look; the industry column is left out because every peer shares it.</li>
+              <li><b>Heading colour:</b> every section and sub-section heading on the stock page is amber (a darker amber on the Light theme).</li>
+              <li><b>Technical Score:</b> the Weekly and Monthly figures (change, rating, RSI) now sit in the header of their own price chart; the plain-English trend sentences (the summary at the top and the one under each timeframe) are gone.</li>
+              <li><b>Price history:</b> the "Price history" title is removed (the Legend button stays), and the chart headers show three matching chips: Change, RSI, Signal.</li>
+              <li><b>Data checks:</b> the "Data checks" box above the Valuation panel is removed.</li>
+              <li><b>Fundamental Score uses only reliable information:</b> a factor counts only when it is built from imported figures, or (Moat and Governance) from researched findings that cite a source. The Moat and Governance peer-ranking estimates, and any factor with no data, show "Not scored" and are left out. The score, verdict and the Traditional / Buffett-Style / Valuation block scores are then worked out over the factors that count, scaled to 10, and the "x/9 factors" badge shows how many counted. Researched text without a source is hidden. The imported file and stored data are unchanged; the page applies this rule when it loads and after each research update.</li>
+              <li><b>Stock page spacing:</b> a little more room around the header (name, ticker, links, Jump to) and between panels and rows, for easier reading.</li>
+              <li><b>Stock page layout:</b> more compact. The links (screener.in, TradingView, Share) sit under the title, and panel, row and heading spacing is tighter, with up to three columns of cells on wide screens, so the page scrolls less. Content and order are unchanged.</li>
+              <li><b>Sticky bar:</b> sits directly under the top bar with no gap, so nothing shows above it while you scroll; it keeps the stock name and ticker (no score), and the Back button is centred on that line.</li>
+              <li><b>Stock page header:</b> the big score and verdict beside the name are removed, the name sits at the top, and the grey bands and boxes around the header, Back button and Jump to are gone (the separator lines between sections stay).</li>
+              <li><b>Stock page:</b> the outer box and border around the whole stock page are gone, and the header (name, score, links, Jump to) uses less vertical space.</li>
+              <li><b>Back button:</b> now on the right of the stock page, and <b>Esc</b> does the same as pressing it (not while you are typing in a box).</li>
+              <li><b>Valuation heading:</b> now written like the Fundamental Score heading: "Valuation · +57.4%" with a coloured "Margin of safety" tag after it.</li>
+              <li><b>Stock page:</b> the "vs last week" score change line and the Margin of Safety line under the name were removed (the Margin of safety is shown in the Valuation heading). The screener.in, TradingView and Share link row stays.</li>
+              <li><b>Stock page:</b> the "Back to ..." button now stays in view at the top while you scroll the stock page. Fixed the Margin of Safety and links row, which lost its styling (blue links, wrong font) on stocks showing "No change vs last week".</li>
+              <li><b>Stock page header:</b> the score and its rating now sit right after the stock name. The <b>Full screen</b> button was removed. The Margin of safety moved into the Valuation heading (for example "Valuation +18.2% Margin of safety"), and the tags in the Fundamental Score, Technical Score and Industry Peers headings are left-aligned next to their titles.</li>
+              <li><b>Stock detail in place:</b> clicking a stock on the Analysis chart or leaderboard, in Strategies results, or in an opened Industry now opens its detail page right there, like the Explorer, instead of jumping to the Screener. "Back to ..." returns to the same page with its filters, open industries and scroll position untouched.</li>
+              <li><b>Industry (was Business):</b> renamed in the menu and the page heading, moved right below Explorer and marked Pro. The "Analysis filters" button was replaced by a <b>Strategy</b> choice: pick any saved strategy and every industry shows how many of its stocks qualify, with the matching stocks highlighted and listed first when you open it. Pick None to switch it off.</li>
+              <li><b>Grids:</b> columns are now as wide as their content instead of stretching across the screen, in every grid, so there is less empty space. Opening an industry no longer changes the column widths above it.</li>
+              <li><b>Grids:</b> hovering over a row now highlights the whole row, in every grid (Screener, Analysis, Strategies, Industry, Peers, Trade Log). The Industry controls (period, grouping, Strategy, Expand all) line up on one row again.</li>
+              <li><b>Grids:</b> no divider lines between rows, in every grid (the shared grid standard).</li>
+              <li><b>Business:</b> the explanatory labels were removed. With the Analysis filters on, a single line above the grid says "Showing N of M stocks".</li>
+              <li><b>Grids:</b> the Business industry table now uses the same grid look as the Screener, Analysis and Strategies (same header, spacing, hover and colours). These shared rules are the standard for every grid added from now on.</li>
+              <li><b>Business:</b> with the Analysis filters on, an industry with no matching stocks now leaves its Matching, Match avg and vs industry cells empty instead of "0 of N" and "n/a", so the industries that do match stand out.</li>
+              <li><b>Business:</b> the page-wide "Collect latest news" buttons at the top were removed. News is collected per industry, from the button inside each opened industry.</li>
+            </ul>
+            <h3>v1.105 &middot; 2026-10-11</h3>
+            <ul>
+              <li><b>Business:</b> the news buttons are easier to find and clearer. In an opened industry they now sit at the top, above the stocks grid, with one button for all of its stocks and, when the Analysis filters are on and only some stocks match, a second one for just the matching stocks.</li>
+            </ul>
+            <h3>v1.104 &middot; 2026-10-11</h3>
+            <ul>
+              <li><b>Business:</b> "Collect latest news" button inside each opened industry (for that industry's stocks, or just its matching ones). It reads the newest headlines for each stock from TradingView, labels new ones positive, negative or neutral, saves them with the stock, and the industry's news list and counts update. Up to 30 stocks per press; press again for the next ones. TradingView has no news feed for the industry itself and none for some small stocks, so an industry's news is the headlines of its stocks, and the status line says how many stocks had no feed.</li>
+            </ul>
+            <h3>v1.103 &middot; 2026-10-11</h3>
+            <ul>
+              <li><b>Business:</b> new "Analysis filters" button. It applies whatever filters are set on the Analysis page (strategy, Fundamental Score, MoS rating, Tech Rating W / M, RSI and MoS ranges) without hiding anything: each industry gets a "Matching" count (for example 3 of 9), the average change of just the matching stocks, and "vs industry", the points by which they are ahead of or behind the whole industry. When an industry is opened, the matching stocks are highlighted and listed first. Turn it off to see the plain industry view.</li>
+            </ul>
+            <h3>v1.102 &middot; 2026-10-11</h3>
+            <ul>
+              <li><b>Business:</b> the small arrow before each industry is gone (an opened industry is shown in bold with an accent bar), and industry names and numbers no longer wrap: on a phone the table scrolls sideways. An opened industry stays as wide as the screen, with its stocks grid scrolling on its own.</li>
+            </ul>
+            <h3>v1.101 &middot; 2026-10-11</h3>
+            <ul>
+              <li><b>Business:</b> new "Expand all" / "Collapse all" button next to the period and grouping buttons, to open every industry's stocks and news at once or close them all.</li>
+            </ul>
+            <h3>v1.100 &middot; 2026-10-11</h3>
+            <ul>
+              <li><b>Business:</b> opening an industry now lists its stocks in the same grid as the Analysis leaderboard and the Strategies results (score, MoS, W and M % change, RSI, Tech Ratings, news, industry, links), plus a last column with the change for the chosen period. Click a stock to open it; "Back to Business" returns to the same industry.</li>
+            </ul>
+            <h3>v1.99 &middot; 2026-10-11</h3>
+            <ul>
+              <li><b>Strategies:</b> the Qualifying stocks table now has a "Sort by" menu with the same choices as the Analysis leaderboard (Margin of Safety, Fundamental Score, Weekly or Monthly RSI, % change, Price, research age, Name). The default is still Fundamental Score, and your choice is remembered in this browser.</li>
+            </ul>
+            <h3>v1.98 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Strategies:</b> Tech Rating W and Tech Rating M now have a "None (no rating)" choice. Pick it (alone, or together with other ratings) to let stocks that have no rating yet qualify.</li>
+            </ul>
+            <h3>v1.97 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Business (new page):</b> lists every industry (or industry group) with its average and median price change over 1 week, 1 month, 3 months, 6 months or 1 year, how many of its stocks are up or down, and the saved news of its stocks. Click an industry to see its stocks and headlines. 1W and 1M use the figures saved with each stock; longer periods are worked out from weekly prices, for the stocks that have them. The average gives every stock the same weight.</li>
+            </ul>
+            <h3>v1.96 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Strategies rules:</b> the rule rows (for example "MoS % (margin of safety)") now line up with the "+ Add a rule..." box and the headings above them instead of sitting slightly indented.</li>
+            </ul>
+            <h3>v1.95 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Analysis and Strategies:</b> the Live Data Refresh line now sits between two thin lines with even spacing, the same as on a stock's page, and its description ("Runs in this page for the stocks you tick below. Separate from the Data Refresh menu.", and the matching line on Strategies) is removed.</li>
+            </ul>
+            <h3>v1.94 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Stock page, less text:</b> three explanatory lines were removed: the description under Global &amp; Macro Information, the "Reviewed from the score breakdown ..." line under Fundamental Score, and the "Weekly and monthly &middot; hover a bar ..." line under Price History. The "Weekly reaction, average" news line under Price History was removed too, along with its "hint, not proof" note. The Legend button stays.</li>
+            </ul>
+            <h3>v1.93 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Analysis filters on a phone:</b> the filters now fold into one "Filters" line that lists what is selected (for example "Strong, Green"), the same as on the Screener. Tap it to open the Strategy, Fundamental Score, MoS Rating and Tech Rating buttons. It starts closed and stays open while you change filters. Laptop layout is unchanged.</li>
+            </ul>
+            <h3>v1.92 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>One look across every screen:</b> the Screener's quiet design now applies to Explorer, Analysis, Strategies, Trade Log, Data Refresh, Help, Knowledge Base and Settings, on laptop and phone. Panels keep their tint but lose their outline, the divider lines inside panels (table rows, rule rows, glossary entries, the lines between the Data Refresh sections, the Strategies list) are hidden, and scroll bars are thin and dark. Buttons, inputs and chips keep their outline so you can still see what to click. Links in Help and the Knowledge Base use the theme's green instead of default blue.</li>
+            </ul>
+            <h3>v1.91 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Stock page:</b> the Live Data Refresh line now sits exactly in the middle between the line above it and the Valuation line below it.</li>
+            </ul>
+            <h3>v1.90 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Screener stock page:</b> the outline around the stock detail is hidden, matching the stock list beside it. The panel keeps its tinted background and the spacing is unchanged.</li>
+            </ul>
+            <h3>v1.89 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Price history legend hidden by default:</b> the colour key (Close above open, Close below open, Volume) and the Event tags buttons under "Price history" are now hidden until you press <b>Legend</b> at the right of the heading. The average news reaction line stays visible. The charts and their hover tags are unchanged.</li>
+            </ul>
+            <h3>v1.88 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Screener stock list:</b> the divider lines between stocks, under the search box and under the "Showing ... stocks" line are hidden, and the list's outer frame too, the same quiet look as the Peers table. The selected stock keeps its tinted row and green bar. The list's scroll bar is now thin and dark instead of bright white.</li>
+            </ul>
+            <h3>v1.87 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Stock page:</b> a thin line again separates the "Jump to" chips from the Live Data Refresh line; the other dividers stay hidden.</li>
+            </ul>
+            <h3>v1.86 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Quieter stock page:</b> divider lines inside a stock's page are now invisible (the spacing is unchanged); only the five main headings, Valuation, Global &amp; Macro, Fundamental Score, Technical Score and Peers, keep their line. The Live Data Refresh line has no divider of its own and the spacing around the "Jump to" chips and Live Data Refresh is smaller, so more data fits on screen.</li>
+            </ul>
+            <h3>v1.85 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Behind the scenes:</b> the large shared <code>core/state.js</code> file was split into four smaller ones (stock list, page elements, Screener view state, database-backed state). Nothing on screen changes; the Analysis panel background is also a little darker.</li>
+            </ul>
+            <h3>v1.84 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Stock page:</b> a <b>Full screen</b> button next to Share link hides the filters and the list so the stock fills the page (Esc or Exit full screen brings them back). The Jump to bar now also shows the stock's name, score and rating once you scroll past the header.</li>
+              <li><b>Valuation card:</b> the Margin of safety sits on the right, the label is gone and the empty space is removed.</li>
+              <li><b>Dark theme:</b> a warm black page with a grey content layer, brighter text and verdict colours for readability; the Strengths and Watch-outs box now matches the factor cards.</li>
+              <li><b>Tidy-up:</b> the Upload history panel code was removed (uploads are still recorded), and the tests now cover the full-screen and scroll behaviour.</li>
+            </ul>
+            <h3>v1.83 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Upload history panels removed:</b> the old Upload history panels on the Data Refresh page are gone, along with the code that drew them. Uploads are still saved and recorded in the database, which is how an import finds its file; the backups list shows what each import changed.</li>
+              <li><b>Tidy-up:</b> two hint lines the import buttons used to fill in, which had no place on the page, were removed from the code, and the fundamental and technical engines now share one CSV reader.</li>
+            </ul>
+            <h3>v1.82 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Import messages:</b> if the final read-back check of an import or restore fails after the new data was already saved, the screen now says the new data is live and suggests checking the list or restoring a backup. It used to say "No changes were published", which was wrong in that case.</li>
+              <li><b>Behind the scenes:</b> the import, backup, restore and watchlist flows now have automatic tests in a real browser, so changes to them are checked before release.</li>
+            </ul>
+            <h3>v1.81 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Strategies: the same Live Data Refresh panel:</b> above the Qualifying stocks table, the plain refresh buttons are replaced by the panel used on Analysis and on a stock's page. The heading opens and closes it (it starts closed and remembers your choice), and inside are two cards, <b>Refresh Fundamental Info</b> and <b>Refresh Technical Info</b>, each with its own button, progress bar, Stop button and result line. Ticking picks, the batch limits and the "next batch not yet refreshed" behaviour are unchanged. Running one refresh no longer wipes the other card's result.</li>
+              <li><b>Fixed:</b> on Strategies the "Finished" message could vanish a moment after a refresh ended, when the table redrew. The result now stays.</li>
+            </ul>
+            <h3>v1.80 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Analysis: Live Data Refresh looks and works like a stock's page:</b> the Live Data Refresh heading above the leaderboard opens and closes the panel (it replaces the separate button), and inside it <b>Refresh Fundamental Info</b> and <b>Refresh Technical Info</b> are two cards, each with its own button, progress bar and result line. A card keeps its result ("Done: 3 of 3 refreshed.") when you run the other one. While the panel is closed, a running refresh shows its progress at the end of the heading and a failed one shows "Last refresh failed". If Claude is not allowed, an <b>Open permissions</b> button appears in the Fundamental card. The limits are unchanged: 10 stocks for Fundamental, 50 for Technical.</li>
+            </ul>
+            <h3>v1.79 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Top bar breadcrumb:</b> "Alba Securities" now matches the page name in size and weight, and the "&rsaquo;" between them is a small dot in the theme's accent colour (green in the dark theme).</li>
+            </ul>
+            <h3>v1.78 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Screener: only the stock detail scrolls:</b> on a computer screen the filter column and the stock list now stay in place under the top bar, and only the stock detail on the right scrolls with the page. The stock list fills the screen height and has its own scroll. On phones and narrow windows the layout is unchanged.</li>
+            </ul>
+            <h3>v1.77 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Live Data Refresh starts collapsed:</b> on a stock's page the Live Data Refresh panel is now a single line that you click to open. While it is closed, a running refresh shows its progress at the end of that line, and a failed one shows "Last refresh failed".</li>
+            </ul>
+            <h3>v1.76 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Page name in the top bar:</b> every page now shows its name in the top bar as "Alba Securities &rsaquo; Screener" (or Analysis, Strategies, Trade Log and so on), so the large heading above each page is gone and its space goes to the data. Pages with a short description keep it as a single line. The top bar itself is also slimmer, and the Screener's stock list is taller to use the space.</li>
+            </ul>
+            <h3>v1.75 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Global &amp; Macro cards line up:</b> the n-th Positive card and the n-th Negative card now sit on the same row and are the same height (the taller one sets it), so the two columns read straight across. When the panel is narrow the two columns stack one above the other instead.</li>
+            </ul>
+            <h3>v1.74 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Filter panels keep names on one line:</b> the Screener's filter column is now the same width as Analysis's (260px), and strategy names stay on one line. A name too long for the column is cut with "&hellip;" instead of wrapping.</li>
+            </ul>
+            <h3>v1.73 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Strategy filter label:</b> the "optional" tag next to the Strategy filter heading in the Screener and Analysis was removed. The filter is still optional: "All" leaves the list as it was.</li>
+            </ul>
+            <h3>v1.72 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Global &amp; Macro reads better:</b> the Positive and Negative columns now share the width evenly and drop to a single column when the panel is narrow (instead of two squeezed columns), the text is slightly larger with balanced line breaks, and the Screener's filter column is a little narrower so the stock detail gets more room.</li>
+            </ul>
+            <h3>v1.71 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Strategy filter in the Screener:</b> the Screener's filter panel has the same optional "Strategy" button list as Analysis, at the top, with "All" first and each strategy showing how many stocks qualify. Choosing one narrows the list to those stocks, together with the Fundamental Score and MoS filters and the search; click it again (or "All") to clear. The choice is remembered with your other Screener filters and is separate from the one in Analysis.</li>
+            </ul>
+            <h3>v1.70 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Strategy filter looks like the other filters:</b> in Analysis, the Strategy choice is now a button list like Fundamental Score, with "All" first and one button per strategy, each with the number of stocks it would give. Click a strategy to apply it, click it again (or "All") to remove it. The filter panel is also a little wider so names and numbers fit.</li>
+            </ul>
+            <h3>v1.69 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Apply a strategy in Analysis (optional):</b> the Analysis filter panel has a new "Strategy" picker at the top. Choose one of your strategies and the chart, leaderboard and filter counts show only the stocks that qualify for it today, on top of the other Analysis filters. "No strategy (all stocks)" is the default and leaves Analysis as it was. Your choice is remembered with your other Analysis filters, and if the strategy is later deleted it is simply ignored.</li>
+            </ul>
+            <h3>v1.68 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Save status next to the rules:</b> the "Saved to your account" note is no longer a permanent line under the strategy list. It now sits beside the "Rules" heading: "Saving&hellip;" while a change is on its way, a green "Saved" for a couple of seconds, and nothing the rest of the time. A warning stays on screen only when you are not signed in or a save failed.</li>
+            </ul>
+            <h3>v1.67 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>MoS as a number range in Strategies:</b> the rule "MoS % (margin of safety)" takes any number, for example "at least 5", "between 5 and 30" or "at most -10". The older Green / Orange / Red choice is still there, now named "MoS rating (Green, Orange, Red)", for when you only want the colour bands.</li>
+            </ul>
+            <h3>v1.66 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Quick links in the Strategies table:</b> the qualifying table now ends with "Screener ↗" and "TV ↗" links for each stock, the same as the Analysis leaderboard. They open in a new tab and do not open the stock inside the dashboard.</li>
+            </ul>
+            <h3>v1.65 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Strategies are saved to your account:</b> your strategies (rules, goal, notes) now have their own private record in your account, written about a third of a second after each change and loaded again whenever you open the page, on any device. A note under the strategy list says "Saved to your account", "Saving&hellip;", or, if it fails, says so. Without a sign-in they stay in this browser only.</li>
+            </ul>
+            <h3>v1.64 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Ticked count always matches the screen:</b> the number of ticked stocks (and what "Track N ticked picks" saves) is now read from the tick boxes you can see, so it cannot drift from the table. If a ticked stock has no price it cannot be tracked, and the confirm box now says how many were left out.</li>
+            </ul>
+            <h3>v1.63 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>"Track these picks" works again:</b> the browser's own confirm pop-up is blocked in this page, so the button looked dead. It now asks in a box on the page. The same fix applies to deleting a strategy and deleting a tracked list.</li>
+              <li><b>Track only the ticked stocks:</b> tick stocks in the qualifying table and the button changes to "Track N ticked picks" and saves just those; with nothing ticked it tracks all of them.</li>
+            </ul>
+            <h3>v1.62 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Strategy rules use Tech Rating:</b> the rule list now has "Tech Rating W" and "Tech Rating M" (Bullish, Turning Up, Weakening, Bearish), the same names as the table columns. They replace the old Weekly / Monthly MACD rules; saved strategies and learned rules keep working.</li>
+            </ul>
+            <h3>v1.61 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Same columns in Analysis and Strategies:</b> the Strategies qualifying table now shows the same columns as the Analysis leaderboard, in the same order (#, Score, MoS, Stock, W % chg, M % chg, Weekly RSI, Monthly RSI, Tech Rating W and M, News 14d, Industry, Research done, Price).</li>
+              <li><b>News 14d everywhere:</b> News 14d (positive and negative items in the last 14 days) is now a column in the Analysis leaderboard too, and appears in its Columns panel so you can move it.</li>
+              <li><b>No wrapped text:</b> headings, stock names and rating badges stay on one line in both tables. If the table is wider than the screen it scrolls sideways.</li>
+            </ul>
+            <h3>v1.60 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Strategies: refreshing more than 10 stocks:</b> pressing "Refresh Fundamental Info" (or Technical) with nothing ticked now does the next batch of picks that have not been refreshed yet (Fundamental: not in the last 7 days; Technical: no price from today), best score first, so pressing it again moves on to the next 10 (50 for Technical). The button shows how many are left, for example "next 10 of 37 to do", and "all up to date" when none are.</li>
+              <li><b>Tick boxes in the qualifying table:</b> tick stocks to refresh exactly those (the header box ticks all); the buttons then say "N ticked". Clear removes the ticks. Fundamental is still limited to 10 per press because it uses your Claude usage.</li>
+            </ul>
+            <h3>v1.59 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Analysis table matches Strategies:</b> the Analysis leaderboard now uses the same grid design as the Strategies "Qualifying stocks" table: the same header style, row spacing and hover highlight, with numbers (rank, score, MoS, % change, RSI, price) right-aligned. Pinning, Live Data Refresh selection, column order and opening a stock work as before.</li>
+            </ul>
+            <h3>v1.58 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Refresh the data of a strategy's picks:</b> under "Qualifying stocks" there are now "Refresh Technical Info" and "Refresh Fundamental Info" buttons that run the Live Data Refresh for the stocks that currently qualify, one after another, with a progress bar and a Stop button. Technical covers up to 50 stocks (price, Margin of Safety, weekly and monthly bars, MACD, RSI); Fundamental covers up to 10 because it uses your Claude usage (it also saves the latest news and events). When more stocks qualify, the highest Fundamental scores are refreshed first. A line above the buttons shows how many picks already have today's price and technical data and a recent Fundamental refresh.</li>
+              <li><b>Suggested order:</b> refresh first, then press "Track these picks", so the tracked list starts from current prices and signals. The list can change after a refresh, because the rules read the new numbers.</li>
+            </ul>
+            <h3>v1.57 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>News and events in strategies:</b> new rule fields use the news and events saved by Refresh Fundamental Info: positive news items, negative news items and all news items in the last 14 days, days since the latest results, and days since the latest company event. A stock whose news has never been saved is treated as unknown, not as "no news", so it will not pass these rules. The qualifying-stocks table has a "News 14d" column (+positive, &minus;negative).</li>
+              <li><b>Do news help reach the goal?</b> "Suggest rules from past prices" now also shows, for the stocks whose news is saved, how often the goal was reached after a week with positive news, negative news or none. The saved record is short (it starts at each stock's first refresh), so this only becomes meaningful over time; the suggested rules themselves still use prices only.</li>
+              <li><b>Tracked lists remember the news:</b> each saved pick keeps its news count at the time, and finished lists show the success rate split by negative news, positive news only, and no news, which measures the effect directly on real outcomes.</li>
+            </ul>
+            <h3>v1.56 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Goal for each strategy:</b> every strategy now has a goal, such as "gain at least 5% within 30 days". The goal is used to suggest rules and to judge tracked picks.</li>
+              <li><b>Suggest rules from past prices:</b> reads all stored weekly and monthly prices and looks for technical conditions (weekly and monthly RSI, MACD state, recent % change; up to three at once) that were followed by the goal more often than usual. The rules are searched on the older 70% of the history and then checked on the newest 30%, which they were not fitted to; each suggestion is marked "held up" or "did not hold up". "Use these rules" replaces the price-based rules and keeps any fundamental rules. Prices are weekly, so the goal is judged by the weekly high within whole weeks. Fundamental rules cannot be learned this way because only today's fundamentals are stored.</li>
+              <li><b>Track these picks:</b> saves today's qualifying stocks with their prices and judges each one against the goal as time passes (Hit, Open or Missed, with the days it took). Finished lists add up to a real success rate for the strategy. The week you save a list only counts through its latest close and the highest price seen since, so a move before you saved cannot count as a hit. Lists are saved with your account.</li>
+            </ul>
+            <h3>v1.55 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Strategies (new menu item):</b> build a strategy from rules and see which stocks qualify today. A rule looks at one thing (Fundamental score, verdict, margin of safety, any of the nine factor scores, weekly or monthly RSI, MACD state, price change, price, days since refresh, pinned, industry) and a stock must pass every rule. Each rule shows how many stocks pass it on its own, so you can see which one is doing the filtering. Click a stock to open it, and use "Why is a stock in or out?" to see which rules a stock passes or fails.</li>
+              <li><b>Starter strategies:</b> Quality + Momentum, Turning up early, Pullback in an uptrend, Oversold quality and Value with a cushion. Edit, duplicate or delete them; "Restore starter strategies" brings them back without touching your own. Strategies are saved with your other settings.</li>
+              <li><b>Ready for backtesting:</b> each strategy says whether it uses only price-based rules (which can later be tested on past prices) or today's fundamentals (which a backtest would see ahead of time). The backtest itself is the next step.</li>
+            </ul>
+            <h3>v1.54 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>News tags: positive or negative:</b> each time you run Refresh Fundamental Info, Claude (cheapest model tier, one short call, only for headlines that have no label yet) marks the saved news headlines as positive, negative or neutral. News tags on the price charts turn green, red, amber (both in the same period), grey (neutral) or stay purple (not labelled yet).</li>
+              <li><b>Price reaction:</b> hovering a news tag shows how the price moved that week (or month) and the next. Under the "Event tags" buttons the weekly charts show the average reaction to positive and negative news. It is a hint, not proof: several items in one week each count, and news can arrive after the price has already moved.</li>
+            </ul>
+            <h3>v1.53 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Price chart event tags:</b> the Weekly and Monthly charts show tags under the bars for news, results dates, company events (such as investor days), your own trades and the day research was saved, so you can see whether an event moved the price. Hover a bar to read the events; use the "Event tags" buttons to hide a kind. News, results and company events are read from TradingView and saved for the stock each time you run Refresh Fundamental Info, so history builds up from your first refresh of each stock.</li>
+              <li><b>Jump to row:</b> the Fundamental Score and Technical Score links now show the score and status.</li>
+              <li><b>Analysis:</b> a stock with no weekly or monthly RSI reading yet is listed (with a dash) while that RSI range is left at 0&ndash;100, and sorts last when sorting by RSI. The Research done column now shows today's date after Refresh Fundamental Info.</li>
+              <li><b>Behind the scenes:</b> the Analysis and Fundamental Score code was split into smaller parts and a regression check now runs before every publish. No change in behaviour.</li>
+            </ul>
+            <h3>v1.52 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Help and Knowledge Base tables:</b> tables now size to their content instead of stretching across the whole page, so short tables (such as the score bands) no longer have large empty gaps between columns.</li>
+            </ul>
+            <h3>v1.51 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Data proxy tag retired:</b> the "Data proxy" tag no longer appears on Moat and Governance cards, and its Help glossary entry was removed. A card that has not been researched yet still carries the footnote about Moat and Governance being estimates; run Refresh Fundamental Info to replace them with researched findings.</li>
+            </ul>
+            <h3>v1.50 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Help glossary:</b> the Data proxy entry now says it appears only until Moat and Governance are researched, and the glossary gained entries for the Researched tag, the Incomplete data tag and the factors badge (for example 5/9).</li>
+            </ul>
+            <h3>v1.49 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Help and Knowledge Base:</b> the two-column text of v1.48 was withdrawn because it hurt readability. The pages keep the full page width (so most lines now fit on one line) and the compact contents row, in a single column.</li>
+            </ul>
+            <h3>v1.48 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Help and Knowledge Base layout:</b> both pages now use the full page width, the contents list is a compact row of links, and on wide screens the text flows in two columns, so there are fewer lines and much less scrolling.</li>
+            </ul>
+            <h3>v1.47 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Analysis filters:</b> the filters moved to a left sidebar on desktop (as on the Screener), each button now shows a count (the stocks you would get by choosing it, given the other filters), and there is a new <b>MoS range</b> slider next to the two RSI sliders. The X-axis, Y-axis and colour buttons moved to their own row below the sliders. The default column order is Pin, #, Score, MoS, Stock, W % chg, M % chg, Weekly RSI, Monthly RSI, Tech Rating W, Tech Rating M, Industry, Research done, Price, Screener.in, TradingView.</li>
+              <li><b>Wider layout everywhere:</b> every section now uses a page width up to 1760px, and the RSI chart resizes to fill its panel.</li>
+              <li><b>Stock detail:</b> the Traditional and Buffett-style analysis show two cards per row at equal height (a single card, such as Valuation, spans the full width). A pinned <b>Jump to</b> row links to Valuation, Fundamental Score, Global &amp; Macro, Technical Score and Peers. The separator lines around Live Data Refresh were tidied.</li>
+              <li><b>Analysis batch refresh:</b> Stop now responds at once ("Stopping&hellip;") and the batch ends after the stock in progress.</li>
+            </ul>
+            <h3>v1.35 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Live Data Refresh in every stock's detail view:</b> two buttons, <b>Refresh Fundamental Info</b> and <b>Refresh Technical Info</b>, each with a progress bar. They run inside the page with your TradingView connector and your own Claude usage (no Claude chat, no web search), and replace "Research this stock" and "Refresh price &amp; technicals". The Data Refresh menu is separate.</li>
+              <li><b>Fundamental refresh:</b> fills missing metrics, re-researches every factor card (scores change only for Moat and Governance), and rewrites the Traditional, Buffett-style, Global &amp; Macro and Strengths &amp; Watch-outs sections together so none is left stale. It also adds a <b>Critical news &amp; world events</b> block (&sect;6).</li>
+              <li><b>Technical refresh:</b> reads the current TradingView price, recomputes Margin of Safety against intrinsic value, fetches weekly and monthly bars (new bars only when history exists), then recomputes MACD, RSI and the Technical Score. A stock whose TradingView symbol differs from its ticker (for example OCCL is OCCLLTD) is looked up automatically.</li>
+              <li><b>Plain-language research:</b> all Fundamental research follows two rules, business-friendly wording with no jargon and short bullets instead of paragraphs (saved as the <code>fundamental-research-style</code> skill).</li>
+              <li><b>Analysis screen:</b> the <b>Live Data Refresh</b> button (was Select) runs the same two refreshes for the stocks you tick, one after another, with one overall progress bar and a working <b>Stop</b>. Fundamental is limited to 10 stocks at a time because it uses Claude usage; Technical allows up to 50.</li>
+              <li><b>Analysis filters on the left:</b> on a desktop screen the Fundamental Score, MoS Rating and Tech Rating filters now sit in a left sidebar, as on the Screener, with the RSI Quadrant beside them. Narrow screens keep the stacked layout.</li>
+              <li><b>Cleaner detail view:</b> research dates now appear only in the Live Data Refresh section; the "Last verified" date and the Valuation intro text were removed; Global &amp; Macro Information moved above the Technical Score as context only.</li>
+            </ul>
+            <h3>v1.21 &middot; 2026-10-10</h3>
+            <ul>
+              <li><b>Watchlist Sync without Claude chat:</b> press <b>Sync now</b> in the TradingView Watchlist Sync section. The page builds the four lists (Alba Securities, Green, Orange, Red) from the stored data and rewrites them in TradingView through your TradingView connector, with a progress bar. The first time, you will be asked to allow the connector.</li>
+              <li><b>Safer than before:</b> each new list is created and checked first and the old one is deleted only afterwards. One delete at a time, and the run stops if any other list goes missing. A list that is already correct is left alone.</li>
+              <li><b>BSE-only stocks look themselves up:</b> both the Watchlist Sync and the Technical import search TradingView by company name for a BSE code with no saved symbol, accept only an exact name match, and save it for next time. A miss is not retried for 30 days.</li>
+              <li><b>Dropped symbols:</b> TradingView sometimes silently drops a symbol; the page looks for it on the other exchange and lists any it cannot place. Only the owner can run it.</li>
+            </ul>
+            <h3>v1.20 &middot; 2026-10-09</h3>
+            <ul>
+              <li><b>Technical import without Claude chat:</b> upload the TradingView Growth List on the Data Refresh page and press <b>Import data</b> in the Technical Score section. The page computes the MACD / RSI / valuation composite itself, refreshes current prices and margins of safety from the Price column, and shows the same progress bar, automatic backup and one-click Restore as the Fundamental import. Fundamental scores and intrinsic values are never touched.</li>
+              <li><b>Curated readings are kept:</b> if the file lacks a component (for example monthly MACD) that a stock already had, its previous technical reading is kept rather than rescaled, and the result card lists those stocks.</li>
+              <li><b>BSE-only stocks:</b> 65 more BSE codes now have a saved TradingView symbol, so they are scored from the file directly.</li>
+              <li><b>Quieter Data Refresh page:</b> long ticker chip lists, explanatory paragraphs and help links were removed; the upload preview now shows four counts only.</li>
+              <li><b>Upload history panels removed</b> from the Data Refresh page; the backups list covers it. Uploads are still recorded in the database, which is how an import finds the file to use.</li>
+              <li><b>One writer at a time:</b> the two imports share a lock, so they cannot run together. Both sections list the same backups.</li>
+            </ul>
+            <h3>v1.19 &middot; 2026-10-09</h3>
+            <ul>
+              <li><b>Fundamental import without Claude chat:</b> on the Data Refresh page, upload the screener.in CSV and press <b>Import data</b>. The page scores every stock itself with the same v3 engine and shows a progress bar (read file, load data, back up, score, check, write, verify). Nothing is copied into a Claude conversation.</li>
+              <li><b>Safety:</b> the current data is backed up automatically before each import (the newest 5 are kept) and any backup can be restored with one click. If anything fails part-way, the previous data is put back. Only the dashboard owner can import or restore.</li>
+              <li><b>New tickers:</b> added automatically with safe defaults (the standard Screener.in link and no TradingView chart mapping yet for BSE-only codes).</li>
+            </ul>
+            <h3>v1.18 &middot; 2026-10-09</h3>
+            <ul>
+              <li><b>Per-user preferences:</b> theme, Screener and Analysis filters and sort, and the Trade Log view are now saved to each signed-in user's own private record, so they follow you to any device. Anyone without a sign-in keeps browser-only settings, as before.</li>
+              <li><b>Pins and Trade Log are personal:</b> each user has their own pinned stocks and their own trades; nobody else can see them. A separate <code>users</code> record (id and visit times only) is kept for each signed-in user.</li>
+              <li><b>Sign-in:</b> users are identified through their claude.ai account (organization members). Google sign-in is not part of this version.</li>
+            </ul>
+            <h3>v1.17 &middot; 2026-10-09</h3>
+            <ul>
+              <li><b>Page text moved out of the page file:</b> the Help, Data Refresh and Knowledge Base text (including this Version History) now lives in <code>partials/*.html</code>, so <code>index.html</code> is about 270 lines. Nothing changes on screen.</li>
+              <li><b>Watchlist helper scripts:</b> the four TradingView watchlists (Alba Securities, Green, Orange, Red) are now built and verified by saved scripts (<code>watchlist_sets</code>, <code>diff_watchlist</code> in the database), so a sync only needs the TradingView calls themselves.</li>
+            </ul>
+            <h3>v1.16 &middot; 2026-10-09</h3>
+            <ul>
+              <li><b>Code split into files:</b> the page's styles and application code now live in separate files (<code>styles.css</code> and <code>js/*.js</code>) instead of one 7,600-line page, so a small change only needs the small file that holds it. Nothing changes on screen; the dashboard behaves exactly as in v1.15.</li>
+              <li><b>Verified:</b> the same stock data, search, Explorer detail view and every section render identically before and after the split.</li>
+            </ul>
+            <h3>v1.15 &middot; 2026-10-08</h3>
+      <ul>
+            <li><b>Cheaper refreshes:</b> the weekly Technical Score (Growth List) and Fundamental Score (screener.in) refreshes now run through saved scripts that do the matching, scoring, checks and chunk splitting outside Claude, so a refresh needs only the data fetch and the write batches. The scripts live in the database, and no page change was needed.</li>
+            <li><b>Verified:</b> the scripts reproduce every stored technical block (35 sampled) and all 2,167 stored fundamental records exactly; only the live-price fields differ, from the 7 Oct price refresh.</li>
+          </ul>
+            <h3>v1.14 &middot; 2026-10-08</h3>
+      <ul>
+            <li><b>Stock data moved to the database:</b> the stock list is no longer inside the page. It loads from the database in chunks and is kept in the browser, so the page is about 0.5 MB (was 11.5 MB) and a repeat visit opens in a fraction of a second. A "Stock data was updated - Reload" banner appears when a refresh changes it.</li>
+            <li><b>Refresh price &amp; technicals:</b> a button on each stock, and a bulk version on the Analysis screen (up to 50 stocks), pulls weekly and monthly bars from your TradingView connector, saves them and recomputes the Technical Score. No Claude run needed.</li>
+            <li><b>Research runs</b> save the technical block and Global &amp; Macro items to the database, so they never republish the page.</li>
+            <li>The BSE-code to TradingView symbol list now lives in the database too, and the old embedded-data fallback and unused styles were removed.</li>
+          </ul>
+            <h3>v1.13 &middot; 2026-10-07</h3>
+      <ul>
+            <li><b>Back to Analysis:</b> opening a stock from an Analysis chart dot or leaderboard row now shows a "&larr; Back to Analysis" button on the detail screen. It returns to Analysis with the same filters and scroll position; using the menu clears it.</li>
+            <li><b>Analysis:</b> new "Research done" column (date research was last done, with an awaiting-save flag) and Tech Rating W / M multi-select filters.</li>
+            <li><b>Technical Score refresh</b> from the 2026-10-07 CSV merged and verified.</li>
+            <li><b>Batch research:</b> 10 stocks, then OCCL and India Glycols refreshed. India Glycols fundamentals and valuation still reflect pre-demerger accounts and need a fresh Fundamental CSV.</li>
+          </ul>
+            <h3>v1.12 &middot; 2026-10-07</h3>
+      <ul>
+            <li><b>Price history on demand:</b> the optional "Include price history (1M, 1W)" tick-box in "Research this stock" is now live for any stock. Weekly and monthly bars are fetched from TradingView (only the new bars on later refreshes) and validated (ordering, candle consistency, matching highs and lows) and saved to <code>priceHistory</code>. It never changes a score. Daily bars were dropped: the chart shows Weekly first, then Monthly.</li>
+            <li><b>Valuation panel:</b> Margin of Safety now shows as a large coloured percentage (like the Trade Log return), with the Intrinsic Value beneath it.</li>
+            <li><b>Performance:</b> the price chart draws a few SVG paths instead of one element per bar (about 1,000 &rarr; 66 elements), and the stock detail no longer re-renders when a database update does not change the open stock.</li>
+            <li>India Glycols (INDIAGLYCO) added as the second stock with a chart: 261 weekly bars from 2021-10-11 and 60 monthly from 2021-11-01, validated.</li>
+          </ul>
+            <h3>v1.11 &middot; 2026-10-06</h3>
+      <ul>
+            <li><b>Explorer:</b> a free, one-stock-at-a-time lookup, now the landing page. A centred search with auto-suggest moves to the top once a stock is picked.</li>
+            <li><b>Deep links:</b> opening a stock updates the page link to its ticker, so posters can link straight to it. A "Share link" button with a share icon copies it.</li>
+            <li>The logo hides once a stock is open.</li>
+            <li>Explorer, Analysis and Strategies carry a "Pro" label (label only, nothing gated yet).</li>
+            <li>The locked teaser was removed for now and will return later.</li>
+            <li>Help and Knowledge Base rewritten with bullets: quick links, a Technical Score section with its colour-coded labels, and an A&ndash;Z glossary.</li>
+            <li>Code cleanup: removed the unused last-section memory and dead RSI styles. Output checked identical before and after.</li>
+            <li>OCCL price history: Daily, Weekly and Monthly candlestick chart in the Technical Score panel, with an optional "Include price history" tick-box in "Research this stock" to pull it for other stocks.</li>
+            <li>TradingView watchlist sync run manually (four lists rebuilt, nothing dropped).</li>
+          </ul>
+      <h3>v1.10 &middot; 2026-10-06</h3>
+      <ul>
+            <li><b>Trade Log:</b> add, sell and remove trades from the page.
+              <ul>
+                <li>Add form uses the same auto-suggest as the top-bar search, with buy date, price and quantity, and freezes the stock's score, verdict, intrinsic value, MoS and data completeness.</li>
+                <li>Cards or Table view, remembered per device.</li>
+                <li>Sell records realized return and days held, before brokerage and taxes. Remove asks for confirmation.</li>
+              </ul>
+            </li>
+            <li><b>Data checks:</b> a notice above the Valuation panel when inputs look implausible or inconsistent. It never changes a score or verdict.</li>
+            <li><b>Cleanup:</b> shared per-trade model, unused styles removed.</li>
+          </ul>
+      <h3>v1.9 &middot; 2026-10-06</h3>
+      <ul>
+            <li>Each Technical Score CSV now also sets every matched stock's current price (INR rows).</li>
+            <li>The Valuation panel, header MoS line, MoS sort and Valuation factor card follow.</li>
+            <li>Intrinsic value, Graham Number, NCAVPS and fundamental scores are unchanged by a Technical import.</li>
+            <li>Applied to 1,872 stocks with an intrinsic value; import instructions updated.</li>
+          </ul>
+      <h3>v1.8 &middot; 2026-10-06</h3>
+      <ul>
+            <li><b>Research in the database:</b> results are stored in <code>stockResearch</code> and layered on at load, with scores and verdict recalculated, so CSV refreshes can't overwrite them.</li>
+            <li><b>Stale-research flag:</b> amber warning after 180 days.</li>
+            <li><b>Safety net:</b> every refresh backs up first (<code>backupLog</code>) and must pass <code>devTools/precheck</code>.</li>
+            <li><b>Stock header redesigned:</b> star replaces "Pin to top", stacked name and ticker, week-on-week change under the score, plain MoS line, "Last verified" at the end.</li>
+            <li><b>Percentile labels fixed:</b> e.g. "100th percentile of 75 peers &middot; Industry", with peer counts worked out from the data.</li>
+            <li><b>Stock links:</b> "Copy link" on every stock; the page opens a stock from <code>#TICKER</code> or <code>#Name</code>.</li>
+            <li><b>Global &amp; Macro sources</b> with a web address now open in a new tab.</li>
+            <li><b>Completeness badge</b> reads e.g. "5/9 factors &middot; 4 researched, data unavailable" when the figures genuinely don't exist.</li>
+          </ul>
+      <h3>v1.7 &middot; 2026-10-06</h3>
+      <ul>
+            <li><b>One "Research this stock" button</b> per stock covers Data-proxy factors, incomplete factors, missing Technical inputs and Global &amp; Macro in one go. First runs: Mahalaxmi Rubtech 9.00 &rarr; 8.30, OCCL 6.59 &rarr; 6.61.</li>
+            <li><b>Researched factors</b> swap the amber "Data proxy" tag for a green "Researched" tag with headline, summary, positives, negatives and sources. Figures that truly don't exist stay n/a with an explanation.</li>
+            <li><b>Hidden, not removed:</b> "Request refresh" and "What changed" are behind switches (<code>SHOW_REQUEST_REFRESH</code>, <code>SHOW_CHANGE_NOTE</code>).</li>
+            <li><b>Leaderboard title</b> shows the count, e.g. "Leaderboard (42)", and updates with the sliders.</li>
+            <li><b>Performance:</b> RSI slider redraws coalesced to one per animation frame.</li>
+            <li><b>Cleanup:</b> removed leftover button styling; dead-code check found the rest in use.</li>
+          </ul>
+      <h3>v1.6 &middot; 2026-10-06</h3>
+      <ul>
+            <li><b>Exact-peer ranking:</b> Financial Health, Profitability, Growth, Valuation, Capital Reinvestment, Moat and Governance rank within the same Industry Group and industry, falling back when fewer than 10 peers.</li>
+            <li><b>Rescore of all 2,167 stocks</b> from the 6 Oct CSV: 176 verdicts changed (129 up, 47 down); median move 0.04, largest 1.49. OCCL 6.39 &rarr; 6.59, GESHIP 6.40 &rarr; 6.37.</li>
+            <li><b>Industry Peers panel</b> added to every detail view, with the stock's rank and the comparison set used.</li>
+            <li><b>Technical card tidy-up:</b> Weekly and Monthly cells show the Tech Rating badge and RSI; the Valuation Screen cell was removed from the display (it still counts in the score).</li>
+            <li><b>MoS Rating filter</b> now covers every stock with valuation data. The TradingView watchlists still follow the sync's own rules.</li>
+            <li><b>Search auto-suggest</b> by ticker, name or industry, and a page about 3.4 MB lighter.</li>
+            <li>Removed the unused "Select stocks" multi-select and aligned the leaderboard header.</li>
+          </ul>
+      <h3>v1.5 &middot; 2026-10-06</h3>
+      <ul>
+            <li><b>Plain-English Fundamental panel:</b> factor cards lead with a peer-relative headline, and the overall summary is a Strengths / Watch-outs list.</li>
+            <li><b>Governance chips</b> for promoter pledge, holding changes and FII/DII exits; a filled "Data proxy" badge.</li>
+            <li><b>Completeness badges name the missing factors</b> on hover; empty metrics are dashed and muted.</li>
+            <li><b>Analysis leaderboard:</b> MoS % colour fixed (was always green), "Columns" reorder button added, "Reset range" removed.</li>
+            <li><b>Smoother RSI sliders:</b> one saved-preference write on release and delegated handlers.</li>
+            <li><b>Screener.in link reliability:</b> a per-stock flag replaces the hardcoded exceptions list (CASTROLIND and OCCL so far), checked at onboarding.</li>
+          </ul>
+      <h3>v1.4 &middot; 2026-09-30</h3>
+      <ul>
+            <li>The v1.3 model became the durable method, captured as the <code>fundamental-score-csv-refresh</code> skill and validated on a new CSV (byte-identical on GESHIP, OCCL, Mahalaxmi Rubtec).</li>
+            <li><b>Technical Score CSV-only:</b> merged 1,949 of 1,951 stocks, rescaling when a component is missing; live fetch retired. BSE tickers matched via their TradingView alpha symbol, including the underscore fix (KLBRENG-B &rarr; KLBRENG_B).</li>
+            <li><b>TradingView watchlist sync:</b> four lists rebuilt on demand, one delete at a time after an earlier parallel-delete incident. Logged to <code>watchlistSyncLog</code>.</li>
+            <li><b>Trade Log / Track Record:</b> logs real trades against a frozen model snapshot, as a real backtest. First entry: GESHIP, bought 29 Sep 2026 at &#8377;1549.89.</li>
+            <li><b>Completeness badges</b> (e.g. "9/9 factors", "3/5 signals") on the Fundamental and Technical panels.</li>
+            <li><b>Fundamental Score column</b> added to the Analysis leaderboard.</li>
+            <li><b>Analysis widened (2026-10-06):</b> the scatter and leaderboard now plot every stock with positive MoS, whatever its verdict, plus a "Sort by" dropdown. The Screener MoS filter and watchlist sync are unchanged.</li>
+          </ul>
+      <h3>v1.3 &middot; 2026-09-30</h3>
+      <ul>
+            <li><b>Mechanical scoring:</b> all stocks reprocessed with a deterministic 9-factor formula (per-factor percentile regressions) in place of per-stock judgment. It is now the primary, always-on method.</li>
+            <li>1,941 tickers rescored, 3 onboarded (Archidply Decor, South. Magnesium, Varmora Granito), and 7 absent from the export left untouched.</li>
+            <li><b>Verdict mix:</b> Strong Buy 24 &rarr; 30, Moderate Buy 463 &rarr; 371, Hold 815 &rarr; 752, Avoid 646 &rarr; 798.</li>
+            <li><b>Bug fix:</b> a factor with 2&ndash;3 inputs scored 0 if any one metric was missing. It now scores on what is present. OCCL moved from Avoid (4.99) to Hold (6.10).</li>
+            <li><b>Industry-relative ranking:</b> five factors ranked against the stock's own Industry Group (groups under 10 fall back to all stocks), after GESHIP was understated against a universe of debt-free small caps.</li>
+            <li><b>Single source of truth for intrinsic value:</b> Screener.in's growth/ROCE-adjusted Graham Number replaced the app's own fixed-multiple one, and the "Computed" cell was retired. One MoS figure now drives the whole app.</li>
+          </ul>
+      <h3>v1.2 &middot; 2026-09-30</h3>
+      <ul>
+            <li>Added a second, cyclical-normalized Graham Number beside Screener's figure in the Valuation panel, for 1,701 of 1,948 stocks.</li>
+            <li>Screener.in stayed the only figure driving MoS %, the MoS Rating filter and the Analysis Green bucket.</li>
+            <li>Retired later the same day in v1.3. See &sect;5.</li>
+          </ul>
+      <h3>v1.1 &middot; 2026-09-30</h3>
+      <ul>
+            <li><b>Analysis section:</b> a Weekly-vs-Monthly RSI scatter with swappable axes, dual-handle RSI sliders, colour-by-timeframe, MoS-scaled dots and a hover tooltip.</li>
+            <li>A ranked leaderboard beneath it, with pin/star shared with the stock page. Settings are saved per browser.</li>
+            <li>Fixed a bug where pinning right after page load could fail to save.</li>
+          </ul>
+      <h3>v1.0 &middot; 2026-09-30</h3>
+      <ul>
+            <li>First tagged milestone.</li>
+            <li>9-factor Fundamental Score with a Graham Number-based MoS, plus flagged industry-relative proxies for Moat and Governance.</li>
+            <li>Technical Score from CSV, Valuation panel, and Global &amp; Macro Information (scoped bulk refresh plus per-stock research).</li>
+            <li>MoS Rating filter and sort, and themes (Dark and Light; at that time Dark, Red and Indigo).</li>
+            <li>The planned GCP/Firebase move is tracked separately and hasn't started.</li>
+          </ul>
+      <p class="help-disclaimer">This page documents how the screener itself is built and sourced, not investment advice.</p>
+    </div>

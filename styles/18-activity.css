@@ -1,0 +1,48 @@
+/* The notification bell in the top bar and the panel under it (src/ui/activity.js). Bundled in file-name order into styles.css: the order is the cascade. */
+.activity-wrap{position:relative;flex:none;margin-left:10px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.activity-bell{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:40px;padding:0;border:0;border-radius:0;background:transparent;color:var(--muted);cursor:pointer;}
+.activity-bell:hover,.activity-bell[aria-expanded="true"]{color:var(--text);}
+.activity-bell:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.activity-bell svg{display:block;}
+/* A run in progress: a small pulsing dot on the bell. */
+.activity-run{display:none;position:absolute;right:6px;bottom:6px;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg);animation:activityPulse 1.4s ease-in-out infinite;}
+.activity-bell.is-running .activity-run{display:block;}
+@keyframes activityPulse{50%{opacity:.35;}}
+/* New (unopened) notices: green when all went well, amber if some failed, red if a run failed. */
+.activity-badge{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:700;line-height:1;color:#fff;background:var(--buy);box-shadow:0 0 0 2px var(--bg);font-variant-numeric:tabular-nums;}
+.activity-badge.is-warn{background:var(--hold);color:#1b1405;}
+.activity-badge.is-error{background:var(--avoid);}
+.activity-badge[hidden]{display:none;}
+.activity-badge.pop{animation:activityPop .45s ease-out;}
+@keyframes activityPop{0%{transform:scale(.4);}60%{transform:scale(1.25);}100%{transform:scale(1);}}
+.activity-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+.activity-panel{position:absolute;top:calc(100% + 12px);right:0;z-index:25;width:min(400px,calc(100vw - 24px));max-height:min(70vh,520px);overflow-y:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:0 14px 36px rgba(0,0,0,.35);}
+.activity-panel[hidden]{display:none;}
+.activity-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);}
+.activity-head-title{font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text);}
+.activity-list{display:flex;flex-direction:column;gap:8px;padding:10px;}
+.activity-empty{padding:18px 14px;font-size:.8rem;line-height:1.5;color:var(--muted);}
+.activity-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;background:var(--panel2);}
+.activity-item.is-ok{border-left-color:var(--buy);}
+.activity-item.is-warn{border-left-color:var(--hold);}
+.activity-item.is-error{border-left-color:var(--avoid);}
+.activity-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.activity-title{font-size:.82rem;font-weight:700;color:var(--text);overflow-wrap:anywhere;}
+.activity-text{font-size:.74rem;line-height:1.45;color:var(--muted);overflow-wrap:anywhere;}
+.activity-text:empty{display:none;}
+.activity-time{font-size:.68rem;color:var(--muted);opacity:.8;}
+.activity-time:empty{display:none;}
+.activity-progress{height:6px;margin-top:4px;border-radius:3px;background:var(--panel);border:1px solid var(--line);overflow:hidden;}
+.activity-fill{height:100%;width:0;background:var(--accent);transition:width .35s ease;}
+.activity-actions{display:flex;align-items:center;gap:8px;flex:none;}
+.activity-btn{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:.74rem;font-weight:600;cursor:pointer;font-family:inherit;}
+.activity-btn:hover:not(:disabled){color:var(--text);border-color:var(--muted);}
+.activity-btn:disabled{opacity:.6;cursor:default;}
+.activity-btn[hidden]{display:none;}
+.activity-close{padding:2px 9px;font-size:1.05rem;line-height:1.2;border-color:transparent;}
+.activity-panel :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media (max-width:600px){
+  .activity-item{flex-wrap:wrap;}
+  .activity-actions{width:100%;justify-content:flex-end;}
+}
+@media (prefers-reduced-motion:reduce){.activity-fill{transition:none;}.activity-run,.activity-badge.pop{animation:none;}}

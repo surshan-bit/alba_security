@@ -1,0 +1,40 @@
+/* Trade Log. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
+  .tl-head-actions{display:flex;gap:8px;align-items:center;}
+  .tl-form{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;margin:10px 0 14px;}
+  .tl-form-title{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:10px;}
+  .tl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .tl-grid label{display:flex;flex-direction:column;gap:4px;font-size:.72rem;color:var(--muted);font-weight:600;}
+  .tl-grid input{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 10px;font-size:.86rem;font-family:inherit;outline:none;min-width:0;}
+  .tl-grid input:focus{border-color:var(--accent);}
+  .tl-grid .tl-wide{grid-column:1/-1;}
+  .tl-form-actions{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;}
+  .tl-msg{font-size:.78rem;color:var(--muted);}
+  .tl-msg.err{color:#e5484d;}
+  .tl-btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .tl-btn-primary:hover{color:#fff;opacity:.9;}
+  .tl-row-actions{display:flex;gap:6px;flex-wrap:wrap;}
+  .tl-row-actions .refresh-btn{padding:3px 9px;}
+  .tl-danger.armed{color:#e5484d;border-color:#e5484d;}
+
+  .tl-view-toggle{display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:2px;}
+  .tl-view-btn{background:transparent;border:none;border-radius:18px;padding:4px 11px;font-size:.74rem;font-weight:600;color:var(--muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+  .tl-view-btn.active{background:var(--accent);color:#fff;}
+  #tradeLogPanelBody .chg-up{color:var(--buy);font-weight:700;}
+  #tradeLogPanelBody .chg-down{color:var(--avoid);font-weight:700;}
+  .tl-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;}
+  .tl-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+  .tl-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .tl-card-name{font-size:.98rem;font-weight:700;line-height:1.25;}
+  .tl-card-tk{font-size:.74rem;color:var(--muted);margin-top:2px;}
+  .tl-card-retval{font-size:1.6rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;}
+  .tl-card-retlbl{font-size:.74rem;color:var(--muted);margin-top:3px;}
+  .tl-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:0;padding-top:10px;border-top:1px solid var(--line);}
+  .tl-card-grid dt{font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 2px;font-weight:600;}
+  .tl-card-grid dd{margin:0;font-size:.84rem;font-variant-numeric:tabular-nums;}
+  .tl-card .tl-row-actions{padding-top:10px;border-top:1px solid var(--line);}
+
+  .pro-pill{
+    margin-left:auto;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:.6rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--accent);border:1px solid var(--accent);border-radius:10px;padding:1px 7px;line-height:1.5;
+  }

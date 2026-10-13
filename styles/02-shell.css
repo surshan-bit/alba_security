@@ -1,0 +1,73 @@
+/* Page shell: top bar, sidebar menu, content wrapper. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
+  .wrap{max-width:1760px;margin:0 auto;padding:0 20px 50px;}
+  header{margin-bottom:12px;}
+  /* The page name is in the top bar (Alba Securities > Page), so the heading stays only for screen readers and a page keeps just its short description. */
+  .app-section > header h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:0;}
+  .app-section > header:not(:has(.sub)){display:none;}
+  .app-section > header .sub{margin:0;}
+  h1{font-size:1.55rem;margin:0 0 6px;font-weight:600;letter-spacing:.2px;}
+  .sub{color:var(--muted);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.88rem;line-height:1.5;max-width:680px;}
+
+  /* ---- Top bar + sidebar navigation ---- */
+  .topbar{
+    display:flex;align-items:center;gap:14px;
+    padding:11px 20px;margin-bottom:14px;
+    border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--bg);z-index:20;
+  }
+  .menu-toggle{
+    background:none;border:none;color:var(--text);cursor:pointer;
+    padding:8px;margin:-8px;border-radius:8px;flex-shrink:0;
+    display:flex;flex-direction:column;justify-content:center;gap:4px;
+  }
+  .menu-toggle:hover{background:var(--panel2);}
+  .menu-toggle span{display:block;width:20px;height:2px;background:currentColor;border-radius:1px;}
+  .topbar-title{font-size:1.15rem;font-weight:600;letter-spacing:.2px;display:flex;align-items:baseline;gap:8px;min-width:0;white-space:nowrap;}
+  .topbar-brand{color:var(--muted);font-weight:600;font-size:inherit;}
+  .topbar-sep{font-size:0;line-height:0;align-self:center;display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+  .topbar-section{overflow:hidden;text-overflow:ellipsis;}
+  .sidebar-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:30;
+  }
+  .sidebar-overlay.show{opacity:1;pointer-events:auto;}
+  .sidebar{
+    position:fixed;top:0;left:0;bottom:0;width:280px;max-width:82vw;
+    background:var(--panel);border-right:1px solid var(--line);
+    transform:translateX(-100%);transition:transform .25s ease;
+    z-index:31;display:flex;flex-direction:column;padding:22px 16px;gap:26px;
+    overflow-y:auto;
+  }
+  .sidebar.open{transform:translateX(0);}
+  .sidebar-brand{padding:0 8px;display:flex;align-items:center;gap:10px;}
+  .brand-mark{flex-shrink:0;}
+  .brand-title{font-size:1.2rem;font-weight:700;letter-spacing:.2px;line-height:1.15;white-space:nowrap;}
+  .brand-version{
+    display:inline-block;margin-left:8px;vertical-align:middle;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:.62rem;font-weight:700;letter-spacing:.02em;color:var(--muted);
+    background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:2px 8px;
+  }
+  .sidebar-nav{display:flex;flex-direction:column;gap:2px;}
+  .nav-section-label{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.7rem;
+    text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;
+    padding:0 12px;margin:10px 0 4px;
+  }
+  .nav-item{
+    display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+    background:none;border:none;color:var(--text);cursor:pointer;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.92rem;
+    padding:10px 12px;border-radius:8px;
+  }
+  .nav-item:hover{background:var(--panel2);}
+  .nav-item.active{background:var(--panel2);font-weight:600;}
+  .nav-icon{width:18px;height:18px;flex-shrink:0;color:var(--muted);display:flex;align-items:center;justify-content:center;}
+  .nav-item.active .nav-icon{color:var(--accent);}
+  .app-section{display:none;}
+  .app-section.active{display:block;}
+  .section-load-error{display:flex;gap:12px;align-items:center;margin:12px 0;padding:10px 14px;border:1px solid var(--accent);border-radius:10px;background:var(--panel);color:var(--text);font-size:.85rem;}
+  .section-load-error button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;}
+  /* A stock opened in place (Analysis, Strategies, Industry): the page's own content is hidden, not removed, so it is exactly as it was on Back. */
+  .app-section.inline-detail-open > :not(.inline-detail-host){display:none !important;}
+  .inline-detail-host{margin-top:6px;}
