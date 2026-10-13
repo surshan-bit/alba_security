@@ -1,0 +1,5 @@
+# Minimal Supabase project settings (used by the automatic function deployment).
+project_id = "djxnoijgwtklszvgunma"
+
+[functions.sample]
+verify_jwt = true

@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_KEY, OWNER_EMAIL } from './config.js';
 import { createSupabaseBackend } from './supabase-backend.js';
-import { installPlatform, supabaseUser, supabaseAssets } from './shim.js';
+import { installPlatform, supabaseUser, supabaseAssets, claudeSample } from './shim.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true, autoRefreshToken: true } });
 
@@ -74,7 +74,10 @@ async function showImport(){
   if(error || !data.session){ showSignIn(error ? error.message : ''); return; }
   if(location.hash === '#import'){ showImport(); return; }
   window.albaSignOut = async () => { await sb.auth.signOut(); location.reload(); };
-  installPlatform({ backend: createSupabaseBackend(sb), user: supabaseUser(sb, OWNER_EMAIL), assets: supabaseAssets(sb) });
+  // Refreshes are for the owner only (the server functions check this again): everyone else gets none of that machinery.
+  const { data: me } = await sb.from('profiles').select('role').maybeSingle();
+  const owner = !!me && me.role === 'owner';
+  installPlatform({ backend: createSupabaseBackend(sb), user: supabaseUser(sb, OWNER_EMAIL), assets: supabaseAssets(sb), sample: owner ? claudeSample(sb) : null });
   // app.js sits next to this file; the build id keeps a new release from being served out of an old cache
   const url = new URL('app.js?v=' + __ALBA_BUILD__, import.meta.url).href;
   await import(url);

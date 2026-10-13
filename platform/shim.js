@@ -46,13 +46,22 @@ function supabaseAssets(sb, bucket = 'assets'){
   };
 }
 
-// mcp / sample: owner-only server functions (they hold the TradingView and Claude keys, which must never reach a browser).
-function edgeFunctions(sb){
-  const call = async (fn, body) => { const { data, error } = await sb.functions.invoke(fn, { body }); if(error) throw new Error(error.message); return data; };
-  return {
-    mcp: { callTool: (server, tool, input) => call('mcp-call', { server, tool, input }) },
-    sample: async (req) => call('sample', req)
+// sample: Claude calls run in a private server function that holds the Anthropic key (supabase/functions/sample).
+// Same call style as the claude.ai runtime: sample(prompt, { modelTier }) or sample({ prompt, modelTier }), answering { text }.
+function claudeSample(sb){
+  return async (promptOrReq, opts) => {
+    const req = (promptOrReq && typeof promptOrReq === 'object') ? promptOrReq : Object.assign({}, opts, { prompt: promptOrReq });
+    const { data, error } = await sb.functions.invoke('sample', { body: { prompt: req.prompt, modelTier: req.modelTier } });
+    if(error){
+      let info = null;
+      try { info = error.context && await error.context.json(); } catch(e){ /* no body */ }
+      throw Object.assign(new Error((info && info.message) || error.message || 'Claude did not answer.'), { code: (info && info.code) || 'sample_error' });
+    }
+    if(typeof req.onText === 'function'){ try { req.onText(data.text); } catch(e){ /* progress only */ } }
+    return { text: data.text };
   };
 }
 
-export { installPlatform, supabaseUser, supabaseAssets, edgeFunctions };
+// mcp: the TradingView connector will be a private server function too (not built yet), so for now the app finds none.
+
+export { installPlatform, supabaseUser, supabaseAssets, claudeSample };

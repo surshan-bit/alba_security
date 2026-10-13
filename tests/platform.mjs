@@ -44,5 +44,16 @@ eq('db present', !!(await p).doc, true); eq('unknown capability', await host.cla
 eq('user', await (await host.claude.use('user')).id(), 'u'); eq('mcp absent', await host.claude.use('mcp'), null);
 eq('permissions default', await (await host.claude.use('permissions')).state(), 'granted');
 
+// Claude calls: both call styles reach the server function; its error codes come through; progress text is passed on
+import { claudeSample } from '../platform/shim.js';
+const calls = []; const sbOk = { functions: { invoke: async (n, o) => { calls.push([n, o.body]); return { data: { text: '{"a":1}' }, error: null }; } } };
+const ask = claudeSample(sbOk); const prog = [];
+eq('sample string style', (await ask('hello', { modelTier: 'quick', onText: t => prog.push(t) })).text, '{"a":1}');
+eq('sample object style', (await ask({ prompt: 'hi', modelTier: 'default' })).text, '{"a":1}');
+eq('sample body', calls, [['sample', { prompt: 'hello', modelTier: 'quick' }], ['sample', { prompt: 'hi', modelTier: 'default' }]]); eq('sample progress', prog, ['{"a":1}']);
+const sbBad = { functions: { invoke: async () => ({ data: null, error: { message: 'x', context: { json: async () => ({ code: 'rate_limited', message: 'slow down' }) } } }) } };
+let caught = null; try { await claudeSample(sbBad)('p'); } catch(e){ caught = e; }
+eq('sample error code', [caught && caught.code, caught && caught.message], ['rate_limited', 'slow down']);
+
 console.log(fails ? fails + ' FAILED' : 'OK: platform contract tests pass');
 process.exit(fails ? 1 : 0);
