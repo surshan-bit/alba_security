@@ -131,7 +131,6 @@ win.__harnessStocks = JSON.parse(JSON.stringify(stocks));   // what the start-up
 if(process.env.HARNESS_DEBUG) console.log('sample stocks:', stocks.length);
 
 // ---- page structure: fill in the partials (the start-up sequence leaves a section that already has its text alone) ----
-for(const el of Array.from(win.document.querySelectorAll('section[data-partial]'))) el.innerHTML = rd(el.dataset.partial);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const sha = s => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 12);
@@ -145,6 +144,11 @@ const click = el => el && el.dispatchEvent(new win.MouseEvent('click', { bubbles
 const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('input', { bubbles: true })); };
 
 (async () => {
+  // the real partial loader (src/boot/partials.js) fills each section, reading the files from disk instead of over the network
+  const { ensurePartial } = await import(require('url').pathToFileURL(path.join(__dirname, '..', 'src', 'boot', 'partials.js')).href);
+  const realFetch = globalThis.fetch; globalThis.fetch = async f => ({ ok: true, status: 200, text: async () => rd(f) });
+  for(const el of Array.from(win.document.querySelectorAll('section[data-partial]'))) await ensurePartial(el);
+  globalThis.fetch = realFetch;
   // The real start-up sequence (src/boot: identity, saved preferences, then the app) as one script. jsdom cannot load ES modules,
   // so this bundle is a single file; a lazily loaded part becomes an import() that resolves from inside the same file.
   const bundle = require('esbuild').buildSync({ stdin: { contents: "import { boot } from './src/boot/boot.js'; window.__bootDone = boot({ loadStocks: async () => window.__harnessStocks });", resolveDir: src, sourcefile: 'harness-entry.js' },

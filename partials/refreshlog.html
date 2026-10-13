@@ -27,15 +27,8 @@
           <div class="upload-result" id="fundamentalUploadResult"></div>
         </div>
 
-        <div class="upload-panel fi-panel" id="fundImportPanel" hidden aria-live="polite">
-          <div class="fi-head"><div class="upload-title" id="fiTitle">Import</div><div class="fi-pct" id="fiPct">0%</div></div>
-          <div class="fi-bar" id="fiBar" role="progressbar" aria-label="Import progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fi-bar-fill" id="fiBarFill"></div></div>
-          <ol class="fi-steps" id="fiSteps"></ol>
-          <div id="fiPrompt"></div>
-          <div class="fi-result" id="fiResult"></div>
-        </div>
+        <div data-import-panel="" data-title="Import" data-label="Import progress" data-backups></div>
 
-        <div class="upload-panel" id="fiBackups" hidden aria-live="polite"></div>
 
       </div>
 
@@ -64,15 +57,8 @@
           <div class="upload-result" id="technicalUploadResult"></div>
         </div>
 
-        <div class="upload-panel fi-panel" id="ti_fundImportPanel" hidden aria-live="polite">
-          <div class="fi-head"><div class="upload-title" id="ti_fiTitle">Import</div><div class="fi-pct" id="ti_fiPct">0%</div></div>
-          <div class="fi-bar" id="ti_fiBar" role="progressbar" aria-label="Import progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fi-bar-fill" id="ti_fiBarFill"></div></div>
-          <ol class="fi-steps" id="ti_fiSteps"></ol>
-          <div id="ti_fiPrompt"></div>
-          <div class="fi-result" id="ti_fiResult"></div>
-        </div>
+        <div data-import-panel="ti_" data-title="Import" data-label="Import progress" data-backups></div>
 
-        <div class="upload-panel" id="ti_fiBackups" hidden aria-live="polite"></div>
 
       </div>
 
@@ -85,13 +71,7 @@
           <button type="button" class="select-mode-btn fi-btn-primary" id="refreshWatchlistBtn" title="Rebuilds the four Alba watchlists in TradingView from the current verdicts, right here on this page" disabled>Sync now</button>
         </div>
 
-        <div class="upload-panel fi-panel" id="wl_fundImportPanel" hidden aria-live="polite">
-          <div class="fi-head"><div class="upload-title" id="wl_fiTitle">Sync</div><div class="fi-pct" id="wl_fiPct">0%</div></div>
-          <div class="fi-bar" id="wl_fiBar" role="progressbar" aria-label="Sync progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fi-bar-fill" id="wl_fiBarFill"></div></div>
-          <ol class="fi-steps" id="wl_fiSteps"></ol>
-          <div id="wl_fiPrompt"></div>
-          <div class="fi-result" id="wl_fiResult"></div>
-        </div>
+        <div data-import-panel="wl_" data-title="Sync" data-label="Sync progress"></div>
 
         <div class="refreshlog-runs-title">Recent runs</div>
         <div id="watchlistSyncLogRuns" aria-live="polite"><p class="upload-hint">Loading…</p></div>
