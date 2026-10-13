@@ -602,6 +602,18 @@ function applyRemote(d) {
 }
 const liveJobs = (d) => (Array.isArray(d && d.jobs) ? d.jobs : []).filter((j) => j && KIND_LABEL[j.kind] && Array.isArray(j.keys) && j.keys.length);
 const freshStats = () => ({ refreshed: 0, notRun: 0, failed: [], stopped: false, note: "", perm: false });
+// Shows the resumed job in the bell at once (the engine's own progress card replaces it when the first batch starts).
+function showResuming() {
+  const j = queue[0];
+  if (!j) return;
+  const left = queue.reduce((n, x) => n + x.keys.length, 0);
+  activityRun("batch", {
+    title: "Refreshing " + KIND_LABEL[j.kind] + " Info · " + j.done + " of " + j.total + " done" + (queue.length > 1 ? " · " + (queue.length - 1) + " more queued" : ""),
+    text: "Starting again where it stopped (" + left + " stock" + (left === 1 ? "" : "s") + " left)…",
+    pct: Math.round((j.done / Math.max(1, j.total)) * 100), section: sectionOf(j.source),
+    onStop: () => { if (activeJob || engineBusy()) return; queue.forEach((x) => activityEnd("rk-q-" + x.id)); queue = []; activityEnd("batch"); persistNow(); repaint(); }
+  });
+}
 // A job nobody has worked on for a while: the first open dashboard that can reach TradingView picks it up.
 async function takeOver() {
   if (taking || queue.length) return;
@@ -617,6 +629,7 @@ async function takeOver() {
     queue = jobs.map((j) => Object.assign({}, j, { stats: freshStats() }));
     clearRemote();
     queue.slice(1).forEach(queuedItem);
+    showResuming();
     await persistNow();   // claims the run: the other dashboards see a fresh heartbeat from this one
     notice({ tone: "ok", title: "Refresh continuing", text: "Carrying on with " + jobs.map((j) => KIND_LABEL[j.kind] + " · " + j.keys.length + " left").join(", ") + ".", section: sectionOf(jobs[0].source) });
     setTimeout(pump, 1000);
@@ -666,6 +679,7 @@ async function resumeSaved(saved) {
   queue = jobs.map((j) => Object.assign({}, j, { stats: freshStats() }));
   clearRemote();
   queue.slice(1).forEach(queuedItem);
+  showResuming();
   notice({ tone: "ok", title: "Refresh continuing", text: "Carrying on with " + jobs.map((j) => KIND_LABEL[j.kind] + " · " + j.keys.length + " left").join(", ") + ".", section: sectionOf(jobs[0].source) });
   setTimeout(pump, 1500);
 }
