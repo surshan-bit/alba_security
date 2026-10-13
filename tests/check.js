@@ -2,6 +2,8 @@
 // Usage: node tests/check.js            run everything, exit 1 on any difference
 //        node tests/check.js --update   accept the current behaviour as the new golden (after reviewing the differences)
 const { spawnSync } = require('child_process'), fs = require('fs'), path = require('path');
+// The app works on India time (market hours, week and month starts), so every test runs on India time whatever machine it is on.
+process.env.TZ = 'Asia/Kolkata';
 const root = path.resolve(__dirname, '..'), out = path.join(__dirname, 'out');
 const step = (title, cmd, args) => {
   process.stdout.write('== ' + title + '\n');
