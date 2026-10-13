@@ -21,7 +21,8 @@
 .strat-sub{margin-bottom:8px;}
 .sr-rules{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
 /* Strategies rules: the rows have no outline any more, so they take no side padding and line up with the heading and the + Add a rule box. */
-.sr-row{padding-left:0;padding-right:0;padding-left:0;padding-right:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;padding:8px 10px;padding-left:0;padding-right:0;background:transparent;}
+.sr-row{padding-left:0;padding-right:0;padding-left:0;padding-right:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:0;border-radius:0;padding:6px 0;background:transparent;}
+@media (min-width:601px){.sr-row{display:grid;grid-template-columns:260px 120px minmax(0,1fr) auto 24px;column-gap:10px;}.sr-row select{width:100%;}.sr-count{margin-left:0;text-align:right;}}
 .sr-row select,.sr-add,.sr-row input,.strat-why-input{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:.84rem;}
 .sr-row select{color:var(--text);}
 .sr-add{color:var(--text);}
