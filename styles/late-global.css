@@ -7,3 +7,5 @@ select:not([multiple]):not([size]){-webkit-appearance:none;appearance:none;backg
 select:not([multiple]):not([size]):disabled{opacity:.55;}
 /* Dark theme: the large container cards blend into the black page instead of being drawn as outlined boxes. */
 :root:not([data-theme="indigo"]):not([data-theme="light"]) :is(.analysis-panel,.strat-panel,.filters,.upload-panel,.settings-row,.refreshlog-run,.help-panel,.settings-panel,.analysis-filters-panel){border-color:transparent;background:transparent;box-shadow:none;}
+/* Explorer's filter list uses the same full-width rows as the Business screen (no inner padding). */
+@media (min-width:601px){.filters.analysis-filters-panel{padding:0;}}
