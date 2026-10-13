@@ -92,3 +92,7 @@
 :root:is([data-theme="indigo"],[data-theme="light"]) :is(.biz-table,.strat-table) > thead > tr > th{color:#2c333c;}
 :root:is([data-theme="indigo"],[data-theme="light"]) :is(.biz-table > tbody > .biz-row > .biz-name,.biz-table > thead > tr > th:first-child)::before{color:#3d4550;}
 :root:not([data-theme="indigo"]):not([data-theme="light"]) :is(.topbar-search-input,.search-input){border-color:#5c574f;}
+:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .live-toggle{border-color:rgba(255,255,255,.6);color:#fff;}
+:root:is([data-theme="indigo"],[data-theme="light"]) .topbar-brand{color:var(--text);}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.strat-table th,.biz-table>thead>tr>th){color:#454b54;}
+:root:is([data-theme="indigo"],[data-theme="light"]) :is(.help-table td,.help-table th){border-bottom-color:var(--line);}

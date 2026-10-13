@@ -1,7 +1,7 @@
 /* Design tokens (colours, spacing, type) for every theme, then the page reset and base elements. */
 /* Theme colours (Dark, Light) and the page reset. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
 /* Row highlight on hover, for every grid (Analysis, Strategies, Explorer, Peers, Trade Log tables). Follows the text colour, so it works in every theme. */
-:root{--bg:#12110f;--panel:#1a1917;--panel2:#252320;--line:#3a3733;--text:#f6f1e9;--muted:#c9c2b7;--accent:#3b9e78;--buy:#34ad79;--mbuy:#86b845;--hold:#cfa82a;--avoid:#e0675f;--tech-sell:#e08a35;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box;--row-hover:color-mix(in srgb, var(--text) 9%, transparent);}
+:root{--bg:#000000;--panel:#1a1917;--panel2:#252320;--line:#3a3733;--text:#f6f1e9;--muted:#c9c2b7;--accent:#3b9e78;--buy:#34ad79;--mbuy:#86b845;--hold:#cfa82a;--avoid:#e0675f;--tech-sell:#e08a35;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box;--row-hover:color-mix(in srgb, var(--text) 9%, transparent);}
 /* Light — the one light theme (v1.113). It follows the Screener look: a warm sand page, cream cards, near-black text
      and a soft purple accent. Surfaces are kept clearly apart (page / card / inset panel / line) and the text colours
      are dark enough to read comfortably on cream; the verdict colours (buy/mbuy/hold/avoid/tech-sell) are the same

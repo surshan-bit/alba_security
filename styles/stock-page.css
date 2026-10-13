@@ -10,21 +10,21 @@
      (boxed panel, uppercase eyebrow title, card grid) so they read as one consistent
      system rather than four bolted-together UIs; their CSS is kept in that same order
      below to make each one easy to find. */
-.val-panel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-.val-panel-head{display:flex;align-items:center;justify-content:flex-start;gap:10px 14px;flex-wrap:wrap;}
-.val-grid{display:grid;}
-.val-cell-value{font-weight:700;}
+.val-panel{margin-top:22px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.val-panel-head{margin-bottom:4px;display:flex;align-items:center;justify-content:flex-start;gap:10px 14px;flex-wrap:wrap;}
+.val-grid{grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;column-gap:32px;display:grid;}
+.val-cell-value{font-size:1.05rem;font-weight:700;}
 .val-cell-value.fs-buy{color:var(--buy);}
 .val-cell-value.fs-mbuy{color:var(--mbuy);}
 .val-cell-value.fs-hold{color:var(--hold);}
 .val-cell-value.fs-avoid{color:var(--avoid);}
 .val-cell-value.fs-pending{color:var(--muted);}
-.val-cell-sub{color:var(--text);line-height:1.5;}
-.fund-panel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-.fund-panel-head{display:flex;align-items:center;justify-content:flex-start;gap:10px 14px;flex-wrap:wrap;}
+.val-cell-sub{font-size:.82rem;margin-top:6px;color:var(--text);line-height:1.5;}
+.fund-panel{margin-top:6px;padding-top:12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.fund-panel-head{margin-bottom:12px;display:flex;align-items:center;justify-content:flex-start;gap:10px 14px;flex-wrap:wrap;}
 .fund-panel-head-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-start;}
-.fund-grid{display:grid;}
-.fund-cell-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+.fund-grid{grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;column-gap:32px;display:grid;}
+.fund-cell-head{margin-bottom:8px;display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
 .fund-cell-label{color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
 .proxy-tag{display:inline-block;margin-left:7px;font-size:.62rem;font-weight:700;text-transform:none;letter-spacing:0;color:var(--hold);background:rgba(201,162,39,.18);border:1px solid var(--hold);border-radius:10px;padding:1px 7px;vertical-align:middle;text-decoration:none;cursor:pointer;}
 .incomplete-tag{display:inline-block;margin-left:7px;font-size:.62rem;font-weight:700;text-transform:none;letter-spacing:0;color:var(--muted);background:rgba(127,127,127,.14);border:1px dashed var(--muted);border-radius:10px;padding:1px 7px;vertical-align:middle;cursor:help;}
@@ -33,7 +33,8 @@
 /* On-demand research of the Data-proxy factors (Moat, Governance), added 2026-10-06 — mirrors the
      the stock-level "Research this stock" button. Once researched, the dashed "proxy" card turns
      solid and the amber tag is replaced by a green "Researched" tag plus the findings and sources. */
-.fund-cell-research{margin:0 0 10px;font-size:.82rem;line-height:1.5;color:var(--text);}
+.fund-cell-research{padding:14px 0;margin:0 0 10px;font-size:.82rem;line-height:1.5;color:var(--text);}
+.fund-subsection .fund-cell{padding:14px 0;}
 .fund-research-stale{margin:0 0 6px;padding:4px 8px;border-radius:6px;font-size:.74rem;font-weight:600;background:rgba(217,119,6,.14);color:#b45309;}
 .fund-research-summary{margin:0 0 6px;}
 .fund-research-list{margin:6px 0 0;padding-left:18px;}
@@ -50,7 +51,7 @@
 .fund-cell-score.fs-hold{color:var(--hold);}
 .fund-cell-score.fs-avoid{color:var(--avoid);}
 .fund-cell-score.fs-pending{color:var(--muted);}
-.fund-cell-bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;}
+.fund-cell-bar{margin-bottom:10px;height:4px;background:var(--line);border-radius:2px;overflow:hidden;}
 .fund-cell-bar i{display:block;height:100%;}
 .fund-cell-bar i.fs-buy{background:var(--buy);}
 .fund-cell-bar i.fs-mbuy{background:var(--mbuy);}
@@ -66,7 +67,7 @@
 .fund-pc-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px;}
 .fund-pc-title-pros{color:var(--buy);}
 .fund-pc-title-cons{color:var(--avoid);}
-.fund-pros-cons ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+.fund-pros-cons ul{gap:7px;list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
 .fund-pros-cons li{font-size:.85rem;line-height:1.4;padding-left:16px;position:relative;color:var(--text);}
 .fund-pc-dot{position:absolute;left:0;top:.5em;width:7px;height:7px;border-radius:50%;}
 .fund-pc-dot.fs-buy{background:var(--buy);}
@@ -79,10 +80,13 @@
 .fund-flag.fs-hold{background:rgba(201,162,39,.16);color:var(--hold);border:1px solid rgba(201,162,39,.4);}
 .fund-proxy-mark{cursor:help;font-size:.7em;opacity:.8;margin-left:1px;}
 .fund-pc-footnote{grid-column:1/-1;font-size:.72rem;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
+.fund-subsection{margin-bottom:20px;}
+.fund-subsection:last-child{margin-bottom:0;}
 .fund-subsection-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px;}
-.fund-subsection-title{font-weight:700;}
-.tech-panel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-.tech-panel-head{display:flex;align-items:center;justify-content:flex-start;gap:10px 14px;flex-wrap:wrap;}
+.fund-subsection-title{color:var(--text);font-weight:700;}
+.fund-subsection .fund-cell-bar{margin-bottom:12px;}
+.tech-panel{margin-top:22px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.tech-panel-head{margin-bottom:12px;display:flex;align-items:center;justify-content:flex-start;gap:10px 14px;flex-wrap:wrap;}
 .tech-news-note{display:flex;gap:8px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--tech-sell);border-radius:8px;padding:10px 12px;margin:0 0 14px;font-size:.82rem;color:var(--text);line-height:1.5;}
 .tech-news-label{color:var(--muted);font-weight:700;text-transform:uppercase;font-size:.68rem;letter-spacing:.04em;flex-shrink:0;margin-top:2px;white-space:nowrap;}
 /* Industry Peers panel — last section of the stock detail view (added 2026-10-06). Lists every
@@ -92,6 +96,10 @@
      lets the pane (and panel) shrink to the screen so .peers-scroll scrolls sideways inside its own box. */
 .detail,.tech-panel{min-width:0;}
 .peers-sub{font-size:.8rem;color:var(--muted);line-height:1.5;margin:0 0 12px;}
+.peers-table th:nth-child(1){min-width:56px;}
+.peers-table td:nth-child(1){min-width:56px;}
+.peers-table th:nth-child(2){min-width:130px;}
+.peers-table td:nth-child(2){min-width:130px;}
 /* Horizontal scroll (2026-10-06): the table keeps its natural column widths and, on a narrow screen,
      scrolls sideways inside .peers-scroll (no columns are pinned — pinned columns ate most of a phone's width). */
 .peers-hint{display:none;font-size:.72rem;color:var(--muted);margin:6px 2px 0;}
@@ -99,11 +107,14 @@
 .peers-hint{display:block;}
 }
 .peers-scroll{max-width:100%;max-height:420px;overflow:auto;-webkit-overflow-scrolling:touch;}
-.peers-table{border-spacing:0;}
+.peers-table{width:100%;border-collapse:separate;font-size:.82rem;border-spacing:0;}
+.peers-table th{position:sticky;top:0;background:var(--panel2);text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);}
+.peers-table td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
 .peers-table tr:last-child td{border-bottom:none;}
 .peers-table tbody tr{cursor:pointer;}
 .peers-table tbody tr:hover{background:var(--row-hover);}
 .peers-table tr.peers-self{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent);}
+.peers-table .chg-up{color:var(--buy);font-weight:700;}
 .peers-table .chg-down{color:var(--avoid);font-weight:700;}
 .peers-empty{color:var(--muted);font-style:italic;}
 /* Weekly/Monthly RSI value + Tech Rating badge rows inside the Technical Score card's
@@ -112,8 +123,8 @@
 .tech-empty{color:var(--muted);font-size:.86rem;}
 /* Positive and Negative sit side by side and share rows: the cards on the same row stretch to the tallest one (subgrid).
      When the panel is narrow they stack instead (see the container query below). */
-.global-panel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;container-type:inline-size;}
-.global-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.global-panel{margin-top:6px;padding-top:12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;container-type:inline-size;}
+.global-panel-head{margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
 .global-panel-sub{font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.5;max-width:90ch;}
 .global-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:16px;}
 .global-col{display:grid;grid-row:1 / span calc(var(--n) + 1);grid-template-rows:subgrid;min-width:0;}
@@ -132,7 +143,7 @@
 .global-col-title.pos{color:var(--buy);}
 .global-col-title.neg{color:var(--avoid);}
 .global-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
-.global-item{font-size:.86rem;line-height:1.55;color:var(--text);text-wrap:pretty;overflow-wrap:anywhere;}
+.global-item{padding:14px 0;font-size:.86rem;line-height:1.55;color:var(--text);text-wrap:pretty;overflow-wrap:anywhere;}
 .global-item-source{display:block;font-size:.7rem;color:var(--muted);margin-top:4px;font-style:italic;}
 .global-item-source a{color:var(--accent);text-decoration:none;}
 .global-item-source a:hover{text-decoration:underline;}
@@ -151,16 +162,28 @@
 .detail-jump .jump-preview.fs-hold{color:var(--hold);}
 .detail-jump .jump-preview.fs-avoid{color:var(--avoid);}
 .detail-jump .jump-preview.fs-pending{color:var(--muted);}
+#jump-val{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
+#jump-fund{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
+#jump-global{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
+#jump-tech{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
+#peersPanel{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
 .filter-label{min-width:0;overflow:hidden;text-overflow:ellipsis;}
 /* Flat, list-style stock page (all widths). The boxes inside boxes (panel > factor card > metric chips) are replaced by
    hairline dividers and larger section headings, so the information gets the width. On wide screens the stock page keeps its one
    outer card; on phones that card goes too. */
 .val-panel,.fund-panel,.tech-panel,.global-panel{background:transparent;border:0;border-top:1px solid var(--line);border-radius:0;padding:20px 0 4px;}
 .val-panel-title,.fund-panel-title,.tech-panel-title,.global-panel-title{font-weight:700;text-transform:none;letter-spacing:0;}
+.val-panel-title{font-size:1.2rem;color:var(--text);}
+.fund-panel-title{font-size:1.2rem;color:var(--text);}
+.tech-panel-title{font-size:1.2rem;color:var(--text);}
+.global-panel-title{font-size:1.2rem;color:var(--text);}
 .fund-subsection-title{font-size:1rem;}
 .global-panel-sub{margin-bottom:10px;}
 /* rows instead of cards: each cell is a line-topped block */
 .val-cell,.fund-cell,.global-item,.fund-overall-summary,.fund-cell-research{background:transparent;border:0;border-radius:0;border-top:1px solid var(--line);}
+.val-cell{padding:14px 0;}
+.fund-cell{padding:14px 0;}
+.fund-overall-summary{margin:6px 0 4px;padding:14px 0;}
 .fund-cell-proxy{border-style:none;border-top:1px solid var(--line);}
 .global-cols{row-gap:0;}
 .global-list{gap:0;}
@@ -256,10 +279,10 @@ html{scrollbar-color:var(--line) transparent;}
 }
 .biz-stocks-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 6px;}
 /* Industry detail: the news button sits on the News heading line; each opened industry is closed off with a line. */
-.biz-news-bar{margin-top:10px;}
+.biz-news-bar{align-items:center;margin-top:10px;}
 /* Top-bar stock search */
-.topbar-search{flex-shrink:1;}
-.topbar-search-input{width:100%;box-sizing:border-box;border-radius:999px;border:1px solid var(--line);background:transparent;font:inherit;padding:0 32px 0 14px;font-size:.92rem;height:40px;}
+.topbar-search{margin-left:auto;flex-shrink:1;}
+.topbar-search-input{color:var(--text);width:100%;box-sizing:border-box;border-radius:999px;border:1px solid var(--line);background:transparent;font:inherit;padding:0 32px 0 14px;font-size:.92rem;height:40px;}
 .topbar-search-input:focus{outline:none;border-color:var(--accent);}
 .topbar-search-clear{display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--muted);font-size:1.1rem;line-height:1;cursor:pointer;padding:2px 6px;}
 .sg-empty{padding:10px 12px;color:var(--muted);font-size:.84rem;}
@@ -280,10 +303,10 @@ html{scrollbar-color:var(--line) transparent;}
 .pcs-cell{display:flex;flex-direction:column;justify-content:center;min-width:96px;position:relative;}
 .pcs-cell + .pcs-cell{border-left:1px solid var(--line);}
 .pcs-key{font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);line-height:1;font-size:.56rem;}
-.pcs-val{display:flex;align-items:center;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;font-size:.9rem;gap:5px;}
+.pcs-val{color:var(--text);display:flex;align-items:center;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;font-size:.9rem;gap:5px;}
 .pcs-arrow{font-style:normal;line-height:1;font-size:.54rem;}
 .pcs-gauge{position:relative;display:block;border-radius:2px;margin-top:1px;background:linear-gradient(90deg,color-mix(in srgb,var(--buy) 55%,transparent) 0 30%,var(--line) 30% 70%,color-mix(in srgb,var(--hold) 65%,transparent) 70% 100%);height:3px;}
-.pcs-dot{border-radius:50%;flex-shrink:0;width:7px;height:7px;}
+.pcs-dot{background:var(--muted);border-radius:50%;flex-shrink:0;width:7px;height:7px;}
 .pcs-sig.sig-buy{background:color-mix(in srgb,var(--buy) 13%,transparent);}
 .pcs-sig.sig-buy .pcs-dot{background:var(--buy);}
 .pcs-sig.sig-mbuy{background:color-mix(in srgb,var(--mbuy) 13%,transparent);}
@@ -310,8 +333,9 @@ html{scrollbar-color:var(--line) transparent;}
 }
 .biz-refresh{margin:10px 0 4px;}
 /* Live prices: the topbar switch, the open stock's live price and the brief flash when a number changes. */
-.live-toggle{flex:none;height:30px;margin-left:auto;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:transparent;font:inherit;font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;}
+.live-toggle{color:var(--muted);flex:none;height:30px;margin-left:auto;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:transparent;font:inherit;font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;}
 .live-toggle:hover{border-color:var(--accent);}
+.live-toggle.on{color:var(--text);}
 .live-toggle.live{color:var(--accent);border-color:var(--accent);}
 .live-toggle.live::first-letter{animation:livePulse 1.6s ease-in-out infinite;}
 @keyframes livePulse{50%{opacity:.35;}}

@@ -5,7 +5,7 @@
 .tl-form-title{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:10px;}
 .tl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
 .tl-grid label{display:flex;flex-direction:column;gap:4px;font-size:.72rem;color:var(--muted);font-weight:600;}
-.tl-grid input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:.86rem;font-family:inherit;outline:none;min-width:0;}
+.tl-grid input{color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:.86rem;font-family:inherit;outline:none;min-width:0;}
 .tl-grid input:focus{border-color:var(--accent);}
 .tl-grid .tl-wide{grid-column:1/-1;}
 .tl-form-actions{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;}

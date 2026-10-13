@@ -32,12 +32,13 @@ async function cacheGet(version){
   });
 }
 async function cachePut(version, list){
+  let json; try { json = JSON.stringify(list); } catch(e){ return; }   // before any await: later overlays must not leak into the saved copy
   const idb = await cacheOpen(); if(!idb) return;
   try {
     const tx = idb.transaction(DATA_STORE, 'readwrite');
     const os = tx.objectStore(DATA_STORE);
     os.clear();
-    os.put(JSON.stringify(list), 'v' + version);
+    os.put(json, 'v' + version);
     await new Promise((resolve) => { tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve; });
   } catch(e){ /* cache is optional */ }
 }

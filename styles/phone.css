@@ -17,9 +17,11 @@
 /* Data Refresh: each import box is the title on one line and the two buttons side by side, sharing the width, on the next. */
 .upload-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:stretch;}
 .upload-row .upload-text{grid-column:1 / 3;min-width:0;}
-.upload-row .upload-title{margin-bottom:0;}
+.upload-row .upload-title{font-size:.88rem;margin-bottom:0;}
 .upload-row .browse-wrap{display:flex;}
 .upload-row .browse-wrap .browse-btn,.upload-row > .select-mode-btn{width:100%;height:36px;padding:0 10px;white-space:nowrap;}
+.upload-row .browse-wrap .browse-btn{box-sizing:border-box;font-size:.84rem;}
+.upload-row>.select-mode-btn{box-sizing:border-box;font-size:.84rem;}
 /* Bands between blocks: modest, so the Filters line, the toolbar and the grid read as separate groups instead of one packed block. */
 .topbar{padding:6px 4px 6px 6px;gap:4px;margin-bottom:6px;}
 .topbar .topbar-search-input{height:var(--ph-ctl);font-size:.86rem;padding-left:12px;}
@@ -27,13 +29,14 @@
 .topbar .activity-bell{width:34px;height:var(--ph-ctl);}
 /* The Live switch stays in the top bar on a phone: a small pill with a one-word state (Live off, Live, Closed, Paused) between the search box and the bell. */
 .live-toggle{display:inline-flex;align-items:center;height:26px;padding:0 7px;font-size:0;}
-.live-toggle::before{font-size:.7rem;}
+.live-toggle::before{content:attr(data-short);font-size:.7rem;}
 .live-toggle.live::before{content:"\25CF " attr(data-short);animation:livePulse 1.6s ease-in-out infinite;}
+.analysis-leaderboard-head{gap:var(--ph-space)!important;margin-bottom:12px!important;}
 .live-toggle.live{animation:none;}
-.analysis-leaderboard-head > div:last-child{width:100%;}
+.analysis-leaderboard-head > div:last-child{gap:var(--ph-space)!important;width:100%;}
 .analysis-leaderboard-head .analysis-filter-label{flex:1 1 100%;font-size:0;gap:0 !important;}
 .analysis-leaderboard-head .sort-select{width:100%;height:var(--ph-ctl-lg);font-size:.84rem;}
-.analysis-leaderboard-head .analysis-reset-btn{height:var(--ph-ctl-lg);white-space:nowrap;}
+.analysis-leaderboard-head .analysis-reset-btn{flex:1 1 0;padding:0 6px;font-size:.76rem;height:var(--ph-ctl-lg);white-space:nowrap;}
 .analysis-leaderboard-head .analysis-panel-title{font-size:.84rem;}
 /* Grids on a phone: sideways room is scarce (the grid scrolls), so the extra air is added above and below each row. */
 .strat-table:not(.peers-table) th{padding:9px 5px;font-size:.62rem;letter-spacing:.03em;}
@@ -41,9 +44,11 @@
 .analysis-leaderboard .analysis-lb-ticker{display:none;}
 .analysis-leaderboard .pin-btn{padding:0 2px;}
 .app-section .analysis-main > .analysis-panel,.app-section > .analysis-panel{margin-top:8px;}
+.analysis-leaderboard{margin-top:0;}
 .analysis-filters-panel,.analysis-filters-panel .filters-toggle{margin-bottom:0;}
 .app-section .analysis-filters-panel .filters-toggle,.app-section .biz-filters-toggle{padding:13px 0;}
 .biz-showing{margin:12px 0;font-size:.8rem;line-height:1.4;}
+.app-section .biz-toolbar{margin:8px 0 14px;}
 .app-section .biz-side{margin-bottom:0;}
 .app-section .biz-layout,.app-section .analysis-layout{gap:0;row-gap:8px;}
 .app-section .analysis-filters-panel{margin-bottom:0;}
@@ -58,6 +63,9 @@
 .sr-rules{gap:0;}
 .sr-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 28px;gap:10px;align-items:center;padding:14px 0;border-width:0 0 1px;border-style:solid;border-color:var(--line);}
 .sr-row select,.sr-row input,.sr-opt,.sr-row .sr-val > span,.strat-goal,.strat-goal-in,.strat-goal .strat-btn,.strat-note{font-size:var(--ph-fs);}
+.strat-fold>summary{font-size:.8rem;margin-bottom:2px;padding:8px 0;gap:8px;}
+.strat-fold-sum{font-size:.74rem;}
+.strat-fold{margin-bottom:4px;}
 .sr-count{font-size:.8rem;grid-column:1 / 4;grid-row:3;margin:-2px 0 0;text-align:left;white-space:nowrap;}
 .sr-row select{width:100%;min-width:0;box-sizing:border-box;}
 .sr-field{grid-column:1;grid-row:1;}
@@ -66,11 +74,13 @@
 .sr-val{grid-column:1 / 4;grid-row:2;min-width:0;}
 .sr-val:has(.sr-opts){grid-column:1 / 4;}
 .sr-add{width:100%;box-sizing:border-box;margin-top:14px;}
+.strat-result-head{gap:var(--ph-space);}
 .strat-result-title{margin-right:0;flex:1 1 100%;flex-direction:row;align-items:baseline;gap:8px;white-space:nowrap;overflow:hidden;}
-.strat-total{flex:1 1 100%;min-width:0;}
-.strat-total .strat-btn{white-space:nowrap;}
-.strat-total .strat-sort{min-width:0;justify-content:flex-end;}
-.strat-total .strat-sort select{max-width:100%;}
+.strat-total{display:flex;flex-wrap:nowrap;align-items:center;gap:var(--ph-space);flex:1 1 100%;min-width:0;}
+.strat-total .strat-btn{height:var(--ph-ctl-lg);flex:0 0 auto;padding:0 12px;font-size:.82rem;white-space:nowrap;}
+.strat-total .sort-select{height:var(--ph-ctl-lg);}
+.strat-total .strat-sort{font-size:.78rem;flex:1 1 0;min-width:0;justify-content:flex-end;}
+.strat-total .strat-sort select{flex:1 1 0;min-width:0;font-size:.82rem;max-width:100%;}
 /* Strategies: the list of strategies becomes one scrolling row of chips and the editor header shrinks, so the rules and results are what you see. */
 #stratList{display:flex;flex-direction:row;flex-wrap:nowrap;gap:var(--ph-space);overflow-x:auto;padding:4px 0 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
 #stratList::-webkit-scrollbar{display:none;}
@@ -99,6 +109,8 @@
 .trk-del{grid-area:del;padding:0 2px;font-size:1.1rem;}
 .trk-goal{grid-area:goal;color:var(--muted);}
 .trk-state{grid-area:state;margin-left:0;font-size:.72rem;}
+#stratMain .strat-panel{margin-top:10px;padding-top:4px;padding-bottom:4px;}
+#stratMain .strat-panel+.strat-panel{margin-top:18px;}
 /* Explorer on phones: the controls fold into one "Filters" line (closed at first, like the Analysis filters); the toolbar and grid are tighter. */
 }
 .biz-filters-toggle{display:none;}
@@ -112,9 +124,11 @@
 .biz-side:not(.filters-collapsed) .biz-controls{padding-top:10px;}
 }
 @media (max-width:600px){
-.biz-toolbar{justify-content:flex-start;}
+.biz-toolbar{flex-wrap:wrap;gap:var(--ph-space);justify-content:flex-start;}
 .biz-toolbar .biz-showing{flex:1 1 100%;margin:0;}
-.biz-toolbar .biz-match-toggle .tl-view-btn{height:32px;white-space:nowrap;}
+.biz-toolbar .biz-expand{height:var(--ph-ctl-lg);padding:0 12px;font-size:.76rem;white-space:nowrap;}
+.biz-toolbar .biz-match-toggle{height:var(--ph-ctl-lg);}
+.biz-toolbar .biz-match-toggle .tl-view-btn{padding:0 12px;font-size:.76rem;height:32px;white-space:nowrap;}
 .biz-detail-box{padding:10px 0;}
 .biz-detail h3{margin:6px 0 10px;}
 .biz-table > thead > tr > th{padding:9px 5px;font-size:.62rem;letter-spacing:.03em;}

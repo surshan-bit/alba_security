@@ -16,7 +16,7 @@
 .pc-panels{display:flex;flex-direction:column;gap:12px;}
 .pc-panel{min-width:0;}
 .pc-ph{display:flex;flex-wrap:wrap;margin-bottom:2px;}
-.pc-ptitle small{color:var(--muted);}
+.pc-ptitle small{margin-left:6px;color:var(--muted);}
 .pc-pills{display:flex;gap:4px;}
 .pc-pill{appearance:none;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-size:.74rem;padding:2px 9px;border-radius:99px;cursor:pointer;}
 .pc-pill[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:600;}

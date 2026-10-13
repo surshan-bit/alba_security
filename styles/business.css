@@ -1,6 +1,6 @@
 /* Business screen. */
 /* Business page (industries and their news). The grids themselves follow the grid standard in 15-strategies.css. */
-.biz-controls{display:flex;flex-wrap:wrap;}
+.biz-controls{gap:10px;align-items:center;margin:6px 0 10px;display:flex;flex-wrap:wrap;}
 .biz-scroll{overflow-x:auto;container-type:inline-size;}
 @media (min-width:700px){
 .biz-table > tbody > .biz-row > .biz-name{position:sticky;left:0;z-index:1;}
@@ -13,16 +13,16 @@
 .biz-breadth i{display:block;height:100%;}
 .biz-breadth .up{background:var(--buy);}
 .biz-breadth .down{background:var(--avoid);}
-.biz-table > tbody > .biz-detail > td{padding:0;border-bottom:1px solid var(--line);padding-bottom:6px;}
+.biz-table > tbody > .biz-detail > td{padding-bottom:6px;padding-bottom:6px;padding:0;border-bottom:1px solid var(--line);padding-bottom:6px;}
 .biz-detail-box{position:sticky;left:0;box-sizing:border-box;width:100cqw;margin-right:-100cqw;padding:10px;}
 /* the negative right margin cancels the width, so an opened industry does not widen the columns above it; the box carries the shade, so it reaches the end of the grid inside it */
 /* an opened industry is as wide as the screen and stays in view while the table scrolls sideways; its grid scrolls on its own */
-.biz-detail h3{font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+.biz-detail h3{margin:0 0 6px;font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
 .biz-news{list-style:none;margin:0;padding:0;}
 .biz-news-meta,.biz-news-date{color:var(--muted);font-size:.74rem;}
 .biz-news li{padding:5px 0;line-height:1.4;}
 .biz-news a{color:var(--text);}
-.biz-expand{border:1px solid var(--line);color:var(--text);cursor:pointer;font-family:inherit;}
+.biz-expand{background:var(--panel);border-radius:20px;padding:5px 14px;font-size:.74rem;font-weight:600;border:1px solid var(--line);color:var(--text);cursor:pointer;font-family:inherit;}
 .biz-expand:hover{border-color:var(--accent);}
 .biz-expand.on{border-color:var(--accent);color:var(--accent);}
 .biz-matchcount{color:var(--accent);}
@@ -55,6 +55,7 @@
 /* Industry screen: no filled panel; the page background shows through. The sticky first column uses the page colour so scrolled cells still hide behind it. */
 #section-business .analysis-panel,#section-business .biz-expand{background:transparent;}
 .biz-table > tbody > .biz-row > .biz-name,.biz-table > thead > tr > th:first-child{background:var(--bg);}
+.biz-news-head{margin-top:16px!important;}
 .biz-table > tbody > .biz-row:hover > .biz-name,.biz-table > tbody > .biz-row:focus > .biz-name{background:linear-gradient(var(--row-hover),var(--row-hover)),var(--bg);}
 .biz-table > tbody > .biz-detail > td,.biz-detail-box{background:transparent;}
 .biz-side .biz-controls{display:flex;flex-direction:column;align-items:stretch;gap:14px;margin:0;}
@@ -63,6 +64,7 @@
 .biz-news-bar .biz-newsbtn{margin:0;}
 /* Explorer: an opened industry is highlighted across the whole row (name cell included, which is sticky and so needs an opaque colour). */
 .biz-table > tbody > .biz-row.open > td{border-top:1px solid var(--line);background:color-mix(in srgb, var(--accent) 16%, var(--bg));}
+.biz-news-bar .biz-news-head{margin:0;}
 /* News line: heading and button share one centre line; the button is filled so it reads as an action. */
 .biz-detail-box .biz-news-bar{display:flex;align-items:center;gap:12px;}
 .biz-detail-box .biz-news-bar h3.biz-news-head{margin:0 !important;line-height:1;padding:0;}

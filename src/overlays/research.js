@@ -21,7 +21,7 @@ import { rerenderDetail } from '../detail/render.js';
 const researchOverlayApplied = new Map(); // docId -> stock
 let stockByDocIdCache = null;
 function stockByDocId(){
-  if(!stockByDocIdCache) stockByDocIdCache = new Map(stocks.map(s => [sanitizeDocId(tickerSymbol(s)), s]));
+  if(!stockByDocIdCache || stockByDocIdCache.size !== stocks.length) stockByDocIdCache = new Map(stocks.map(s => [sanitizeDocId(tickerSymbol(s)), s]));
   return stockByDocIdCache;
 }
 function recomputeFundamentals(s){
