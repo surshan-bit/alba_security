@@ -30,6 +30,8 @@ tests/run.js                  regression harness (jsdom; bundles the same source
 tests/check.js                the pre-publish check: build, syntax, lint, harness vs tests/golden.json, Chromium suites
 tests/state.js, browser.js, imports.js   Chromium suites
 tests/golden.json             expected snapshot hashes
+tests/golden-text.json.gz     the text behind each hash, so a mismatch prints the first changed lines
+tools/typecheck.js            TypeScript checkJs over src/; fails only on findings not in tests/types.baseline.txt
 tests/fixtures/stocks.json    anonymised sample of the stock list used by the harness
 ```
 
@@ -76,7 +78,8 @@ tests/fixtures/stocks.json    anonymised sample of the stock list used by the ha
 npm install            once per fresh checkout (needs network)
 # edit files in src/ and styles/ (and partials/, js/loader.js)
 npm run check          build (app.js, chunks/, styles.css) + syntax + lint + regression harness; must print OK before publishing
-npm run update-golden  after reviewing an intended change in behaviour, accept the new snapshots
+npm run update-golden  after reviewing an intended change in behaviour, accept the new snapshots (hashes and their text)
+npm run types          type check src/ (also part of npm run check); new findings fail, the 230 known ones are in tests/types.baseline.txt
 ```
 
 If `check` reports differing snapshots, the new ones are written to `tests/out/`. To see what changed, run the harness on the previous version

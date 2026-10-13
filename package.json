@@ -14,14 +14,16 @@
     "platform": "node tests/platform.mjs",
     "update-golden": "node tests/check.js --update",
     "check:live": "node tests/check.js --live",
-    "refresh": "node tests/refresh.js"
+    "refresh": "node tests/refresh.js",
+    "types": "node tools/typecheck.js"
   },
   "devDependencies": {
     "esbuild": "0.28.2",
     "eslint-scope": "9.1.2",
     "espree": "11.2.0",
     "estraverse": "5.3.0",
-    "jsdom": "29.1.1"
+    "jsdom": "29.1.1",
+    "typescript": "5.9.3"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4"
