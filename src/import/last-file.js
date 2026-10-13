@@ -2,11 +2,11 @@
 // when, and what became of it (waiting to be imported, imported, or the last attempt failed / was cancelled).
 import { getDb, fundamentalCsvUploadLog, technicalCsvUploadLog } from '../core/store.js';
 import { escapeHtml, formatUploadTimestamp } from '../core/util.js';
+import { lockBusy } from './joblock.js';
 import { pruneLogCollection } from '../joblogs/panels.js';
 
 // The job record (importJobs/fundamental) as last read: tells whether an import is running or was interrupted.
 let jobState = null;
-const STALE_MS = 3 * 60 * 1000;   // as in import/fund-import.js (a job without a heartbeat for this long is interrupted)
 
 const KINDS = {
   fund: { log: fundamentalCsvUploadLog, collection: 'fundamentalCsvUploadLog', el: 'fundamentalLastFile', stamps: 'Fundamental refresh date' },
@@ -43,11 +43,10 @@ function describe(r, k){
 function jobBanner(kind){
   const j = jobState;
   if(!j || j.status !== 'running' || (j.kind === 'technical') !== (kind === 'tech')) return '';
-  const quiet = Date.now() - (Date.parse(j.heartbeatAt || j.startedAt) || 0);
   const when = formatUploadTimestamp(j.startedAt);
-  return quiet < STALE_MS
-    ? '<div class="lf-status lf-warn">An import is running (started ' + escapeHtml(when) + ').</div><div class="upload-hint lf-line">If you reloaded or closed the page during it, it counts as interrupted after 3 minutes without activity.</div>'
-    : '<div class="lf-status lf-err">An earlier import was interrupted (started ' + escapeHtml(when) + ').</div><div class="upload-hint lf-line">The page was closed or reloaded before it finished. Press "Import data" to run the file again; the stock data is checked again before anything is written.</div>';
+  return lockBusy(j)
+    ? '<div class="lf-status lf-warn">An import is running (started ' + escapeHtml(when) + ').</div><div class="upload-hint lf-line">If it was started from another tab or device that has since been closed, it counts as interrupted after 3 minutes without activity.</div>'
+    : '<div class="lf-status lf-err">An earlier import was interrupted (started ' + escapeHtml(when) + ').</div><div class="upload-hint lf-line">The page was reloaded or closed before it finished. Press "Import data" to run the file again; the stock data is checked again before anything is written.</div>';
 }
 
 function renderLastFile(kind){

@@ -329,6 +329,13 @@ async function fundScenarios(){
     await upload(page, 'fund', 'may.csv', fundFileChanged().csv);
     const r = await run(page, 'fund'); ok(r.cls === 'err' && /another import is already running \(started .*last active/.test(r.text), 'message: ' + r.text.slice(0, 220));
   });
+  await runScenario('fund import: an import started by this same tab before a reload is interrupted at once', {}, async page => {
+    const tab = await page.evaluate(() => window.sessionStorage.getItem('albaJobTab'));
+    ok(!!tab, 'the tab has an id');
+    await page.evaluate(t => window.__setDoc('importJobs/fundamental', { status: 'running', startedAt: new Date().toISOString(), heartbeatAt: new Date().toISOString(), owner: t }), tab);
+    await upload(page, 'fund', 'may.csv', fundFileChanged().csv);
+    const r = await run(page, 'fund'); ok(r.cls === 'ok', 'the import goes ahead straight away: ' + r.text.slice(0, 160));
+  });
   await runScenario('fund import: an interrupted import (no heartbeat for minutes) is shown on the card and can be run again', { docs: { 'importJobs/fundamental': { status: 'running', startedAt: new Date(Date.now() - 10 * 60000).toISOString(), heartbeatAt: new Date(Date.now() - 5 * 60000).toISOString() } } }, async page => {
     await page.waitForFunction(() => /was interrupted/.test((document.getElementById('fundamentalLastFile') || {}).innerText || ''), null, { timeout: 15000 });
     await upload(page, 'fund', 'may.csv', fundFileChanged().csv);

@@ -1,8 +1,9 @@
 // Technical Score import: apply and run.
+import { lockBusy, lockText, startBeat, tabId } from './joblock.js';
 import { technicalCsvUploadLog } from '../core/store.js';
 import { formatBytes } from '../core/util.js';
 import { recordAttempt, saveRecord } from './last-file.js';
-import { albaFiBeat, albaFiLockBusy, albaFiLockText, ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 import { AlbaTechEngine } from './tech-engine.js';
 import { albaWlResolveBse } from './wlsync.js';
@@ -80,8 +81,8 @@ async function albaTiRunImport(){
   let rec = null, recId = null;
   try {
     const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
-    if(albaFiLockBusy(ld)) throw new Error('another import is already running (' + albaFiLockText(ld) + '). If you reloaded or closed the page during an import, it counts as interrupted after 3 minutes without activity; then try again.');
-    await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString(), kind: 'technical' })); locked = true; stopBeat = albaFiBeat(job);
+    if(lockBusy(ld)) throw new Error('another import is already running (' + lockText(ld) + '). It was started from another tab or device. If that one was closed, it counts as interrupted after 3 minutes without activity; then try again.');
+    await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString(), kind: 'technical', owner: tabId })); locked = true; stopBeat = startBeat(job);
 
     // 1. the uploaded file (always the one recorded in the upload log, never a cached copy)
     current = 'read'; fiSet('read', 'running', '', 0.3);

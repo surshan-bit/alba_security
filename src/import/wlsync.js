@@ -1,9 +1,10 @@
 // TradingView watchlist sync.
+import { lockBusy, lockText, startBeat, tabId } from './joblock.js';
 import { getDb, watchlistSyncLog } from '../core/store.js';
 import { sanitizeDocId } from '../core/util.js';
 import { renderWatchlistSyncLogPanel } from '../joblogs/panels.js';
 import { TV_SERVER, tvCall, tvErrorText, tvMcp } from '../tv/connector.js';
-import { albaFiBeat, albaFiLockBusy, albaFiLockText, albaFiErr, albaFiLoadRaw, albaFiRetry, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { albaFiErr, albaFiLoadRaw, albaFiRetry, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 
 // ====================================================================================================
@@ -197,8 +198,8 @@ async function albaWlRunSync(){
   const done = [];
   try {
     const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
-    if(albaFiLockBusy(ld)) throw new Error('another sync is already running (' + albaFiLockText(ld) + '). Try again in a few minutes.');
-    await albaFiRetry(() => job.set({ status: 'running', startedAt })); locked = true; stopBeat = albaFiBeat(job);
+    if(lockBusy(ld)) throw new Error('another sync is already running (' + lockText(ld) + '). Try again in a few minutes.');
+    await albaFiRetry(() => job.set({ status: 'running', startedAt, owner: tabId })); locked = true; stopBeat = startBeat(job);
     await saveLog({ startedAt, status: 'running', triggeredBy: 'manual', note: 'Running from the page.' });
 
     current = 'load'; fiSet('load', 'running', '', 0);
