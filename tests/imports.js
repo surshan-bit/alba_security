@@ -225,6 +225,8 @@ async function fundScenarios(){
     const rec = a.fundLog[0]; ok(rec.status === 'processed' && /^Imported in the page: 1999 rescored, 3 new, 5 left unchanged/.test(rec.processedNote), 'upload record marked processed: ' + rec.status + ' ' + (rec.processedNote || '').slice(0, 80));
     ok(a.job.status === 'done' && a.job.finishedAt, 'lock released: ' + JSON.stringify(a.job));
     ok(await page.evaluate(() => !document.getElementById('importFundamentalDataBtn').disabled && document.getElementById('importFundamentalDataBtn').textContent === 'Import data'), 'the button is usable again');
+    const cached = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('albaStockCache', 1); r.onsuccess = () => { const q = r.result.transaction('kv', 'readonly').objectStore('kv').getAllKeys(); q.onsuccess = () => res(q.result); q.onerror = () => res(null); }; r.onerror = () => res(null); }));
+    ok(Array.isArray(cached) && cached.join() === 'v6', 'the new list is saved in the browser cache under the new version, so the reload is quick: ' + JSON.stringify(cached));
     const lf = await page.evaluate(() => document.getElementById('fundamentalLastFile').innerText);
     ok(/may\.csv/.test(lf) && /Imported/.test(lf) && !/not imported/i.test(lf), 'the last-file card says the file was imported: ' + lf.replace(/\s+/g, ' ').slice(0, 160));
     const rows1 = await backupsInfo(page); ok(rows1.length === 1 && rows1[0].btn && /Before importing may\.csv/.test(rows1[0].title), 'backups list shows it with a Restore button');
@@ -323,7 +325,17 @@ async function fundScenarios(){
     const r = await run(page, 'fund'); ok(r.cls === 'err' && /another import is already running \(started/.test(r.text), 'message: ' + r.text.slice(0, 200));
     const a = await readDb(page); ok(a.job.status === 'running' && a.meta.version === 5, "the other import's lock is left alone");
   });
-  await runScenario('fund import: a lock older than 20 minutes is treated as abandoned', { docs: { 'importJobs/fundamental': { status: 'running', startedAt: new Date(Date.now() - 30 * 60000).toISOString() } } }, async page => {
+  await runScenario('fund import: a long-running import that is still sending heartbeats is respected', { docs: { 'importJobs/fundamental': { status: 'running', startedAt: new Date(Date.now() - 30 * 60000).toISOString(), heartbeatAt: new Date(Date.now() - 20000).toISOString() } } }, async page => {
+    await upload(page, 'fund', 'may.csv', fundFileChanged().csv);
+    const r = await run(page, 'fund'); ok(r.cls === 'err' && /another import is already running \(started .*last active/.test(r.text), 'message: ' + r.text.slice(0, 220));
+  });
+  await runScenario('fund import: an interrupted import (no heartbeat for minutes) is shown on the card and can be run again', { docs: { 'importJobs/fundamental': { status: 'running', startedAt: new Date(Date.now() - 10 * 60000).toISOString(), heartbeatAt: new Date(Date.now() - 5 * 60000).toISOString() } } }, async page => {
+    await page.waitForFunction(() => /was interrupted/.test((document.getElementById('fundamentalLastFile') || {}).innerText || ''), null, { timeout: 15000 });
+    await upload(page, 'fund', 'may.csv', fundFileChanged().csv);
+    const r = await run(page, 'fund'); ok(r.cls === 'ok', 'the import goes ahead: ' + r.text.slice(0, 160));
+    ok(await page.evaluate(() => !/was interrupted/.test(document.getElementById('fundamentalLastFile').innerText)), 'the interrupted notice is gone afterwards');
+  });
+  await runScenario('fund import: a lock with no activity for over 3 minutes is treated as abandoned', { docs: { 'importJobs/fundamental': { status: 'running', startedAt: new Date(Date.now() - 30 * 60000).toISOString() } } }, async page => {
     await upload(page, 'fund', 'may.csv', fundFileChanged().csv);
     const r = await run(page, 'fund'); ok(r.cls === 'ok', 'the import goes ahead: ' + r.text.slice(0, 160));
     ok((await readDb(page)).job.status === 'done', 'lock is now done');

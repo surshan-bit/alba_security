@@ -1,8 +1,12 @@
 // "Last file loaded" card of the Fundamental and Technical sections on the Data Refresh page: which file was uploaded last,
 // when, and what became of it (waiting to be imported, imported, or the last attempt failed / was cancelled).
-import { fundamentalCsvUploadLog, technicalCsvUploadLog } from '../core/store.js';
+import { getDb, fundamentalCsvUploadLog, technicalCsvUploadLog } from '../core/store.js';
 import { escapeHtml, formatUploadTimestamp } from '../core/util.js';
 import { pruneLogCollection } from '../joblogs/panels.js';
+
+// The job record (importJobs/fundamental) as last read: tells whether an import is running or was interrupted.
+let jobState = null;
+const STALE_MS = 3 * 60 * 1000;   // as in import/fund-import.js (a job without a heartbeat for this long is interrupted)
 
 const KINDS = {
   fund: { log: fundamentalCsvUploadLog, collection: 'fundamentalCsvUploadLog', el: 'fundamentalLastFile', stamps: 'Fundamental refresh date' },
@@ -35,25 +39,44 @@ function describe(r, k){
   return ['warn', 'Uploaded, not imported yet', ['Press "Import data" to score this file and update the stock data. Stock dates and the data-age bars change only after that.']];
 }
 
+// A job that is marked running: either it is, or the page that ran it was closed or reloaded before it finished.
+function jobBanner(kind){
+  const j = jobState;
+  if(!j || j.status !== 'running' || (j.kind === 'technical') !== (kind === 'tech')) return '';
+  const quiet = Date.now() - (Date.parse(j.heartbeatAt || j.startedAt) || 0);
+  const when = formatUploadTimestamp(j.startedAt);
+  return quiet < STALE_MS
+    ? '<div class="lf-status lf-warn">An import is running (started ' + escapeHtml(when) + ').</div><div class="upload-hint lf-line">If you reloaded or closed the page during it, it counts as interrupted after 3 minutes without activity.</div>'
+    : '<div class="lf-status lf-err">An earlier import was interrupted (started ' + escapeHtml(when) + ').</div><div class="upload-hint lf-line">The page was closed or reloaded before it finished. Press "Import data" to run the file again; the stock data is checked again before anything is written.</div>';
+}
+
 function renderLastFile(kind){
   const k = KINDS[kind], host = document.getElementById(k.el);
   if(!host) return;
   const r = newest(k.log);
-  if(!r){ host.innerHTML = '<div class="upload-title">Last file loaded</div><div class="upload-hint">No file has been uploaded yet.</div>'; return; }
+  const banner = jobBanner(kind);
+  if(!r){ host.innerHTML = '<div class="upload-title">Last file loaded</div><div class="upload-hint">No file has been uploaded yet.</div>' + banner; return; }
   const [cls, head, lines] = describe(r, k);
-  host.innerHTML = '<div class="upload-title">Last file loaded</div>' +
+  host.innerHTML = '<div class="upload-title">Last file loaded</div>' + banner +
     '<div class="lf-file">' + escapeHtml(r.filename || 'file') + '</div>' +
     '<div class="upload-hint">Uploaded ' + escapeHtml(formatUploadTimestamp(r.uploadedAt)) + (r.rowCount != null ? ' \u00b7 ' + Number(r.rowCount).toLocaleString('en-IN') + ' rows' : '') + '</div>' +
     '<div class="lf-status lf-' + cls + '">' + escapeHtml(head) + '</div>' +
     lines.map(t => '<div class="upload-hint lf-line">' + escapeHtml(t) + '</div>').join('');
 }
 function renderAllLastFiles(){ renderLastFile('fund'); renderLastFile('tech'); }
+// Reads the job record first, so the cards can say that an import is running or was interrupted.
+async function refreshLastFiles(){
+  try { const db = getDb(); if(db){ const d = await db.doc('importJobs/fundamental').get(); jobState = d && d.exists ? d.data() : null; } }
+  catch(e){ /* the cards just leave the job line out */ }
+  renderAllLastFiles();
+}
 
 // Writes a whole upload record back (the same way it was created, which is known to work) and redraws the card.
 // Returns null, or the reason it could not be saved.
 async function saveRecord(kind, recId, record, db){
   const k = KINDS[kind];
   k.log.put(recId, record);
+  jobState = null;   // the job that produced this outcome has ended
   renderLastFile(kind);
   try {
     await db.collection(k.collection).doc(recId).set(record);
@@ -72,4 +95,4 @@ async function recordAttempt(kind, rec, recId, e, db){
   await saveRecord(kind, recId, Object.assign({}, rec, { lastAttempt }), db);
 }
 
-export { recordAttempt, renderAllLastFiles, saveRecord };
+export { recordAttempt, refreshLastFiles, renderAllLastFiles, saveRecord };

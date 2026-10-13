@@ -2,6 +2,7 @@
 import { fundamentalCsvUploadLog } from '../core/store.js';
 import { formatBytes, formatUploadTimestamp } from '../core/util.js';
 import { recordAttempt, saveRecord } from './last-file.js';
+import { primeStockCache } from '../boot/stockdata.js';
 import { fiAsk, fiEl, fiReset, fiSet, fiShowResult, getFiState, setFiPfx } from './panel.js';
 import { albaApplyFundamental } from './fund-engine.js';
 import { albaTiRunImport } from './tech-import.js';
@@ -14,7 +15,7 @@ import { albaWlRunSync } from './wlsync.js';
 // written to the database with a progress bar, and a one-click Restore puts a backup back.
 // Owner only (writing stock data and the asset store need the artifact's write bit).
 // ====================================================================================================
-const ALBA_FI = { HARD: 240000, SOFT: 200000, KEEP: 2, STALE_MS: 20 * 60 * 1000 };
+const ALBA_FI = { HARD: 240000, SOFT: 200000, KEEP: 2, STALE_MS: 3 * 60 * 1000, BEAT_MS: 20 * 1000 };   // a running job is treated as abandoned after 3 minutes without a heartbeat
 const ALBA_FI_COLUMNS = ['Name','BSE Code','NSE Code','ISIN Code','Industry Group','Industry','Current Price','Intrinsic Value','Book value','Profit growth','Profit growth 3Years','Profit growth 5Years','Sales growth 3Years','Return on invested capital','Return on capital employed','Return on equity','OPM','Price to Earning','Industry PE','PEG Ratio','Pledged percentage','Interest Coverage','Debt to equity','Change in promoter holding','Piotroski score','Quick ratio','Altman Z Score','Current ratio','Contingent liabilities','Average return on equity 7Years','Average return on equity 10Years','Median return on capital employed 10Years','Free cash flow 3years','Free cash flow 5years','Operating cash flow 3years','Operating cash flow 5years','CROIC','Graham','Change in FII holding 3Years','Change in DII holding 3Years','Historical PE 5Years','Average debtor days 3years','NCAVPS','Number of Shareholders'];
 const ALBA_FI_PUBLISHED = 'The new data had already been saved when this failed, so it is live. Check the stock list, or restore a backup below.';
 const albaFiSleep = ms => new Promise(r => setTimeout(r, ms));
@@ -63,6 +64,15 @@ async function albaFiLoadRaw(db, onProgress){
   const stocks = [].concat(...meta.chunks.map(c => docs[c].stocks));
   if(stocks.length !== meta.count) throw new Error('expected ' + meta.count + ' stocks but read ' + stocks.length);
   return { meta, docs, oldCanon, stocks };
+}
+
+// ---- The job lock (importJobs/*): a running job refreshes `heartbeatAt` every few seconds, so a job whose page was closed or reloaded
+// is seen as interrupted after a few minutes instead of blocking everything for a long time.
+const albaFiLockBusy = ld => !!ld && ld.status === 'running' && Date.now() - (Date.parse(ld.heartbeatAt || ld.startedAt) || 0) < ALBA_FI.STALE_MS;
+const albaFiLockText = ld => 'started ' + formatUploadTimestamp(ld.startedAt) + (ld.heartbeatAt ? ', last active ' + formatUploadTimestamp(ld.heartbeatAt) : '');
+function albaFiBeat(job){
+  const t = setInterval(() => { try { job.update({ heartbeatAt: new Date().toISOString() }).catch(() => {}); } catch(e){ /* the next beat tries again */ } }, ALBA_FI.BEAT_MS);
+  return () => clearInterval(t);
 }
 
 // ---- Integrity checks (the saved check_fundamental + precheck_data scripts) ----
@@ -229,6 +239,10 @@ async function albaFiPersist(db, raw, stocks, jobLabel){
   } catch(e){ await rollback(); const err = new Error('Could not publish the new data (' + albaFiErr(e) + '). Your previous data was put back.'); err.rolledBack = true; throw err; }
   for(const cid of plan.emptied){ try { await db.doc('stockData/' + cid).delete(); } catch(e){ /* orphan chunk is harmless */ } }
   fiSet('write', 'done', total + ' parts written');
+  try {   // keep the new list in this browser too, so the reload that follows is quick
+    const byId = new Map(plan.changed.map(c => [c.cid, c.doc]));
+    await primeStockCache(plan.newMeta.version, [].concat(...plan.newMeta.chunks.map(c => (byId.get(c) || raw.docs[c]).stocks)));
+  } catch(e){ console.error('Could not keep the new data in this browser', e); }
   // verify: index version/count, and a sample of chunks read back
   try {   // from here on the new data is live: a failing check must not be reported as "nothing was published"
   fiSet('verify', 'running', 'Reading it back…', 0.2);
@@ -251,13 +265,13 @@ async function albaFiRunImport(){
   if(!db || !assets){ fiReset('Import data'); fiShowResult('err', [{ text: 'File storage or the database is not available in this view, so the import cannot run here.' }]); return; }
   setFiPfx('');
   fiRunning = true; fiSetButtons(); fiReset('Importing fundamental data');
-  const job = db.doc('importJobs/fundamental'); let locked = false, current = 'read';
+  const job = db.doc('importJobs/fundamental'); let locked = false, current = 'read', stopBeat = () => {};
   let rec = null, recId = null;
   try {
     // one import at a time (a lock older than 20 minutes is treated as abandoned)
     const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
-    if(ld && ld.status === 'running' && Date.now() - (Date.parse(ld.startedAt) || 0) < ALBA_FI.STALE_MS) throw new Error('another import is already running (started ' + formatUploadTimestamp(ld.startedAt) + '). Try again in a few minutes.');
-    await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString() })); locked = true;
+    if(albaFiLockBusy(ld)) throw new Error('another import is already running (' + albaFiLockText(ld) + '). If you reloaded or closed the page during an import, it counts as interrupted after 3 minutes without activity; then try again.');
+    await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString() })); locked = true; stopBeat = albaFiBeat(job);
 
     // 1. the uploaded file
     current = 'read'; fiSet('read', 'running', '', 0.3);
@@ -329,7 +343,7 @@ async function albaFiRunImport(){
     fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);
     if(locked){ try { await job.set({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500) }); } catch(x){} }
   } finally {
-    fiRunning = false; fiSetButtons(); albaFiRenderBackups();
+    stopBeat(); fiRunning = false; fiSetButtons(); albaFiRenderBackups();
   }
 }
 
@@ -340,11 +354,11 @@ async function albaFiRunRestore(b, pfx){
   const go = await (async () => { fiReset('Restore a backup'); return fiAsk('Restore the stock data saved on ' + formatUploadTimestamp(b.createdAt) + ' (' + (b.stockCount || '?') + ' stocks)? Today\'s data is backed up first, so this can be undone.', 'Restore'); })();
   if(!go){ const p = fiEl('fundImportPanel'); if(p) p.hidden = true; return; }
   fiRunning = true; fiSetButtons(); fiReset('Restoring a backup');
-  const db = fiDb, assets = fiAssets, job = db.doc('importJobs/fundamental'); let locked = false, current = 'read';
+  const db = fiDb, assets = fiAssets, job = db.doc('importJobs/fundamental'); let locked = false, current = 'read', stopBeat = () => {};
   try {
     const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
-    if(ld && ld.status === 'running' && Date.now() - (Date.parse(ld.startedAt) || 0) < ALBA_FI.STALE_MS) throw new Error('an import is already running. Try again in a few minutes.');
-    await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString() })); locked = true;
+    if(albaFiLockBusy(ld)) throw new Error('an import is already running (' + albaFiLockText(ld) + '). Try again in a few minutes.');
+    await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString() })); locked = true; stopBeat = albaFiBeat(job);
     fiSet('read', 'running', 'Downloading the backup…', 0.3);
     const resp = await fetch('/_blob/' + b.assetId); if(!resp.ok) throw new Error('the backup file could not be read (' + resp.status + ')');
     const list = await resp.json();
@@ -370,7 +384,7 @@ async function albaFiRunRestore(b, pfx){
     fiShowResult('err', [{ text: 'Restore stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The data that was live before is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);
     if(locked){ try { await job.set({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500) }); } catch(x){} }
   } finally {
-    fiRunning = false; fiSetButtons(); albaFiRenderBackups();
+    stopBeat(); fiRunning = false; fiSetButtons(); albaFiRenderBackups();
   }
 }
 
@@ -399,6 +413,8 @@ async function albaFiRenderBackups(){
 }
 
 function init_import_fund_import(){
+  // leaving the page in the middle of an import or sync interrupts it: ask first
+  window.addEventListener('beforeunload', e => { if(fiRunning){ e.preventDefault(); e.returnValue = ''; } });
 
 (async function albaFiInit(){
   try {
@@ -424,4 +440,4 @@ function getFiAssets(){ return fiAssets; }
 function getFiOwner(){ return fiOwner; }
 function setFiRunning(v){ fiRunning = v; }
 
-export { ALBA_FI, ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiErr, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, fiSetButtons, getFiAssets, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning };
+export { albaFiBeat, albaFiLockBusy, albaFiLockText, ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiErr, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, fiSetButtons, getFiAssets, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning };

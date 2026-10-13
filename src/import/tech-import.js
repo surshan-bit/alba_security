@@ -1,8 +1,8 @@
 // Technical Score import: apply and run.
 import { technicalCsvUploadLog } from '../core/store.js';
-import { formatBytes, formatUploadTimestamp } from '../core/util.js';
+import { formatBytes } from '../core/util.js';
 import { recordAttempt, saveRecord } from './last-file.js';
-import { ALBA_FI, ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { albaFiBeat, albaFiLockBusy, albaFiLockText, ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 import { AlbaTechEngine } from './tech-engine.js';
 import { albaWlResolveBse } from './wlsync.js';
@@ -76,12 +76,12 @@ async function albaTiRunImport(){
   setFiPfx('ti_');
   if(!db || !assets){ fiReset('Import data'); fiShowResult('err', [{ text: 'File storage or the database is not available in this view, so the import cannot run here.' }]); return; }
   setFiRunning(true); fiSetButtons(); fiReset('Importing technical data');
-  const job = db.doc('importJobs/fundamental'); let locked = false, current = 'read';
+  const job = db.doc('importJobs/fundamental'); let locked = false, current = 'read', stopBeat = () => {};
   let rec = null, recId = null;
   try {
     const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
-    if(ld && ld.status === 'running' && Date.now() - (Date.parse(ld.startedAt) || 0) < ALBA_FI.STALE_MS) throw new Error('another import is already running (started ' + formatUploadTimestamp(ld.startedAt) + '). Try again in a few minutes.');
-    await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString(), kind: 'technical' })); locked = true;
+    if(albaFiLockBusy(ld)) throw new Error('another import is already running (' + albaFiLockText(ld) + '). If you reloaded or closed the page during an import, it counts as interrupted after 3 minutes without activity; then try again.');
+    await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString(), kind: 'technical' })); locked = true; stopBeat = albaFiBeat(job);
 
     // 1. the uploaded file (always the one recorded in the upload log, never a cached copy)
     current = 'read'; fiSet('read', 'running', '', 0.3);
@@ -181,7 +181,7 @@ async function albaTiRunImport(){
     fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);
     if(locked){ try { await job.set({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500), kind: 'technical' }); } catch(x){} }
   } finally {
-    setFiRunning(false); fiSetButtons(); albaFiRenderBackups();
+    stopBeat(); setFiRunning(false); fiSetButtons(); albaFiRenderBackups();
   }
 }
 

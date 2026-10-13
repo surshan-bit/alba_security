@@ -225,6 +225,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.144 &middot; 2026-10-13</h3>
+            <ul>
+              <li><b>Reloading in the middle of an import:</b> the browser now asks before you leave the page while an import or sync is running. If the page is reloaded or closed anyway, the interrupted import is recognised after about 3 minutes (it used to block new imports for 20 minutes), and the Last file loaded card says that an earlier import was interrupted and the file can simply be imported again.</li>
+              <li><b>Quicker reload after an import:</b> the new stock list is also saved in your browser as soon as an import or restore finishes, so the reload that follows no longer has to fetch every part again.</li>
+            </ul>
+
             <h3>v1.143 &middot; 2026-10-13</h3>
             <ul>
               <li><b>Last file loaded now updates after an import:</b> the upload record is saved the same way it is created, so the card changes to "Imported" once an import finishes. If the record cannot be saved, the import result says so instead of staying silent.</li>

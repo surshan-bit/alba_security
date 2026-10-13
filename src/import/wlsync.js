@@ -1,9 +1,9 @@
 // TradingView watchlist sync.
 import { getDb, watchlistSyncLog } from '../core/store.js';
-import { formatUploadTimestamp, sanitizeDocId } from '../core/util.js';
+import { sanitizeDocId } from '../core/util.js';
 import { renderWatchlistSyncLogPanel } from '../joblogs/panels.js';
 import { TV_SERVER, tvCall, tvErrorText, tvMcp } from '../tv/connector.js';
-import { ALBA_FI, albaFiErr, albaFiLoadRaw, albaFiRetry, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { albaFiBeat, albaFiLockBusy, albaFiLockText, albaFiErr, albaFiLoadRaw, albaFiRetry, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 
 // ====================================================================================================
@@ -188,7 +188,7 @@ async function albaWlRunSync(){
   setFiPfx('wl_');
   if(!db){ fiReset('Watchlist sync', WL_STEPS); fiShowResult('err', [{ text: 'The database is not available in this view, so the sync cannot run here.' }], true); return; }
   setFiRunning(true); fiSetButtons(); fiReset('Syncing TradingView watchlists', WL_STEPS);
-  const job = db.doc('importJobs/watchlist'); let locked = false, current = 'load';
+  const job = db.doc('importJobs/watchlist'); let locked = false, current = 'load', stopBeat = () => {};
   const startedAt = new Date().toISOString(), logId = sanitizeDocId(startedAt);
   const logDb = getDb();
   const saveLog = async rec => {
@@ -197,8 +197,8 @@ async function albaWlRunSync(){
   const done = [];
   try {
     const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
-    if(ld && ld.status === 'running' && Date.now() - (Date.parse(ld.startedAt) || 0) < ALBA_FI.STALE_MS) throw new Error('another sync is already running (started ' + formatUploadTimestamp(ld.startedAt) + '). Try again in a few minutes.');
-    await albaFiRetry(() => job.set({ status: 'running', startedAt })); locked = true;
+    if(albaFiLockBusy(ld)) throw new Error('another sync is already running (' + albaFiLockText(ld) + '). Try again in a few minutes.');
+    await albaFiRetry(() => job.set({ status: 'running', startedAt })); locked = true; stopBeat = albaFiBeat(job);
     await saveLog({ startedAt, status: 'running', triggeredBy: 'manual', note: 'Running from the page.' });
 
     current = 'load'; fiSet('load', 'running', '', 0);
@@ -247,7 +247,7 @@ async function albaWlRunSync(){
     await saveLog({ startedAt, finishedAt: new Date().toISOString(), status: 'failed', triggeredBy: 'manual', error: msg.slice(0, 400), note: done.join(' | ').slice(0, 400) });
     if(locked){ try { await job.set({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500) }); } catch(x){} }
   } finally {
-    setFiRunning(false); fiSetButtons();
+    stopBeat(); setFiRunning(false); fiSetButtons();
   }
 }
 

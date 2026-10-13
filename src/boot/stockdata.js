@@ -38,6 +38,7 @@ async function cachePut(version, list){
     const os = tx.objectStore(DATA_STORE);
     os.clear();
     os.put(JSON.stringify(list), 'v' + version);
+    await new Promise((resolve) => { tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve; });
   } catch(e){ /* cache is optional */ }
 }
 async function fetchChunk(db, id){
@@ -124,4 +125,8 @@ async function loadStocks(){
   return list;
 }
 
-export { loadStocks };
+// After an import or restore the page already holds the new list: saving it under the new version lets the reload that follows
+// start from this browser's copy instead of fetching every part again.
+const primeStockCache = (version, list) => cachePut(version, list);
+
+export { loadStocks, primeStockCache };
