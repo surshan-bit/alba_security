@@ -9,6 +9,8 @@ select:not([multiple]):not([size]):disabled{opacity:.55;}
 :root:not([data-theme="indigo"]):not([data-theme="light"]) :is(.analysis-panel,.strat-panel,.filters,.upload-panel,.settings-row,.refreshlog-run,.help-panel,.settings-panel,.analysis-filters-panel){border-color:transparent;background:transparent;box-shadow:none;}
 /* Explorer's filter list uses the same full-width rows as the Business screen (no inner padding). */
 @media (min-width:601px){.filters.analysis-filters-panel{padding:0;}}
-/* Business (Explorer): the content keeps the same inner spacing as Analysis and Strategies; only the filter column is pulled out to the page edge, where the Analysis and Strategies filters sit. */
+/* The filter column starts at the same height as the content beside it on Analysis, Explorer and Strategies. Business (Explorer): the content keeps the same inner spacing as Analysis and Strategies; only the filter column is pulled out to the page edge, where the Analysis and Strategies filters sit. */
 @media (min-width:601px){:root:not([data-theme="indigo"]):not([data-theme="light"]) #section-business .analysis-panel:has(.biz-layout){border-width:0;margin-top:14px;}
-:root:not([data-theme="indigo"]):not([data-theme="light"]) #section-business .biz-side{margin:-16px 0 0 -18px;width:260px;}}
+:root:not([data-theme="indigo"]):not([data-theme="light"]) #section-business .biz-side{margin:0 0 0 -18px;width:260px;}
+.filters.analysis-filters-panel{padding-top:16px;}
+.strat-side{margin-top:20px;}}
