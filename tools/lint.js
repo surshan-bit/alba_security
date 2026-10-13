@@ -73,5 +73,14 @@ for(const [f, m] of mods){
   }
   for(const n of exported) if(!isRoot && !(importedNames.get(f) || new Set()).has(n)) warn(rel(f) + ' exports "' + n + '" but no module imports it');
 }
+// 5. CSS: a selector with unbalanced brackets makes the browser swallow everything after it, so catch it here
+for(const f of require('fs').readdirSync('styles').filter(x => x.endsWith('.css'))){
+  const css = require('fs').readFileSync('styles/' + f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  for(const m of css.matchAll(/([^{}]*)\{[^{}]*\}/g)){
+    let d = 0, bad = false;
+    for(const c of m[1]){ if(c === '(') d++; else if(c === ')') d--; if(d < 0) bad = true; }
+    if(bad || d !== 0) err('styles/' + f + ': unbalanced brackets in selector "' + m[1].trim().slice(0, 80) + '"');
+  }
+}
 console.log('lint: ' + mods.size + ' modules, ' + errors + ' errors, ' + warnings + ' warnings');
 process.exit(errors || (process.argv.includes('--strict') && warnings) ? 1 : 0);
