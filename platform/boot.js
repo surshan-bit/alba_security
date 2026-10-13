@@ -47,7 +47,9 @@ async function showImport(){
       const text = f.name.endsWith('.gz') ? await new Response(f.stream().pipeThrough(new DecompressionStream('gzip'))).text() : await f.text();
       const parsed = JSON.parse(text);
       if(parsed.format !== 'alba-docs-v1') throw new Error('This is not an Alba data file.');
-      const entries = Object.entries(parsed.docs);
+      // a settings file names the person as "me": it lands under the signed-in account
+      const { data: ses } = await sb.auth.getSession(), uid = ses.session.user.id;
+      const entries = Object.entries(parsed.docs).map(([p, d]) => [p.startsWith('data/users/me/') ? 'data/users/' + uid + p.slice('data/users/me'.length) : p, d]);
       let done = 0, batch = [], size = 0;
       const flush = async () => {
         if(!batch.length) return;
