@@ -6,6 +6,7 @@ import { pcTickerKey } from '../prices/store.js';
 import { LD_LABEL, ldAbort, ldGet, ldRunning, ldStart } from './bar.js';
 import { ldEnsureClaudeAccess, setLdParallel } from './claude.js';
 import { activityEnd, activityNotify, activityRun } from '../ui/activity.js';
+import { getRefreshKit } from '../refresh/hook.js';
 
 var ldBatch = null;   // { kind, source, total, done, active: Map(key -> ticker), workers, slow, running, stop, failed[], skipped, note, perm }
 // The last finished run of each kind on each screen: { state, pct, text, perm }. Kept so a card still shows its result
@@ -27,19 +28,11 @@ function batchTail(){
 }
 const activeNames = () => Array.from(ldBatch.active.values()).join(', ');
 const KIND_NAME = { fund: 'Fundamental', tech: 'Technical' };
-const STAY_OPEN_NOTE = 'You can use other screens; keep this browser tab open.';
+const STAY_OPEN_NOTE = 'Safe to close this page: the refresh carries on when you reopen the dashboard.';
 // The screen that started a run, for the "View" button on the top strip.
 const sectionOf = (P) => P === 'analysis' ? 'analysis' : P === 'strat' ? 'strategies' : /^biz-/.test(P) ? 'business' : '';
 function batchStoppingText(){
   return 'Stopping: finishing ' + activeNames() + ' (a bar download already under way cannot be cut short), then the remaining stock(s) will not run.';
-}
-
-// A screen tells its panel what each card says and allows while nothing is running: the button's label, whether it
-// can be used, its tooltip and the line under it. The painter below adds the progress of a running batch on top.
-function ldSetCard(P, kind, m){
-  const c = document.getElementById(P + 'Card-' + kind);
-  if(!c) return;
-  c.dataset.label = m.label; c.dataset.off = m.off ? '1' : ''; c.dataset.title = m.title; c.dataset.idle = m.idle;
 }
 
 // Draws one screen's Live Data Refresh panel (P = 'analysis' or 'strat'): the same buttons, bars and result lines
@@ -52,7 +45,7 @@ function paintLivePanel(P){
     if(mine && ldBatch.kind === kind){
       const first = ldBatch.active.size ? ldBatch.active.keys().next().value : '', j = first ? ldGet(first, kind) : null;
       const pct = batchPct();
-      state[kind] = { state: 'running', pct, text: ldBatch.stop ? batchStoppingText() : pct + '% · ' + ldBatch.done + ' of ' + ldBatch.total + ' done · ' + activeNames() + (j ? ' · ' + j.msg : '') + (ldBatch.workers > 1 ? ' (' + ldBatch.workers + ' at a time)' : '') + ' (you can use other screens; keep this browser tab open)' };
+      state[kind] = { state: 'running', pct, text: ldBatch.stop ? batchStoppingText() : pct + '% · ' + ldBatch.done + ' of ' + ldBatch.total + ' done · ' + activeNames() + (j ? ' · ' + j.msg : '') + (ldBatch.workers > 1 ? ' (' + ldBatch.workers + ' at a time)' : '') + '' };
     } else state[kind] = running && !mine ? null : (ldBatchLast[P] || {})[kind] || null;
   }
   // While the panel is closed, a running or failed refresh still shows at the end of its heading.
@@ -95,14 +88,18 @@ function paintLivePanel(P){
 // The strip at the top of every screen follows the run, so progress stays visible after you leave the screen that started it.
 function syncActivity(){
   if(!(ldBatch && ldBatch.running)){ activityEnd('batch'); return; }
-  activityRun('batch', {
+  const info = {
     title: 'Refreshing ' + KIND_NAME[ldBatch.kind] + ' Info · ' + ldBatch.done + ' of ' + ldBatch.total + ' done',
     text: ldBatch.stop ? batchStoppingText() : (activeNames() ? activeNames() + ' · ' : '') + STAY_OPEN_NOTE,
     pct: batchPct(), section: sectionOf(ldBatch.source), onStop: ldBatchStop, stopping: ldBatch.stop
-  });
+  };
+  const kit = getRefreshKit();
+  if(kit) kit.activity(info); else activityRun('batch', info);
 }
 function ldBatchPaint(){
   syncActivity();
+  const kit = getRefreshKit();
+  if(kit) kit.repaint();
   paintLivePanel('analysis');
   paintLivePanel('strat');
   document.querySelectorAll('[data-live-panel]').forEach(el => paintLivePanel(el.dataset.livePanel));
@@ -160,7 +157,8 @@ async function ldBatchStart(kind, list, source = 'strat'){
     // Tell the viewer on whatever screen they are on; the notice stays until they close it.
     const refreshed = ldBatch.total - ldBatch.failed.length - ldBatch.skipped, clean = ldBatch.note === 'Finished.';
     activityEnd('batch');
-    activityNotify({
+    const kit = getRefreshKit();
+    if(!(kit && kit.batchNotice())) activityNotify({
       tone: failed ? (refreshed > 0 ? 'warn' : 'error') : clean ? 'ok' : 'warn',
       title: KIND_NAME[kind] + ' refresh ' + (ldBatch.stop ? 'stopped' : clean ? 'finished' : 'ended early'),
       text: (clean ? '' : ldBatch.note + ' ') + batchTail(), section: sectionOf(ldBatch.source)
@@ -176,4 +174,4 @@ async function ldBatchStart(kind, list, source = 'strat'){
 
 function getLdBatch(){ return ldBatch; }
 
-export { LD_BATCH_MAX, getLdBatch, ldBatchPaint, ldBatchStart, ldBatchStop, ldSetCard };
+export { LD_BATCH_MAX, getLdBatch, ldBatchPaint, ldBatchStart, ldBatchStop };

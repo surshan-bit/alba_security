@@ -9,7 +9,7 @@ const espree = require('espree'), escope = require('eslint-scope'), estraverse =
 const root = path.resolve(__dirname, '..'), srcDir = path.join(root, 'src');
 const GLOBALS = new Set(('AbortController Event Array Blob Float32Array Float64Array Int8Array Int32Array Uint8Array Boolean Date Error FileReader Infinity JSON Map Math IntersectionObserver MutationObserver NaN Number Object Promise ResizeObserver Set String TextEncoder URLSearchParams ' +
   'clearTimeout console decodeURIComponent document encodeURIComponent fetch history isFinite isNaN localStorage location navigator parseFloat parseInt requestAnimationFrame setTimeout undefined window ' +
-  'WeakMap indexedDB performance ' +
+  'WeakMap indexedDB performance setInterval clearInterval CustomEvent ' +
   'claude').split(' '));   // `claude` is the claude.ai page runtime; there are no other page-wide globals (identity and boot are modules in src/)
 const files = []; (function walk(d){ for(const f of fs.readdirSync(d)){ const p = path.join(d, f); fs.statSync(p).isDirectory() ? walk(p) : p.endsWith('.js') && files.push(p); } })(srcDir);
 const rel = p => path.relative(srcDir, p).split(path.sep).join('/');

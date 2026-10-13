@@ -150,7 +150,7 @@ async function businessTests(browser){
   await page.locator('.biz-row').first().click();
   ok((await page.locator('.biz-detail').count()) === 0, 'business: clicking again closes it');
   { // Strategy: none by default; choosing one counts its stocks per industry, highlights them and lists them first when open, nothing removed
-    ok(!/Matching/i.test(await page.locator('.biz-table > thead').innerText()) && !/Mapped \d+ of/.test(await page.locator('#businessBody').innerText()), 'business: no strategy chosen, so no matching columns');
+    ok(!/Matching/i.test(await page.locator('.biz-table > thead').innerText()) && !/Matched \d+ of/.test(await page.locator('#businessBody').innerText()), 'business: no strategy chosen, so no matching columns');
     const before = await page.locator('.biz-row').count();
     const opts = await page.$$eval('[data-biz-strat]', bs => bs.map(b => b.dataset.bizStrat).filter(Boolean));
     ok(opts.length >= 2, 'business: the saved strategies can be chosen (' + opts.length + ')');
@@ -161,15 +161,16 @@ async function businessTests(browser){
       if(withMatch.length) break;
     }
     const hdr = await page.locator('.biz-table > thead').innerText();
-    ok(/Matching/i.test(hdr) && /vs industry/i.test(hdr) && /Mapped \d+ of \d+ stocks/.test(await page.locator('#businessBody').innerText()) && (await page.locator('.biz-row').count()) === before, 'business: a strategy adds Matching and vs industry columns and the Mapped line without removing industries');
+    ok(/Matching/i.test(hdr) && /vs industry/i.test(hdr) && /Matched \d+ of \d+ stocks/.test(await page.locator('#businessBody').innerText()) && (await page.locator('.biz-row').count()) === before, 'business: a strategy adds Matching and vs industry columns and the Matched line without removing industries');
     if(withMatch.length){
       await page.locator('.biz-row').nth(withMatch[0].i).click();
       const rows = await page.$$eval('.biz-detail .strat-row', trs => trs.map(t => t.classList.contains('biz-match')));
       const k = rows.filter(Boolean).length;
-      ok((await page.locator('.biz-detail [data-biz-news]').count()) === 0 && (await page.locator('.biz-detail [data-biz-newstoggle]').getAttribute('aria-expanded')) === 'false', 'business: News starts folded inside an opened industry');
-      await page.locator('.biz-detail [data-biz-newstoggle]').click();   // the news buttons show once News is unfolded
-      const nb = await page.locator('.biz-detail [data-biz-news]').count();
-      ok(nb === (k < rows.length ? 2 : 1), 'business: an opened industry offers news for all its stocks' + (k < rows.length ? ' and for just the matching ones' : '') + ' (' + nb + ' buttons)');
+      if(!(await page.locator('.biz-detail [data-biz-newstoggle][aria-expanded="true"]').count())) await page.locator('.biz-detail [data-biz-newstoggle]').first().click();
+      await page.locator('.biz-detail .biz-newsbtn').first().evaluate(b => b.click()); await page.waitForSelector('.rk-menu [data-rk-act="choice-run"]', { timeout: 5000 }).catch(() => {});
+      const nb = await page.locator('.rk-menu [data-rk-act="choice-run"]').count();
+      await page.keyboard.press('Escape'); await page.evaluate(() => document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))); await page.waitForTimeout(150);
+      ok(nb === (k < rows.length ? 2 : 1), 'business: an opened industry offers news for all its stocks' + (k < rows.length ? ' and for just the matching ones' : '') + ' (' + nb + ' choices)');
       ok(k === withMatch[0].m && rows.slice(0, k).every(Boolean) && rows.slice(k).every(x => !x), 'business: matching stocks are highlighted and listed first (' + k + ' of ' + rows.length + ')');
       await page.locator('.biz-row').nth(withMatch[0].i).click();
     } else ok(true, 'business: (no industry has a stock matching these strategies in this data)');
@@ -190,19 +191,21 @@ async function businessTests(browser){
     await page.locator('.biz-row').first().click();
   }
   { // collecting news on demand: runs, reports, and never breaks the page (the stand-in feed has no headlines)
-    ok((await page.locator('[data-biz-news]').count()) === 0, 'business: no news button at the top of the page, only inside an opened industry');
+    ok((await page.locator('.biz-newsbtn').count()) === 0, 'business: no news button at the top of the page, only inside an opened industry');
     await page.locator('.biz-row').first().click();
-    if(!(await page.locator('.biz-newsbtn').count())) await page.locator('.biz-detail [data-biz-newstoggle]').click();   // News starts folded
+    if(!(await page.locator('.biz-detail [data-biz-newstoggle][aria-expanded="true"]').count())) await page.locator('.biz-detail [data-biz-newstoggle]').first().click();
     await page.locator('.biz-newsbtn').first().click();
+    await page.waitForSelector('.rk-menu [data-rk-act="choice-run"]:not([disabled])', { timeout: 5000 });
+    await page.locator('.rk-menu [data-rk-act="choice-run"]:not([disabled])').first().click();
     await page.waitForFunction(() => /^Done|Could not/.test((document.getElementById('bizNewsStatus') || { textContent: '' }).textContent), null, { timeout: 60000 });
     const st = await page.locator('#bizNewsStatus').innerText();
-    ok(/^Done\. Looked at \d+ of \d+ stocks/.test(st) && /Refresh news|Collect latest news/.test(await page.locator('.biz-newsbtn').first().innerText()), 'business: Collect latest news runs and reports: ' + st.slice(0, 90));
+    ok(/^Done\. Looked at \d+ of \d+ stocks/.test(st) && /Refresh/.test(await page.locator('.biz-newsbtn').first().innerText()), 'business: Collect latest news runs and reports: ' + st.slice(0, 90));
   }
   await page.locator('[data-biz-period="1W"]').click();
   ok(/Average 1W/i.test(await page.locator('.biz-table th').nth(2).innerText()), 'business: the period buttons change the figures');
   await page.locator('[data-biz-period="3M"]').click(); await page.waitForTimeout(500);
   ok(/Average 3M/i.test(await page.locator('.biz-table th').nth(2).innerText()), 'business: a longer period reads weekly prices');
-  { const t = await page.locator('#businessBody').innerText(); ok(!/Macro view|1 week change is|3 months change is|Nothing is hidden/.test(t) && /Mapped \d+ of \d+ stocks/.test(t) && !/^\s*Industries\s*$/m.test(t), 'business: only the "Mapped N of M stocks" line is shown above the grid'); }
+  { const t = await page.locator('#businessBody').innerText(); ok(!/Macro view|1 week change is|3 months change is|Nothing is hidden/.test(t) && /Matched \d+ of \d+ stocks/.test(t) && !/^\s*Industries\s*$/m.test(t), 'business: only the "Matched N of M stocks" line is shown above the grid'); }
   await page.locator('[data-biz-by="group"]').click();
   ok(/Industry group/i.test(await page.locator('.biz-table th').first().innerText()), 'business: the grouping button switches to industry groups');
   await page.reload(); await appReady(page); await page.waitForTimeout(300); await goto(page, 'business'); await page.waitForSelector('.biz-row', { timeout: 5000 });
@@ -222,17 +225,19 @@ async function layoutTests(browser){
       const o = await sticksOut(page);
       ok(!o.scrolls && o.out.length === 0, `${w}px ${k}: sideways overflow (page ${o.scrollWidth} > ${o.W}) ${o.out.join('; ')}`);
     }
-    // Live Data Refresh cards: Analysis and Strategies, beside each other on a wide screen and stacked on a phone
-    for(const [sec, P] of [['analysis', 'analysis'], ['strategies', 'strat']]){
+    // Refresh menus: Analysis and Strategies each have one "Refresh" button in the header that opens a menu with Fundamental and Technical
+    for(const sec of ['analysis', 'strategies']){
       await goto(page, sec); await page.waitForTimeout(400);
-      const cards = await page.evaluate(P => ['fund', 'tech'].map(k => { const e = document.getElementById(P + 'Card-' + k); if(!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width) }; }), P);
-      ok(cards[0] && cards[1], `${w}px ${sec}: both Live Data Refresh cards are drawn`);
-      if(cards[0] && cards[1]){
-        const side = Math.abs(cards[0].y - cards[1].y) < 4 && cards[1].x > cards[0].x;
-        if(w >= 1000) ok(side, `${w}px ${sec}: cards should sit side by side ${JSON.stringify(cards)}`);
-        if(w <= 450) ok(!side && cards[1].y > cards[0].y && cards[0].w > w * 0.7, `${w}px ${sec}: cards should stack and use the width ${JSON.stringify(cards)}`);
+      const bar = page.locator('#section-' + sec + ' [data-rk-act="bar-menu"]').first();
+      ok((await bar.count()) === 1, `${w}px ${sec}: the header has one Refresh button`);
+      if(await bar.count()){
+        await bar.evaluate(b => b.click()); await page.waitForTimeout(250);
+        const m = await page.evaluate(() => { const e = document.querySelector('.rk-menu'); if(!e) return null; const r = e.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), W: window.innerWidth, text: e.innerText }; });
+        ok(!!m && /Fundamental/.test(m.text) && /Technical/.test(m.text), `${w}px ${sec}: the Refresh menu offers Fundamental and Technical`);
+        ok(!!m && m.l >= -1 && m.r <= m.W + 1, `${w}px ${sec}: the Refresh menu fits the screen ${JSON.stringify(m && { l: m.l, r: m.r, W: m.W })}`);
+        await page.keyboard.press('Escape'); await page.evaluate(() => document.body.click()); await page.waitForTimeout(150);
       }
-      const o = await sticksOut(page); ok(!o.scrolls && o.out.length === 0, `${w}px ${sec} with the refresh cards: overflow ${o.out.join('; ')}`);
+      const o = await sticksOut(page); ok(!o.scrolls && o.out.length === 0, `${w}px ${sec}: overflow ${o.out.join('; ')}`);
     }
     // a stock's page
     await goto(page, 'analysis'); await page.waitForTimeout(400);

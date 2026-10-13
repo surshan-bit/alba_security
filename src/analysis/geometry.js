@@ -73,4 +73,22 @@ function chartGeometry(host, plottable){
   return { W, H, xFor, yFor, radiusForMos, mosBoundLo, mosBoundHi, gridSvg, axisBox, quadrantLines, quadrantLabels, axisLabels };
 }
 
-export { chartGeometry, valueFor };
+// The stocks inside the current RSI and MoS ranges. A stock with no reading for an RSI passes that range only while
+// the range is left at the full 0-100, so blanks are listed (in the leaderboard) until you narrow the range.
+function stocksInRange(listable){
+  const { weekMin, weekMax, monthMin, monthMax } = analysisFilters;
+  const mLo = analysisFilters.mosLo, mHi = analysisFilters.mosHi;
+  const weekFull = weekMin === 0 && weekMax === 100, monthFull = monthMin === 0 && monthMax === 100;
+  return listable.filter(s => {
+    const r = (s.technical && s.technical.raw) || {};
+    if(mLo !== null || mHi !== null){
+      const m = mosPct(s);
+      if(m === -Infinity || (mLo !== null && m < mLo) || (mHi !== null && m > mHi)) return false;
+    }
+    const weekOk = r.weekRsi == null ? weekFull : (r.weekRsi >= weekMin && r.weekRsi <= weekMax);
+    const monthOk = r.monthRsi == null ? monthFull : (r.monthRsi >= monthMin && r.monthRsi <= monthMax);
+    return weekOk && monthOk;
+  });
+}
+
+export { chartGeometry, stocksInRange, valueFor };

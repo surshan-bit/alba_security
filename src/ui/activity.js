@@ -112,7 +112,7 @@ function activityNotify(info){
   notices.unshift(Object.assign({ id: 'note-' + (++noticeSeq), read: false, at: Date.now() }, info));
   notices = notices.slice(0, MAX_NOTICES);
   const live = byId('activityLive');
-  if(live) live.textContent = info.title + '. ' + (info.text || '');   // read out by screen readers while the panel is closed
+  if(live && !info.silent) live.textContent = info.title + '. ' + (info.text || '');   // read out by screen readers while the panel is closed
   render();
 }
 
@@ -139,12 +139,6 @@ function init_ui_activity(){
     setOpen(false);
     bell.focus();
   }, true);
-  // Leaving or reloading the tab stops a refresh (it runs inside this page), so ask first while one is running.
-  window.addEventListener('beforeunload', (e) => {
-    if(running.size === 0) return;
-    e.preventDefault();
-    e.returnValue = '';
-  });
   render();
 }
 

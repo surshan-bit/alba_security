@@ -1,25 +1,29 @@
-// Analysis screen: the two Live Data Refresh cards below the leaderboard (Fundamental, Technical), laid out like the Explorer's
-// industry refresh. Nothing has to be ticked: a press refreshes the next batch of the shown stocks.
+// Analysis screen: which stocks the header Refresh button works on. The Refresh kit (src/refresh/kit.js) draws the button, the row ticks and the
+// selection bar; this module tells it which stocks are shown, in leaderboard order. The older two-card panel is still used when no kit is installed.
 import { stocks } from '../core/stocks.js';
 import { analysisFilters, getAnalysisShownIdx } from './state.js';
-import { createBatchRounds, liveCardsHtml, paintBatchCards } from '../livedata/panel.js';
+import { createBatchRounds } from '../livedata/panel.js';
+import { getRefreshKit } from '../refresh/hook.js';
 
-// Each press refreshes the next batch of the shown stocks, in leaderboard order, whether or not they were refreshed lately:
-// the first press does ranks 1-50, the next 51-100 and so on, then it starts again from the top. The place is kept per card
-// and starts over when the number of shown stocks or the sort changes.
+// A batch place is kept per kind and starts over when the number of shown stocks or the sort changes (not when the order itself changes:
+// a refresh moves prices and so the ranking, but the batch place must stay).
 const rounds = createBatchRounds();
 const shownStocks = () => getAnalysisShownIdx().map(i => stocks[i]).filter(Boolean);
-// Not the order itself: a refresh moves prices and so the ranking, but the batch place must stay.
 const planKey = () => getAnalysisShownIdx().length + ':' + analysisFilters.sortBy;
 // Called when a card's button is pressed: returns that batch and moves on to the following one.
 const analysisTakeBatch = (kind) => rounds.take(kind, shownStocks(), planKey());
 
-function renderAnalysisLivePanel(){
-  return `<div class="analysis-refresh" id="analysisLiveRefresh">${liveCardsHtml('analysis', { fund: 'analysisSelFund', tech: 'analysisSelTech' })}</div>`;
+// Tells the kit what "all shown stocks" means for the header Refresh button.
+function defineAnalysisScope(){
+  const kit = getRefreshKit();
+  if(kit) kit.defineScope('analysis', { label: 'shown stocks', source: 'analysis', selName: 'analysis', stocks: shownStocks });
 }
-// What each card says and allows while nothing is running; called whenever the shown stocks change.
+// Called whenever the shown stocks change.
 function updateAnalysisRefresh(){
-  paintBatchCards('analysis', rounds, shownStocks(), planKey(), 'shown stocks');
+  const kit = getRefreshKit();
+  if(!kit) return;
+  defineAnalysisScope();
+  kit.repaint();
 }
 
-export { analysisTakeBatch, renderAnalysisLivePanel, updateAnalysisRefresh };
+export { analysisTakeBatch, defineAnalysisScope, updateAnalysisRefresh };

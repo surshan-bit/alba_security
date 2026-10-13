@@ -6,6 +6,7 @@
 import { stocks } from '../core/stocks.js';
 import { mosRatingAny } from '../list/metrics.js';
 import { analysisFilters, saveAnalysisFilters } from './state.js';
+import { stocksInRange } from './geometry.js';
 import { publishedStrategies } from '../strategies/state.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { strategyStockSet } from '../strategies/pick.js';
@@ -64,6 +65,7 @@ function analysisPasses(s, skip, inStrategy){
   if(inStrategy && !inStrategy.has(s)) return false;
   const rating = mosRatingAny(s);
   if(rating == null) return false;
+  if(stocksInRange([s]).length === 0) return false;   // the same MoS and RSI ranges the list applies, so a count equals what the list shows
   const st = techStates(s);
   if(skip !== 'averdict' && analysisFilters.verdicts.length && !analysisFilters.verdicts.includes(s.verdict)) return false;
   if(skip !== 'amos' && analysisFilters.mosRatings.length && !analysisFilters.mosRatings.includes(rating)) return false;

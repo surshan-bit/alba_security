@@ -5,6 +5,7 @@ import { FIELD_BY_ID } from './fields.js';
 import { describeRule, evaluateStock, formatValue } from './rules.js';
 import { ANALYSIS_SORT_KEYS, ANALYSIS_SORT_OPTIONS, analysisSortComparator } from '../analysis/state.js';
 import { analysisLbCell, analysisRowContext, columnHeaderHtml, stockGridColumnIds } from '../analysis/columns.js';
+import { kit } from '../refresh/kit.js';
 
 const ROW_CAP = 300;
 
@@ -22,10 +23,8 @@ function sortSelectHtml(){
     <select class="sort-select" id="stratSort">${ANALYSIS_SORT_OPTIONS.map(o => `<option value="${o.value}"${o.value === sortBy ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select></label>`;
 }
 
-// The picks in the order the table shows them (ties keep the best Fundamental score first). A batch refresh works through them in this order.
+// The picks in the order the table lists them (ties keep the best Fundamental score first): also the order a refresh works through them.
 const orderedPicks = (matches) => matches.slice().sort((a, b) => (b.score || 0) - (a.score || 0)).sort(analysisSortComparator(sortBy));
-const getResultsSort = () => sortBy;
-
 function resultsHtml(matches, selected){
   if(!matches.length) return `<div class="strat-empty">No stock passes all of these rules right now.</div>`;
   const sorted = orderedPicks(matches);
@@ -33,7 +32,7 @@ function resultsHtml(matches, selected){
   const rows = sorted.slice(0, ROW_CAP).map((s, i) => {
     const idx = stockIndex.get(s), ctx = analysisRowContext(s, i, idx);
     return `<tr class="strat-row" data-idx="${idx}" tabindex="0">
-      <td class="strat-selcell"><input type="checkbox" class="strat-sel" data-sym="${escapeHtml(tickerSymbol(s))}"${selected.has(tickerSymbol(s)) ? ' checked' : ''} aria-label="Select ${escapeHtml(s.name)} to track"></td>
+      <td class="strat-selcell"><input type="checkbox" class="strat-sel" data-sym="${escapeHtml(tickerSymbol(s))}"${selected.has(tickerSymbol(s)) ? ' checked' : ''} aria-label="Select ${escapeHtml(s.name)} to track">${kit.rowBtn(s, 'strat')}</td>
       ${cols.map(id => analysisLbCell(id, ctx)).join('')}
     </tr>`;
   }).join('');
@@ -69,4 +68,4 @@ function whyHtml(query, rules){
   return head + `<ul class="strat-why-list">${rows}</ul>`;
 }
 
-export { getResultsSort, orderedPicks, resultsHtml, setResultsSort, sortSelectHtml, whyDatalist, whyHtml };
+export { orderedPicks, resultsHtml, setResultsSort, sortSelectHtml, whyDatalist, whyHtml };

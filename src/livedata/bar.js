@@ -9,6 +9,7 @@ import { ldErrText, ldIsClaudeError, setLdPhase } from './claude.js';
 import { ldRunTechnical } from './technical.js';
 import { getLdBatch, ldBatchPaint } from './batch.js';
 import { activityEnd, activityNotify, activityRun } from '../ui/activity.js';
+import { getRefreshKit } from '../refresh/hook.js';
 
 var ldJobs = new Map();    // "<ticker key>|fund" or "|tech" -> { pct, msg, state: 'idle'|'running'|'ok'|'error', at }
 const ldAbort = new Map();   // "<ticker key>|fund" -> AbortController
@@ -41,7 +42,7 @@ function ldReportOne(key, kind){
   const id = 'one|' + key + '|' + kind, j = ldGet(key, kind), s = ldStockByKey(key);
   if(!j || !s || j.state !== 'running' || ldPanelVisible(key)){ activityEnd(id); return; }
   activityRun(id, {
-    title: 'Refreshing ' + LD_KIND_NAME[kind] + ' Info · ' + s.name, text: j.msg + ' · You can use other screens; keep this browser tab open.', pct: j.pct, section: '',
+    title: 'Refreshing ' + LD_KIND_NAME[kind] + ' Info · ' + s.name, text: j.msg + ' · Safe to close this page: the refresh carries on when you reopen the dashboard.', pct: j.pct, section: '',
     onStop: kind === 'fund' ? () => { const c = ldAbort.get(key + '|fund'); if(c) c.abort(); } : null
   });
 }
@@ -71,6 +72,7 @@ function ldIdleNote(s, kind){
 }
 
 function renderLiveDataBar(s){
+  if(getRefreshKit()) return '';
   const key = pcTickerKey(s);
   const row = (kind, title) => `
       <div class="live-refresh-item" data-kind="${kind}">
@@ -147,8 +149,9 @@ function bindLiveDataBar(s){
     if(caret) caret.innerHTML = ldOpen ? '&#9662;' : '&#9656;';
   };
   const f = document.getElementById('ldBtn-fund'), t = document.getElementById('ldBtn-tech');
-  if(f) f.onclick = () => ldStart(s, 'fund');
-  if(t) t.onclick = () => ldStart(s, 'tech');
+  const kit = getRefreshKit();
+  if(f) f.onclick = () => (kit ? kit.enqueueOne(s, 'fund') : ldStart(s, 'fund'));
+  if(t) t.onclick = () => (kit ? kit.enqueueOne(s, 'tech') : ldStart(s, 'tech'));
   document.querySelectorAll('[data-ld-stop]').forEach(b => {
     b.onclick = () => { const c = ldAbort.get(key + '|' + b.dataset.ldStop); if(c) c.abort(); };
   });

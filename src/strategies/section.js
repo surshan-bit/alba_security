@@ -8,11 +8,10 @@ import { openStockInline } from '../ui/inlinedetail.js';
 import { qualifyingStocks, ruleReady } from './rules.js';
 import { addStrategy, deleteStrategy, duplicateStrategy, restoreStarters, saveStrategies, selectStrategy, selectedStrategy, strategies } from './state.js';
 import { rulesEditorHtml, wireRulesEditor } from './editor.js';
-import { getResultsSort, orderedPicks, resultsHtml, setResultsSort, sortSelectHtml, whyDatalist, whyHtml } from './results.js';
+import { orderedPicks, resultsHtml, setResultsSort, sortSelectHtml, whyDatalist, whyHtml } from './results.js';
 import { cleanGoal } from './goal.js';
-import { ldBatchStart, ldBatchStop } from '../livedata/batch.js';
-import { ldOpenPermissions } from '../livedata/bar.js';
-import { createBatchRounds, liveCardsHtml, paintBatchCards } from '../livedata/panel.js';
+import { pcTickerKey } from '../prices/store.js';
+import { kit } from '../refresh/kit.js';
 import { forgetLearned, wireLearnPanel } from './learnpanel.js';
 import { askConfirm } from '../ui/confirm.js';
 import { renderTrackPanel, trackPanelHtml, wireTrackPanel } from './trackpanel.js';
@@ -26,36 +25,20 @@ function openStockFromStrategies(idx){
 
 const readyRules = (st) => st.rules.filter(ruleReady);
 
+const folds = new Set();   // which collapsible blocks are open (kept across redraws)
+// The picks in the order the table shows them: what a refresh works through.
+const refreshList = (st) => orderedPicks(qualifyingStocks(stocks, st.rules));
+
 const selected = new Set();   // symbols ticked in the results table (kept while you move between strategies)
 const symOf = (s) => tickerSymbol(s);
 // What is ticked on screen is the truth: bring the saved set in line with the visible tick boxes.
 function syncSelected(){
-  const rows = document.querySelectorAll('#stratResults tbody .strat-sel');
-  rows.forEach(b => { if(b.checked) selected.add(b.dataset.sym); else selected.delete(b.dataset.sym); });
-  const head = document.querySelector('#stratResults thead .strat-sel');
+  document.querySelectorAll('#stratResults tbody .strat-sel').forEach(b => { if(b.checked) selected.add(b.dataset.sym); else selected.delete(b.dataset.sym); });
+  const head = document.querySelector('#stratResults thead .strat-sel'), rows = document.querySelectorAll('#stratResults tbody .strat-sel');
   if(head) head.checked = rows.length > 0 && Array.from(rows).every(b => b.checked);
   return selected;
 }
 const trackLabel = (matches) => { const k = matches.filter(s => selected.has(symOf(s))).length; return k ? `Track ${k} ticked pick${k === 1 ? '' : 's'}` : 'Track these picks'; };
-const folds = new Set();   // the fold-outs that are open (they stay open when the section redraws)
-
-// Each press of a refresh card does the next batch of the picks, in the order the table shows them (ranks 1-50, then 51-100 and so
-// on), like the Analysis screen. The place starts over when the strategy, the number of picks or the sort changes.
-const rounds = createBatchRounds();
-const refreshList = (st) => orderedPicks(qualifyingStocks(stocks, st.rules));
-const refreshKey = (st, n) => st.id + ':' + n + ':' + getResultsSort();
-
-// Refresh controls for the picks, below the results grid and laid out like the Explorer's industry refresh: two cards
-// (Fundamental, Technical) under the table. The Fundamental refresh uses Claude, so it is capped (as in Analysis).
-function refreshHtml(){
-  return `<div class="strat-refresh" id="stratLiveRefresh">${liveCardsHtml('strat', { fund: 'stratRefFund', tech: 'stratRefTech' })}</div>`;
-}
-// What each card says and allows while nothing is running: which batch of the picks a press would do.
-function applyLiveCards(st){
-  const list = refreshList(st);
-  paintBatchCards('strat', rounds, list, refreshKey(st, list.length), 'picks');
-}
-
 // Save status, shown beside the "Rules" heading: "Saving..." while a change is on its way, a brief "Saved" afterwards, and
 // (kept on screen) a warning when it could not be saved to the account or when you are not signed in.
 const SAVE_NOTE = { browser: ['Not signed in: saved in this browser only', 'warn'], saving: ['Saving&hellip;', ''], saved: ['&#10003; Saved to your account', 'ok'],
@@ -120,10 +103,10 @@ function mainHtml(st){
     <div class="analysis-panel strat-panel">
       <div class="strat-result-head">
         <div class="strat-result-title"><span class="strat-count" aria-label="Qualifying stocks">Showing <b id="stratCount">${matches.length}</b> of ${stocks.length} stocks${ignored ? ` &middot; ${ignored} rule${ignored === 1 ? '' : 's'} not applied yet` : ''}</span></div>
-        <div class="strat-total"><button type="button" class="strat-btn" id="stratTrackBtn"${matches.length ? '' : ' disabled'} title="Save the ticked picks (or all of today's list when none is ticked) with their prices and judge them against the goal later">${trackLabel(matches)}</button>${sortSelectHtml()}</div>
+        <div class="strat-total">${sortSelectHtml()}<button type="button" class="strat-btn" id="stratTrackBtn"${matches.length ? '' : ' disabled'} title="Save the ticked picks (or all of today's list when none is ticked) with their prices and judge them against the goal later">${trackLabel(matches)}</button>${(kit.defineScope('strat', { label: 'picks', source: 'strat', selName: 'strat', stocks: () => refreshList(st) }), kit.barHtml('strat'))}</div>
       </div>
       <div id="stratResults">${resultsHtml(matches, selected)}</div>
-      <div id="stratRefreshWrap">${refreshHtml()}</div>
+      ${kit.selbarSlot('strat')}
     </div>
     ${trackPanelHtml()}
     <div class="analysis-panel strat-panel">
@@ -141,10 +124,17 @@ function renderStrategiesSection(){
   listEl.innerHTML = listHtml(sel);
   mainEl.innerHTML = mainHtml(sel);
   renderTrackPanel(sel);
-  if(sel) applyLiveCards(sel);
 }
 
 function init_strategies_section(){
+  kit.useExternalSelection('strat', () => new Set(stocks.filter(s => selected.has(symOf(s))).map(pcTickerKey)));
+  document.addEventListener('alba-rk-clear', (e) => {
+    if(!e.detail || e.detail.name !== 'strat') return;
+    selected.clear();
+    document.querySelectorAll('.strat-sel').forEach(b => { b.checked = false; });
+    const st = selectedStrategy(), tb = document.getElementById('stratTrackBtn');
+    if(tb && st) tb.textContent = trackLabel(qualifyingStocks(stocks, st.rules));
+  });
   window.addEventListener('alba-strategies-status', onSaveStatus);
   window.addEventListener('alba-strategies-reloaded', () => { if(document.getElementById('section-strategies').classList.contains('active')) renderStrategiesSection(); });
   const sec = document.getElementById('section-strategies');
@@ -162,8 +152,6 @@ function init_strategies_section(){
     if(e.target.closest('#stratNew')){ addStrategy(); renderStrategiesSection(); return; }
     if(e.target.closest('#stratRestore')){ restoreStarters(); renderStrategiesSection(); return; }
     const st = selectedStrategy();
-    if(e.target.closest('#stratRefTech') && st){ const l = refreshList(st); ldBatchStart('tech', rounds.take('tech', l, refreshKey(st, l.length)), 'strat'); return; }
-    if(e.target.closest('#stratRefFund') && st){ const l = refreshList(st); ldBatchStart('fund', rounds.take('fund', l, refreshKey(st, l.length)), 'strat'); return; }
     const tick = e.target.closest('.strat-sel');
     if(tick){   // (a click on a tick box must not open the stock)
       const sym = tick.dataset.sym;
@@ -172,10 +160,9 @@ function init_strategies_section(){
       syncSelected();
       const tb = document.getElementById('stratTrackBtn');
       if(tb && st) tb.textContent = trackLabel(qualifyingStocks(stocks, st.rules));
+      kit.selectionChanged();
       return;
     }
-    if(e.target.closest('#stratStop-fund, #stratStop-tech')){ ldBatchStop(); return; }
-    if(e.target.closest('#stratPerm')){ ldOpenPermissions(); return; }
     if(e.target.closest('#stratPub') && st){ st.published = !st.published; saveStrategies(); renderStrategiesSection(); return; }
     if(e.target.closest('#stratDup') && st){ duplicateStrategy(st); renderStrategiesSection(); return; }
     if(e.target.closest('#stratDel') && st){
@@ -202,7 +189,6 @@ function init_strategies_section(){
       syncSelected(); setResultsSort(e.target.value);
       document.getElementById('stratResults').innerHTML = resultsHtml(qualifyingStocks(stocks, st.rules), selected);
       syncSelected();
-      applyLiveCards(st);
     }
     else if(e.target.id === 'stratNote' && st){ st.note = e.target.value.trim(); saveStrategies(); }
     else if(e.target.id === 'stratWhy' && st){

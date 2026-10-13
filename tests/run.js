@@ -79,7 +79,7 @@ const e2eStubs = {
     const d = {};
     if(tool === 'mcp-tv-search-symbols') return { payload: { data: { symbols: [{ symbol: 'NSE:' + String(input.query).replace(/\W/g, '').toUpperCase(), exchange: 'NSE', description: String(input.query) }] } } };
     if(tool === 'mcp-tv-get-symbol-data') return { payload: { data: { close: 123.4 } } };
-    if(tool === 'mcp-tv-get-news') return { payload: { data: { headlines: [{ id: 'n1', title: 'News ' + 'x'.repeat(60), provider: { name: 'P' }, published: Date.parse('2026-10-10T00:00:00Z') / 1000 - 86400,   /* the page's clock is fixed to 2026-10-10 (see above); the real clock would drift out of range */ link: 'https://e.com/1', paywall: false }] } } };
+    if(tool === 'mcp-tv-get-news') return { payload: { data: { headlines: [{ id: 'n1', title: 'News ' + 'x'.repeat(60), provider: { name: 'P' }, published: Date.now() / 1000 - 86400, link: 'https://e.com/1', paywall: false }] } } };
     if(tool === 'mcp-tv-get-ohlcv'){   // consistent, ascending bars ending at 2026-10-05
       const step = input.interval === '1W' ? 7 * 86400 : 30 * 86400, n = Math.min(input.count || 100, 300), end = Date.parse('2026-10-05T00:00:00Z') / 1000;
       const b = { t: [], o: [], h: [], l: [], c: [], v: [] };
@@ -175,6 +175,10 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   snap('s6b_axis', { body: html$('#analysisPanelBody') });
   click($('#colorByMonthBtn')); await sleep(100);
   snap('s6c_color', { body: html$('#analysisPanelBody') });
+  click($('#analysisSelectBtn')); await sleep(150);
+  snap('s6d_select', { body: html$('#analysisPanelBody') });
+  const cbs = win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-row'); if(cbs[0]) click(cbs[0]); if(cbs[1]) click(cbs[1]); await sleep(100);
+  snap('s6e_ticked', { body: html$('#analysisPanelBody'), bar: html$('#analysisSelNote') });
   click($('#analysisColumnsBtn')); await sleep(150);
   snap('s6f_columns', { body: html$('#analysisPanelBody') });
   // more Analysis paths: filter buttons, sliders, MoS range, sort, column move/reset, Y axis, tooltip, dot click, pin
@@ -213,6 +217,9 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   { const pb = $('#analysisLeaderboardBody .pin-btn'); click(pb); await sleep(150); }
   snap('s6s_pin', { body: html$('#analysisPanelBody') });
   { const pb = $('#analysisLeaderboardBody .pin-btn'); click(pb); await sleep(150); }
+  click($('#analysisSelClear')); click($('#analysisSelAllShown')); await sleep(100);
+  snap('s6t_selall', { bar: html$('#analysisSelNote'), body: html$('#analysisPanelBody') });
+  click($('#analysisSelectBtn')); await sleep(150);
   click($('#analysisColumnsBtn')); await sleep(150);
   snap('s6u_closed', { body: html$('#analysisPanelBody') });
   { const d = $('#analysisDots .analysis-dot'); if(d) click(d); await sleep(200); snap('s6v_dotclick', { opened: String(!!$('#detailBackBtn')), parent: $('#detail').parentNode.className }); }
@@ -378,92 +385,23 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   await sleep(1800);   // let debounced saves go out
   const lsd = {}; for(let i = 0; i < win.localStorage.length; i++){ const k = win.localStorage.key(i); if(k.startsWith('albaDashboard')) lsd[k] = win.localStorage.getItem(k); }
   delete lsd['albaDashboard.prefsLocalAt.v1'];
-  // ---- Strategies: the Live Data Refresh panel for the picks (the same heading and cards as the Analysis screen) ----
-  {
-    const keysBefore = new Set(store.keys());
-    const txt = s => (($(s) || {}).textContent || '').replace(/\s+/g, ' ').trim();
-    const waitFor = async (fn, ms) => { for(let t = 0; t < ms; t += 100){ if(fn()) return true; await sleep(100); } return false; };
-    const running = () => { const m = txt('#stratStatus-tech').match(/^\d+% · (\d+) of (\d+) done · ([^·]+)/); return m ? m.slice(1).map(x => x.trim()).join('/') : txt('#stratStatus-tech'); };
-    const card = kind => ({ btn: txt(kind === 'fund' ? '#stratRefFund' : '#stratRefTech'), off: String($(kind === 'fund' ? '#stratRefFund' : '#stratRefTech').disabled), barHidden: String($('#stratBar-' + kind).hidden), fill: $('#stratFill-' + kind).className + ' ' + $('#stratFill-' + kind).style.width, stopHidden: String($('#stratStop-' + kind).hidden), status: txt('#stratStatus-' + kind) });
-    const ticked = () => String(win.document.querySelectorAll('#stratResults tbody .strat-sel:checked').length);
-    const finished = () => /^(Done|Stopped|Finished)/.test(txt('#stratStatus-tech'));
-    globalThis.__tvDelay = 400;   // the stubbed TradingView answers slowly, so a refresh is still running when the checks below look
-    nav('strategies'); await sleep(150);
-    click($('#stratNew')); await sleep(100);
-    chg($('.sr-add'), 'score'); await sleep(50); chg($('.sr-row .sr-v1'), '8.3'); await sleep(50);
-    snap('s12a_strat_live_closed', { block: html$('#stratRefreshWrap'), count: $('#stratCount').textContent });
-    snap('s12a1_strat_live_open', { block: html$('#stratRefreshWrap'), fund: JSON.stringify(card('fund')), tech: JSON.stringify(card('tech')) });
-    { const boxes = win.document.querySelectorAll('#stratResults tbody .strat-sel'); click(boxes[0]); click(boxes[1]); await sleep(50);
-      snap('s12a2_strat_ticked', { fund: txt('#stratRefFund'), tech: txt('#stratRefTech'), ticked: ticked(), track: txt('#stratTrackBtn') });
-      click($('#stratResults thead .strat-sel')); await sleep(50);
-      snap('s12a3_strat_ticked_all', { fund: txt('#stratRefFund'), ticked: ticked() });
-      click($('#stratResults thead .strat-sel')); await sleep(80);
-      snap('s12a4_strat_ticks_cleared', { fund: txt('#stratRefFund'), ticked: ticked(), track: txt('#stratTrackBtn') }); }
-    // Technical for the next batch of picks; Stop while the first is still being fetched
-    click($('#stratRefTech')); await sleep(200);
-    { const t = card('tech'), f = card('fund');
-      snap('s12b_strat_refresh_running', { techBtn: t.btn, techOff: t.off, techBar: t.barHidden, techStop: t.stopHidden, techStatus: running(), fundOff: f.off, fundBar: f.barHidden, fundStatus: f.status, chip: /^Refreshing… \d+%$/.test(txt('#stratLdChip')) ? 'running' : txt('#stratLdChip'), analysisBar: String(($('#analysisBar-tech') || { hidden: 'none' }).hidden), analysisNote: txt('#analysisStatus-tech') }); }
-    click($('#stratStop-tech')); await sleep(50);
-    snap('s12b2_strat_stopping', { status: txt('#stratStatus-tech'), stopBtn: txt('#stratStop-tech') });
-    await waitFor(finished, 30000);
-    snap('s12b3_strat_stopped', { tech: JSON.stringify(card('tech')), fund: JSON.stringify(card('fund')), chip: txt('#stratLdChip') });
-    await sleep(1800);   // the picks list is redrawn twice after a run; the result must still be there afterwards
-    snap('s12c_strat_refresh_done', { tech: JSON.stringify(card('tech')), fund: JSON.stringify(card('fund')), count: $('#stratCount').textContent });
-    // Technical again (the next batch): runs to the end; its result stays on its card
-    click($('#stratRefTech')); await sleep(200);
-    snap('s12d_strat_running_again', { status: running() });
-    await waitFor(() => /^(Done|Finished)/.test(txt('#stratStatus-tech')), 30000); await sleep(1800);
-    snap('s12e_strat_done', { tech: JSON.stringify(card('tech')), fund: JSON.stringify(card('fund')), perm: String($('#stratPerm').hidden) });
-    globalThis.__tvDelay = 0;
-    [...store.keys()].forEach(k => { if(!keysBefore.has(k) && /^(priceHistory|stockUpdates)\//.test(k)) store.delete(k); });
-  }
-  // ---- Analysis: the Live Data Refresh cards below the leaderboard: a press refreshes the next batch of the shown stocks; run, stop, results stay on their card ----
-  {
-    const keysBefore = new Set(store.keys());
-    const txt = s => (($(s) || {}).textContent || '').replace(/\s+/g, ' ').trim();
-    const waitFor = async (fn, ms) => { for(let t = 0; t < ms; t += 100){ if(fn()) return true; await sleep(100); } return false; };
-    const running = () => { const m = txt('#analysisStatus-tech').match(/^\d+% · (\d+) of (\d+) done · ([^·]+)/); return m ? m.slice(1).map(x => x.trim()).join('/') : txt('#analysisStatus-tech'); };
-    const card = kind => ({ btn: txt(kind === 'fund' ? '#analysisSelFund' : '#analysisSelTech'), off: String($(kind === 'fund' ? '#analysisSelFund' : '#analysisSelTech').disabled), barHidden: String($('#analysisBar-' + kind).hidden), fill: $('#analysisFill-' + kind).className + ' ' + $('#analysisFill-' + kind).style.width, stopHidden: String($('#analysisStop-' + kind).hidden), status: txt('#analysisStatus-' + kind) });
-    globalThis.__tvDelay = 400;   // the stubbed TradingView answers slowly, so a refresh is still running when the checks below look
-    nav('analysis'); await sleep(200);
-    snap('s13a_analysis_live_idle', { panel: html$('#analysisLiveRefresh'), fund: JSON.stringify(card('fund')), tech: JSON.stringify(card('tech')) });
-    // Technical for the shown stocks (the leaderboard has just a few rows at this point); Stop while the first is still being fetched
-    click($('#analysisSelTech')); await sleep(200);
-    { const t = card('tech'), f = card('fund');
-      snap('s13c_analysis_live_running', { techBtn: t.btn, techOff: t.off, techBar: t.barHidden, techStop: t.stopHidden, techStatus: running(), fundOff: f.off, fundBar: f.barHidden, fundStop: f.stopHidden, fundStatus: f.status }); }
-    click($('#analysisStop-tech')); await sleep(50);
-    snap('s13d_analysis_live_stopping', { status: txt('#analysisStatus-tech'), stopBtn: txt('#analysisStop-tech') });
-    await waitFor(() => /^(Done|Stopped|Finished)/.test(txt('#analysisStatus-tech')), 30000);
-    snap('s13e_analysis_live_stopped', { tech: JSON.stringify(card('tech')), fund: JSON.stringify(card('fund')) });
-    // Technical again: runs to the end
-    click($('#analysisSelTech')); await sleep(200);
-    snap('s13f_analysis_live_running_again', { status: running() });
-    await waitFor(() => /^(Done|Finished)/.test(txt('#analysisStatus-tech')), 30000); await sleep(200);
-    snap('s13g_analysis_live_tech_done', { tech: JSON.stringify(card('tech')), fund: JSON.stringify(card('fund')) });
-    // Fundamental for the same stocks: its card shows its own result and the Technical card keeps the earlier one
-    click($('#analysisSelFund')); await sleep(300);
-    { const f = card('fund');
-      snap('s13h_analysis_live_fund_running', { fundBtn: f.btn, fundOff: f.off, fundBar: f.barHidden, fundStop: f.stopHidden, fundStatus: f.status.replace(/^\d+% · (\d+) of (\d+) done · ([^·]+)·.*$/, 'N% · $1 of $2 done · $3'), tech: JSON.stringify(card('tech')) }); }
-    await waitFor(() => /^(Done|Stopped|Finished)/.test(txt('#analysisStatus-fund')), 60000);
-    snap('s13i_analysis_live_both_done', { fund: JSON.stringify(card('fund')), tech: JSON.stringify(card('tech')), perm: String($('#analysisPerm').hidden) });
-    globalThis.__tvDelay = 0;
-    [...store.keys()].forEach(k => { if(!keysBefore.has(k) && /^(priceHistory|stockUpdates)\//.test(k)) store.delete(k); });
-  }
+  // (the old Live Data Refresh cards on Analysis and Strategies were replaced by the header Refresh menus: see tests/refresh.js)
   { // Business: collect the latest news for one industry, on demand
     const waitFor = async (fn, ms) => { for(let t = 0; t < ms; t += 100){ if(fn()) return true; await sleep(100); } return false; };
     nav('business'); await sleep(150);
     const rows = [...win.document.querySelectorAll('.biz-row')], target = rows.find(r => parseInt(r.children[1].textContent, 10) >= 2) || rows[0];
     const name = target.dataset.bizName; click(target); await sleep(80);
-    const foldedBefore = String(!win.document.querySelector('.biz-detail [data-biz-news]') && !win.document.querySelector('.biz-detail .biz-news'));
-    click(win.document.querySelector('.biz-detail [data-biz-newstoggle]')); await sleep(80);   // News starts folded; unfold it
-    const btn = () => win.document.querySelector('.biz-detail [data-biz-news]');
-    const label = btn().textContent, evBefore = [...store.keys()].filter(k => /^stockResearch\//.test(k) && (store.get(k).events || []).length).length;
-    click(btn());
-    await waitFor(() => /^Done/.test((win.document.getElementById('bizNewsStatus') || { textContent: '' }).textContent), 30000); await sleep(1500);   // the saved headlines reach the page through the live subscription a moment after the last save
+    const btn = () => win.document.querySelector('.biz-detail .biz-newsbtn');
+    if(!btn()){ click(win.document.querySelector('.biz-detail [data-biz-newstoggle]')); await sleep(80); }   // the News block starts closed
+    click(btn()); await sleep(60);   // opens the choice menu
+    const choice = win.document.querySelector('.rk-menu [data-rk-act="choice-run"]');
+    const label = choice.textContent.replace(/\s+/g, ' ').trim(), evBefore = [...store.keys()].filter(k => /^stockResearch\//.test(k) && (store.get(k).events || []).length).length;
+    click(choice);
+    await waitFor(() => /^Done/.test((win.document.getElementById('bizNewsStatus') || { textContent: '' }).textContent), 30000); await sleep(100);
     const status = win.document.getElementById('bizNewsStatus').textContent.replace(/\s+/g, ' ');
     const evAfter = [...store.keys()].filter(k => /^stockResearch\//.test(k) && (store.get(k).events || []).length).length;
     const labelled = [...store.entries()].filter(([k]) => /^stockResearch\//.test(k)).some(([, v]) => (v.events || []).some(e => e.k === 'news' && e.s));
-    snap('s7j_business_news', { name, foldedBefore, label, status, savedMore: String(evAfter > evBefore), labelled: String(labelled), listed: String(!!win.document.querySelector('.biz-detail .biz-news li')), again: (btn() || { textContent: '' }).textContent });
+    snap('s7j_business_news', { name, label, status, savedMore: String(evAfter > evBefore), labelled: String(labelled), listed: String(!!win.document.querySelector('.biz-detail .biz-news li')), again: ((btn() || { textContent: '' }).textContent) });
     click(target); await sleep(50); nav('analysis'); await sleep(50);
   }
   { // Explorer: the All / Matched toggle (Matched needs a strategy; it keeps only the industries and stocks that match)

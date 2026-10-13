@@ -80,7 +80,7 @@ async function tvResolveSymbol(s){
   const key = pcTickerKey(s);
   if(priceSymbolByTicker[key]) return priceSymbolByTicker[key];
   if(!/^\d+$/.test(key)) return 'NSE:' + key.replace(/[-&]/g, '_');
-  if(BSE_ALPHA_MAP[key]) return 'BSE:' + BSE_ALPHA_MAP[key];
+  if(BSE_ALPHA_MAP[key]) return 'BSE:' + String(BSE_ALPHA_MAP[key]).replace(/^BSE:/, '');
   // BSE-only stock (ticker is the numeric code): TradingView uses the alpha symbol, found by company name.
   const p = await tvCall('mcp-tv-search-symbols', { query: s.name, type_filter: 'stock' });
   const list = (p && p.data && p.data.symbols) || (p && p.symbols) || [];
@@ -88,11 +88,11 @@ async function tvResolveSymbol(s){
   const want = norm(s.name);
   const hits = list.filter(r => r && r.exchange === 'BSE' && r.symbol && (norm(r.description).startsWith(want) || want.startsWith(norm(r.description))));
   if(hits.length === 1){
-    BSE_ALPHA_MAP[key] = hits[0].symbol;   // remember it for next time (and for the TradingView link)
-    try { const db = await dbCapabilityPromise; if(db){ const ref = db.doc('stockMeta/bseAlpha'); const cur = await ref.get(); const o = {}; o[key] = hits[0].symbol; if(cur && cur.exists) await ref.update(o); else await ref.set(o); } } catch(_){}
+    BSE_ALPHA_MAP[key] = hits[0].symbol.replace(/^BSE:/, '');   // remember the bare name for next time (and for the TradingView link)
+    try { const db = await dbCapabilityPromise; if(db){ const ref = db.doc('stockMeta/bseAlpha'); const cur = await ref.get(); const o = {}; o[key] = BSE_ALPHA_MAP[key]; if(cur && cur.exists) await ref.update(o); else await ref.set(o); } } catch(_){}
   }
   if(hits.length !== 1) throw new Error('Could not match ' + s.name + ' to a single BSE symbol on TradingView (' + hits.length + ' matches). Use "Research this stock" with price history for this one.');
-  return hits[0].symbol;
+  return 'BSE:' + BSE_ALPHA_MAP[key];
 }
 
 export { TV_SERVER, tvCall, tvErrorText, tvIstDate, tvMcp, tvMergeDelta, tvResolveSymbol, tvToRows, tvValidate };

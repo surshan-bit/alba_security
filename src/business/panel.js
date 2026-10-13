@@ -9,16 +9,14 @@ import { publishedStrategies } from '../strategies/state.js';
 import { strategyStockSet, validStrategyId } from '../strategies/pick.js';
 import { getNewsRun, planNews, startNewsCollect, stopNewsCollect } from './news.js';
 import { prefSet } from '../identity/prefs.js';
-import { ldBatchStart, ldBatchStop } from '../livedata/batch.js';
 import { browserFullscreen, fullscreenLabel, watchFullscreenExit } from '../ui/fullscreen.js';
-import { ldOpenPermissions } from '../livedata/bar.js';
-import { createBatchRounds, liveCardsHtml, paintBatchCards } from '../livedata/panel.js';
+import { kit } from '../refresh/kit.js';
 import { heatmapHtml } from './heatmap.js';
 import { PERIODS, industryTable, needsBars, periodOf } from './calc.js';
 
 const KEY = 'albaDashboard.business.v1';
 let bizFull = false;   // the table fills the whole window
-const newsOpen = new Set();   // industries whose News section is unfolded (folded at first)
+const newsOpen = new Set();   // industries whose News section is open (closed at first)
 let bizFiltersOpen = false;   // phones: the view, period, grouping and strategy controls fold into one "Filters" line, closed at first
 let period = '1M', by = 'industry', view = 'table', strategyId = '', showMatched = false, loadState = 'idle';   // loadState: 'idle' | 'loading' | 'failed' (price bars for long periods)
 const open = new Set();                                    // industries whose detail is open
@@ -61,15 +59,21 @@ function newsStatusFor(name){
   const run = getNewsRun();
   return run && (run.label === name || run.label === name + ' (matching stocks)') ? newsStatusHtml() : '';
 }
-// One button for all of the stocks and, when the Analysis filters are on and only some of them match, one for just the matching ones.
-function newsButtons(members, matched, key){
+// One Refresh-news button for the industry. Its menu offers all of the stocks and, when the Analysis filters are on and only some of
+// them match, just the matching ones.
+function newsRefreshBtn(members, matched, key){
   const r = getNewsRun(), busy = !!r && r.state === 'running';
-  const one = (list, mode, text) => {
-    const plan = planNews(list), n = plan.stocks.length;
-    return '<button type="button" class="biz-expand biz-newsbtn" data-biz-news="' + escapeHtml(key) + '|' + mode + '"' + (busy || !list.length ? ' disabled' : '') + ' title="Reads the latest headlines from TradingView for these stocks and saves them">' + (plan.again ? 'Refresh news' : 'Collect latest news') + ' · ' + text + ' (' + n + (plan.left ? ', then ' + plan.left + ' more' : '') + ')</button>';
-  };
   const hit = strategyOn() ? matched : [];
-  return one(members, 'all', members.length === 1 ? 'the stock' : 'all ' + members.length + ' stocks') + (hit.length && hit.length < members.length ? ' ' + one(hit, 'match', 'matching ' + hit.length) : '');
+  const opt = (list, mode, text) => {
+    const plan = planNews(list), n = plan.stocks.length;
+    return { label: (plan.again ? 'Refresh news' : 'Collect latest news') + ' · ' + text, small: n + ' stock' + (n === 1 ? '' : 's') + (plan.left ? ', then ' + plan.left + ' more' : ''), off: busy || !list.length, run: () => runNews(key + '|' + mode) };
+  };
+  kit.defineChoices('news:' + key, () => {
+    const items = [opt(members, 'all', members.length === 1 ? 'the stock' : 'all ' + members.length + ' stocks')];
+    if(hit.length && hit.length < members.length) items.push(opt(hit, 'match', 'matching ' + hit.length));
+    return { head: key + ' · news', items };
+  });
+  return kit.choiceBtn('news:' + key, busy || !members.length, 'Reads the latest headlines from TradingView for these stocks and saves them');
 }
 function runNews(spec){
   const [key, mode] = spec.split('|'), matched = matchSet();
@@ -95,31 +99,18 @@ function newsHtml(r){
     return '<li><span class="biz-news-date">' + escapeHtml(n.d) + '</span> ' + tag + ' ' + title + '<span class="biz-news-meta"> · ' + escapeHtml(n.stock) + (n.src ? ' · ' + escapeHtml(n.src) : '') + '</span></li>';
   }).join('') + '</ul>' + (r.news.length > 15 ? '<p class="upload-hint">Showing the newest 15 of ' + r.news.length + '.</p>' : '');
 }
-// Technical and Fundamental refresh for the stocks of one industry (the same refreshes as the other screens). Each open industry has its own panel id ("biz-N") so several can be open at once.
-const panelIds = new Map();
-const panelId = (name) => { if(!panelIds.has(name)) panelIds.set(name, 'biz-' + panelIds.size); return panelIds.get(name); };
-// Each press does the next batch of the industry's stocks (ranks 1-50, then 51-100 and so on), like the Analysis screen. One cursor per industry.
-const roundsOf = new Map();
-const roundsFor = (name) => { if(!roundsOf.has(name)) roundsOf.set(name, createBatchRounds()); return roundsOf.get(name); };
-const refreshStocks = (r) => r.items.map(x => x.stock);
-const refreshKey = (r) => r.name + ':' + r.items.length;
-function refreshHtml(r){
-  const P = panelId(r.name);
-  return '<div class="biz-refresh" data-live-panel="' + P + '">' + liveCardsHtml(P, { fund: 'bizRefFund-' + P, tech: 'bizRefTech-' + P }) + '</div>';
-}
-function paintRefreshCards(rows){
-  rows.filter(r => open.has(r.name)).forEach(r => paintBatchCards(panelId(r.name), roundsFor(r.name), refreshStocks(r), refreshKey(r), 'stocks'));
-}
 // The industry's stocks in the same grid as the Analysis leaderboard and the Strategies results (best change first),
 // with the period's own change as the last column.
 function detailHtml(r, cols){
+  const vis = r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock);
+  kit.defineScope('biz:' + r.name, { label: r.name, source: 'biz-kit', selName: 'biz', stocks: () => vis });   // what this table's Refresh button works on
   const p = periodOf(period), colIds = stockGridColumnIds();   // the column order set in Analysis
   const rows = r.items.filter(x => !matchedOnly() || x.match).map((x, i) => {
     const idx = stockIndex.get(x.stock), ctx = analysisRowContext(x.stock, i, idx);
-    return '<tr class="strat-row' + (x.match ? ' biz-match' : '') + '" data-idx="' + idx + '" tabindex="0">' + colIds.map(id => analysisLbCell(id, ctx)).join('') + '<td class="num">' + pct(x.change) + '</td></tr>';
+    return '<tr class="strat-row' + (x.match ? ' biz-match' : '') + '" data-idx="' + idx + '" tabindex="0">' + kit.rowCell(x.stock, 'biz') + colIds.map(id => analysisLbCell(id, ctx)).join('') + '<td class="num">' + pct(x.change) + '</td></tr>';
   }).join('');
-  const grid = '<div class="strat-table-wrap"><table class="strat-table"><thead><tr>' + colIds.map(columnHeaderHtml).join('') + '<th class="num">' + p.key + ' chg</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
-  return '<tr class="biz-detail"><td colspan="' + cols + '"><div class="biz-detail-box"><div class="biz-stocks-head"><h3>Stocks</h3>' + (strategyOn() ? '<span class="upload-hint">' + r.matches + ' of ' + r.count + ' match the strategy</span>' : '') + '</div>' + grid + refreshHtml(r) + '<div class="biz-stocks-head biz-news-bar"><h3 class="biz-news-head"><button type="button" class="biz-news-toggle" data-biz-newstoggle="' + escapeHtml(r.name) + '" aria-expanded="' + newsOpen.has(r.name) + '">' + (newsOpen.has(r.name) ? '\u25be' : '\u25b8') + ' News' + (r.news.length ? ' (' + r.news.length + ')' : '') + '</button></h3>' + (newsOpen.has(r.name) ? newsButtons(r.items.map(x => x.stock), r.items.filter(x => x.match).map(x => x.stock), r.name) : '') + newsStatusFor(r.name) + '</div>' + (newsOpen.has(r.name) ? newsHtml(r) : '') + '</div></td></tr>';
+  const grid = '<div class="strat-table-wrap"><table class="strat-table"><thead><tr>' + kit.headCell('biz', 'biz:' + r.name) + colIds.map(columnHeaderHtml).join('') + '<th class="num">' + p.key + ' chg</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  return '<tr class="biz-detail"><td colspan="' + cols + '"><div class="biz-detail-box"><div class="biz-stocks-head"><h3>Stocks</h3>' + (strategyOn() ? '<span class="upload-hint">' + r.matches + ' of ' + r.count + ' match the strategy</span>' : '') + kit.barHtml('biz:' + r.name) + '</div>' + grid + '<div class="biz-stocks-head biz-news-bar"><h3 class="biz-news-head"><button type="button" class="biz-news-toggle" data-biz-newstoggle="' + escapeHtml(r.name) + '" aria-expanded="' + newsOpen.has(r.name) + '">' + (newsOpen.has(r.name) ? '▾' : '▸') + ' News' + (r.news.length ? ' (' + r.news.length + ')' : '') + '</button></h3>' + (newsOpen.has(r.name) ? newsRefreshBtn(r.items.map(x => x.stock), r.items.filter(x => x.match).map(x => x.stock), r.name) : '') + newsStatusFor(r.name) + '</div>' + (newsOpen.has(r.name) ? newsHtml(r) : '') + '</div></td></tr>';
 }
 function openStockFromBusiness(idx){
   openStockInline(appSections.business, 'Explorer', idx);
@@ -177,7 +168,7 @@ function draw(el){
     else if(loadState === 'failed') status = '<p class="upload-hint biz-warn">Could not load the price history, so ' + p.label + ' figures are missing. <button type="button" class="refresh-btn" data-biz-retry="1">Retry</button></p>';
   }
   const total = rows.reduce((a, r) => a + r.matches, 0);
-  const filterNote = strategyOn() ? '<p class="upload-hint biz-showing">Mapped ' + total + ' of ' + stocks.length + ' stocks</p>' : '';
+  const filterNote = strategyOn() ? '<p class="upload-hint biz-showing">Matched ' + total + ' of ' + stocks.length + ' stocks</p>' : '';
   const note = '';
   const head = '<tr><th>' + (by === 'group' ? 'Industry group' : 'Industry') + '</th><th class="num">Stocks</th><th class="num">Average ' + p.key + '</th><th class="num">Median</th><th>Up / down</th><th class="num">News</th>' + (strategyOn() ? '<th class="num">Matching</th><th class="num">Match avg ' + p.key + '</th><th class="num">vs industry</th>' : '') + '</tr>';
   const cols = strategyOn() ? 9 : 6;
@@ -186,8 +177,15 @@ function draw(el){
     return '<tr class="biz-row' + (isOpen ? ' open' : '') + '" data-biz-name="' + escapeHtml(r.name) + '" tabindex="0" role="button" aria-expanded="' + isOpen + '"><td class="biz-name">' + escapeHtml(r.name) + '</td><td class="num">' + r.count + '</td><td class="num">' + pct(r.mean) + '</td><td class="num">' + pct(r.median) + '</td><td>' + breadth(r) + '</td><td class="num">' + (r.news.length ? r.news.length + (r.pos || r.neg ? ' <span class="news-pos">+' + r.pos + '</span> <span class="news-neg">&minus;' + r.neg + '</span>' : '') : '') + '</td>' + (strategyOn() ? '<td class="num">' + (r.matches ? '<b class="biz-matchcount">' + r.matches + '</b> of ' + r.count : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null ? pct(r.matchMean) : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null && r.mean !== null ? signedPp(r.matchMean - r.mean) : '') + '</td>' : '') + '</tr>' + (isOpen ? detailHtml(r, cols) : '');
   }).join('');
   if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + heatmapHtml(rows, period, Math.max(300, el.clientWidth - 280)) + note); return; }
-  el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + expandBtn + '</div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + note);
-  paintRefreshCards(rows);
+  kit.defineToolbar('biz', () => {
+    const st = r => r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock), out = [];
+    if(strategyOn()) out.push({ id: 'matched', label: 'Matched stocks', stocks: () => rows.flatMap(r => r.items.filter(x => x.match).map(x => x.stock)) });
+    const o = rows.filter(r => open.has(r.name));
+    if(o.length) out.push({ id: 'open', label: 'Expanded industries (' + o.length + ')', stocks: () => o.flatMap(st) });
+    out.push({ id: 'all', label: 'Every stock in the table', stocks: () => rows.flatMap(st) });
+    return out;
+  });
+  el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + expandBtn + kit.toolbarButton('biz') + '</div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + note + kit.selbarSlot('biz'));
 }
 
 function ensureData(){
@@ -224,16 +222,6 @@ function init(){
     const pb = e.target.closest('[data-biz-period]'), gb = e.target.closest('[data-biz-by]');
     if(pb){ period = pb.dataset.bizPeriod; save(); open.clear(); render(); ensureData(); return; }
     if(gb){ by = gb.dataset.bizBy; save(); open.clear(); render(); return; }
-    const rb = e.target.closest('.biz-refresh .refresh-btn'), rs = e.target.closest('.biz-refresh .live-stop');
-    if(rs){ if(/Perm$/.test(rs.id)) ldOpenPermissions(); else ldBatchStop(); return; }
-    if(rb){
-      const P = rb.closest('.biz-refresh').dataset.livePanel, kind = /^bizRefFund-/.test(rb.id) ? 'fund' : 'tech', name = Array.from(panelIds).find(x => x[1] === P)[0];
-      const r = industryTable(stocks, { by, period, barsFor }).find(x => x.name === name);
-      if(r){ const list = roundsFor(name).take(kind, refreshStocks(r), refreshKey(r)); if(list.length) ldBatchStart(kind, list, P); }
-      return;
-    }
-    const nb = e.target.closest('[data-biz-news]');
-    if(nb){ runNews(nb.dataset.bizNews); return; }
     if(e.target.closest('[data-biz-newsstop]')){ stopNewsCollect(); return; }
         const all = e.target.closest('[data-biz-all]');
     if(all){

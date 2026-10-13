@@ -225,6 +225,29 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.141 &middot; 2026-10-13</h3>
+            <ul>
+              <li><b>Analysis counts now agree with the list:</b> the number beside <b>All</b> and each strategy (for example Weekly Positive) counts only the stocks the list will actually show, after the MoS rating, MoS range and RSI range filters. Before, the sidebar could say 49 while the list showed 40.</li>
+              <li><b>Clearer wording:</b> Analysis says <b>Showing N of M stocks</b>; Explorer says <b>Matched N of M stocks</b> when a strategy is chosen.</li>
+              <li><b>One look on phones:</b> controls are one standard height, toolbars stay on one line, spacing and text sizes follow one scale on Analysis, Explorer, Strategies, Data Refresh, Settings and Trade Log. Strategy Setup has its own button style, and the stock page&rsquo;s Refresh matches the Share link.</li>
+              <li><b>Refresh keeps going:</b> a refresh started on a stock carries on while you move between screens and ends with one clear notification. If the page is reloaded, it waits for the old copy to go quiet and then continues (&ldquo;Refresh continuing&rdquo;) instead of stopping with a confusing message. It still needs the dashboard open to run.</li>
+              <li><b>Fix for BSE-only companies:</b> a BSE company whose symbol was matched by name is now always used as <code>BSE:NAME</code>, never with the exchange written twice.</li>
+              <li><b>Checks:</b> the automatic tests were brought up to date with the Refresh menus and re-run in full (engines, screens, pins and Trade Log, live prices, imports, plus a new test for Refresh and the Analysis counts).</li>
+            </ul>
+            <h3>v1.136 &middot; 2026-10-13</h3>
+            <ul>
+              <li><b>Smarter &ldquo;only what is out of date&rdquo;:</b> how old is too old now depends on the stock. Pinned stocks and stocks that match a published strategy: Fundamental is fresh for 7 days, all other stocks for 30; Technical is fresh for 1 day for every stock. A stock is also flagged whatever its age when it has results or a company event newer than its last Fundamental refresh, two or more negative headlines since then, or a big price move (10%+ in a week or 20%+ in a month). The Refresh menu shows how many stocks have something new.</li>
+              <li><b>Most important first:</b> when more stocks need a Fundamental refresh than one run allows (300), the run takes the ones that matter most: something new first, then pinned, then strategy matches, then the oldest. Run it again for the rest.</li>
+            </ul>
+            <h3>v1.121 &middot; 2026-10-13</h3>
+            <ul>
+              <li><b>Refresh moved to the top of every list:</b> on Explorer (each industry), Analysis and Strategies the <b>Fundamental</b> and <b>Technical</b> buttons now sit in the header line of the stocks table, with a &#9662; menu (Both, or only the stocks that are out of date) and a summary such as &ldquo;Fundamental: 12 of 20 need refresh&rdquo;. The big boxes below the lists are gone.</li>
+              <li><b>Pick the stocks:</b> every row has a checkbox and a small &#8635; button. Tick several rows and a bar appears at the bottom to refresh just those. Strategies uses the same ticks as Track.</li>
+              <li><b>Explorer toolbar:</b> a Refresh &#9662; button beside Expand all lets you refresh the matched stocks, the expanded industries or every stock in the table, optionally only those that need it. Large runs ask for confirmation first.</li>
+              <li><b>Freshness badges:</b> next to each stock name a small F and T show how old its fundamentals and technicals are (green fresh, amber ageing, red stale, dashed never).</li>
+              <li><b>Saved queue instead of a tab you must keep open:</b> a refresh is saved as a job with progress in Notifications, jobs queue one after another, and anything unfinished carries on when you reopen the dashboard. It still needs the dashboard open to actually run (there is no server-side worker), so it is not a true background job.</li>
+              <li><b>Stock page:</b> the Live Data Refresh buttons use the same saved queue.</li>
+            </ul>
             <h3>v1.120 &middot; 2026-10-13</h3>
             <ul>
               <li><b>Light theme in blue:</b> the Light theme now uses a blue palette: a deeper blue top bar, buttons, links and selected switches, with cool pale-blue pages and white cards. Text is darker and the grid text heavier (Dark has the heavier grid text and brighter text too), so everything is easier to read. Light uses the same fonts as Dark.</li>
@@ -268,7 +291,7 @@
               <li><b>Suggested Rules:</b> the button in Strategies opens a pop-up with Short term, Medium term and Long term tabs. Each asks Claude for common screening approaches (written with the strategy's own rule fields) with how many stocks qualify today, and "Use these rules" applies one. A fourth tab keeps the search of past prices. Claude cannot browse, so the approaches come from its general knowledge and are starting points, not advice.</li>
               <li><b>Publish / Unpublish:</b> each strategy can be published or unpublished. Only published strategies are offered in Explorer and the Analysis strategy filter; the Strategies screen lists all. New strategies and copies start unpublished.</li>
               <li><b>Strategies:</b> the Goal section is back, with the Track record showing the goal each list is judged by. Live Data Refresh sits below the results, rule choices have colour tags, and the results show "Showing N of M stocks" under the heading.</li>
-              <li><b>Explorer:</b> an All / Matched toggle, and the count reads "Mapped N of M stocks".</li>
+              <li><b>Explorer:</b> an All / Matched toggle, and the count reads "Matched N of M stocks".</li>
               <li><b>Grids and labels:</b> every stock grid uses the column order set in Analysis. The RSI and rating columns are named W RSI, M RSI, W Tech Rating and M Tech Rating everywhere.</li>
               <li><b>Behind the scenes:</b> the automatic tests were brought up to date with these changes.</li>
             </ul>
@@ -694,7 +717,7 @@
             <li><b>One "Research this stock" button</b> per stock covers Data-proxy factors, incomplete factors, missing Technical inputs and Global &amp; Macro in one go. First runs: Mahalaxmi Rubtech 9.00 &rarr; 8.30, OCCL 6.59 &rarr; 6.61.</li>
             <li><b>Researched factors</b> swap the amber "Data proxy" tag for a green "Researched" tag with headline, summary, positives, negatives and sources. Figures that truly don't exist stay n/a with an explanation.</li>
             <li><b>Hidden, not removed:</b> "Request refresh" and "What changed" are behind switches (<code>SHOW_REQUEST_REFRESH</code>, <code>SHOW_CHANGE_NOTE</code>).</li>
-            <li><b>Leaderboard title</b> shows the count, e.g. "Leaderboard (42)", and updates with the sliders.</li>
+            <li><b>Showing line</b> above the grid shows the count, e.g. "Showing 42 of 2186 stocks", and updates with the sliders.</li>
             <li><b>Performance:</b> RSI slider redraws coalesced to one per animation frame.</li>
             <li><b>Cleanup:</b> removed leftover button styling; dead-code check found the rest in use.</li>
           </ul>

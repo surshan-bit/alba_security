@@ -8,7 +8,6 @@ function browserFullscreen(on){
     else if(!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   } catch(e){ /* the layout alone is enough */ }
 }
-// The text of a screen's full-screen button.
 const fullscreenLabel = (on) => on ? 'Exit full screen' : 'Full screen';
 // `isOn()` says whether the screen is in full screen; `leave()` takes it out.
 function watchFullscreenExit(isOn, leave){ watchers.push({ isOn, leave }); }

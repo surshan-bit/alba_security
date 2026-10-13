@@ -1,0 +1,3 @@
+/* Every grid: labels and data are left aligned (headers and cells, numbers included). */
+table :is(th,td),table :is(th,td).num,table :is(th,td).analysis-lb-score{text-align:left !important;}
+table :is(th,td) :is(.num){text-align:left;}

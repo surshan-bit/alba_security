@@ -1,13 +1,14 @@
 // The Analysis leaderboard table: ranking, header and rows, and its click handling.
-import { stockIndex } from '../core/stocks.js';
+import { stockIndex, stocks } from '../core/stocks.js';
 import { isPinned, togglePin } from '../core/pins.js';
 import { escapeHtml } from '../core/util.js';
 import { ANALYSIS_SORT_KEYS, ANALYSIS_SORT_OPTIONS, getAnalysisColumnsPanelOpen, setAnalysisColumnsPanelOpen, analysisFilters, analysisPersistUi, setAnalysisShownIdx, analysisSortComparator, saveAnalysisFilters } from './state.js';
-import { analysisTakeBatch, renderAnalysisLivePanel, updateAnalysisRefresh } from './selectbar.js';
+import { analysisTakeBatch, defineAnalysisScope, updateAnalysisRefresh } from './selectbar.js';
 import { ANALYSIS_LB_COLUMN_IDS, analysisColumnOrder, analysisLbCell, analysisRowContext, columnHeaderHtml, renderAnalysisColumnsPanel } from './columns.js';
 import { ldOpenPermissions } from '../livedata/bar.js';
 import { ldBatchStart, ldBatchStop } from '../livedata/batch.js';
 import { browserFullscreen, fullscreenLabel, watchFullscreenExit } from '../ui/fullscreen.js';
+import { getRefreshKit } from '../refresh/hook.js';
 
 // ---- full screen ----
 // The leaderboard can fill the whole window. The state lives here so a redraw of the section keeps it. Esc and the browser's own full screen are handled in ui/fullscreen.js.
@@ -30,10 +31,10 @@ function init_leaderboard_fullscreen(){
 // ---- markup ----
 // Title, "Sort by", the Columns, Show chart and Full screen buttons, the RSI Quadrant block (`chartBlock`, hidden until opened), the columns panel, the table shell and, below the table, the Live Data Refresh panel.
 function leaderboardHtml(chartBlock){
-  const headerColOrder = analysisColumnOrder();
+  const headerColOrder = analysisColumnOrder(), kit = getRefreshKit();
   return `<div class="analysis-leaderboard${lbFull ? ' lb-full' : ''}">
       <div class="analysis-leaderboard-head" style="margin-top:0;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-        <div class="analysis-panel-title">Leaderboard <span id="analysisLeaderboardCount"></span></div>
+        <div class="rk-headline"><p class="upload-hint biz-showing" style="margin:0"><span id="analysisLeaderboardCount"></span></p>${(defineAnalysisScope(), '')}</div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <label class="analysis-filter-label" style="display:flex;align-items:center;gap:6px;">Sort by:
             <select class="sort-select" id="analysisSortSelect">
@@ -43,17 +44,18 @@ function leaderboardHtml(chartBlock){
           <button type="button" class="analysis-reset-btn" id="analysisColumnsBtn">Columns</button>
           <button type="button" class="analysis-reset-btn" id="analysisChartToggle" aria-expanded="false">Show chart</button>
           <button type="button" class="analysis-reset-btn" id="analysisFullscreenBtn" aria-pressed="${lbFull}" title="Show the leaderboard across the whole window (Esc to leave)">${fullscreenLabel(lbFull)}</button>
+          ${kit ? kit.barHtml('analysis') : ''}
         </div>
       </div>
       ${chartBlock}
       ${renderAnalysisColumnsPanel(headerColOrder)}
       <div class="strat-table-wrap">
         <table class="strat-table">
-          <thead><tr>${headerColOrder.map(columnHeaderHtml).join('')}</tr></thead>
+          <thead><tr>${kit ? kit.headCell('analysis', 'analysis') : ''}${headerColOrder.map(columnHeaderHtml).join('')}</tr></thead>
           <tbody id="analysisLeaderboardBody"></tbody>
         </table>
       </div>
-      ${renderAnalysisLivePanel()}
+      ${kit ? kit.selbarSlot('analysis') : ''}
     </div>`;
 }
 
@@ -70,12 +72,12 @@ function rankStocks(filtered){
 }
 
 function leaderboardRowHtml(s, i, colOrder){
-  const idx = stockIndex.get(s);
+  const kit = getRefreshKit(), idx = stockIndex.get(s);
   const pinned = isPinned(s);
   const ctx = analysisRowContext(s, i, idx);
   return `
             <tr class="analysis-lb-row${pinned ? ' pinned' : ''}" data-idx="${idx}">
-              ${colOrder.map(id => analysisLbCell(id, ctx)).join('')}
+              ${kit ? kit.rowCell(s, 'analysis') : ''}${colOrder.map(id => analysisLbCell(id, ctx)).join('')}
             </tr>
           `;
 }
@@ -84,11 +86,11 @@ function leaderboardRowHtml(s, i, colOrder){
 function renderLeaderboardRows(filtered){
   const ranked = rankStocks(filtered);
   const lbCountEl = document.getElementById('analysisLeaderboardCount');
-  if(lbCountEl) lbCountEl.textContent = `(${ranked.length})`;
+  if(lbCountEl) lbCountEl.textContent = `Showing ${ranked.length} of ${stocks.length} stocks`;
   const lbBody = document.getElementById('analysisLeaderboardBody');
   const colOrder = analysisColumnOrder();
   lbBody.innerHTML = ranked.length === 0
-    ? `<tr><td colspan="${colOrder.length}" class="analysis-lb-empty">No stocks in the current RSI range.</td></tr>`
+    ? `<tr><td colspan="${colOrder.length + (getRefreshKit() ? 1 : 0)}" class="analysis-lb-empty">No stocks in the current RSI range.</td></tr>`
     : ranked.map((s, i) => leaderboardRowHtml(s, i, colOrder)).join('');
   setAnalysisShownIdx(ranked.map(s => stockIndex.get(s)));
   updateAnalysisRefresh();

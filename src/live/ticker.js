@@ -100,7 +100,7 @@ function paintButton(){
   const open = marketOpen(), live = enabled && open && !document.hidden && fails < 3;
   btn.className = 'live-toggle' + (enabled ? ' on' : '') + (live ? ' live' : '');
   btn.textContent = !enabled ? 'Live off' : !open ? 'Market closed' : fails >= 3 ? 'Live paused' : '● Live';
-  btn.dataset.short = !enabled ? 'Live off' : !open ? 'Closed' : fails >= 3 ? 'Paused' : 'Live';   // the shorter label the phone layout shows (styles/19-phone.css)
+  btn.dataset.short = !enabled ? 'Live off' : !open ? 'Closed' : fails >= 3 ? 'Paused' : 'Live';
   btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
   btn.title = !enabled ? 'Turn live prices on' : !open ? 'Live prices run on weekdays 9:15 to 15:30 (India time). Click to turn off.' : fails >= 3 ? 'TradingView did not answer; trying again every 2 minutes. Click to turn off.' : 'Prices of the stocks on screen refresh every 20 seconds (' + lastCount + ' watched' + (lastAt ? ', last ' + new Date(lastAt).toLocaleTimeString('en-IN', { hour12: false }) : '') + '). Nothing is saved. Click to turn off.';
 }
