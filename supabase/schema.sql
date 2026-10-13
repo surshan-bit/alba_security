@@ -62,6 +62,11 @@ create policy shared_read_pro on public.docs for select to authenticated
 create policy shared_write_owner on public.docs for all to authenticated
   using (public.is_owner() and path not like 'data/users/%') with check (public.is_owner() and path not like 'data/users/%');
 
+create policy own_user_record on public.docs for all to authenticated
+  using (path = 'users/' || auth.uid()::text) with check (path = 'users/' || auth.uid()::text);
+create policy owner_read_users on public.docs for select to authenticated
+  using (public.is_owner() and path like 'users/%');
+
 create policy profile_read_own on public.profiles for select to authenticated using (uid = auth.uid());
 -- no insert / update policy: profiles change only through the trigger above, the payment webhook (service key) or the owner in the dashboard.
 
