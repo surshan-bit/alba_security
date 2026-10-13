@@ -42,16 +42,18 @@ async function saveRun(run){
   const runs = await loadRuns();
   if(!runs.includes(run)) { runs.push(run); runs.sort(byNewest); }
   const col = runsCol();
-  if(col){ try { await col.doc(run.id).set(run); } catch(e){ console.error('Could not save tracked picks', e); } }
+  if(col){ try { await col.doc(run.id).set(run); } catch(e){ console.error('Could not save tracked picks', e); return false; } }
   else writeLocal(runs);
+  return true;
 }
 async function deleteRun(run){
   const runs = await loadRuns();
   const i = runs.indexOf(run);
   if(i >= 0) runs.splice(i, 1);
   const col = runsCol();
-  if(col){ try { await col.doc(run.id).delete(); } catch(e){ console.error('Could not delete tracked picks', e); } }
+  if(col){ try { await col.doc(run.id).delete(); } catch(e){ console.error('Could not delete tracked picks', e); return false; } }
   else writeLocal(runs);
+  return true;
 }
 const savesToAccount = () => !!runsCol();
 

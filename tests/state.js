@@ -164,6 +164,18 @@ async function tradeScenarios(){
     await until(page, () => !document.querySelector('#tradeLogPanelBody table') && !!document.querySelector('#tradeLogPanelBody .tl-card'), null, 'the Cards button shows the cards again');
   });
 
+  // a failed delete tells the viewer, and the trade stays
+  await scenario('trade log: a refused remove shows a notice and keeps the trade', { section: 'trackrecord', liveCollections: true, rules: [{ op: 'delete', prefix: TRADES, error: { message: 'refused' } }] }, { [TRADES + '/' + idA]: openTrade(A, '2026-10-01', 100, 5) }, async page => {
+    await goto(page, 'trackrecord');
+    await until(page, () => document.querySelectorAll('#tradeLogPanelBody .tl-card').length === 1, null, 'the trade is listed');
+    await page.evaluate(id => { const b = document.querySelector('[data-tl-remove="' + id + '"]'); b.click(); b.click(); }, idA);
+    await until(page, () => !!document.getElementById('albaConfirm') && /Could not remove the trade/.test(document.getElementById('albaConfirm').textContent), null, 'a notice says the trade could not be removed');
+    ok(await page.evaluate(() => document.getElementById('albaConfirmNo').hidden), 'the notice has a single OK button');
+    ok(await page.evaluate(id => window.__store.has('data/users/u_SMOKE/portfolio/trades/' + id), idA), 'the trade is still in the database');
+    await domClick(page, '#albaConfirmOk');
+    ok(!(await page.evaluate(() => !!document.getElementById('albaConfirm'))), 'the notice closes');
+  }, /Failed to remove trade/);
+
   // the saved choice of view is read when the page loads
   const prefsTable = { v: 1, theme: 'dark', tradeView: 'table', updatedAt: '2026-10-10T00:00:00.000Z', uiState: { section: 'trackrecord' } };
   await scenario('trade log: the saved Table view is used on load', { section: 'trackrecord' }, { [PREFS]: prefsTable, [TRADES + '/' + idA]: openTrade(A, '2026-10-01', 100, 5) }, async page => {

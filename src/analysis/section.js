@@ -142,7 +142,7 @@ function init_analysis_section(){
     clearTimeout(analysisResizeTimer);
     analysisResizeTimer = setTimeout(() => {
       const sec = document.getElementById('section-analysis');
-      if(sec && sec.classList.contains('active')){ try { renderAnalysisSection(); } catch(e){} }
+      if(sec && sec.classList.contains('active')){ try { renderAnalysisSection(); } catch(e){ console.error('Could not redraw Analysis after a resize', e); } }
     }, 200);
   });
 }

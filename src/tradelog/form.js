@@ -6,6 +6,7 @@ import { fundamentalCompleteness, technicalCompleteness } from '../detail/comple
 import { buildSuggestions, sgMark } from '../ui/suggest.js';
 import { holdingDaysBetween, tlSetView } from './panel.js';
 import { tradeCol } from '../identity/session.js';
+import { tellUser } from '../ui/confirm.js';
 
 // ---- Trade Log: add / sell / remove from this page (added 2026-10-06) ----
 function tlToday(){
@@ -186,7 +187,7 @@ async function tlRemove(id){
   const tradeDb = getTradeDb();
   if(!tradeDb) return;
   try { await tradeCol(tradeDb).doc(id).delete(); }
-  catch(e){ console.error('Failed to remove trade', e); }
+  catch(e){ console.error('Failed to remove trade', e); tellUser('Could not remove the trade. Please try again.'); }
 }
 
 function init_tradelog_form(){

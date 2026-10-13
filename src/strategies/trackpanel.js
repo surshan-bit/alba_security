@@ -5,7 +5,7 @@ import { stockByTickerSymbol, stocks } from '../core/stocks.js';
 import { deleteRun, evaluateRun, loadRuns, makeRun, saveRun, savesToAccount } from './tracking.js';
 import { loadPriceSet } from './pricedata.js';
 import { qualifyingStocks } from './rules.js';
-import { askConfirm } from '../ui/confirm.js';
+import { askConfirm, tellUser } from '../ui/confirm.js';
 
 const open = new Set();      // run ids whose pick list is expanded
 let renderToken = 0;
@@ -121,7 +121,7 @@ function wireTrackPanel(root, getStrategy, getTicked){
       if(!run.picks.length) return;
       const skipped = matches.length - run.picks.length;
       if(!await askConfirm(`Save ${ticked.size ? 'the ' + run.picks.length + ' ticked' : "today's " + run.picks.length} picks at their current prices and follow them for ${st.goal.days} days?${skipped ? ` (${skipped} without a price cannot be tracked and are left out.)` : ''}`, 'Track these picks')) return;
-      await saveRun(run);
+      if(!await saveRun(run)){ await tellUser('Could not save these picks, so they are not being tracked. Please try again.'); return; }
       open.add(run.id);
       renderTrackPanel(st);
       return;
@@ -132,7 +132,7 @@ function wireTrackPanel(root, getStrategy, getTicked){
     const run = runs.find(r => r.id === row.dataset.run);
     if(!run) return;
     if(e.target.closest('.trk-del')){
-      if(await askConfirm('Delete this tracked list?', 'Delete')){ await deleteRun(run); open.delete(run.id); renderTrackPanel(st); }
+      if(await askConfirm('Delete this tracked list?', 'Delete')){ if(await deleteRun(run)){ open.delete(run.id); renderTrackPanel(st); } else await tellUser('Could not delete this list. Please try again.'); }
     } else if(e.target.closest('.trk-toggle')){
       if(open.has(run.id)) open.delete(run.id); else open.add(run.id);
       renderTrackPanel(st);
