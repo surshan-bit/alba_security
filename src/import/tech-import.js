@@ -2,7 +2,8 @@
 import { getDb, technicalCsvUploadLog } from '../core/store.js';
 import { formatBytes, formatUploadTimestamp } from '../core/util.js';
 import { pruneLogCollection } from '../joblogs/panels.js';
-import { ALBA_FI, ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, fiAsk, getFiAssets, getFiDb, getFiOwner, setFiPfx, fiReset, getFiRunning, setFiRunning, fiSet, fiSetButtons, fiShowResult, getFiState } from './fund-import.js';
+import { ALBA_FI, ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 import { AlbaTechEngine } from './tech-engine.js';
 import { albaWlResolveBse } from './wlsync.js';
 

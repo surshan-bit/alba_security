@@ -3,7 +3,8 @@ import { getDb, watchlistSyncLog } from '../core/store.js';
 import { formatUploadTimestamp, sanitizeDocId } from '../core/util.js';
 import { renderWatchlistSyncLogPanel } from '../joblogs/panels.js';
 import { TV_SERVER, tvCall, tvErrorText, tvMcp } from '../tv/connector.js';
-import { ALBA_FI, albaFiErr, albaFiLoadRaw, albaFiRetry, getFiDb, getFiOwner, setFiPfx, fiReset, getFiRunning, setFiRunning, fiSet, fiSetButtons, fiShowResult, getFiState } from './fund-import.js';
+import { ALBA_FI, albaFiErr, albaFiLoadRaw, albaFiRetry, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 
 // ====================================================================================================
 // TRADINGVIEW WATCHLIST SYNC, IN THE PAGE (added 2026-10-10). "Sync now" no longer opens a Claude chat: the page

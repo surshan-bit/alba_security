@@ -55,7 +55,7 @@ tests/fixtures/stocks.json    anonymised sample of the stock list used by the ha
 | `tv/` | TradingView: `connector` (calls, retries, symbols, bars), `links` |
 | `live/` | `ticker`: the live price ticker. On weekdays during the market session it asks TradingView for the stocks on screen and updates Price, Margin of Safety, W % chg and M % chg in place (nothing is saved); the stock page shows a small live price beside the ticker |
 | `livedata/` | the Live Data Refresh buttons: `bar`, `fundamental`, `technical`, `claude`, `symbols`, `panel` (markup shared by the Analysis and Strategies panels), `batch`, `events` (dated news / results / company events saved for the chart tags) |
-| `import/` | (loaded with the Data Refresh page) CSV and TradingView imports: `fund-engine`, `fund-import`, `tech-engine`, `tech-import`, `csv-upload`, `csvparse`, `upload-history`, `wlsync` |
+| `import/` | (loaded with the Data Refresh page) CSV and TradingView imports: `fund-engine`, `fund-import`, `panel` (the progress panel all three jobs draw into; its markup is one template in `boot/partials.js`), `tech-engine`, `tech-import`, `csv-upload`, `csvparse`, `upload-history`, `wlsync` |
 | `business/` | the Business page: `calc` (industry table: changes over a period, breadth, news, and the stocks qualifying for the chosen strategy; pure functions), `news` (collects the latest TradingView headlines for chosen stocks on demand and saves them as the stock's events), `panel` (table, period and grouping buttons, price history loaded on first use of a long period). Loaded on first use via `sections/business.js` |
 | `tradelog/` | the Trade Log: `panel`, `form` |
 | `joblogs/` | Data Refresh page panels: `panels`, `freshness`, `integrity` |

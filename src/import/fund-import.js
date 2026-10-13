@@ -2,6 +2,7 @@
 import { fundamentalCsvUploadLog, getDb } from '../core/store.js';
 import { formatBytes, formatUploadTimestamp } from '../core/util.js';
 import { pruneLogCollection } from '../joblogs/panels.js';
+import { fiAsk, fiEl, fiReset, fiSet, fiShowResult, getFiState, setFiPfx } from './panel.js';
 import { albaApplyFundamental } from './fund-engine.js';
 import { albaTiRunImport } from './tech-import.js';
 import { albaWlRunSync } from './wlsync.js';
@@ -174,82 +175,7 @@ async function albaFiMakeBackup(db, assets, json, count, version, label){
   return doc;
 }
 
-// ---- Progress UI ----
-const FI_STEPS = [
-  { key: 'read', label: 'Read the uploaded file', w: 3 },
-  { key: 'load', label: 'Load the current stock data', w: 17 },
-  { key: 'backup', label: 'Back up the current data', w: 15 },
-  { key: 'score', label: 'Score every stock', w: 10 },
-  { key: 'check', label: 'Run integrity checks', w: 5 },
-  { key: 'write', label: 'Write the updated data', w: 45 },
-  { key: 'verify', label: 'Verify and finish', w: 5 }
-];
-let fiCur = null;   // the step list of the job being shown (set by fiReset)
-let fiRunning = false, fiState = null, fiUser = null, fiDb = null, fiAssets = null, fiOwner = false;
-let fiPfx = '';   // id prefix of the panel being driven: '' = Fundamental section, 'ti_' = Technical section
-const fiEl = id => document.getElementById(fiPfx + id);
-function fiReset(title, steps){
-  fiCur = steps || FI_STEPS;
-  fiState = { title, status: {}, detail: {}, frac: {}, error: null };
-  fiCur.forEach(s => { fiState.status[s.key] = 'pending'; fiState.detail[s.key] = ''; fiState.frac[s.key] = 0; });
-  const p = fiEl('fundImportPanel'); if(p) p.hidden = false;
-  const r = fiEl('fiResult'); if(r){ r.innerHTML = ''; r.className = 'fi-result'; }
-  const q = fiEl('fiPrompt'); if(q) q.innerHTML = '';
-  fiPaint();
-}
-function fiSet(key, status, detail, frac){
-  if(!fiState) return;
-  fiState.status[key] = status;
-  if(detail != null) fiState.detail[key] = detail;
-  fiState.frac[key] = status === 'done' ? 1 : (frac || 0);
-  fiPaint();
-}
-function fiPaint(){
-  if(!fiState) return;
-  let pct = 0;
-  for(const s of fiCur) pct += s.w * (fiState.status[s.key] === 'done' ? 1 : (fiState.status[s.key] === 'running' ? fiState.frac[s.key] : 0));
-  pct = Math.max(0, Math.min(100, Math.round(pct)));
-  const fill = fiEl('fiBarFill'), pctEl = fiEl('fiPct'), title = fiEl('fiTitle'), list = fiEl('fiSteps'), bar = fiEl('fiBar');
-  if(fill) fill.style.width = pct + '%';
-  if(bar) bar.setAttribute('aria-valuenow', String(pct));
-  if(pctEl) pctEl.textContent = pct + '%';
-  if(title) title.textContent = fiState.title;
-  if(fill) fill.classList.toggle('fi-bar-error', !!fiState.error);
-  if(!list) return;
-  list.textContent = '';
-  for(const s of fiCur){
-    const li = document.createElement('li'); li.className = 'fi-step fi-' + fiState.status[s.key];
-    const mark = document.createElement('span'); mark.className = 'fi-mark';
-    mark.textContent = fiState.status[s.key] === 'done' ? '✓' : fiState.status[s.key] === 'error' ? '✕' : fiState.status[s.key] === 'running' ? '…' : '·';
-    const lab = document.createElement('span'); lab.className = 'fi-label'; lab.textContent = s.label;
-    const det = document.createElement('span'); det.className = 'fi-detail'; det.textContent = fiState.detail[s.key] || '';
-    li.appendChild(mark); li.appendChild(lab); li.appendChild(det); list.appendChild(li);
-  }
-}
-function fiAsk(message, okLabel){
-  return new Promise(resolve => {
-    const host = fiEl('fiPrompt'); if(!host){ resolve(false); return; }
-    host.textContent = '';
-    const msg = document.createElement('div'); msg.className = 'fi-prompt-msg'; msg.textContent = message;
-    const row = document.createElement('div'); row.className = 'fi-prompt-row';
-    const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'select-mode-btn fi-btn-primary'; ok.textContent = okLabel;
-    const no = document.createElement('button'); no.type = 'button'; no.className = 'select-mode-btn'; no.textContent = 'Cancel';
-    ok.addEventListener('click', () => { host.textContent = ''; resolve(true); });
-    no.addEventListener('click', () => { host.textContent = ''; resolve(false); });
-    row.appendChild(ok); row.appendChild(no); host.appendChild(msg); host.appendChild(row);
-  });
-}
-function fiShowResult(kind, lines, noReload){
-  const r = fiEl('fiResult'); if(!r) return;
-  r.textContent = ''; r.className = 'fi-result fi-result-' + kind;
-  for(const ln of lines){
-    const d = document.createElement('div'); d.className = ln.cls || 'fi-line'; d.textContent = ln.text; r.appendChild(d);
-  }
-  if(kind === 'ok' && !noReload){
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'select-mode-btn fi-btn-primary'; b.textContent = 'Reload dashboard with the new data';
-    b.addEventListener('click', () => location.reload()); r.appendChild(b);
-  }
-}
+let fiRunning = false, fiUser = null, fiDb = null, fiAssets = null, fiOwner = false;
 function fiSetButtons(){
   const defs = [
     ['importFundamentalDataBtn', 'Scores the uploaded CSV and updates the stock data, right here on this page'],
@@ -323,7 +249,7 @@ async function albaFiRunImport(){
   if(fiRunning || !fiOwner) return;
   const db = fiDb, assets = fiAssets;
   if(!db || !assets){ fiReset('Import data'); fiShowResult('err', [{ text: 'File storage or the database is not available in this view, so the import cannot run here.' }]); return; }
-  fiPfx = '';
+  setFiPfx('');
   fiRunning = true; fiSetButtons(); fiReset('Importing fundamental data');
   const job = db.doc('importJobs/fundamental'); let locked = false, current = 'read';
   try {
@@ -402,7 +328,7 @@ async function albaFiRunImport(){
     fiShowResult('ok', lines);
   } catch(e){
     console.error('Fundamental import failed', e);
-    if(fiState){ fiState.error = e; if(current && fiState.status[current] !== 'done') fiSet(current, 'error', ''); }
+    const st = getFiState(); if(st){ st.error = e; if(current && st.status[current] !== 'done') fiSet(current, 'error', ''); }
     const msg = (e && e.message) ? e.message : String(e);
     fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);
     if(locked){ try { await job.set({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500) }); } catch(x){} }
@@ -414,7 +340,7 @@ async function albaFiRunImport(){
 // ---- Restore ----
 async function albaFiRunRestore(b, pfx){
   if(fiRunning || !fiOwner || !fiDb || !fiAssets) return;
-  fiPfx = pfx || '';
+  setFiPfx(pfx || '');
   const go = await (async () => { fiReset('Restore a backup'); return fiAsk('Restore the stock data saved on ' + formatUploadTimestamp(b.createdAt) + ' (' + (b.stockCount || '?') + ' stocks)? Today\'s data is backed up first, so this can be undone.', 'Restore'); })();
   if(!go){ const p = fiEl('fundImportPanel'); if(p) p.hidden = true; return; }
   fiRunning = true; fiSetButtons(); fiReset('Restoring a backup');
@@ -443,7 +369,7 @@ async function albaFiRunRestore(b, pfx){
     fiShowResult('ok', [{ text: 'Restore complete.', cls: 'fi-line fi-line-strong' }, { text: 'The data saved on ' + formatUploadTimestamp(b.createdAt) + ' is live again (' + list.length.toLocaleString('en-IN') + ' stocks).' }]);
   } catch(e){
     console.error('Restore failed', e);
-    if(fiState){ fiState.error = e; if(current && fiState.status[current] !== 'done') fiSet(current, 'error', ''); }
+    const st = getFiState(); if(st){ st.error = e; if(current && st.status[current] !== 'done') fiSet(current, 'error', ''); }
     const msg = (e && e.message) ? e.message : String(e);
     fiShowResult('err', [{ text: 'Restore stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The data that was live before is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);
     if(locked){ try { await job.set({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500) }); } catch(x){} }
@@ -497,11 +423,9 @@ function init_import_fund_import(){
 }
 
 function getFiRunning(){ return fiRunning; }
-function getFiState(){ return fiState; }
 function getFiDb(){ return fiDb; }
 function getFiAssets(){ return fiAssets; }
 function getFiOwner(){ return fiOwner; }
-function setFiPfx(v){ fiPfx = v; }
 function setFiRunning(v){ fiRunning = v; }
 
-export { ALBA_FI, ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiErr, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, fiAsk, fiReset, fiSet, fiSetButtons, fiShowResult, getFiAssets, getFiDb, getFiOwner, getFiRunning, getFiState, init_import_fund_import, setFiPfx, setFiRunning };
+export { ALBA_FI, ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiErr, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, fiSetButtons, getFiAssets, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning };
