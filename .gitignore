@@ -3,3 +3,4 @@ tests/out
 cmp
 live_ref
 *.log
+dist
