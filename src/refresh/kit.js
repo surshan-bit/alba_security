@@ -58,6 +58,8 @@ let heartbeat = null, persistTimer = null, lastSaved = "";
 let progress = null;         // what the running job last reported (title, text, pct): saved so other devices can show it
 let remote = null;           // a refresh that another device is running: { jobs, stale }
 let lastRemoteData = null, starting = true, taking = false;
+let claimedAt = 0, lastWriteAt = 0;   // when this tab took the run, and when it last saved it
+let stopHandled = 0, stopPending = false, stopAsked = 0, yielded = false;
 const remoteIds = new Set(); // bell items drawn for the other device's jobs
 const seen = new Set();      // notices already in the bell, by time and title
 let dismissed = [];          // keys of notices the viewer removed: they never come back, on any device
@@ -90,10 +92,17 @@ async function writeNow() {
   if (sig === lastSaved && !queue.length) return;
   lastSaved = sig;
   const ref = userRef("data/users/{uid}/refreshQueue");
+  if (yielded) return;
   try {
+    // Waking from sleep: another device may have taken the run over meanwhile. Check before writing over it.
+    if (ref && queue.length && lastWriteAt && Date.now() - lastWriteAt > TAKEOVER_MS * 0.66) {
+      const snap = await ref.get(), cur = snap && snap.exists ? snap.data() : null;
+      if (cur && cur.v === 1 && cur.owner && cur.owner !== tabId && hbAge(cur) < TAKEOVER_MS && liveJobs(cur).length) { lastSaved = ""; lastRemoteData = cur; yieldRun(); return; }
+    }
     if (ref && !queue.length && remoteBusy()) await ref.update({ notices: data.notices, dismissed, updatedAt: data.updatedAt });   // another device owns the run: only add our notices
     else if (ref) await ref.set(data);
     else localStorage.setItem(LS_KEY, JSON.stringify(data));
+    lastWriteAt = Date.now();
   } catch (e) { console.error("Could not save the refresh queue", e); }
 }
 function persistSoon() { if (!persistTimer) persistTimer = setTimeout(writeNow, 5000); }
@@ -149,6 +158,7 @@ function batchNotice() {
   return true;
 }
 function finishJob(j) {
+  if (yielded) return;   // another device carries the run on: it reports the result
   const st = j.stats, ended = st.stopped || !!st.note;
   const failed = st.failed.length > 0;
   const tail = st.refreshed + " of " + j.total + " refreshed." + (st.notRun ? " " + st.notRun + " not run." : "") + (failed ? " Failed: " + st.failed.slice(0, 5).join("; ") + (st.failed.length > 5 ? "; …" : "") : "");
@@ -179,6 +189,7 @@ function enqueueJob(kind, list, source, label) {
   for (const s of list) { const k = pcTickerKey(s); if (!already.has(k) && !keys.includes(k)) keys.push(k); }
   if (!keys.length) return 0;
   const j = { id: jobId(), kind, keys, total: keys.length, done: 0, source: source || "", label: label || "", createdAt: Date.now(), stats: { refreshed: 0, notRun: 0, failed: [], stopped: false, note: "", perm: false } };
+  if (!queue.length) claimedAt = Date.now();
   queue.push(j);
   if (queue.length > 1) queuedItem(j);
   persistNow(); repaint(); pump();
@@ -194,6 +205,11 @@ async function pump() {
     while (queue.length) {
       const job = queue[0];
       while (engineBusy()) await sleep(500);
+      if (!queue.length) break;
+      if (stopPending) {   // Stop was pressed on another device between two batches
+        stopPending = false; queue.shift(); activeJob = null; activityEnd("rk-q-" + job.id);
+        job.stats.stopped = true; finishJob(job); persistNow(); continue;
+      }
       const list = job.keys.slice(0, CHUNK).map(stockByKey).filter(Boolean);
       if (!list.length) { queue.shift(); activityEnd("rk-q-" + job.id); continue; }
       activeJob = job; activityEnd("rk-q-" + job.id);
@@ -207,7 +223,8 @@ async function pump() {
   } finally {
     activeJob = null; pumping = false;
     if (heartbeat) { clearInterval(heartbeat); heartbeat = null; }
-    persistNow(); repaint();
+    stopPending = false;
+    persistNow(); yielded = false; repaint();
   }
 }
 function batchNoticeDone(job, taken, b) {
@@ -582,14 +599,21 @@ function applyRemote(d) {
   });
   history = history.slice(0, 10);
   const jobs = liveJobs(d);
+  if (queue.length && d.owner && d.owner !== tabId && jobs.length && hbAge(d) < TAKEOVER_MS) { yieldRun(); }   // another device has the run: do not run it twice
+  if (queue.length && d.owner === tabId && d.stopRequest > Math.max(stopHandled, claimedAt)) {   // Stop was pressed on another device
+    stopHandled = d.stopRequest;
+    if (engineBusy()) ldBatchStop(); else stopPending = true;
+  }
   if (!jobs.length || d.owner === tabId || queue.length) { clearRemote(); return; }
-  const fresh = hbAge(d) < TAKEOVER_MS, left = jobs.reduce((n, j) => n + j.keys.length, 0), j0 = jobs[0], p = d.progress || null;
+  if (stopAsked && (!fresh0(d) || Date.now() - stopAsked > 90000)) stopAsked = 0;
+  const fresh = fresh0(d), left = jobs.reduce((n, j) => n + j.keys.length, 0), j0 = jobs[0], p = d.progress || null;
   const pct = p && typeof p.pct === "number" ? p.pct : Math.round((j0.done / Math.max(1, j0.total)) * 100);
   const ids = new Set(["rk-remote"]);
   activityRun("rk-remote", {
     title: fresh ? (p && p.title) || "Refreshing " + KIND_LABEL[j0.kind] + " Info · " + j0.done + " of " + j0.total + " done" : "Refresh paused · " + KIND_LABEL[j0.kind] + " · " + left + " stock" + (left === 1 ? "" : "s") + " left",
-    text: fresh ? ((p && p.text) ? p.text + " · " : "") + "Running on another device." : "No dashboard is working on it right now. It carries on when one with TradingView is open.",
-    pct, section: sectionOf(j0.source)
+    text: stopAsked ? "Stopping… waiting for the other device to stop." : fresh ? ((p && p.text) ? p.text + " · " : "") + "Running on another device." : "No dashboard is working on it right now. It carries on when one with TradingView is open.",
+    pct, section: sectionOf(j0.source),
+    onStop: remoteStop, stopping: !!stopAsked
   });
   jobs.slice(1).forEach((j) => {
     const id = "rk-remote-q-" + j.id; ids.add(id);
@@ -599,6 +623,35 @@ function applyRemote(d) {
   remoteIds.clear(); ids.forEach((id) => remoteIds.add(id));
   remote = { jobs, stale: !fresh }; repaint();
   if (!fresh && !starting) takeOver();
+}
+const fresh0 = (d) => hbAge(d) < TAKEOVER_MS;
+// Stop pressed on a device that is not running the refresh: ask the running one, or clear a paused job.
+async function remoteStop() {
+  const ref = userRef("data/users/{uid}/refreshQueue"), d = lastRemoteData;
+  if (!ref || !d || stopAsked) return;
+  const jobs = liveJobs(d);
+  if (!jobs.length) return;
+  stopAsked = Date.now();
+  try {
+    if (fresh0(d)) await ref.update({ stopRequest: stopAsked });
+    else {
+      const j = jobs[0];
+      await ref.update({ jobs: jobs.slice(1), progress: null, owner: null, updatedAt: new Date().toISOString() });
+      stopAsked = 0;
+      notice({ tone: "warn", title: KIND_LABEL[j.kind] + " refresh stopped" + (j.label ? " · " + j.label : ""), text: "Stopped from this device. " + j.done + " of " + j.total + " done before it was paused.", section: sectionOf(j.source) });
+    }
+  } catch (e) { stopAsked = 0; console.error("Could not stop the refresh", e); }
+  if (lastRemoteData) applyRemote(lastRemoteData);
+}
+// This tab was running a refresh that another device has now taken over (this one slept or lost contact): stop without saving.
+function yieldRun() {
+  if (!queue.length) return;
+  const dropped = queue; queue = [];
+  dropped.forEach((j) => activityEnd("rk-q-" + j.id));
+  activityEnd("batch");
+  if (pumping) { yielded = true; if (engineBusy()) ldBatchStop(); }
+  stopPending = false; repaint();
+  if (lastRemoteData) setTimeout(() => applyRemote(lastRemoteData), 0);
 }
 const liveJobs = (d) => (Array.isArray(d && d.jobs) ? d.jobs : []).filter((j) => j && KIND_LABEL[j.kind] && Array.isArray(j.keys) && j.keys.length);
 const freshStats = () => ({ refreshed: 0, notRun: 0, failed: [], stopped: false, note: "", perm: false });
@@ -626,6 +679,7 @@ async function takeOver() {
     if (!jobs.length) return;
     let mcp = null; try { mcp = await tvMcp(); } catch (e) { mcp = null; }
     if (!mcp) return;
+    claimedAt = Date.now();
     queue = jobs.map((j) => Object.assign({}, j, { stats: freshStats() }));
     clearRemote();
     queue.slice(1).forEach(queuedItem);
@@ -675,6 +729,7 @@ async function resumeSaved(saved) {
   let mcp = null;
   try { mcp = await tvMcp(); } catch (e) { mcp = null; }
   if (!mcp) return;   // this view cannot reach TradingView: the bell shows the paused job and a dashboard that can will carry on
+  claimedAt = Date.now();
   queue = jobs.map((j) => Object.assign({}, j, { stats: freshStats() }));
   clearRemote();
   queue.slice(1).forEach(queuedItem);
