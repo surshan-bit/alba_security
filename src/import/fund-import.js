@@ -8,6 +8,7 @@ import { fiAsk, fiEl, fiReset, fiSet, fiShowResult, getFiState, setFiPfx } from 
 import { albaApplyFundamental } from './fund-engine.js';
 import { albaTiRunImport } from './tech-import.js';
 import { albaWlRunSync } from './wlsync.js';
+import { registerBusy } from '../core/busy.js';
 
 // ====================================================================================================
 // FUNDAMENTAL IMPORT, IN THE PAGE (added 2026-10-09). "Import data" no longer opens a Claude chat:
@@ -405,6 +406,7 @@ async function albaFiRenderBackups(){
 }
 
 function init_import_fund_import(){
+  registerBusy(() => fiRunning);
   // leaving the page in the middle of an import or sync interrupts it: ask first
   window.addEventListener('beforeunload', e => { if(fiRunning){ e.preventDefault(); e.returnValue = ''; } });
 

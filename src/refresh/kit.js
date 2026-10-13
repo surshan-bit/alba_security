@@ -12,6 +12,7 @@ import { pcTickerKey } from '../prices/store.js';
 import { tvMcp } from '../tv/connector.js';
 import { escapeHtml } from '../core/util.js';
 import { dbCapabilityPromise } from '../core/store.js';
+import { registerBusy } from '../core/busy.js';
 import { stocks } from '../core/stocks.js';
 import { userRef } from '../identity/session.js';
 import { ago, counts, dots, freshness, needs, priorityOrder } from './freshness.js';
@@ -618,6 +619,7 @@ function watchRemote() {
 // ---------- start-up: restore the saved queue and carry on ----------
 export async function init() {
   installListeners();
+  registerBusy(() => queue.length > 0 || engineBusy());
   try { await dbCapabilityPromise; } catch (e) { /* no database: the browser copy is used */ }
   const saved = await loadSaved();
   if (saved && saved.v === 1) {

@@ -10,8 +10,10 @@ import { ldRunTechnical } from './technical.js';
 import { getLdBatch, ldBatchPaint } from './batch.js';
 import { activityEnd, activityNotify, activityRun } from '../ui/activity.js';
 import { getRefreshKit } from '../refresh/hook.js';
+import { registerBusy } from '../core/busy.js';
 
 var ldJobs = new Map();    // "<ticker key>|fund" or "|tech" -> { pct, msg, state: 'idle'|'running'|'ok'|'error', at }
+registerBusy(() => { for(const j of ldJobs.values()) if(j && j.state === 'running') return true; return false; });
 const ldAbort = new Map();   // "<ticker key>|fund" -> AbortController
 var ldOpen = false;   // the Live Data Refresh panel on the stock page starts collapsed and is opened when needed
 const LD_LABEL = { fund: '↻ Refresh Fundamental Info', tech: '↻ Refresh Technical Info' };
@@ -42,7 +44,7 @@ function ldReportOne(key, kind){
   const id = 'one|' + key + '|' + kind, j = ldGet(key, kind), s = ldStockByKey(key);
   if(!j || !s || j.state !== 'running' || ldPanelVisible(key)){ activityEnd(id); return; }
   activityRun(id, {
-    title: 'Refreshing ' + LD_KIND_NAME[kind] + ' Info · ' + s.name, text: j.msg + ' · Safe to close this page: the refresh carries on when you reopen the dashboard.', pct: j.pct, section: '',
+    title: 'Refreshing ' + LD_KIND_NAME[kind] + ' Info · ' + s.name, text: j.msg + ' · You can move to other screens. If you close the dashboard it pauses and carries on when it is opened again.', pct: j.pct, section: '',
     onStop: kind === 'fund' ? () => { const c = ldAbort.get(key + '|fund'); if(c) c.abort(); } : null
   });
 }

@@ -28,7 +28,7 @@ function batchTail(){
 }
 const activeNames = () => Array.from(ldBatch.active.values()).join(', ');
 const KIND_NAME = { fund: 'Fundamental', tech: 'Technical' };
-const STAY_OPEN_NOTE = 'Safe to close this page: the refresh carries on when you reopen the dashboard.';
+const STAY_OPEN_NOTE = 'You can move to other screens. If you close the dashboard it pauses and carries on when it is opened again.';
 // The screen that started a run, for the "View" button on the top strip.
 const sectionOf = (P) => P === 'analysis' ? 'analysis' : P === 'strat' ? 'strategies' : /^biz-/.test(P) ? 'business' : '';
 function batchStoppingText(){

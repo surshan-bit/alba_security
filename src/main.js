@@ -63,6 +63,7 @@ import { init_live_ticker } from './live/ticker.js';
 import { init_leaderboard_fullscreen } from './analysis/leaderboard.js';
 import { init_ui_fullscreen } from './ui/fullscreen.js';
 import { init_app_actions } from './app/actions.js';
+import { init_boot_autoreload } from './boot/autoreload.js';
 
 setRefreshKit(kit);
 init_joblogs_integrity();
@@ -81,3 +82,4 @@ init_live_ticker();
 init_ui_fullscreen();
 init_leaderboard_fullscreen();
 init_app_actions();
+init_boot_autoreload();
