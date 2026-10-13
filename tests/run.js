@@ -198,11 +198,11 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   click($('#analysisTechWFilters [data-atechw="all"]')); await sleep(150);
   snap('s6j_allfilters', { body: html$('#analysisPanelBody'), filt: html$('#analysisGlobalFilters') });
   snap('s6j2_narrow', { rows: Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-ticker')).map(e => e.textContent).join(',') });
-  typeInto($('#monthRsiMaxInput'), '100'); typeInto($('#weekRsiMinInput'), '0'); await sleep(100);
+  typeInto($('#monthRsiMaxInput'), '100'); typeInto($('#weekRsiMinInput'), '0'); await sleep(700);
   snap('s6j3_fullrange', { rows: Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-ticker')).map(e => e.textContent).join(','), body: html$('#analysisPanelBody') });
   { const sel = $('#analysisSortSelect'); sel.value = 'monthRsi_asc'; sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100); }
   snap('s6j4_blank_sorted_last', { rows: Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-ticker')).map(e => e.textContent).join(',') });
-  typeInto($('#weekRsiMinInput'), '55'); await sleep(100);
+  typeInto($('#weekRsiMinInput'), '55'); await sleep(700);
   typeInto($('#monthRsiMaxInput'), '90'); await sleep(100);
   snap('s6k_sliders', { body: html$('#analysisPanelBody') });
   { const mi = $('#mosMinInput'); typeInto(mi, String(Math.round((Number(mi.min) + Number(mi.max)) / 2))); await sleep(100); }
