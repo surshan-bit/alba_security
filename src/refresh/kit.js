@@ -54,6 +54,16 @@ let activeJob = null;
 let pumping = false;
 let history = [];            // last finished-job notices, kept across a reload
 let heartbeat = null, persistTimer = null, lastSaved = "";
+let progress = null;         // what the running job last reported (title, text, pct): saved so other devices can show it
+let remote = null;           // a refresh that another device is running: { jobs, stale }
+let lastRemoteData = null, starting = true, taking = false;
+const remoteIds = new Set(); // bell items drawn for the other device's jobs
+const seen = new Set();      // notices already in the bell, by time and title
+const noticeKey = (n) => (n.at || 0) + "|" + (n.title || "");
+const hbAge = (d) => Date.now() - (Date.parse(d && d.heartbeatAt) || 0);
+const remoteBusy = () => !!(remote && remote.jobs.length);
+const isBusy = () => queue.length > 0 || remoteBusy();
+const refreshLabel = () => isBusy() ? '<i class="rk-spin" aria-hidden="true"></i> Refreshing ▾' : "↻ Refresh ▾";
 const jobId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 function jobView(j) {
@@ -62,7 +72,7 @@ function jobView(j) {
   return { id: j.id, kind: j.kind, keys: j.keys.slice(progressed), total: j.total, done: j.done + progressed, source: j.source, label: j.label, createdAt: j.createdAt };
 }
 function docData() {
-  return { v: 1, jobs: queue.map(jobView), notices: history.slice(0, 10), owner: queue.length ? tabId : null, heartbeatAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  return { v: 1, jobs: queue.map(jobView), notices: history.slice(0, 10), progress: activeJob ? progress : null, owner: queue.length ? tabId : null, heartbeatAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
 }
 async function writeNow() {
   persistTimer = null;
@@ -71,7 +81,8 @@ async function writeNow() {
   lastSaved = sig;
   const ref = userRef("data/users/{uid}/refreshQueue");
   try {
-    if (ref) await ref.set(data);
+    if (ref && !queue.length && remoteBusy()) await ref.update({ notices: data.notices, updatedAt: data.updatedAt });   // another device owns the run: only add our notices
+    else if (ref) await ref.set(data);
     else localStorage.setItem(LS_KEY, JSON.stringify(data));
   } catch (e) { console.error("Could not save the refresh queue", e); }
 }
@@ -87,7 +98,8 @@ async function loadSaved() {
 
 // ---------- notifications ----------
 function notice(n) {
-  history.unshift({ tone: n.tone, title: n.title, text: n.text, section: n.section || "", at: Date.now() });
+  const item = { tone: n.tone, title: n.title, text: n.text, section: n.section || "", at: Date.now() };
+  history.unshift(item); seen.add(noticeKey(item));
   history = history.slice(0, 10);
   activityNotify(n);
   persistNow();
@@ -106,10 +118,13 @@ function activity(info) {
   const more = queue.length - 1;
   const done = j.done + Math.min(b.done, b.total);
   const frac = (j.done + (info.pct || 0) / 100 * b.total) / j.total;
-  activityRun("batch", Object.assign({}, info, {
+  const shown = Object.assign({}, info, {
     title: "Refreshing " + KIND_LABEL[j.kind] + " Info · " + done + " of " + j.total + " done" + (more > 0 ? " · " + more + " more queued" : ""),
     pct: Math.round(Math.min(1, frac) * 100)
-  }));
+  });
+  progress = { title: shown.title, text: info.text || "", pct: shown.pct, section: shown.section || sectionOf(j.source) };
+  activityRun("batch", shown);
+  persistSoon();
 }
 function batchNotice() {
   // The engine reports once per batch of up to 50 stocks; the kit sums them up and reports once per job (see finishJob).
@@ -203,6 +218,11 @@ function batchNoticeDone(job, taken, b) {
 
 // ---------- running from the controls ----------
 function request(spec, anchor) {
+  if (remoteBusy()) {
+    const n = remote.jobs.reduce((t, j) => t + j.keys.length, 0);
+    notice({ tone: "warn", title: "A refresh is already in progress", text: "Another device is " + (remote.stale ? "paused on" : "running") + " a refresh with " + n + " stock" + (n === 1 ? "" : "s") + " left. Start a new one when it has finished.", section: "" });
+    return;
+  }
   const plan = [];
   for (const kind of ["tech", "fund"]) {
     if (!spec.kinds.includes(kind)) continue;
@@ -276,7 +296,7 @@ function rowBtn(s, selName) { return rowButton(s, selName); }
 const choices = new Map();     // id -> () => { head, note, items: [{ label, small, off, run }] }
 function defineChoices(id, fn) { choices.set(id, fn); }
 function choiceBtn(id, off, title) {
-  return '<button type="button" class="rk-btn rk-main rk-choicebtn biz-newsbtn" data-rk-act="choice" data-rk-cid="' + esc(id) + '"' + (off ? " disabled" : "") + ' aria-haspopup="menu" title="' + esc(title || "Refresh") + '">↻ Refresh ▾</button>';
+  return '<button type="button" class="rk-btn rk-main rk-choicebtn biz-newsbtn" data-rk-act="choice" data-rk-cid="' + esc(id) + '"' + (off ? " disabled" : "") + ' aria-haspopup="menu" data-rk-busy="' + (isBusy() ? "1" : "0") + '" title="' + esc(title || "Refresh") + '">' + refreshLabel() + '</button>';
 }
 function choiceMenuHtml(id) {
   let c; try { c = choices.get(id)(); } catch (e) { c = null; }
@@ -303,7 +323,7 @@ function selbarInner(name) {
 }
 function selbarSlot(name) { return '<div class="rk-selslot" data-rk-selbar="' + esc(name) + '">' + selbarInner(name) + "</div>"; }
 function toolbarButton(name) {
-  return '<button type="button" class="biz-expand rk-toolbtn" data-rk-act="toolbar" data-rk-tb="' + esc(name) + '" aria-haspopup="menu" title="Refresh Fundamental or Technical info for many stocks at once">↻ Refresh ▾</button>';
+  return '<button type="button" class="biz-expand rk-toolbtn" data-rk-act="toolbar" data-rk-tb="' + esc(name) + '" aria-haspopup="menu" data-rk-busy="' + (isBusy() ? "1" : "0") + '" title="Refresh Fundamental or Technical info for many stocks at once">' + refreshLabel() + '</button>';
 }
 
 // ---------- repaint ----------
@@ -320,6 +340,11 @@ function repaint() {
     document.querySelectorAll("[data-rk-selbar]").forEach((el) => {
       const html = selbarInner(el.dataset.rkSelbar);
       if (el.__rk !== html) { el.__rk = html; el.innerHTML = html; }
+    });
+    const busy = isBusy() ? "1" : "0";
+    document.querySelectorAll(".rk-toolbtn,.rk-choicebtn").forEach((b) => {
+      if (b.dataset.rkBusy === busy) return;
+      b.dataset.rkBusy = busy; b.innerHTML = refreshLabel();
     });
     if (activeJob) persistSoon();
   });
@@ -522,44 +547,106 @@ function installListeners() {
   document.addEventListener("mousedown", (e) => { if (menuEl && !e.target.closest(".rk-menu") && !e.target.closest("[data-rk-act]") && !e.target.closest(".rk-row-btn")) closeMenu(false); }, true);
   window.addEventListener("scroll", (e) => { if (menuEl && !(e.target && e.target.closest && e.target.closest(".rk-menu"))) closeMenu(false); }, true);
   window.addEventListener("resize", () => closeMenu(false));
-  window.addEventListener("pagehide", () => { if (queue.length || history.length) writeNow(); });
+  window.addEventListener("pagehide", () => { if (queue.length) writeNow(); });
+}
+
+// ---------- other devices: the saved record is shared, so every device shows the same status ----------
+function clearRemote() {
+  remoteIds.forEach((id) => activityEnd(id)); remoteIds.clear();
+  if (remote) { remote = null; repaint(); }
+}
+function applyRemote(d) {
+  lastRemoteData = d;
+  if (!d || d.v !== 1) { clearRemote(); return; }
+  // notices written by another device (or an earlier visit) that this device has not shown yet
+  (Array.isArray(d.notices) ? d.notices : []).slice().reverse().forEach((n) => {
+    if (!n || !n.title || seen.has(noticeKey(n))) return;
+    seen.add(noticeKey(n));
+    history.unshift({ tone: n.tone || "ok", title: n.title, text: n.text || "", section: n.section || "", at: n.at || Date.now() });
+    activityNotify({ tone: n.tone || "ok", title: n.title, text: n.text || "", section: n.section || "", at: n.at || Date.now() });
+  });
+  history = history.slice(0, 10);
+  const jobs = liveJobs(d);
+  if (!jobs.length || d.owner === tabId || queue.length) { clearRemote(); return; }
+  const fresh = hbAge(d) < TAKEOVER_MS, left = jobs.reduce((n, j) => n + j.keys.length, 0), j0 = jobs[0], p = d.progress || null;
+  const pct = p && typeof p.pct === "number" ? p.pct : Math.round((j0.done / Math.max(1, j0.total)) * 100);
+  const ids = new Set(["rk-remote"]);
+  activityRun("rk-remote", {
+    title: fresh ? (p && p.title) || "Refreshing " + KIND_LABEL[j0.kind] + " Info · " + j0.done + " of " + j0.total + " done" : "Refresh paused · " + KIND_LABEL[j0.kind] + " · " + left + " stock" + (left === 1 ? "" : "s") + " left",
+    text: fresh ? ((p && p.text) ? p.text + " · " : "") + "Running on another device." : "No dashboard is working on it right now. It carries on when one with TradingView is open.",
+    pct, section: sectionOf(j0.source)
+  });
+  jobs.slice(1).forEach((j) => {
+    const id = "rk-remote-q-" + j.id; ids.add(id);
+    activityRun(id, { title: "Queued: " + KIND_LABEL[j.kind] + " refresh · " + j.keys.length + " stock" + (j.keys.length === 1 ? "" : "s"), text: (j.label ? j.label + " · " : "") + "Waiting for the current refresh to finish.", pct: 0, section: sectionOf(j.source) });
+  });
+  remoteIds.forEach((id) => { if (!ids.has(id)) activityEnd(id); });
+  remoteIds.clear(); ids.forEach((id) => remoteIds.add(id));
+  remote = { jobs, stale: !fresh }; repaint();
+  if (!fresh && !starting) takeOver();
+}
+const liveJobs = (d) => (Array.isArray(d && d.jobs) ? d.jobs : []).filter((j) => j && KIND_LABEL[j.kind] && Array.isArray(j.keys) && j.keys.length);
+const freshStats = () => ({ refreshed: 0, notRun: 0, failed: [], stopped: false, note: "", perm: false });
+// A job nobody has worked on for a while: the first open dashboard that can reach TradingView picks it up.
+async function takeOver() {
+  if (taking || queue.length) return;
+  taking = true;
+  try {
+    await sleep(Math.random() * 3000);
+    const again = await loadSaved();
+    if (!again || again.v !== 1 || queue.length || hbAge(again) < TAKEOVER_MS) return;
+    const jobs = liveJobs(again);
+    if (!jobs.length) return;
+    let mcp = null; try { mcp = await tvMcp(); } catch (e) { mcp = null; }
+    if (!mcp) return;
+    queue = jobs.map((j) => Object.assign({}, j, { stats: freshStats() }));
+    clearRemote();
+    queue.slice(1).forEach(queuedItem);
+    await persistNow();   // claims the run: the other dashboards see a fresh heartbeat from this one
+    notice({ tone: "ok", title: "Refresh continuing", text: "Carrying on with " + jobs.map((j) => KIND_LABEL[j.kind] + " · " + j.keys.length + " left").join(", ") + ".", section: sectionOf(jobs[0].source) });
+    setTimeout(pump, 1000);
+  } finally { taking = false; }
+}
+function watchRemote() {
+  const ref = userRef("data/users/{uid}/refreshQueue");
+  if (!ref || typeof ref.onSnapshot !== "function") return;
+  try { ref.onSnapshot((snap) => applyRemote(snap && snap.exists ? snap.data() : null), (e) => console.error("Refresh status sync error", e)); }
+  catch (e) { console.error("Refresh status sync unavailable", e); return; }
+  setInterval(() => { if (lastRemoteData) applyRemote(lastRemoteData); }, 10000);   // notices a run that has gone quiet
 }
 
 // ---------- start-up: restore the saved queue and carry on ----------
 export async function init() {
   installListeners();
   try { await dbCapabilityPromise; } catch (e) { /* no database: the browser copy is used */ }
-  let saved = await loadSaved();
-  if (!saved || saved.v !== 1) return;
-  history = (Array.isArray(saved.notices) ? saved.notices : []).slice(0, 10);
-  history.slice().reverse().forEach((n) => activityNotify({ tone: n.tone || "ok", title: n.title || "", text: n.text || "", section: n.section || "", at: n.at || Date.now(), read: true, silent: true }));
-  const live = (d) => (Array.isArray(d && d.jobs) ? d.jobs : []).filter((j) => j && KIND_LABEL[j.kind] && Array.isArray(j.keys) && j.keys.length);
-  let jobs = live(saved);
+  const saved = await loadSaved();
+  if (saved && saved.v === 1) {
+    history = (Array.isArray(saved.notices) ? saved.notices : []).slice(0, 10);
+    history.slice().reverse().forEach((n) => { seen.add(noticeKey(n)); activityNotify({ tone: n.tone || "ok", title: n.title || "", text: n.text || "", section: n.section || "", at: n.at || Date.now(), read: true, silent: true }); });
+  }
+  watchRemote();
+  try { if (saved && saved.v === 1) await resumeSaved(saved); }
+  finally { starting = false; if (lastRemoteData) applyRemote(lastRemoteData); }
+}
+async function resumeSaved(saved) {
+  let jobs = liveJobs(saved);
   if (!jobs.length) return;
   // A fresh heartbeat from another tab usually means this page was reloaded while a refresh was running:
   // wait a moment, and carry on from where it stopped once that tab has gone quiet.
   let waited = 0;
-  while (saved && saved.owner && saved.owner !== tabId && Date.now() - (Date.parse(saved.heartbeatAt) || 0) < TAKEOVER_MS && waited < 70000) {
+  while (saved && saved.owner && saved.owner !== tabId && hbAge(saved) < TAKEOVER_MS && waited < 70000) {
     await sleep(5000); waited += 5000;
     const again = await loadSaved();
     if (!again || again.v !== 1) return;
-    saved = again; jobs = live(saved);
+    saved = again; jobs = liveJobs(saved);
     if (!jobs.length) return;
   }
-  if (saved.owner && saved.owner !== tabId && Date.now() - (Date.parse(saved.heartbeatAt) || 0) < TAKEOVER_MS) {
-    notice({ tone: "ok", title: "Refresh still running", text: "Another open copy of the dashboard is still working through " + jobs.reduce((n, j) => n + j.keys.length, 0) + " stocks. Leave it open there to finish.", section: "" });
-    return;
-  }
+  if (saved.owner && saved.owner !== tabId && hbAge(saved) < TAKEOVER_MS) return;   // still being worked on elsewhere: the bell already shows it
   let mcp = null;
   try { mcp = await tvMcp(); } catch (e) { mcp = null; }
-  const left = jobs.reduce((n, j) => n + j.keys.length, 0);
-  if (!mcp) {
-    queue = jobs.map((j) => Object.assign({}, j, { stats: { refreshed: 0, notRun: 0, failed: [], stopped: false, note: "", perm: false } }));
-    queue.forEach(queuedItem);
-    notice({ tone: "warn", title: "Refresh waiting", text: left + " stock" + (left === 1 ? " is" : "s are") + " still waiting to be refreshed, but TradingView is not available in this view. Open the dashboard on claude.ai to continue.", section: "" });
-    return;
-  }
-  queue = jobs.map((j) => Object.assign({}, j, { stats: { refreshed: 0, notRun: 0, failed: [], stopped: false, note: "", perm: false } }));
+  if (!mcp) return;   // this view cannot reach TradingView: the bell shows the paused job and a dashboard that can will carry on
+  queue = jobs.map((j) => Object.assign({}, j, { stats: freshStats() }));
+  clearRemote();
   queue.slice(1).forEach(queuedItem);
   notice({ tone: "ok", title: "Refresh continuing", text: "Carrying on with " + jobs.map((j) => KIND_LABEL[j.kind] + " · " + j.keys.length + " left").join(", ") + ".", section: sectionOf(jobs[0].source) });
   setTimeout(pump, 1500);
