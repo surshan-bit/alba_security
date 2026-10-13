@@ -292,6 +292,7 @@ async function albaFiRunImport(){
     // 5. checks
     current = 'check'; fiSet('check', 'running', '', 0.5); await albaFiSleep(30);
     const chk = albaFiCheck(raw.stocks, prev);
+    if(res.rescored < 1500) chk.soft.unshift('Only ' + res.rescored.toLocaleString('en-IN') + ' of the ' + raw.stocks.length.toLocaleString('en-IN') + ' dashboard stocks are in this file (a full Screener.in export has about 2,100 or more), so every other stock keeps its old data and its old refresh date. That usually means a filtered or partial export.');
     if(chk.hard.length) throw new Error('integrity check failed, nothing was written:\n• ' + chk.hard.slice(0, 6).join('\n• '));
     fiSet('check', 'done', 'passed');
     if(chk.soft.length){
