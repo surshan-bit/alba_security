@@ -305,7 +305,7 @@ function barInner(id) {
   const sc = scopes.get(id);
   if (!sc) return "";
   const list = scopeStocks(id), c = counts(list), off = list.length ? "" : " disabled";
-  return '<button type="button" class="rk-btn rk-main" data-rk-act="bar-menu" data-rk-scope="' + esc(id) + '"' + off + ' aria-haspopup="menu" title="Refresh Fundamental and Technical info for ' + list.length + ' stock' + (list.length === 1 ? "" : "s") + '">↻ Refresh ▾</button>' + runStatus(sc.source);
+  return '<button type="button" class="rk-btn rk-main rk-barbtn" data-rk-act="bar-menu" data-rk-scope="' + esc(id) + '"' + off + ' aria-haspopup="menu" data-rk-busy="' + (isBusy() ? "1" : "0") + '" title="Refresh Fundamental and Technical info for ' + list.length + ' stock' + (list.length === 1 ? "" : "s") + '">' + refreshLabel() + '</button>'  + runStatus(sc.source);
 }
 function barHtml(id) {
   return '<span class="rk-bar" data-rk-bar="' + esc(id) + '">' + barInner(id) + "</span>";
@@ -369,7 +369,7 @@ function repaint() {
       if (el.__rk !== html) { el.__rk = html; el.innerHTML = html; }
     });
     const busy = isBusy() ? "1" : "0";
-    document.querySelectorAll(".rk-toolbtn,.rk-choicebtn").forEach((b) => {
+    document.querySelectorAll(".rk-toolbtn,.rk-choicebtn,.rk-barbtn").forEach((b) => {
       if (b.dataset.rkBusy === busy) return;
       b.dataset.rkBusy = busy; b.innerHTML = refreshLabel();
     });
