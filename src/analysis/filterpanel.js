@@ -139,14 +139,44 @@ function strategyGroup(){
     all++;
     strategies.forEach(x => { if(sets.get(x.id).has(s)) counts.set(x.id, counts.get(x.id) + 1); });
   });
+  const hiddenNoteHtml = hiddenNote();
   const buttons = [filterButton('astrat', 'all', !chosen, 'var(--text)', 'All', all, 'Do not narrow Analysis by a strategy')]
     .concat(strategies.map(x => filterButton('astrat', escapeHtml(x.id), x.id === chosen, 'var(--accent)', `<span class="filter-label">${escapeHtml(x.name)}</span>`, counts.get(x.id), 'Only stocks that qualify for this strategy today')));
   return `<div class="filter-group" id="analysisStrategyFilter">
         <h2>Strategy</h2>
         <div class="filter-group-row">
           ${buttons.join('\n          ')}
-        </div>
+        </div>${hiddenNoteHtml}
       </div>`;
+}
+
+// Why the numbers above can be lower than the Explorer's: Analysis never lists a stock with no valuation data, and a stock with no RSI
+// reading is hidden as soon as that RSI range is narrowed. Shown only when something is hidden.
+function hiddenNote(){
+  const inStrategy = strategyPassSet(), f = analysisFilters;
+  const base = inStrategy ? stocks.filter(s => inStrategy.has(s)) : stocks;
+  const weekFull = f.weekMin === 0 && f.weekMax === 100, monthFull = f.monthMin === 0 && f.monthMax === 100;
+  const n = { noVal: 0, noWeek: 0, noMonth: 0, range: 0, other: 0 };
+  let shown = 0;
+  base.forEach(s => {
+    if(mosRatingAny(s) == null){ n.noVal++; return; }
+    const raw = (s.technical && s.technical.raw) || {};
+    if(raw.weekRsi == null && !weekFull){ n.noWeek++; return; }
+    if(raw.monthRsi == null && !monthFull){ n.noMonth++; return; }
+    if(analysisPasses(s, null, null)){ shown++; return; }
+    if(stocksInRange([s]).length === 0) n.range++; else n.other++;
+  });
+  const hidden = base.length - shown;
+  if(!hidden) return '';
+  const fmt = (v) => v.toLocaleString('en-IN');
+  const parts = [];
+  if(n.noVal) parts.push(`${fmt(n.noVal)} with no valuation data (Analysis never lists these)`);
+  if(n.noWeek) parts.push(`${fmt(n.noWeek)} with no weekly RSI while the W RSI range is ${f.weekMin}–${f.weekMax}`);
+  if(n.noMonth) parts.push(`${fmt(n.noMonth)} with no monthly RSI while the M RSI range is ${f.monthMin}–${f.monthMax}`);
+  if(n.range) parts.push(`${fmt(n.range)} outside the MoS or RSI ranges`);
+  if(n.other) parts.push(`${fmt(n.other)} left out by the Fundamental Score, MoS Rating or Tech Rating buttons`);
+  return `
+        <p class="filter-note" id="analysisHiddenNote">Showing ${fmt(shown)} of ${fmt(base.length)} ${inStrategy ? 'stocks that qualify for this strategy' : 'stocks'}. Hidden: ${parts.join('; ')}.</p>`;
 }
 
 // Phones: the filters fold into one "Filters" line that lists what is selected (closed to start with).

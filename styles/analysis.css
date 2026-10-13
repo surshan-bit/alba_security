@@ -117,3 +117,4 @@ body.lb-full-open{overflow:hidden;}
 a.stock-link:hover .analysis-lb-name{text-decoration:underline;}
 .strat-refresh,.analysis-refresh{margin:14px 0 4px;display:flex;flex-direction:column;gap:12px;}
 body.biz-full-open{overflow:hidden;}
+.filter-note{margin:8px 0 0;font-size:.74rem;line-height:1.4;color:var(--muted);}
