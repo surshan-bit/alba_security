@@ -71,4 +71,12 @@ create policy assets_own on storage.objects for all to authenticated
   using (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text);
 
+-- tables are not exposed automatically (a project setting), so access is granted here, on purpose.
+-- Row level security above still decides which rows each person may see or change.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.docs to authenticated;
+grant select on public.profiles to authenticated;
+grant execute on function public.docs_merge(text, jsonb) to authenticated;
+revoke all on public.docs, public.profiles from anon;
+
 alter publication supabase_realtime add table public.docs;
