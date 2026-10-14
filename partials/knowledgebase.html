@@ -220,6 +220,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.179 &middot; 2026-10-14</h3>
+            <ul>
+              <li><b>A Technical import now replaces older same-day updates:</b> a price or chart reading saved earlier the same day by a Live Data refresh used to stay on top of the file you imported afterwards, so a stock such as DCB Bank kept showing the older price. After an import, those older saved price and technical updates for the stocks the file refreshed are removed (Global factors stay); an update dated after the file is left alone. The result card says how many were replaced.</li>
+            </ul>
             <h3>v1.178 &middot; 2026-10-14</h3>
             <ul>
               <li><b>Import now uses the file you just chose:</b> if you pressed Import while a freshly chosen CSV was still being saved, the import could pick an older file that was still waiting, so new prices and scores did not appear. Import (Fundamental and Technical) now waits for the new file to finish saving first.</li>

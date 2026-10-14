@@ -71,7 +71,7 @@ async function upload(page, which, name, text){
   await page.waitForTimeout(100);
 }
 async function readDb(page){
-  const json = await page.evaluate(() => JSON.stringify(Object.fromEntries(Array.from(window.__store).filter(([k]) => /^(stockData|stockMeta|backupLog|importJobs|fundamentalCsvUploadLog|technicalCsvUploadLog|watchlistSyncLog)\//.test(k)))));
+  const json = await page.evaluate(() => JSON.stringify(Object.fromEntries(Array.from(window.__store).filter(([k]) => /^(stockData|stockMeta|backupLog|importJobs|fundamentalCsvUploadLog|technicalCsvUploadLog|watchlistSyncLog|stockUpdates)\//.test(k)))));
   const all = JSON.parse(json), meta = all['stockMeta/main'], stocks = new Map(), chunkDocs = {};
   for(const cid of meta.chunks){ const d = all['stockData/' + cid]; chunkDocs[cid] = d; if(d) for(const s of d.stocks) stocks.set(symOf(s), s); }
   const col = c => Object.entries(all).filter(([k]) => k.startsWith(c + '/')).map(([k, v]) => Object.assign({ id: k.slice(c.length + 1) }, v)).sort((a, b) => String(a.createdAt || a.uploadedAt || a.startedAt || a.id).localeCompare(String(b.createdAt || b.uploadedAt || b.startedAt || b.id)));
@@ -465,6 +465,23 @@ async function techScenarios(){
     eq(done, ['today.csv'], 'the new file is the one imported');
     ok(db.techLog.some(x => x.filename === 'old.csv' && x.status === 'uploaded'), 'the older file is left alone');
   });
+  // a same-day saved update (from a Live Data refresh) must not hide the price and readings the file just brought
+  {
+    const f = techFile({ seed: 5 }), mm = T.AlbaTechEngine.matchAndScore(f.csv, clone(DS.stocks), DS.bseAlpha);
+    const priced = mm.matched.filter(x => !x.missing.length && x.stock.valuation && x.stock.valuation.intrinsicValue > 0).slice(0, 2).map(x => symOf(x.stock));
+    const today = indiaDay(new Date().toISOString());
+    const upd = (sym, day) => ({ ['stockUpdates/' + sym]: { ticker: sym, asof: day, valuation: { asof: day, currentPrice: 1.11, source: 'test' }, technical: { asof: day, score: 1, reason: 'old' }, globalFactors: { scope: 's', asof: day, positive: ['x'], negative: [] } } });
+    await runScenario('tech import: an update saved earlier the same day gives way to the file; a later-dated one stays', { docs: Object.assign({}, seedRec('tech', 'u1', 'u.csv'), upd(priced[0], today), upd(priced[1], '2099-01-01')) }, async page => {
+      page.blobs.set('u1', f.csv);
+      const r = await run(page, 'tech');
+      ok(r.cls === 'ok', 'import ends green: ' + r.text.slice(0, 160));
+      ok(/1 earlier saved price/.test(r.text), 'the result says an earlier update was replaced: ' + r.text.slice(-260));
+      const all = (await readDb(page)).all;
+      const a = all['stockUpdates/' + priced[0]], b = all['stockUpdates/' + priced[1]];
+      ok(a && !a.valuation && !a.technical && a.globalFactors, 'the same-day update lost its price and technical block and kept its global factors: ' + JSON.stringify(a).slice(0, 160));
+      ok(b && b.valuation && b.technical, 'the later-dated update is left alone');
+    });
+  }
   await runScenario('tech import: no file has been uploaded', {}, async page => { const r = await run(page, 'tech'); ok(r.cls === 'err' && /there is no uploaded file waiting\. Use "Browse CSV…" to upload the TradingView Growth List export first\./.test(r.text), r.text.slice(0, 200)); });
   await runScenario('tech import: another import holds the lock', { docs: { 'importJobs/fundamental': { status: 'running', startedAt: new Date().toISOString() } } }, async page => {
     await upload(page, 'tech', 'growth.csv', techFile().csv); const r = await run(page, 'tech'); ok(r.cls === 'err' && /another import is already running/.test(r.text), r.text.slice(0, 200));
