@@ -475,6 +475,7 @@ async function techScenarios(){
       page.blobs.set('u1', f.csv);
       const r = await run(page, 'tech');
       ok(r.cls === 'ok', 'import ends green: ' + r.text.slice(0, 160));
+      ok(r.steps.some(x => x[1] === 'Verify and finish' && x[0] === 'done'), 'the last step ends done');
       ok(/1 earlier saved price/.test(r.text), 'the result says an earlier update was replaced: ' + r.text.slice(-260));
       const all = (await readDb(page)).all;
       const a = all['stockUpdates/' + priced[0]], b = all['stockUpdates/' + priced[1]];
