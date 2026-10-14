@@ -58,6 +58,9 @@ One `Artifact` publish with `url`, `file_path` = `publish/index.html`, `root` = 
 - `null` for every old chunk that no longer exists locally (compare the artifact's file listing with `chunks/`).
 **Repo-only files are not published to the artifact:** `platform/`, `supabase/`, `.github/`, `wrangler.jsonc`, `skills/`, `tools/dist.js`, `tools/export-pack.js`, `tools/export-settings.js`, `tests/platform.mjs`, `.gitignore`. Publishing never removes a file you leave out, so do not null anything except old chunks. Do not pass `capabilities` (the stored declaration carries forward). Never publish `tests/out`, `node_modules` or `publish/`.
 
+### 4f. Write the release record (required, easy to forget)
+Open pages compare their own build id with the document `appMeta/release`. If it still names an older build, every open tab reloads once and then shows "A new version is available" on every screen. Right after the publish, run `node tools/release-record.js publish/index.html` (it fails if the published page's build differs from the repo build) and write the printed `build` and `version`, plus `at` (the current time with +05:30), with `ArtifactData` `set` on collection `appMeta`, doc `release` (pin it with the `version` you just read). v1.171 and v1.172 skipped this step and left v1.170's record in place.
+
 After publishing, tell the user what changed in one or two sentences, and ask them to open the live page once and click through Analysis, Explorer, a stock detail page, Data Refresh, Strategies and Trade Log, since the real runtime cannot be tested here. Note the new live version id as the base for any further change in the same session.
 
 ## 5. Roll back
