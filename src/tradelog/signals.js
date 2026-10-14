@@ -18,7 +18,7 @@ const GOOD = new Set(['buy', 'mbuy']), WEAK = new Set(['hold', 'avoid']);
 const CALLS = { hold: 'Hold', trim: 'Consider trimming', add: 'Consider adding', review: 'Review' };
 const fx = (v, d = 1) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : null;
 
-// facts: { buyPrice, price, entryScore, score, verdict, intrinsic, rsiWeek, rsiMonth }; any of them may be null.
+// facts: { buyPrice, price, entryScore, score, verdict, intrinsic, techScore, rsiWeek, rsiMonth }; any of them may be null.
 function tradeSignal(facts, limits = LIMITS){
   const f = facts || {};
   const gain = (f.price != null && f.buyPrice) ? (f.price - f.buyPrice) / f.buyPrice * 100 : null;
@@ -72,6 +72,7 @@ function factsFor(trade, stock){
     score: stock && typeof stock.score === 'number' ? stock.score : null,
     verdict: stock && stock.verdict || null,
     intrinsic: stock && stock.valuation && stock.valuation.intrinsicValue || null,
+    techScore: tech && typeof tech.score === 'number' ? tech.score : null,
     rsiWeek: raw && typeof raw.weekRsi === 'number' ? raw.weekRsi : null,
     rsiMonth: raw && typeof raw.monthRsi === 'number' ? raw.monthRsi : null
   };
