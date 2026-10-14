@@ -75,7 +75,10 @@ function dismissNotices(list) {
 const hbAge = (d) => Date.now() - (Date.parse(d && d.heartbeatAt) || 0);
 const remoteBusy = () => !!(remote && remote.jobs.length);
 const isBusy = () => queue.length > 0 || remoteBusy();
-const refreshLabel = () => isBusy() ? '<i class="rk-spin" aria-hidden="true"></i> Refreshing ▾' : "↻ Refresh ▾";
+// Only the screen that started the refresh shows the spinner; the other screens keep a normal Refresh button.
+const runSection = () => { const j = queue[0] || (remote && remote.jobs[0]); return j ? sectionOf(j.source) : ""; };
+const busyIn = (sec) => isBusy() && !!sec && runSection() === sec;
+const refreshLabel = (sec) => busyIn(sec) ? '<i class="rk-spin" aria-hidden="true"></i> Refreshing ▾' : "↻ Refresh ▾";
 const jobId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 function jobView(j) {
@@ -305,7 +308,7 @@ function barInner(id) {
   const sc = scopes.get(id);
   if (!sc) return "";
   const list = scopeStocks(id), c = counts(list), off = list.length ? "" : " disabled";
-  return '<button type="button" class="rk-btn rk-main rk-barbtn" data-rk-act="bar-menu" data-rk-scope="' + esc(id) + '"' + off + ' aria-haspopup="menu" data-rk-busy="' + (isBusy() ? "1" : "0") + '" title="Refresh Fundamental and Technical info for ' + list.length + ' stock' + (list.length === 1 ? "" : "s") + '">' + refreshLabel() + '</button>'  + runStatus(sc.source);
+  return '<button type="button" class="rk-btn rk-main rk-barbtn" data-rk-act="bar-menu" data-rk-scope="' + esc(id) + '"' + off + ' aria-haspopup="menu" data-rk-busy="' + (busyIn(sectionOf(sc.source)) ? "1" : "0") + '" title="Refresh Fundamental and Technical info for ' + list.length + ' stock' + (list.length === 1 ? "" : "s") + '">' + refreshLabel(sectionOf(sc.source)) + '</button>'  + runStatus(sc.source);
 }
 function barHtml(id) {
   return '<span class="rk-bar" data-rk-bar="' + esc(id) + '">' + barInner(id) + "</span>";
@@ -315,7 +318,7 @@ function rowBtn() { return ""; }     // no per-row refresh button in the grids
 const choices = new Map();     // id -> () => { head, note, items: [{ label, small, off, run }] }
 function defineChoices(id, fn) { choices.set(id, fn); }
 function choiceBtn(id, off, title) {
-  return '<button type="button" class="rk-btn rk-main rk-choicebtn biz-newsbtn" data-rk-act="choice" data-rk-cid="' + esc(id) + '"' + (off ? " disabled" : "") + ' aria-haspopup="menu" data-rk-busy="' + (isBusy() ? "1" : "0") + '" title="' + esc(title || "Refresh") + '">' + refreshLabel() + '</button>';
+  return '<button type="button" class="rk-btn rk-main rk-choicebtn biz-newsbtn" data-rk-act="choice" data-rk-cid="' + esc(id) + '"' + (off ? " disabled" : "") + ' aria-haspopup="menu" data-rk-busy="' + (busyIn("business") ? "1" : "0") + '" title="' + esc(title || "Refresh") + '">' + refreshLabel("business") + '</button>';
 }
 function choiceMenuHtml(id) {
   let c; try { c = choices.get(id)(); } catch (e) { c = null; }
@@ -337,7 +340,7 @@ function selbarInner(name) {
 }
 function selbarSlot(name) { return '<div class="rk-selslot" data-rk-selbar="' + esc(name) + '">' + selbarInner(name) + "</div>"; }
 function toolbarButton(name) {
-  return '<button type="button" class="biz-expand rk-toolbtn" data-rk-act="toolbar" data-rk-tb="' + esc(name) + '" aria-haspopup="menu" data-rk-busy="' + (isBusy() ? "1" : "0") + '" title="Refresh Fundamental or Technical info for many stocks at once">' + refreshLabel() + '</button>';
+  return '<button type="button" class="biz-expand rk-toolbtn" data-rk-act="toolbar" data-rk-tb="' + esc(name) + '" aria-haspopup="menu" data-rk-busy="' + (busyIn("business") ? "1" : "0") + '" title="Refresh Fundamental or Technical info for many stocks at once">' + refreshLabel("business") + '</button>';
 }
 
 // ---------- repaint ----------
@@ -355,10 +358,11 @@ function repaint() {
       const html = selbarInner(el.dataset.rkSelbar);
       if (el.__rk !== html) { el.__rk = html; el.innerHTML = html; }
     });
-    const busy = isBusy() ? "1" : "0";
     /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".rk-toolbtn,.rk-choicebtn,.rk-barbtn")).forEach((b) => {
+      const sc = b.dataset.rkScope ? scopes.get(b.dataset.rkScope) : null, sec = sc ? sectionOf(sc.source) : "business";
+      const busy = busyIn(sec) ? "1" : "0";
       if (b.dataset.rkBusy === busy) return;
-      b.dataset.rkBusy = busy; b.innerHTML = refreshLabel();
+      b.dataset.rkBusy = busy; b.innerHTML = refreshLabel(sec);
     });
     if (activeJob) persistSoon();
   });
