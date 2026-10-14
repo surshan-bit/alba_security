@@ -9,6 +9,7 @@ import { albaApplyFundamental } from './fund-engine.js';
 import { albaTiRunImport } from './tech-import.js';
 import { albaWlRunSync } from './wlsync.js';
 import { registerBusy } from '../core/busy.js';
+import { uploadsSettled } from './upload-history.js';
 import { recordScoreHistory } from '../history/scorehistory.js';
 
 // ====================================================================================================
@@ -267,8 +268,9 @@ async function albaFiRunImport(){
     if(lockBusy(ld)) throw new Error('another import is already running (' + lockText(ld) + '). It was started from another tab or device. If that one was closed, it counts as interrupted after 3 minutes without activity; then try again.');
     await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString(), owner: tabId })); locked = true; stopBeat = startBeat(job);
 
-    // 1. the uploaded file
+    // 1. the uploaded file (after any file still being saved, so the newest upload is the one used)
     current = 'read'; fiSet('read', 'running', '', 0.3);
+    await uploadsSettled();
     for(const [id, r] of fundamentalCsvUploadLog.entries()){ if(r.status === 'uploaded' && (!rec || String(r.uploadedAt) > String(rec.uploadedAt))){ rec = r; recId = id; } }
     if(!rec) throw new Error('there is no uploaded file waiting. Use "Browse CSV…" to upload the screener.in export first.');
     const resp = await fetch('/_blob/' + rec.assetId);
