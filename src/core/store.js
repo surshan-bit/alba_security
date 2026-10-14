@@ -33,7 +33,6 @@ function attachTradeDb(db){ state.tradeDb = db; }
 // Pins bubble a stock to the top of the list, independent of the filter and sort in use. They are saved per user
 // through the db handle (see core/pins.js); without a db, or without a sign-in, they last for the current page load.
 function isPinnedTicker(ticker){ return state.pinned.has(ticker); }
-function pinnedTickerList(){ return Array.from(state.pinned); }
 function togglePinnedTicker(ticker){
   if(state.pinned.has(ticker)) state.pinned.delete(ticker);
   else state.pinned.add(ticker);
@@ -80,4 +79,4 @@ const fundamentalCsvUploadLog = createLog();
 const technicalCsvUploadLog = createLog();
 const watchlistSyncLog = createLog();
 
-export { allTrades, attachDb, attachTradeDb, dbCapabilityPromise, fundamentalCsvUploadLog, getDb, getRefreshRequest, getTrade, getTradeDb, isPinnedTicker, pinnedTickerList, replacePinnedTickers, replaceRefreshRequests, replaceTradeLog, technicalCsvUploadLog, togglePinnedTicker, watchlistSyncLog };
+export { allTrades, attachDb, attachTradeDb, dbCapabilityPromise, fundamentalCsvUploadLog, getDb, getRefreshRequest, getTrade, getTradeDb, isPinnedTicker, replacePinnedTickers, replaceRefreshRequests, replaceTradeLog, technicalCsvUploadLog, togglePinnedTicker, watchlistSyncLog };

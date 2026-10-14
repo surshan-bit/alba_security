@@ -225,6 +225,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.167 &middot; 2026-10-14</h3>
+            <ul>
+              <li><b>Pinned stocks can no longer be wiped:</b> pinning or unpinning a stock now changes only that one stock in the saved list, instead of saving this page&rsquo;s whole copy. Before, a page that had not finished loading its pins (for example right after a new release reloaded it) or an older open tab could overwrite the saved list and leave it empty. A late update from the database also no longer undoes a pin you have just clicked.</li>
+            </ul>
             <h3>v1.166 &middot; 2026-10-14</h3>
             <ul>
               <li><b>Global &amp; Macro no longer left empty by a refresh:</b> a Fundamental refresh used to skip a stock as &ldquo;already up to date&rdquo; when its factor cards were recent, even if its Global &amp; Macro step had failed earlier and the panel still said &ldquo;Not yet researched&rdquo;. Such a stock now gets its Global &amp; Macro researched again (without redoing the factor cards).</li>

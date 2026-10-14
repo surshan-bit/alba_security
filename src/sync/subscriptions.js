@@ -6,6 +6,7 @@ import { rerenderDetail } from '../detail/render.js';
 import { applyResearchOverlay } from '../overlays/research.js';
 import { applyUpdatesOverlay } from '../overlays/updates.js';
 import { pinsRef, tradeCol } from '../identity/session.js';
+import { pinWritesInFlight } from '../core/pins.js';
 import { renderLoadedPart } from '../core/lazy.js';
 
 function init_sync_subscriptions(){
@@ -22,6 +23,8 @@ function init_sync_subscriptions(){
   try {
     (pinsRef(db) || { onSnapshot(){} }).onSnapshot(
       (snap) => {
+        // While our own changes are still being saved, a snapshot may show an older list; the last one after they finish is right.
+        if(pinWritesInFlight()) return;
         const data = snap.data();
         const arr = (data && Array.isArray(data.tickers)) ? data.tickers : [];
         // The write we just made via togglePin() already re-rendered optimistically; this snapshot fires
