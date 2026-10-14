@@ -6,7 +6,7 @@ const K12 = 2 / 13, K26 = 2 / 27, K9 = 2 / 10;
 const MACD_STATES = ['bull_above', 'bull_below', 'bear_above', 'bear_below'];
 const MIN_MACD_BARS = 35, MIN_RSI_BARS = 15;   // same minimums as the engine
 
-const rsiOf = (ag, al) => (al === 0 ? 100 : 100 - 100 / (1 + ag / al));
+const rsiOf = (ag, al) => (ag === 0 && al === 0 ? NaN : al === 0 ? 100 : 100 - 100 / (1 + ag / al));
 const macdCode = (level, signal) => (level > signal ? 0 : 2) + (level > 0 ? 0 : 1);
 
 function buildIndicators(c){

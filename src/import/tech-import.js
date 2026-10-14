@@ -6,6 +6,7 @@ import { recordAttempt, saveRecord } from './last-file.js';
 import { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 import { AlbaTechEngine } from './tech-engine.js';
+import { techValLabel } from '../engine/technical.js';
 import { albaWlResolveBse } from './wlsync.js';
 
 const ALBA_TI_COMP = { 'monthly MACD': 'monthMacd', 'weekly MACD': 'weekMacd', 'monthly RSI': 'monthRsi', 'weekly RSI': 'weekRsi' };
@@ -14,7 +15,6 @@ const ALBA_TI_COMP = { 'monthly MACD': 'monthMacd', 'weekly MACD': 'weekMacd', '
 // has (the hand-curated / BSE-derived blocks) keeps that block: the weekly CSV must not wipe curated data.
 function albaApplyTechnical(csvText, stocks, bseMap, asof){
   const res = AlbaTechEngine.matchAndScore(csvText, stocks, bseMap || {});
-  const valLabel = v => v >= 8 ? 'attractively valued' : v >= 6 ? 'reasonably valued' : v >= 5 ? 'fully valued' : 'expensive / stretched valuation';
   const MACD = { bull_above: 'bullish, above zero', bear_above: 'bearish, above zero', bull_below: 'bullish, below zero', bear_below: 'bearish, below zero' };
   const f1 = x => (Math.round(x * 10) / 10).toFixed(1);
   const kept = [], rescored = [];
@@ -31,9 +31,9 @@ function albaApplyTechnical(csvText, stocks, bseMap, asof){
     if(st.monthRsi) rs.push('monthly RSI ' + f1(r.monthRsi) + ' (' + st.monthRsi + ')');
     if(st.weekRsi) rs.push('weekly RSI ' + f1(r.weekRsi) + ' (' + st.weekRsi + ')');
     if(rs.length) parts.push(rs.join(', ') + '.');
-    parts.push('Valuation pillar reading of ' + f1(v) + '/10 (' + valLabel(v) + ').');
+    parts.push('Valuation pillar reading of ' + f1(v) + '/10 (' + techValLabel(v) + ').');
     if(m.missing.length) parts.push('(' + m.missing.join(', ') + ' not available in this export — composite computed from available components only, rescaled to a 0–10 scale.)');
-    s.technical = { asof, score: m.score, states: Object.assign({}, st, { valuation: valLabel(v) }), raw: Object.assign({}, r, { valuationScore: v }), reason: parts.join(' ') };
+    s.technical = { asof, score: m.score, states: Object.assign({}, st, { valuation: techValLabel(v) }), raw: Object.assign({}, r, { valuationScore: v }), reason: parts.join(' ') };
     rescored.push(albaFiSym(s));
   }
   // ---- Price & MoS refresh: the Price column (INR rows only) is the CURRENT PRICE of every matched stock that has
@@ -157,7 +157,7 @@ async function albaTiRunImport(){
     current = 'verify';
     const dataVer = out.nothing ? raw.meta.version : out.plan.newMeta.version;
     if(out.nothing) fiSet('write', 'done', 'nothing changed');
-    const note = 'Imported in the page: ' + res.rescored + ' rescored, ' + res.kept.length + ' kept (curated), ' + res.priced + ' prices refreshed, ' + res.frozen + ' without a valuation anchor. Average technical score ' + avgBefore.toFixed(2) + '→' + avgAfter.toFixed(2) + '.';
+    const note = 'Imported in the page: ' + res.rescored + ' rescored, ' + res.kept.length + ' kept (curated), ' + res.priced + ' prices refreshed, ' + res.frozen + ' not scored. Average technical score ' + avgBefore.toFixed(2) + '→' + avgAfter.toFixed(2) + '.';
     fiSet('verify', 'running', 'Updating the upload history…', 0.7);
     const upd = { status: 'processed', processedAt: new Date().toISOString(), processedNote: note };
     const logErr = await saveRecord('tech', recId, Object.assign({}, rec, upd), db);
@@ -165,7 +165,7 @@ async function albaTiRunImport(){
     fiSet('verify', 'done', 'data v' + dataVer);
     const lines = [
       { text: out.nothing ? 'Import complete: the file produced no changes to the stored data.' : 'Import complete.', cls: 'fi-line fi-line-strong' },
-      { text: res.rescored.toLocaleString('en-IN') + ' stocks rescored · ' + res.kept.length + ' kept as they were (curated) · ' + res.frozen + ' without a valuation anchor · ' + res.unmatchedCsv.toLocaleString('en-IN') + ' file rows not on the dashboard (ignored).' },
+      { text: res.rescored.toLocaleString('en-IN') + ' stocks rescored · ' + res.kept.length + ' kept as they were (curated) · ' + res.frozen + ' not scored · ' + res.unmatchedCsv.toLocaleString('en-IN') + ' file rows not on the dashboard (ignored).' },
       { text: 'Average technical score ' + avgBefore.toFixed(2) + ' → ' + avgAfter.toFixed(2) + '.' },
       { text: bseFound ? bseFound + ' new BSE symbol(s) found and saved.' : 'No new BSE symbols needed.', cls: 'fi-line fi-line-muted' },
       { text: res.hasPrice ? res.priced.toLocaleString('en-IN') + ' current prices and margins of safety refreshed.' : 'The file has no Price column, so current prices were NOT updated.' }

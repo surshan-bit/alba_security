@@ -99,9 +99,13 @@ test('tech score: a missing component is dropped and the rest are rescaled', () 
   const csv = tvCsv([['AAA1', '', '', '', '', '3', '2', '1', '2', '60', '']]);
   const r = Te.matchAndScore(csv, [stk('AAA1', 6)]).matched[0];
   assert.strictEqual(r.score, 8.06); assert.deepStrictEqual(r.missing, ['weekly RSI']); assert.strictEqual(r.states.weekRsi, null);
-  // only a valuation anchor left: score is the valuation pillar alone (6 -> 6)
-  const bare = Te.matchAndScore(tvCsv([['AAA1', '', '', '', '', '', '', '', '', '', '']]), [stk('AAA1', 6)]).matched[0];
-  assert.strictEqual(bare.score, 6); assert.strictEqual(bare.missing.length, 4);
+  // no indicators at all: only the valuation anchor would be left, which would copy the valuation score as a technical score, so the stock is not scored
+  const bare = Te.matchAndScore(tvCsv([['AAA1', '', '', '', '', '', '', '', '', '', '']]), [stk('AAA1', 6)]);
+  assert.strictEqual(bare.matched.length, 0); assert.strictEqual(bare.frozen.length, 1); assert.ok(/no technical indicators/.test(bare.frozen[0].reason));
+  assert.deepStrictEqual(bare.unmatchedCsvSymbols, []);
+  // one indicator is enough to score (weekly RSI 60 = 2.0 points, valuation 6 -> 1.2, over weight 4)
+  const one = Te.matchAndScore(tvCsv([['AAA1', '', '', '', '', '', '', '', '', '', '60']]), [stk('AAA1', 6)]).matched[0];
+  assert.strictEqual(one.score, 8); assert.strictEqual(one.missing.length, 3);
 });
 test('tech matching: BSE number via alpha map, hyphen/underscore variants, case, unmatched rows', () => {
   const csv = tvCsv([['ABC', '', '', '', '', '3', '2', '1', '0', '60', '60'], ['BAJAJ_AUTO', '', '', '', '', '3', '2', '1', '0', '60', '60'], ['zzz', '', '', '', '', '3', '2', '1', '0', '60', '60'], ['LONE', '', '', '', '', '', '', '', '', '', '']]);
@@ -252,7 +256,9 @@ test('apply: re-scores listed stocks in place, adds new ones with safe defaults,
   assert.strictEqual(w0.valuation.note, 'keep');                                    // merged, not replaced
   assert.strictEqual(w0.valuation.intrinsicValue, +universe[0]['Intrinsic Value']); assert.strictEqual(w0.valuation.asof, '2026-10-10');
   // untouched fields stay as they were
-  for(const k of ['name', 'ticker', 'pillars', 'technical', 'globalFactors']) assert.deepStrictEqual(w0[k], before[0][k], k);
+  for(const k of ['name', 'ticker', 'technical', 'globalFactors']) assert.deepStrictEqual(w0[k], before[0][k], k);
+  // the valuation anchor that the technical score uses follows the new valuation factor score
+  assert.strictEqual(w0.pillars.val, Math.round(w0.fundamentals.factors.find(f => f.key === 'dcf').score * 10 * 10) / 10); assert.notStrictEqual(w0.pillars.val, 3);
   // a stock that is not in the file is left exactly alone
   assert.deepStrictEqual(stocks[2], before[2]);
   // a stock listed by its BSE number matches the file's BSE column
@@ -339,6 +345,67 @@ test('apply: bad files throw before anything is changed', () => {
     assert.strictEqual(t.find(r => r.name === 'Steel').known, 1);
   });
 }
+
+// =========================================================== Scoring-correctness fixes (v1.171)
+const scoreOne = (rows, sym) => Fe.scoreCsv(fundCsv(rows), {}).records.find(r => r.nseCode === sym);
+const factorOf = (r, key) => r.scored.factors.find(f => f.key === key);
+const baseRows = () => { D.setSeed(4242); const rows = []; for(let i = 0; i < 14; i++) rows.push(fundRow('Z' + i, 'Alpha', 'Widgets')); return rows; };
+test('fix: a blank current ROCE / ROE counts as missing, not as 0 (no halved value)', () => {
+  const withBoth = baseRows(), blanked = baseRows();
+  // same company twice: once with ROCE equal to its 10-year median, once with ROCE blank -> the effective ROCE must be the same
+  const med = withBoth[0]['Median return on capital employed 10Years'], avg = withBoth[0]['Average return on equity 7Years'];
+  withBoth[0]['Return on capital employed'] = med; blanked[0]['Return on capital employed'] = '';
+  withBoth[0]['Return on equity'] = avg; blanked[0]['Return on equity'] = '';
+  const a = factorOf(scoreOne(withBoth, 'Z0'), 'prof').score, b = factorOf(scoreOne(blanked, 'Z0'), 'prof').score;
+  near(a, b, 1e-6);
+});
+test('fix: a negative debt-to-equity (negative net worth) ranks worst on leverage, not best', () => {
+  const zero = baseRows(), neg = baseRows();
+  zero[0]['Debt to equity'] = 0; neg[0]['Debt to equity'] = -1.5;
+  const f0 = factorOf(scoreOne(zero, 'Z0'), 'fin').score, fn = factorOf(scoreOne(neg, 'Z0'), 'fin').score;
+  assert.ok(fn < f0, 'negative D/E scored ' + fn + ' vs D/E 0 at ' + f0);
+});
+test('fix: a negative P/E gives no own-history valuation gap (same as having no history at all)', () => {
+  const withHist = baseRows(), noHist = baseRows();
+  withHist[0]['Price to Earning'] = noHist[0]['Price to Earning'] = -20; withHist[0]['Historical PE 5Years'] = 25; noHist[0]['Historical PE 5Years'] = '';
+  near(factorOf(scoreOne(withHist, 'Z0'), 'val').score, factorOf(scoreOne(noHist, 'Z0'), 'val').score, 1e-9);
+  // a positive P/E still uses the history
+  withHist[0]['Price to Earning'] = noHist[0]['Price to Earning'] = 10;
+  assert.notStrictEqual(factorOf(scoreOne(withHist, 'Z0'), 'val').score, factorOf(scoreOne(noHist, 'Z0'), 'val').score);
+});
+test('fix: the technical valuation anchor is refreshed on every fundamental import, not only for new stocks', () => {
+  const stocks = [mkStock('WID0', 'Widgets', { pillars: { val: 4 } })];
+  F.albaApplyFundamental(fundCsv(universe.slice(0, 14)), stocks, '2026-10-14');
+  const dcf = stocks[0].fundamentals.factors.find(f => f.key === 'dcf');
+  assert.strictEqual(stocks[0].pillars.val, Math.round(dcf.score * 10 * 10) / 10);
+  // no intrinsic value in the file: the old anchor is kept rather than overwritten with 0
+  const rows = universe.slice(0, 14).map(r => Object.assign({}, r)); rows[0]['Intrinsic Value'] = '';
+  const s2 = [mkStock('WID0', 'Widgets', { pillars: { val: 4 } })];
+  F.albaApplyFundamental(fundCsv(rows), s2, '2026-10-14');
+  assert.strictEqual(s2[0].pillars.val, 4);
+});
+{
+  const FS = load('src/core/fundscore.js');
+  const fac = (key, category, weight, score, extra) => Object.assign({ key, category, weight, score, name: key, metrics: [['x', '1']], note: '' }, extra || {});
+  test('fix: a factor with no data (stored as 0) is left out and the score is rescaled over the rest', () => {
+    const mk = z => ({ fundamentals: { factors: [fac('fin', 'Traditional', 1, 0.8), fac('dcf', 'Valuation', 1, z)], total: 10 }, score: 0 });
+    const s = mk(0); FS.applyFundamentalConfidence(s);
+    assert.strictEqual(s.fundamentals.factors[1].excluded, 'not enough data to score this factor'); assert.strictEqual(s.score, 8);
+    const t = mk(0.2); FS.applyFundamentalConfidence(t);   // a genuinely low score still counts
+    assert.strictEqual(t.fundamentals.factors[1].excluded, undefined); assert.strictEqual(t.score, 5);
+  });
+}
+test('fix: a flat price series has no RSI (not 100)', () => {
+  const TECH = load('src/engine/technical.js');
+  const flat = Array.from({ length: 40 }, (_, i) => [i, 10, 10, 10, 10, 0]);
+  const rising = Array.from({ length: 40 }, (_, i) => [i, 10 + i, 10 + i, 10 + i, 10 + i, 0]);
+  assert.strictEqual(TECH.computeTechnical(flat, flat, 5, '2026-10-14').raw.weekRsi, null);
+  assert.strictEqual(TECH.computeTechnical(rising, rising, 5, '2026-10-14').raw.weekRsi, 100);
+});
+test('fix: both technical paths call a 4/10 valuation "fully valued"', () => {
+  const TECH = load('src/engine/technical.js');
+  assert.strictEqual(TECH.techValLabel(4), 'fully valued'); assert.strictEqual(TECH.techValLabel(3.9), 'expensive / stretched valuation');
+});
 
 // =========================================================== Characterisation: today's exact numbers on the made-up universe
 const golden = {};

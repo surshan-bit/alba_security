@@ -12,6 +12,9 @@ function exclusionReason(f){
   if(!f) return 'no data';
   if(PROXY_KEYS.has(f.key) && !hasSource(f)) return 'an estimate from peer rankings, not individually researched with a cited source';
   if(Array.isArray(f.metrics) && f.metrics.length && f.metrics.every(m => Array.isArray(m) && m[1] === 'n/a')) return 'no data available';
+  // The import stores a factor it could not compute (missing input) as score 0. A real computed factor is never exactly 0
+  // (percentile ranks are at least 100/n), so a 0 with no researched source means "no data": leave it out, do not count it as worst.
+  if((typeof f.score !== 'number' || f.score === 0) && !hasSource(f)) return 'not enough data to score this factor';
   return null;
 }
 const r2 = x => Math.round(x * 100) / 100;

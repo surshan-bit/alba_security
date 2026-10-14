@@ -220,6 +220,15 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.171 &middot; 2026-10-14</h3>
+            <ul>
+              <li><b>Scoring fixes (fundamental and technical):</b> a blank current ROCE or ROE is now treated as missing and the 10-year / 7-year figure is used on its own, instead of being averaged with a hidden zero (which roughly halved the value and dragged the percentile down).</li>
+              <li>A negative debt-to-equity (negative net worth) now ranks last on leverage instead of first, and a negative P/E no longer looks cheap against the stock's own 5-year P/E.</li>
+              <li>A factor that has no data is now shown as &ldquo;Not scored&rdquo; and left out of the score (the rest is rescaled) instead of counting as 0 out of its weight.</li>
+              <li>The valuation reading used by the Technical Score is now refreshed every time a Fundamental Score file is imported, not only when a stock is first added, so it no longer goes stale.</li>
+              <li>A stock whose Growth List row has no indicators at all is no longer given its valuation score as a technical score; it is reported as &ldquo;not scored&rdquo; and its existing block is left alone. A flat price history no longer reads as RSI 100, and both technical paths now call a valuation of 4/10 or more &ldquo;fully valued&rdquo;.</li>
+              <li>Scores will move for the stocks affected (blank ROCE/ROE, negative D/E or P/E, missing data) the next time a fundamentals file is imported; nothing changes until then. Technical scores pick up the refreshed valuation reading at the next Growth List import or live refresh.</li>
+            </ul>
             <h3>v1.170 &middot; 2026-10-14</h3>
             <ul>
               <li><b>Pin changes are now dated:</b> every pin or unpin stores the time, the stock, the list size before and after, the build number, the device type and the screen, both with the pin list (<code>updatedAt</code>, <code>lastChange</code>) and in a short history of the last 40 changes (<code>pinAudit</code>). If the pins ever change without a click, the record shows which version and device did it.</li>

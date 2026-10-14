@@ -154,6 +154,8 @@ function matchAndScore(csvText, stocks, bseAlphaMap) {
     if (macdFraction(csvRow.weekMacdLevel, csvRow.weekMacdSignal) == null) missing.push('weekly MACD');
     if (csvRow.monthRsi == null) missing.push('monthly RSI');
     if (csvRow.weekRsi == null) missing.push('weekly RSI');
+    // Nothing but the valuation pillar would be left, and that would just copy the fundamental valuation score as a technical score.
+    if (missing.length === 4) { frozen.push({ stock: s, reason: 'no technical indicators for this stock in the file, so there is nothing to score' }); continue; }
 
     matched.push({
       stock: s, matchedSymbol, score: technicalComposite(csvRow, pillarsVal),
