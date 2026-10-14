@@ -6,6 +6,7 @@
 // A refresh does not need the page to stay open in the sense that the job is saved: close the page and it carries on from where
 // it stopped when the dashboard is opened again (it still needs an open dashboard to run: TradingView and Claude are reached
 // through the page).
+import { ldForceKeys } from '../livedata/fundamental.js';
 import { LD_BATCH_MAX, getLdBatch, ldBatchStart, ldBatchStop } from '../livedata/batch.js';
 import { activityDropWhere, activityEnd, activityNotify, activityRun, setNoticeDismissHandler } from '../ui/activity.js';
 import { pcTickerKey } from '../prices/store.js';
@@ -84,7 +85,7 @@ const jobId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 function jobView(j) {
   const b = j === activeJob ? getLdBatch() : null;
   const progressed = b && b.running ? Math.min(j.keys.length, b.done) : 0;
-  return { id: j.id, kind: j.kind, keys: j.keys.slice(progressed), total: j.total, done: j.done + progressed, source: j.source, label: j.label, createdAt: j.createdAt };
+  return { id: j.id, kind: j.kind, keys: j.keys.slice(progressed), total: j.total, done: j.done + progressed, source: j.source, label: j.label, force: !!j.force, createdAt: j.createdAt };
 }
 function docData() {
   return { v: 1, jobs: queue.map(jobView), notices: history.filter((n) => !isDismissed(n)).slice(0, 10), dismissed, progress: activeJob ? progress : null, owner: queue.length ? tabId : null, heartbeatAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
@@ -186,12 +187,12 @@ function queuedKeys(kind) {
   queue.filter((j) => j.kind === kind).forEach((j) => j.keys.forEach((k) => set.add(k)));
   return set;
 }
-function enqueueJob(kind, list, source, label) {
+function enqueueJob(kind, list, source, label, force) {
   const already = queuedKeys(kind);
   const keys = [];
   for (const s of list) { const k = pcTickerKey(s); if (!already.has(k) && !keys.includes(k)) keys.push(k); }
   if (!keys.length) return 0;
-  const j = { id: jobId(), kind, keys, total: keys.length, done: 0, source: source || "", label: label || "", createdAt: Date.now(), stats: { refreshed: 0, notRun: 0, failed: [], stopped: false, note: "", perm: false } };
+  const j = { id: jobId(), kind, keys, total: keys.length, done: 0, source: source || "", label: label || "", force: !!force && kind === "fund", createdAt: Date.now(), stats: { refreshed: 0, notRun: 0, failed: [], stopped: false, note: "", perm: false } };
   if (!queue.length) claimedAt = Date.now();
   queue.push(j);
   if (queue.length > 1) queuedItem(j);
@@ -217,6 +218,7 @@ async function pump() {
       if (!list.length) { queue.shift(); activityEnd("rk-q-" + job.id); continue; }
       activeJob = job; activityEnd("rk-q-" + job.id);
       persistSoon(); repaint();
+      if (job.force) ldForceKeys(list.map(pcTickerKey));   // chosen because it is out of date: do not skip it as "researched within 30 days"
       const before = getLdBatch();
       await ldBatchStart(job.kind, list, job.source || "strat");
       const b = getLdBatch();
@@ -275,7 +277,7 @@ function request(spec, anchor) {
   const big = plan.find((p) => p.list.length > CONFIRM_OVER[p.kind]);
   if (big && !spec.confirmed) { openConfirm(anchor, spec, plan); return; }
   let added = 0;
-  for (const p of plan) added += enqueueJob(p.kind, p.list, spec.source, spec.label);
+  for (const p of plan) added += enqueueJob(p.kind, p.list, spec.source, spec.label, spec.only);
   if (!added) notice({ tone: "ok", title: "Already queued", text: "These stocks are already waiting in the refresh queue or being refreshed.", section: "" });
   if (spec.selName && spec.clearSel && !external[spec.selName]) { selKeys(spec.selName).clear(); syncChecks(); }
   repaint();

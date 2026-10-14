@@ -330,4 +330,6 @@ async function ldRunFundamental(s){
   }
 }
 
-export { ldRunFundamental };
+// The refresh kit asks for these stocks because they are out of date for their tier, so the 30-day skip must not apply to them.
+function ldForceKeys(keys){ keys.forEach(k => { ldForce.add(k); setTimeout(() => ldForce.delete(k), 3600000); }); }
+export { ldForceKeys, ldRunFundamental };

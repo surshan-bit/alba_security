@@ -14,3 +14,8 @@ select:not([multiple]):not([size]):disabled{opacity:.55;}
 :root:not([data-theme="indigo"]):not([data-theme="light"]) #section-business .biz-side{margin:0 0 0 -18px;width:260px;}
 .filters.analysis-filters-panel{padding-top:16px;}
 .strat-side{margin-top:20px;}}
+/* Stock page, Traditional and Buffett-style analysis: a tidy grid at every width instead of columns that squeeze and leave gaps.
+   Wide windows: 4 cards across (one row of four). Laptop and narrower: 2 across (2 x 2). Phones: 1 across. */
+#detail .fund-subsection .fund-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 28px;align-items:start;}
+@media (max-width:1399px){#detail .fund-subsection .fund-grid{grid-template-columns:repeat(2,minmax(0,1fr));}#detail .fund-subsection .fund-grid>.fund-cell:last-child:nth-child(odd){grid-column:1 / -1;}}
+@media (max-width:600px){#detail .fund-subsection .fund-grid{grid-template-columns:minmax(0,1fr);}}
