@@ -2,7 +2,7 @@
 import { lockBusy, lockText, startBeat, tabId } from './joblock.js';
 import { technicalCsvUploadLog } from '../core/store.js';
 import { uploadsSettled } from './upload-history.js';
-import { formatBytes } from '../core/util.js';
+import { formatBytes, sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { recordAttempt, saveRecord } from './last-file.js';
 import { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
@@ -19,7 +19,7 @@ function albaApplyTechnical(csvText, stocks, bseMap, asof){
   const res = AlbaTechEngine.matchAndScore(csvText, stocks, bseMap || {});
   const MACD = { bull_above: 'bullish, above zero', bear_above: 'bearish, above zero', bull_below: 'bullish, below zero', bear_below: 'bearish, below zero' };
   const f1 = x => (Math.round(x * 10) / 10).toFixed(1);
-  const kept = [], rescored = [];
+  const kept = [], rescored = [], techDocs = new Set(), priceDocs = new Set();
   for(const m of res.matched){
     const s = m.stock, st = m.states, r = m.raw, v = s.pillars.val, old = s.technical;
     if(m.missing.length && old && old.states && m.missing.some(c => old.states[ALBA_TI_COMP[c]] != null)){ kept.push(albaFiSym(s)); continue; }
@@ -36,7 +36,7 @@ function albaApplyTechnical(csvText, stocks, bseMap, asof){
     parts.push('Valuation pillar reading of ' + f1(v) + '/10 (' + techValLabel(v) + ').');
     if(m.missing.length) parts.push('(' + m.missing.join(', ') + ' not available in this export — composite computed from available components only, rescaled to a 0–10 scale.)');
     s.technical = { asof, score: m.score, states: Object.assign({}, st, { valuation: techValLabel(v) }), raw: Object.assign({}, r, { valuationScore: v }), reason: parts.join(' ') };
-    rescored.push(albaFiSym(s));
+    rescored.push(albaFiSym(s)); techDocs.add(sanitizeDocId(tickerSymbol(s)));
   }
   // ---- Price & MoS refresh: the Price column (INR rows only) is the CURRENT PRICE of every matched stock that has
   // valuation.intrinsicValue. Only the price, asof and its display text change, never intrinsicValue / Graham / NCAVPS / factor scores.
@@ -67,10 +67,33 @@ function albaApplyTechnical(csvText, stocks, bseMap, asof){
       for(const mt of dcf.metrics || []){ if(mt[0] === 'Current price') mt[1] = String(price); else if(mt[0] === 'Margin of safety') mt[1] = mosTxt; }
       if(typeof dcf.note === 'string') dcf.note = dcf.note.replace(/current price ₹[\d.,]+ \(-?[\d.]+% margin of safety/, 'current price ₹' + price + ' (' + mosTxt + ' margin of safety');
     }
-    priced++;
+    priced++; priceDocs.add(sanitizeDocId(tickerSymbol(s)));
   }
-  return { matched: res.matched.length, rescored: rescored.length, kept, frozen: res.frozen.length,
+  return { techDocs, priceDocs, matched: res.matched.length, rescored: rescored.length, kept, frozen: res.frozen.length,
            unmatchedCsv: res.unmatchedCsvSymbols.length, missingColumns: res.missingColumns, hasPrice: priceCol >= 0, priced, noValuation, pricesInCsv: priceBySym.size };
+}
+
+// A saved update (a Live Data refresh or a research run) is shown on top of the stock data when its date is the same as or newer than
+// the stock data's. So after this import, an update written EARLIER the same day would still hide the file's newer price and
+// readings. The file just imported is the latest word for the stocks it priced or scored: for those, an update dated on or before the
+// file's day loses its price and / or technical block (Global factors stay). Updates dated after the file's day are left alone.
+async function albaTiClearOlderUpdates(db, res, asof){
+  let cleared = 0;
+  try {
+    const snap = await albaFiRetry(() => db.collection('stockUpdates').get());
+    for(const d of snap.docs){
+      const data = d.data(), id = d.id;
+      const dropPrice = res.priceDocs.has(id) && data && data.valuation && typeof data.valuation.asof === 'string' && data.valuation.asof <= asof;
+      const dropTech = res.techDocs.has(id) && data && data.technical && typeof data.technical.asof === 'string' && data.technical.asof <= asof;
+      if(!dropPrice && !dropTech) continue;
+      const next = Object.assign({}, data);
+      if(dropPrice) delete next.valuation;
+      if(dropTech) delete next.technical;
+      await albaFiRetry(() => db.doc('stockUpdates/' + id).set(next));
+      cleared++;
+    }
+  } catch(e){ console.error('Could not clear older saved updates', e); }
+  return cleared;
 }
 
 async function albaTiRunImport(){
@@ -159,6 +182,7 @@ async function albaTiRunImport(){
     const out = await albaFiPersist(db, raw, raw.stocks, 'import');
     current = 'verify';
     await recordScoreHistory(db, raw.stocks);   // the trend on the stock page; never fails the import
+    const clearedUpdates = await albaTiClearOlderUpdates(db, res, albaFiDay(rec.uploadedAt));
     const dataVer = out.nothing ? raw.meta.version : out.plan.newMeta.version;
     if(out.nothing) fiSet('write', 'done', 'nothing changed');
     const note = 'Imported in the page: ' + res.rescored + ' rescored, ' + res.kept.length + ' kept (curated), ' + res.priced + ' prices refreshed, ' + res.frozen + ' not scored. Average technical score ' + avgBefore.toFixed(2) + '→' + avgAfter.toFixed(2) + '.';
@@ -174,6 +198,7 @@ async function albaTiRunImport(){
       { text: bseFound ? bseFound + ' new BSE symbol(s) found and saved.' : 'No new BSE symbols needed.', cls: 'fi-line fi-line-muted' },
       { text: res.hasPrice ? res.priced.toLocaleString('en-IN') + ' current prices and margins of safety refreshed.' : 'The file has no Price column, so current prices were NOT updated.' }
     ];
+    if(clearedUpdates) lines.push({ text: clearedUpdates + ' earlier saved price / chart update(s) for these stocks were replaced by this file (they were older than it).', cls: 'fi-line fi-line-muted' });
     if(res.kept.length) lines.push({ text: 'Kept (a component is missing from the file but was present before): ' + res.kept.slice(0, 12).join(', ') + (res.kept.length > 12 ? ' … +' + (res.kept.length - 12) : '') + '.', cls: 'fi-line fi-line-muted' });
     if(res.missingColumns.length) lines.push({ text: 'Columns not found in this export: ' + res.missingColumns.join(', ') + '.', cls: 'fi-line fi-line-muted' });
     if(logErr) lines.push({ text: 'The data is saved, but the upload record could not be marked as imported (' + logErr + '), so the Last file loaded card may still say "not imported".' });
