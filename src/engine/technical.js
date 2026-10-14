@@ -15,6 +15,7 @@ function techRsi(c, n = 14){
   for(let i = 1; i <= n; i++){ const d = c[i] - c[i - 1]; if(d > 0) ag += d; else al -= d; }
   ag /= n; al /= n;
   for(let i = n + 1; i < c.length; i++){ const d = c[i] - c[i - 1]; ag = (ag * (n - 1) + Math.max(d, 0)) / n; al = (al * (n - 1) + Math.max(-d, 0)) / n; }
+  if(ag === 0 && al === 0) return null;   // flat series: RSI is undefined, not 100
   return al === 0 ? 100 : 100 - 100 / (1 + ag / al);
 }
 function techMacdState(m){ return !m ? null : (m.level > m.signal ? 'bull' : 'bear') + (m.level > 0 ? '_above' : '_below'); }
@@ -56,4 +57,4 @@ function computeTechnical(weekBars, monthBars, pillarsVal, today){
   return { score: techComposite(states, pillarsVal), reason: reason.trim(), states, raw, asof: today };
 }
 
-export { computeTechnical };
+export { computeTechnical, techValLabel };

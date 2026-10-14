@@ -170,11 +170,15 @@ function extractRecords(rows, colMap) {
 }
 
 // ---- Derived per-record values used by more than one factor ----
-function roceEffective(r) { return r.medianRoce10 != null ? (r.roce + r.medianRoce10) / 2 : r.roce; }
+// A blank current figure must not be treated as 0 (null + 30 = 30 in JS would halve the value): use whichever side exists.
+function roceEffective(r) { return r.roce != null && r.medianRoce10 != null ? (r.roce + r.medianRoce10) / 2 : (r.roce != null ? r.roce : r.medianRoce10); }
+// Negative D/E means negative net worth, which is the worst balance sheet, not the best: rank it last.
+function deRankValue(r) { return r.de == null ? null : (r.de < 0 ? 1e9 : r.de); }
 function roeAvg(r) { return r.avgRoe7 != null ? r.avgRoe7 : r.avgRoe10; }
-function roeEffective(r) { const avg = roeAvg(r); return avg != null ? (r.roe + avg) / 2 : r.roe; }
+function roeEffective(r) { const avg = roeAvg(r); return r.roe != null && avg != null ? (r.roe + avg) / 2 : (r.roe != null ? r.roe : avg); }
 function relPe(r) { return (r.pe != null && r.pe > 0 && r.industryPe != null) ? r.industryPe / r.pe : null; }
-function ownHistGap(r) { if (r.histPe5 == null || r.histPe5 === 0 || r.pe == null) return null; return ((r.histPe5 - r.pe) / r.histPe5) * 100; }
+// A negative P/E (loss-making) is not a cheap multiple, so it gives no own-history gap.
+function ownHistGap(r) { if (r.histPe5 == null || r.histPe5 <= 0 || r.pe == null || r.pe <= 0) return null; return ((r.histPe5 - r.pe) / r.histPe5) * 100; }
 function reinvestMetric(r) { return r.croic != null ? r.croic : r.roic; }
 function marginOfSafetyPct(r) { if (r.intrinsicValue == null || r.intrinsicValue <= 0 || r.currentPrice == null) return null; return ((r.intrinsicValue - r.currentPrice) / r.intrinsicValue) * 100; }
 const groupKey = r => r.industryGroup;
@@ -201,7 +205,7 @@ function scoreCsv(csvText, opts) {
   const moatBasis = new Map(), piotBasis = new Map();
 
   const pct = {
-    deInv: relativePercentiles(records, r => (r.de != null ? -r.de : null), groupKey),
+    deInv: relativePercentiles(records, r => { const d = deRankValue(r); return d == null ? null : -d; }, groupKey),
     intCov: relativePercentiles(records, r => r.interestCoverage, groupKey),
     quick: relativePercentiles(records, r => r.quickRatio, groupKey),
     altmanZ: relativePercentiles(records, r => r.altmanZ, groupKey),
@@ -414,6 +418,9 @@ function buildFundamentals(r, industry, group) {
   const factors = ['fin', 'prof', 'growth', 'val', 'moat', 'gov', 'predict', 'reinvest', 'dcf'].map(k => buildFactor(k, r, sc, industry, group, sc));
   return { factors, scoringBreakdown: { buffettSubscore: sc.buffettSubscore, overallComposite: sc.score, traditionalSubscore: sc.traditionalSubscore, valuationSubscore: sc.valuationSubscore }, total: 10 };
 }
+// Technical composite's valuation pillar = the valuation factor score x10, kept in step with every fundamental import.
+function pillarVal(r) { const sc = r.scored.factors.find(x => x.key === 'dcf').score; return sc == null ? null : Math.round(sc * 10 * 10) / 10; }
+function pillarsFor(r) { const v = pillarVal(r); return v == null ? null : { val: v }; }
 function valuationBlock(r, old) {
   const v = { asof, currentPrice: r.currentPrice, grahamNumber: r.graham, intrinsicValue: r.intrinsicValue,
     intrinsicValueSource: 'Screener.in Intrinsic Value estimate (from uploaded fundamentals CSV) — the single source of truth for intrinsic value across this app.', ncavps: r.ncavps };
@@ -434,6 +441,7 @@ for (const s of stocks) {
   s.score = r.scored.score; s.verdict = r.scored.verdict; if (r.industryGroup !== '(unclassified)') s.industryGroup = r.industryGroup;
   s.fundamentals = buildFundamentals(r, indOf(s) || r.industry, r.industryGroup);
   s.valuation = { ...(s.valuation || {}), ...valuationBlock(r) };
+  { const pv = pillarsFor(r); if (pv) s.pillars = { ...(s.pillars || {}), ...pv }; }
   s.asof = asof; rescored++;
 }
 const onboarded = [], needScreenerCheck = [], bseOnly = [];
@@ -441,10 +449,9 @@ for (const r of records) {
   if (used.has(r)) continue;
   const code = r.nseCode || r.bseCode; if (!code || r.scored.score == null) continue;
   const industry = r.industry || r.industryGroup;
-  const dcfScore = r.scored.factors.find(x => x.key === 'dcf').score || 0;
-  stocks.push({
+    stocks.push({
     asof, name: r.name, ticker: `${code} · ${industry}`, industryGroup: r.industryGroup, score: r.scored.score, verdict: r.scored.verdict,
-    pillars: { val: Math.round(dcfScore * 10 * 10) / 10 },
+    pillars: pillarsFor(r) || {},
     technical: { reason: 'Newly imported in the fresh full-universe data load; no Technical Signal history yet. Will be computed from the next Growth List CSV / TradingView refresh.', asof },
     globalFactors: { scope: 'sector', sectorLabel: industry, asof, positive: [], negative: [] },
     fundamentals: buildFundamentals(r, industry, r.industryGroup), valuation: valuationBlock(r),
