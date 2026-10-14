@@ -6,6 +6,7 @@ import { completenessBadge } from '../detail/completeness.js';
 import { prefSet } from '../identity/prefs.js';
 import { signalCol } from '../identity/session.js';
 import { ymdOf } from '../history/scorehistory.js';
+import { refreshIdeasBody } from './ideas.js';
 import { addSignalPoint, callChanges, factsFor, tradeSignal } from './signals.js';
 
 // Which view the panel shows: 'cards' or 'table'. Only this panel uses it, so it is kept here (the saved choice
@@ -219,6 +220,7 @@ function renderTradeLogPanel(){
   }
   el.innerHTML = aggregateHtml + listHtml;
   syncSignals(models);
+  refreshIdeasBody();
 }
 
 
