@@ -4,6 +4,7 @@ import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { priceHistoryStatus } from '../detail/pending.js';
 import { ensurePriceBars, pcTickerKey, priceApply, priceHistoryByTicker } from './store.js';
 import { computeTechnical } from '../engine/technical.js';
+import { recordScoreLog } from '../history/scorelog.js';
 import { tvCall, tvErrorText, tvIstDate, tvMcp, tvMergeDelta, tvResolveSymbol, tvToRows, tvValidate } from '../tv/connector.js';
 
 const priceJobs = new Map();   // dashboard ticker key -> { state: 'queued'|'running'|'ok'|'error', msg, at }
@@ -67,7 +68,8 @@ async function refreshOneStock(s, db){
       const ref = db.doc('stockUpdates/' + id);
       const cur = await ref.get();
       if(cur && cur.exists) await ref.update({ technical: t }); else await ref.set({ ticker: tickerSymbol(s), technical: t });
-      techMsg = '; technical score ' + (t.score == null ? 'n/a' : t.score.toFixed(2));
+      await recordScoreLog(db, id, t, t.asof);   // the score and its inputs, kept for back-testing; never fails the refresh
+      techMsg = '; technical score ' + (t.score == null ? 'n/a' : t.score.toFixed(2)) + (t.provisional ? ' (completed bars; this week/month in progress reads ' + (t.provisional.score == null ? 'n/a' : t.provisional.score.toFixed(2)) + ')' : '');
     }
   }
   priceJobSet(key, 'ok', 'Bars to ' + tvIstDate(W[W.length - 1][0]) + ' (' + W.length + ' weekly, ' + M.length + ' monthly)' + techMsg + note);

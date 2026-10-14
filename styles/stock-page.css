@@ -88,6 +88,8 @@
 .tech-panel{margin-top:22px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
 .tech-panel-head{margin-bottom:12px;display:flex;align-items:center;justify-content:flex-start;gap:10px 14px;flex-wrap:wrap;}
 .tech-news-note{display:flex;gap:8px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--tech-sell);border-radius:8px;padding:10px 12px;margin:0 0 14px;font-size:.82rem;color:var(--text);line-height:1.5;}
+.tech-prov{display:flex;gap:8px;align-items:flex-start;margin:0 0 14px;font-size:.8rem;color:var(--muted);line-height:1.5;}
+.tech-prov b{color:var(--text);font-weight:700;white-space:nowrap;}
 .tech-news-label{color:var(--muted);font-weight:700;text-transform:uppercase;font-size:.68rem;letter-spacing:.04em;flex-shrink:0;margin-top:2px;white-space:nowrap;}
 /* Industry Peers panel — last section of the stock detail view (added 2026-10-06). Lists every
      stock sharing this stock's exact industry within its Industry Group (the Fundamental Score's peer set, with fallback). */

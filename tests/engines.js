@@ -411,6 +411,55 @@ test('fix: both technical paths call a 4/10 valuation "fully valued"', () => {
   assert.strictEqual(TECH.techValLabel(4), 'fully valued'); assert.strictEqual(TECH.techValLabel(3.9), 'expensive / stretched valuation');
 });
 
+// ---- v1.181: one set of scoring rules, completed bars only, and the score log ----
+// Weekly bars open on Mondays and monthly bars on the 1st (03:45 UTC = 09:15 IST), like TradingView's. Closes rise for a long
+// time, and the LAST bar of each series drops hard, so the in-progress reading differs from the completed one.
+const barsAt = (opens, closes) => opens.map((d, i) => [Date.parse(d + 'T03:45:00Z') / 1000, closes[i], closes[i], closes[i], closes[i], 0]);
+const mondays = (last, n) => Array.from({ length: n }, (_, i) => new Date(Date.parse(last + 'T00:00:00Z') - (n - 1 - i) * 7 * 86400000).toISOString().slice(0, 10));
+const firsts = (lastYm, n) => Array.from({ length: n }, (_, i) => { const [y, m] = lastYm.split('-').map(Number), k = y * 12 + m - 1 - (n - 1 - i); return Math.floor(k / 12) + '-' + String(k % 12 + 1).padStart(2, '0') + '-01'; });
+const risingThenDrop = n => Array.from({ length: n }, (_, i) => i === n - 1 ? 60 : 100 + i * 2);
+const mkBars = () => ({ W: barsAt(mondays('2026-10-12', 60), risingThenDrop(60)), M: barsAt(firsts('2026-10', 40), risingThenDrop(40)) });
+test('v1.181: a week and month still in progress are left out of the saved score and shown as provisional', () => {
+  const TECH = load('src/engine/technical.js'), { W, M } = mkBars();
+  const t = TECH.computeTechnical(W, M, 5, '2026-10-14');   // a Wednesday: this week and October are not finished
+  const done = TECH.computeTechnical(W.slice(0, -1), M.slice(0, -1), 5, '2026-10-14');
+  assert.strictEqual(t.score, done.score); assert.deepStrictEqual(t.states, done.states);
+  assert.deepStrictEqual(t.basis, { week: '2026-10-05', month: '2026-09-01' });
+  assert.strictEqual(done.provisional, undefined);
+  assert.ok(t.states.weekMacd.startsWith('bull') && t.states.monthMacd.startsWith('bull'));
+  assert.ok(t.provisional.states.weekMacd.startsWith('bear') && t.provisional.states.monthMacd.startsWith('bear'));   // the old code scored this reading
+  assert.notStrictEqual(t.provisional.score, t.score);
+  assert.ok(t.raw.weekPctChange < -40, 'the price change still shows the current move');
+});
+test('v1.181: a weekly bar counts as finished from Saturday, a monthly bar from the next month', () => {
+  const TECH = load('src/engine/technical.js'), { W, M } = mkBars();
+  const sat = TECH.computeTechnical(W, M, 5, '2026-10-17');
+  assert.deepStrictEqual(sat.basis, { week: '2026-10-12', month: '2026-09-01' }); assert.ok(sat.provisional);   // October is still open
+  const fri = TECH.computeTechnical(W, M, 5, '2026-10-16'); assert.strictEqual(fri.basis.week, '2026-10-05');
+  const nov = TECH.computeTechnical(W, M, 5, '2026-11-02');
+  assert.deepStrictEqual(nov.basis, { week: '2026-10-12', month: '2026-10-01' }); assert.strictEqual(nov.provisional, undefined);
+});
+test('v1.181: the CSV import and the live refresh score the same readings identically', () => {
+  const TECH = load('src/engine/technical.js'), { W, M } = mkBars();
+  const t = TECH.computeTechnical(W.slice(0, -1), M.slice(0, -1), 6, '2026-10-14'), r = t.raw;
+  const csv = Te.matchAndScore(tvCsv([['Q', '', '', '', '', r.monthMacdLevel, r.monthMacdSignal, r.weekMacdLevel, r.weekMacdSignal, r.monthRsi, r.weekRsi]]), [ist('Q', 6)]).matched[0];
+  assert.deepStrictEqual(csv.states, { monthMacd: t.states.monthMacd, weekMacd: t.states.weekMacd, monthRsi: t.states.monthRsi, weekRsi: t.states.weekRsi });
+  assert.strictEqual(csv.score, t.score);
+});
+test('v1.181: the score log row carries the score and its inputs; one row per date, capped', () => {
+  const TECH = load('src/engine/technical.js'), { W, M } = mkBars();
+  const LOG = load('src/history/scorelog.js', 'export { MAX_ROWS, addLogRow, logRowFor };');
+  const t = TECH.computeTechnical(W, M, 5, '2026-10-14'), row = LOG.logRowFor(t, '2026-10-14');
+  assert.strictEqual(row.d, '2026-10-14'); assert.strictEqual(row.src, 'bars'); assert.strictEqual(row.score, t.score);
+  assert.strictEqual(row.val, 5); assert.strictEqual(row.wk, '2026-10-05'); assert.strictEqual(row.mo, '2026-09-01');
+  assert.strictEqual(row.mR, Math.round(t.raw.monthRsi * 1e4) / 1e4); assert.strictEqual(row.pS, Math.round(t.provisional.score * 1e4) / 1e4);
+  assert.strictEqual(LOG.logRowFor({ score: null }, '2026-10-14'), null); assert.strictEqual(LOG.logRowFor(null, '2026-10-14'), null);
+  const a = LOG.addLogRow([], row), b = LOG.addLogRow(a, Object.assign({}, row, { score: 1 }));   // same day: replaced
+  assert.strictEqual(b.length, 1); assert.strictEqual(b[0].score, 1);
+  let rows = []; for(let i = 0; i < LOG.MAX_ROWS + 25; i++) rows = LOG.addLogRow(rows, Object.assign({}, row, { d: new Date(Date.UTC(2020, 0, 1) + i * 86400000).toISOString().slice(0, 10) }));
+  assert.strictEqual(rows.length, LOG.MAX_ROWS); assert.ok(rows[0].d < rows[1].d);
+});
+
 // =========================================================== Characterisation: today's exact numbers on the made-up universe
 const golden = {};
 for(const r of Fe.scoreCsv(csv, { exactIndustryBySym: exactMap }).records){
@@ -430,7 +479,7 @@ test('golden: the scores for the made-up universe have not moved', () => {
 });
 
 // =========================================================== score history (the trend on the stock page)
-const H = load('src/history/scorehistory.js', 'export { BUCKETS, SCORE_ENGINE, addPoint, bucketId, bucketOf, pointFor };');
+const H = load('src/history/scorehistory.js', 'export { BUCKETS, addPoint, bucketId, bucketOf, pointFor };');
 const R = load('src/detail/scoretrend.js', 'export { scoreTrendHtml };');
 test('history: a stock always lands in the same one of 64 buckets', () => {
   assert.strictEqual(H.bucketOf('AAA1'), H.bucketOf('AAA1'));

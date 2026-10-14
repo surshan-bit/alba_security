@@ -18,7 +18,8 @@ function techRsi(c, n = 14){
   if(ag === 0 && al === 0) return null;   // flat series: RSI is undefined, not 100
   return al === 0 ? 100 : 100 - 100 / (1 + ag / al);
 }
-function techMacdState(m){ return !m ? null : (m.level > m.signal ? 'bull' : 'bear') + (m.level > 0 ? '_above' : '_below'); }
+function techMacdStateOf(level, signal){ return level == null || signal == null ? null : (level > signal ? 'bull' : 'bear') + (level > 0 ? '_above' : '_below'); }
+function techMacdState(m){ return !m ? null : techMacdStateOf(m.level, m.signal); }
 function techRsiState(r){ return r == null ? null : r >= 70 ? 'overbought' : r >= 55 ? 'strong' : r >= 45 ? 'neutral' : r >= 30 ? 'weak' : 'oversold'; }
 function techValLabel(v){ return v == null ? null : v >= 8 ? 'attractively valued' : v >= 6 ? 'reasonably valued' : v >= 4 ? 'fully valued' : 'expensive / stretched valuation'; }
 var TECH_MACD_MULT = { bull_above: 1, bear_above: 0.5, bull_below: 1 / 3, bear_below: 0 };
@@ -32,29 +33,67 @@ function techComposite(st, valScore){
   if(valScore != null){ pts += valScore / 10 * 2.0; wt += 2.0; }
   return wt ? Math.round(pts / wt * 10 * 100) / 100 : null;
 }
-// Technical block from [t,o,h,l,c,v] bars (weekly, monthly) and the stock's valuation pillar (0-10). Returns null without any usable component.
-function computeTechnical(weekBars, monthBars, pillarsVal, today){
-  const wc = (weekBars || []).map(b => b[4]), mc = (monthBars || []).map(b => b[4]);
+// ---- Completed bars only (v1.181) ----
+// A weekly or monthly bar that is still in progress keeps moving, so a score saved from it can flip on the next refresh.
+// The saved score therefore uses completed bars only; the in-progress reading is kept apart as `provisional`.
+// Bar times are unix seconds (bar open); `today` is the IST date 'YYYY-MM-DD' of the refresh, which keeps this testable.
+function techIstDate(sec){ return new Date((sec + 19800) * 1000).toISOString().slice(0, 10); }
+function techDayNo(ymd){ return Math.floor(new Date(ymd + 'T00:00:00Z').getTime() / 86400000); }
+function techWeekStart(ymd){ const n = techDayNo(ymd); return n - ((n + 3) % 7); }   // Monday of that week (day 0 was a Thursday)
+// True when the bar's week (or month) has not finished on `today`. A weekly bar counts as finished from Saturday; a
+// monthly bar from the first day of the next month.
+function techBarForming(bar, kind, today){
+  if(!bar || !today) return false;
+  const open = techIstDate(bar[0]);
+  if(kind === 'month') return open.slice(0, 7) >= today.slice(0, 7);
+  if((techDayNo(today) + 3) % 7 >= 5) return techWeekStart(open) > techWeekStart(today);
+  return techWeekStart(open) >= techWeekStart(today);
+}
+function techCompleted(bars, kind, today){ return bars.length && techBarForming(bars[bars.length - 1], kind, today) ? bars.slice(0, -1) : bars; }
+// States, raw figures and score from two close series; null without any usable component.
+function techReading(wc, mc, pillarsVal){
   const wm = techMacd(wc), mm = techMacd(mc), wr = techRsi(wc), mr = techRsi(mc);
-  const states = { monthMacd: techMacdState(mm), weekMacd: techMacdState(wm), monthRsi: techRsiState(mr), weekRsi: techRsiState(wr), valuation: techValLabel(pillarsVal) };
   if(!wm && !mm && wr == null && mr == null) return null;
+  const states = { monthMacd: techMacdState(mm), weekMacd: techMacdState(wm), monthRsi: techRsiState(mr), weekRsi: techRsiState(wr), valuation: techValLabel(pillarsVal) };
+  const raw = { monthMacdLevel: mm ? mm.level : null, monthMacdSignal: mm ? mm.signal : null, weekMacdLevel: wm ? wm.level : null, weekMacdSignal: wm ? wm.signal : null, monthRsi: mr, weekRsi: wr };
+  return { states, raw, score: techComposite(states, pillarsVal) };
+}
+// Technical block from [t,o,h,l,c,v] bars (weekly, monthly) and the stock's valuation pillar (0-10). Returns null without any usable component.
+// The score uses completed bars only; when a week or month is still in progress its reading is kept as `provisional`.
+function computeTechnical(weekBars, monthBars, pillarsVal, today){
+  const wAll = weekBars || [], mAll = monthBars || [];
+  const wDone = techCompleted(wAll, 'week', today), mDone = techCompleted(mAll, 'month', today);
+  const closes = bars => bars.map(b => b[4]);
+  const wc = closes(wDone), mc = closes(mDone);
+  const done = techReading(wc, mc, pillarsVal);
+  if(!done) return null;
+  const { states, raw: r } = done;
+  const wp = closes(wAll), mp = closes(mAll);
   const pct = c => c.length >= 2 && c[c.length - 2] ? (c[c.length - 1] / c[c.length - 2] - 1) * 100 : null;
-  const raw = { monthMacdLevel: mm ? mm.level : null, monthMacdSignal: mm ? mm.signal : null, weekMacdLevel: wm ? wm.level : null, weekMacdSignal: wm ? wm.signal : null,
-    weekPctChange: pct(wc), monthPctChange: pct(mc), monthRsi: mr, weekRsi: wr, valuationScore: pillarsVal == null ? null : pillarsVal };
+  // The price changes show the current move, so they use every bar; the score inputs use completed bars.
+  const raw = { monthMacdLevel: r.monthMacdLevel, monthMacdSignal: r.monthMacdSignal, weekMacdLevel: r.weekMacdLevel, weekMacdSignal: r.weekMacdSignal,
+    weekPctChange: pct(wp), monthPctChange: pct(mp), monthRsi: r.monthRsi, weekRsi: r.weekRsi, valuationScore: pillarsVal == null ? null : pillarsVal };
   const mt = s => s ? (s.startsWith('bull') ? 'bullish' : 'bearish') + ', ' + (s.endsWith('above') ? 'above' : 'below') + ' zero' : null;
   const parts = [];
   if(states.monthMacd) parts.push('monthly MACD ' + mt(states.monthMacd));
   if(states.weekMacd) parts.push('weekly MACD ' + mt(states.weekMacd));
   const rs = [];
-  if(mr != null) rs.push('monthly RSI ' + mr.toFixed(1) + ' (' + states.monthRsi + ')');
-  if(wr != null) rs.push('weekly RSI ' + wr.toFixed(1) + ' (' + states.weekRsi + ')');
+  if(r.monthRsi != null) rs.push('monthly RSI ' + r.monthRsi.toFixed(1) + ' (' + states.monthRsi + ')');
+  if(r.weekRsi != null) rs.push('weekly RSI ' + r.weekRsi.toFixed(1) + ' (' + states.weekRsi + ')');
   let reason = parts.join(', ') + (parts.length ? '. ' : '') + rs.join(', ') + (rs.length ? '. ' : '');
   if(pillarsVal != null) reason += 'Valuation pillar reading of ' + pillarsVal.toFixed(1) + '/10 (' + states.valuation + ').';
   const missing = [];
-  if(!states.monthMacd) missing.push('monthly MACD'); if(mr == null) missing.push('monthly RSI');
-  if(!states.weekMacd) missing.push('weekly MACD'); if(wr == null) missing.push('weekly RSI');
+  if(!states.monthMacd) missing.push('monthly MACD'); if(r.monthRsi == null) missing.push('monthly RSI');
+  if(!states.weekMacd) missing.push('weekly MACD'); if(r.weekRsi == null) missing.push('weekly RSI');
   if(missing.length) reason += ' (' + missing.join(' and ') + ' not available: too little price history. Composite computed from available components only, rescaled to a 0–10 scale.)';
-  return { score: techComposite(states, pillarsVal), reason: reason.trim(), states, raw, asof: today };
+  const out = { score: techComposite(states, pillarsVal), reason: reason.trim(), states, raw, asof: today };
+  // Which bars the score rests on, and the in-progress reading when a week or month is not finished yet.
+  out.basis = { week: wDone.length ? techIstDate(wDone[wDone.length - 1][0]) : null, month: mDone.length ? techIstDate(mDone[mDone.length - 1][0]) : null };
+  if(wDone.length !== wAll.length || mDone.length !== mAll.length){
+    const live = techReading(closes(wAll), closes(mAll), pillarsVal);
+    if(live) out.provisional = { score: techComposite(live.states, pillarsVal), states: { monthMacd: live.states.monthMacd, weekMacd: live.states.weekMacd, monthRsi: live.states.monthRsi, weekRsi: live.states.weekRsi }, monthRsi: live.raw.monthRsi, weekRsi: live.raw.weekRsi };
+  }
+  return out;
 }
 
-export { computeTechnical, techValLabel };
+export { computeTechnical, techComposite, techMacdStateOf, techRsiState, techValLabel };

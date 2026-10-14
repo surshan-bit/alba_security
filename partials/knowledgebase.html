@@ -120,6 +120,7 @@
             <li><b>Composite:</b> the sum, rounded to 2 decimals.</li>
           </ul>
         </li>
+        <li><b>Two paths, one rule set:</b> the CSV import scores the MACD and RSI values TradingView supplies; the Live Data refresh calculates them from price bars. Both use the same MACD states, RSI bands, weights and composite (<code>src/engine/technical.js</code>). The refresh uses completed weekly and monthly bars only (a week counts as finished from Saturday, a month from the 1st of the next month) and keeps the in-progress reading as <code>technical.provisional</code>; the CSV values include the bar in progress. Every refresh also writes a row to the <code>scoreLog</code> collection (score, inputs, bar dates).</li>
         <li><b>Partial data:</b> a blank component (often monthly MACD/RSI for newer tickers) is left out, and the sum is rescaled to 0&ndash;10 over the weights present.
           <ul>
             <li>Example: weekly MACD + weekly RSI + Valuation = 5.5 weight, so composite = (points &divide; 5.5) &times; 10.</li>
@@ -220,9 +221,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
-            <h3>v1.180 &middot; 2026-10-14</h3>
+            <h3>v1.181 &middot; 2026-10-14</h3>
             <ul>
-              <li><b>Technical import shows its progress while replacing older updates:</b> that last step could take a minute or two with no sign of life and look stuck. It now runs several at a time and shows &ldquo;Replacing older saved updates 40 / 209&hellip;&rdquo;.</li>
+              <li><b>One set of scoring rules:</b> the Technical import and the Live Data refresh now score from the same code, so the same readings always give the same score. Imported scores do not change.</li>
+              <li><b>Live refresh scores finished weeks and months only:</b> the week or month still in progress used to move the saved score from one refresh to the next. The saved score now uses completed bars, and the stock page shows the in-progress reading separately as <i>Provisional</i>. A week counts as finished from Saturday, a month from the 1st of the next month. Scores from a Live Data refresh can differ from before until the next refresh.</li>
+              <li><b>Every Live Data refresh keeps a score log:</b> the score, the RSI and MACD figures behind it, the bar dates used and the provisional reading are saved for each stock, one row per day, so the real live score can be checked against what happened later. The stock page trend marks this change as &ldquo;Scoring rules changed&rdquo;.</li>
+              <li>Removed a duplicated v1.180 entry from this list.</li>
             </ul>
             <h3>v1.180 &middot; 2026-10-14</h3>
             <ul>
