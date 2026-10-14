@@ -20,28 +20,43 @@ function init_sync_subscriptions(){
   if(!db) return; // capability not granted/available in this view — everything below stays session-only
   attachDb(db);
 
+  // Pins. The saved list is read two ways so one failure cannot leave every star empty: the live listener (restarted after an
+  // error) and a one-time read at start-up that fills in if the listener has not delivered anything yet.
+  let pinsHeard = false;
+  const showPins = (data) => {
+    const arr = (data && Array.isArray(data.tickers)) ? data.tickers : [];
+    // The write we just made via togglePin() already re-rendered optimistically; this snapshot fires
+    // again once that write round-trips, with the same resulting set — replacePinnedTickers() reports
+    // that as "no change", and the (expensive, full-list) re-render is skipped.
+    if(!replacePinnedTickers(arr)) return;
+    rerenderDetail();
+    // Keep the Analysis section's pin highlighting/leaderboard order in sync too, if it's
+    // the section currently open (e.g. a pin change arriving from another open tab/device).
+    const analysisSectionEl = document.getElementById('section-analysis');
+    if(analysisSectionEl && analysisSectionEl.classList.contains('active')) renderAnalysisSection();
+  };
+  const watchPins = (attempt) => {
+    const ref = pinsRef(db);
+    if(!ref) return;   // not signed in: pins stay in this page only
+    try {
+      ref.onSnapshot(
+        (snap) => {
+          pinsHeard = true;
+          // While our own changes are still being saved, a snapshot may show an older list; the last one after they finish is right.
+          if(pinWritesInFlight()) return;
+          showPins(snap.data());
+        },
+        (err) => { console.error('Pin sync error', err); if(attempt < 5) setTimeout(() => watchPins(attempt + 1), 3000 * (attempt + 1)); }
+      );
+    } catch(e){
+      console.error('Pin persistence unavailable', e);
+    }
+  };
+  watchPins(0);
   try {
-    (pinsRef(db) || { onSnapshot(){} }).onSnapshot(
-      (snap) => {
-        // While our own changes are still being saved, a snapshot may show an older list; the last one after they finish is right.
-        if(pinWritesInFlight()) return;
-        const data = snap.data();
-        const arr = (data && Array.isArray(data.tickers)) ? data.tickers : [];
-        // The write we just made via togglePin() already re-rendered optimistically; this snapshot fires
-        // again once that write round-trips, with the same resulting set — replacePinnedTickers() reports
-        // that as "no change", and the (expensive, full-list) re-render is skipped.
-        if(!replacePinnedTickers(arr)) return;
-        rerenderDetail();
-        // Keep the Analysis section's pin highlighting/leaderboard order in sync too, if it's
-        // the section currently open (e.g. a pin change arriving from another open tab/device).
-        const analysisSectionEl = document.getElementById('section-analysis');
-        if(analysisSectionEl && analysisSectionEl.classList.contains('active')) renderAnalysisSection();
-      },
-      (err) => console.error('Pin sync error', err)
-    );
-  } catch(e){
-    console.error('Pin persistence unavailable', e);
-  }
+    const ref0 = pinsRef(db);
+    if(ref0) ref0.get().then((snap) => { if(!pinsHeard && !pinWritesInFlight() && snap && snap.exists) showPins(snap.data()); }).catch((e) => console.error('Pins could not be read', e));
+  } catch(e){ console.error('Pins could not be read', e); }
 
   try {
     db.collection('stockResearch').onSnapshot(

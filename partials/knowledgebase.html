@@ -220,6 +220,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.169 &middot; 2026-10-14</h3>
+            <ul>
+              <li><b>Pinned stocks always load:</b> the saved pins are now read in two ways at start-up (the live link and a direct read), the live link restarts itself if it fails, and your account id is asked for again a few times if it is slow right after a reload. Before, any one of these failing left every star empty for that page load, and the next pin click then overwrote the saved list.</li>
+              <li><b>No more false &ldquo;A new version is available&rdquo;:</b> the release record that tells open pages to reload carried the wrong build id for one release (it was copied before the final rebuild), so pages reloaded once and then kept showing the banner. The release record is now generated from the finished build and compared with the published page before it is saved.</li>
+            </ul>
             <h3>v1.168 &middot; 2026-10-14</h3>
             <ul>
               <li><b>Fundamental refresh is for every stock:</b> the stock page and the Knowledge Base no longer say Global &amp; Macro is limited to Strong and Good stocks. Refresh &rarr; Fundamental already worked for any stock (Hold, Avoid or Pending too); only the wording was out of date.</li>

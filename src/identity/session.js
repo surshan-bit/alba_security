@@ -17,7 +17,14 @@ async function loadIdentity(){
     if(!(typeof claude !== 'undefined' && claude && typeof claude.use === 'function')) return;
     const [db, user] = await Promise.all([claude.use('db').catch(() => null), claude.use('user').catch(() => null)]);
     state.db = db;
-    const id = user ? await user.id() : null;
+    // The viewer's id can be slow or briefly empty right after a reload; asking again a few times keeps the saved pins,
+    // preferences and strategies from silently going missing for that page load.
+    let id = null;
+    for(let i = 0; i < 4 && !id; i++){
+      if(i) await new Promise(r => setTimeout(r, 500 * i));
+      try { id = user ? await user.id() : null; } catch(e){ id = null; }
+      if(!user || !db) break;
+    }
     state.uid = (db && id) ? String(id) : null;
   } catch(e){ state.uid = null; }
 }
