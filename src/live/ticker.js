@@ -2,7 +2,9 @@
 // price from TradingView every 20 seconds, and their price, Margin of Safety, W% CHG and M% CHG cells change in place (the weekly
 // figures are this week's and this month's move against the last close before the week / month began, from the weekly and monthly bars). This is polling, not a
 // WebSocket (the page cannot open one); it saves nothing, so a Live Data Refresh is still what stores prices and bars.
-import { stocks } from '../core/stocks.js';
+import { stocks, stockByTickerSymbol } from '../core/stocks.js';
+import { allTrades } from '../core/store.js';
+import { renderTradeLogPanel } from '../tradelog/panel.js';
 import { detailEl } from '../core/dom.js';
 import { getShownIndex } from '../detail/render.js';
 import { pcTickerKey, priceSymbolByTicker } from '../prices/store.js';
@@ -23,12 +25,24 @@ function marketOpen(now = new Date()){
   return d >= 1 && d <= 5 && m >= 9 * 60 + 15 && m <= 15 * 60 + 30;
 }
 const isShown = (el) => !!el && el.offsetParent !== null;
+// The Trade Log is open: its open positions are watched too, so their price, return and today's call stay live.
+const tradeLogOpen = () => isShown(document.getElementById('section-trackrecord'));
+function openTradeIdx(){
+  const out = [];
+  for(const tr of allTrades()){
+    if(tr.status === 'closed' && tr.sell) continue;
+    const s = stockByTickerSymbol.get(tr.ticker), idx = s ? stocks.indexOf(s) : -1;
+    if(idx >= 0 && !out.includes(idx)) out.push(idx);
+  }
+  return out;
+}
 
 // The stocks to watch: the open stock page first, then the rows on screen, in grid order. When more than MAX_ROWS rows are on
 // screen, each sweep takes the ones looked at longest ago, so every row gets its turn (and a sweep stays short).
 const lastLook = new Map();   // stock index -> time of its last live price
 function watched(){
   const out = [];
+  if(tradeLogOpen()) openTradeIdx().forEach(i => out.push(i));
   if(isShown(detailEl)){ const d = getShownIndex(); if(d >= 0 && stocks[d]) out.push(d); }
   const rows = [];
   document.querySelectorAll('.app-section.active tr[data-idx]').forEach(tr => {
@@ -123,7 +137,7 @@ async function tick(){
         const q = await quoteOf(s), px = q.price;
         if(px == null){ bad++; continue; }
         const key = pcTickerKey(s), before = s.valuation && s.valuation.currentPrice;
-        livePrice.set(key, px); lastLook.set(idx, Date.now());
+        livePrice.set(key, px); lastLook.set(idx, Date.now()); s.liveAt = Date.now();
         if(!s.valuation) s.valuation = {};
         s.valuation.currentPrice = px;
         // W% CHG and M% CHG follow the live price too. They are kept on the stock's technical readings, so sorting, filters and
@@ -145,7 +159,7 @@ async function tick(){
   };
   try { await Promise.all(Array.from({ length: Math.min(PARALLEL, list.length) }, worker)); }
   finally { busy = false; }
-  if(ok){ fails = 0; lastAt = Date.now(); paintDetail(); } else if(bad) fails++;
+  if(ok){ fails = 0; lastAt = Date.now(); paintDetail(); if(tradeLogOpen()) renderTradeLogPanel(); } else if(bad) fails++;
   paintButton();
 }
 
