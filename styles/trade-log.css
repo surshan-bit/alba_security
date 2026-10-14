@@ -37,3 +37,16 @@
 .biz-side .tl-view-toggle .tl-view-btn{flex:1;text-align:center;}
 .biz-toolbar .biz-match-toggle .tl-view-btn{height:28px;padding:0 14px;font-size:.78rem;}
 .biz-match-toggle .tl-view-btn:disabled{opacity:.45;cursor:not-allowed;}
+/* ---- Daily call on an open trade ---- */
+.tl-signal{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px;font-size:.82rem;}
+.tl-signal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.tl-signal-label{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;}
+.tl-signal-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.72rem;font-weight:700;border:1px solid var(--line);}
+.tl-sig-hold .tl-signal-badge,.tl-signal-badge.tl-sig-hold{background:rgba(120,140,160,.15);}
+.tl-sig-add .tl-signal-badge,.tl-signal-badge.tl-sig-add{background:rgba(60,180,110,.18);border-color:rgba(60,180,110,.5);}
+.tl-sig-trim .tl-signal-badge,.tl-signal-badge.tl-sig-trim{background:rgba(224,160,48,.2);border-color:rgba(224,160,48,.55);}
+.tl-sig-review .tl-signal-badge,.tl-signal-badge.tl-sig-review{background:rgba(220,80,80,.18);border-color:rgba(220,80,80,.5);}
+.tl-signal-why{margin:0;padding-left:18px;}
+.tl-signal-why li{margin:2px 0;}
+.tl-signal-notes p{margin:4px 0;}
+.tl-signal-hist,.tl-signal-foot{color:var(--muted);font-size:.72rem;}

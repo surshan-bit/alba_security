@@ -172,17 +172,24 @@ function init_sync_subscriptions(){
     const _tradeCol = tradeCol(db);
     if(!_tradeCol) throw new Error('no signed-in identity: the trade log is per user');
     attachTradeDb(db);
-    _tradeCol.onSnapshot(
-      (snap) => {
-        const next = new Map();
-        snap.docs.forEach(d => {
-          if(d.exists) next.set(d.id, Object.assign({}, d.data(), {_id: d.id}));
-        });
-        replaceTradeLog(next);
-        renderLoadedPart('trackrecord');
-      },
-      (err) => console.error('Trade log sync error', err)
-    );
+    // A failed listener (a slow start, a dropped connection) is retried a few times, so the cards do not stay empty until a reload.
+    const listen = (attempt) => {
+      _tradeCol.onSnapshot(
+        (snap) => {
+          const next = new Map();
+          snap.docs.forEach(d => {
+            if(d.exists) next.set(d.id, Object.assign({}, d.data(), {_id: d.id}));
+          });
+          replaceTradeLog(next);
+          renderLoadedPart('trackrecord');
+        },
+        (err) => {
+          console.error('Trade log sync error', err);
+          if(attempt < 4) setTimeout(() => listen(attempt + 1), 2000 * (attempt + 1));
+        }
+      );
+    };
+    listen(0);
   } catch(e){
     console.error('Trade log persistence unavailable', e);
   }

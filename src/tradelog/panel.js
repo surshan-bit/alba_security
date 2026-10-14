@@ -4,6 +4,9 @@ import { allTrades, getTradeDb } from '../core/store.js';
 import { escapeHtml, formatDate, pctChangeSpan } from '../core/util.js';
 import { completenessBadge } from '../detail/completeness.js';
 import { prefSet } from '../identity/prefs.js';
+import { signalCol } from '../identity/session.js';
+import { ymdOf } from '../history/scorehistory.js';
+import { addSignalPoint, callChanges, factsFor, tradeSignal } from './signals.js';
 
 // Which view the panel shows: 'cards' or 'table'. Only this panel uses it, so it is kept here (the saved choice
 // is read once, when the page loads; the Cards / Table buttons change it).
@@ -46,6 +49,46 @@ function tlScoreCell(snap){
 }
 // Everything a trade's card or table row needs, computed once per trade (the markup builders
 // below only format it). A trade counts as closed only when it has a sell record.
+
+// ---- Daily call (rules in signals.js): shown on each open trade, recorded once a day, history kept per trade ----
+const signalDocs = new Map();   // trade id -> { history, notes } as saved
+let signalsLoaded = false, signalsLoading = false;
+const signalDay = () => ymdOf(new Date());
+function tlSignalHtml(id, sig){
+  const doc = signalDocs.get(id) || {};
+  const changes = callChanges(doc.history).slice(0, 4);
+  const notes = Array.isArray(doc.notes) ? doc.notes.slice(-3).reverse() : [];
+  const fmt = n => escapeHtml(formatDate(String(n).replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3')));
+  return `<div class="tl-signal tl-sig-${sig.call}">
+    <div class="tl-signal-head"><span class="tl-signal-label">Today's call</span><span class="tl-signal-badge">${escapeHtml(sig.label)}</span></div>
+    <ul class="tl-signal-why">${sig.reasons.map(r => '<li>' + escapeHtml(r) + '</li>').join('')}</ul>
+    ${notes.length ? '<div class="tl-signal-notes">' + notes.map(n => '<p><b>' + fmt(n.d) + ':</b> ' + escapeHtml(n.text) + '</p>').join('') + '</div>' : ''}
+    ${changes.length > 1 ? '<div class="tl-signal-hist">Earlier: ' + changes.slice(1).map(c => escapeHtml(c.call === 'trim' ? 'Trimming' : c.call === 'add' ? 'Adding' : c.call === 'review' ? 'Review' : 'Hold') + ' from ' + fmt(c.ymd)).join(' &middot; ') + '</div>' : ''}
+    <div class="tl-signal-foot">A reference for your own decision, from fixed rules on today's data. Not an order.</div>
+  </div>`;
+}
+// Loads the saved calls once, then records today's call for every open trade (one point a day per trade) and redraws.
+// Never throws: a failure only means today's point is missing.
+async function syncSignals(models){
+  if(signalsLoaded || signalsLoading) return;
+  const db = getTradeDb(), col = signalCol(db);
+  if(!col) return;
+  signalsLoading = true;
+  try {
+    const snap = await col.get();
+    snap.docs.forEach(d => { if(d.exists) signalDocs.set(d.id, d.data() || {}); });
+    const day = signalDay();
+    for(const m of models){
+      if(m.isClosed || !m.sig || !m.t._id || m.facts.price == null) continue;
+      const doc = signalDocs.get(m.t._id) || { history: [], notes: [] };
+      const next = Object.assign({}, doc, { history: addSignalPoint(doc.history, day, m.sig, m.facts) });
+      await col.doc(m.t._id).set(next);
+      signalDocs.set(m.t._id, next);
+    }
+  } catch(e){ console.error('Trade calls were not saved', e); }
+  finally { signalsLoaded = true; signalsLoading = false; }
+  renderTradeLogPanel();
+}
 function tlTradeModel(t){
   const buy = t.buy || {};
   const bs = buy.snapshot || {};
@@ -57,8 +100,11 @@ function tlTradeModel(t){
   const qty = buy.quantity || 0;
   const ret = tradeReturnPct(t);
   const id = escapeHtml(t._id || '');
+  const facts = isClosed ? null : factsFor(t, live);
+  const sig = facts ? tradeSignal(facts) : null;
   return {
-    t, buy, sell, isClosed, curPx,
+    t, buy, sell, isClosed, curPx, facts, sig,
+    signalHtml: sig ? tlSignalHtml(t._id, sig) : '',
     name: escapeHtml(t.name || t.ticker || ''),
     ticker: escapeHtml(t.ticker || ''),
     boughtOn: escapeHtml(formatDate(buy.date)),
@@ -95,6 +141,7 @@ function tlCardHtml(m){
           <div><dt>Data at entry</dt><dd>${m.entryBadge}</dd></div>
           ${m.isClosed ? `<div><dt>Exit score</dt><dd>${m.exitScore}</dd></div>` : ''}
         </dl>
+        ${m.signalHtml}
         ${m.actions}
       </div>`;
 }
@@ -109,6 +156,7 @@ function tlRowHtml(m){
         <td>${m.returnCell}</td>
         <td>${m.held != null ? m.held + 'd' : '—'}</td>
         <td>${m.exitScore}</td>
+        <td>${m.sig ? '<span class="tl-signal-badge tl-sig-' + m.sig.call + '">' + escapeHtml(m.sig.label) + '</span>' : '<span class="analysis-lb-empty">—</span>'}</td>
         <td>${m.actions}</td>
       </tr>`;
 }
@@ -158,12 +206,13 @@ function renderTradeLogPanel(){
     listHtml = `
     <div class="help-table-wrap">
       <table class="help-table">
-        <thead><tr><th>Stock</th><th>Buy date / price &times; qty</th><th>Status</th><th>Entry score</th><th>Data at entry</th><th>${returnHead}</th><th>Held</th><th>Exit score</th><th></th></tr></thead>
+        <thead><tr><th>Stock</th><th>Buy date / price &times; qty</th><th>Status</th><th>Entry score</th><th>Data at entry</th><th>${returnHead}</th><th>Held</th><th>Exit score</th><th>Today's call</th><th></th></tr></thead>
         <tbody>${models.map(tlRowHtml).join('')}</tbody>
       </table>
     </div>`;
   }
   el.innerHTML = aggregateHtml + listHtml;
+  syncSignals(models);
 }
 
 

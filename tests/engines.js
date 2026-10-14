@@ -483,6 +483,42 @@ test('history: the trend chart needs two points, marks engine changes, and says 
   assert.ok(!/trend-engine/.test(R.scoreTrendHtml([[20261001, 6, 5, 1, 2], [20261008, 7, 5, 1, 2]])));
 });
 
+// =========================================================== trade calls (Trade Log: Hold / trim / add / review)
+const G = load('src/tradelog/signals.js');
+const base = { buyPrice: 100, price: 105, entryScore: 6.5, score: 6.5, verdict: 'mbuy', intrinsic: 140, rsiWeek: 55, rsiMonth: 55 };
+test('trade call: a calm position with a good verdict is Hold, with the reasons listed', () => {
+  const s = G.tradeSignal(base);
+  assert.strictEqual(s.call, 'hold'); assert.ok(s.reasons.length >= 2);
+});
+test('trade call: a big gain with stretched RSI is Consider trimming (the OCCL case)', () => {
+  const s = G.tradeSignal({ buyPrice: 193.68, price: 232, entryScore: 6.59, score: 6.52, verdict: 'mbuy', intrinsic: 355, rsiWeek: 83.3, rsiMonth: 75.2 });
+  assert.strictEqual(s.call, 'trim'); assert.match(s.reasons[0], /Weekly RSI is 83\.3/);
+});
+test('trade call: a weaker verdict, a falling score, a deep loss or a price above fair value is Review, and beats trimming', () => {
+  assert.strictEqual(G.tradeSignal({ ...base, verdict: 'hold' }).call, 'review');
+  assert.strictEqual(G.tradeSignal({ ...base, score: 5.3 }).call, 'review');
+  assert.strictEqual(G.tradeSignal({ ...base, price: 80 }).call, 'review');
+  assert.strictEqual(G.tradeSignal({ ...base, price: 160, rsiWeek: 90 }).call, 'review', 'price above fair value comes first');
+});
+test('trade call: Consider adding needs a good verdict, a roomy cushion, calm RSI and a price near the buy price', () => {
+  assert.strictEqual(G.tradeSignal({ ...base, price: 102, intrinsic: 160 }).call, 'add');
+  assert.strictEqual(G.tradeSignal({ ...base, price: 102, intrinsic: 160, rsiWeek: 72 }).call, 'hold');
+  assert.strictEqual(G.tradeSignal({ ...base, price: 120, intrinsic: 200 }).call, 'hold', 'too far from the buy price');
+});
+test('trade call: missing data never crashes and never invents a call', () => {
+  const s = G.tradeSignal({});
+  assert.strictEqual(s.call, 'hold'); assert.strictEqual(s.gain, null);
+  assert.strictEqual(G.factsFor({ buy: { price: 10 } }, null).price, null);
+});
+test('trade call: history keeps one point a day and lists when the call changed', () => {
+  let h = G.addSignalPoint([], 20261001, { call: 'hold', mos: 40, gain: 5 }, { price: 105, score: 6.5, rsiWeek: 55 });
+  h = G.addSignalPoint(h, 20261002, { call: 'hold', mos: 39, gain: 6 }, { price: 106, score: 6.5, rsiWeek: 57 });
+  h = G.addSignalPoint(h, 20261003, { call: 'trim', mos: 30, gain: 20 }, { price: 120, score: 6.5, rsiWeek: 82 });
+  h = G.addSignalPoint(h, 20261003, { call: 'trim', mos: 29, gain: 21 }, { price: 121, score: 6.5, rsiWeek: 83 });
+  assert.strictEqual(h.length, 3, 'same day is replaced');
+  assert.deepStrictEqual(G.callChanges(h).map(c => c.call), ['trim', 'hold']);
+});
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

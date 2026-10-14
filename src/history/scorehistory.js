@@ -98,4 +98,4 @@ async function loadScoreHistory(s){
   return Array.isArray(all[key]) ? all[key] : [];
 }
 
-export { loadScoreHistory, recordScoreHistory, tickerKey, ymdToDate };
+export { loadScoreHistory, recordScoreHistory, tickerKey, ymdOf, ymdToDate };
