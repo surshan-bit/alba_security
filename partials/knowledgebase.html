@@ -220,6 +220,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.170 &middot; 2026-10-14</h3>
+            <ul>
+              <li><b>Pin changes are now dated:</b> every pin or unpin stores the time, the stock, the list size before and after, the build number, the device type and the screen, both with the pin list (<code>updatedAt</code>, <code>lastChange</code>) and in a short history of the last 40 changes (<code>pinAudit</code>). If the pins ever change without a click, the record shows which version and device did it.</li>
+            </ul>
             <h3>v1.169 &middot; 2026-10-14</h3>
             <ul>
               <li><b>Pinned stocks always load:</b> the saved pins are now read in two ways at start-up (the live link and a direct read), the live link restarts itself if it fails, and your account id is asked for again a few times if it is slow right after a reload. Before, any one of these failing left every star empty for that page load, and the next pin click then overwrote the saved list.</li>

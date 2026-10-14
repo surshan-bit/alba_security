@@ -4,7 +4,7 @@
  "s0_boot__analysis": "32647:056537f92b94",
  "s0_boot__business": "188:ad107a93c457",
  "s0_boot__trackrecord": "797:2d67cac2808a",
- "s0_boot__knowledgebase": "110637:5e6221e8c635",
+ "s0_boot__knowledgebase": "111134:05dab5f109a9",
  "s0_boot__settings": "1213:737ba50cc929",
  "s0_boot__theme": "4:3d09ba44760d",
  "s0_boot__active": "16:7469b67fecde",
@@ -58,7 +58,7 @@
  "s7_business__sec": "23447:14bbbb471fad",
  "s7_trackrecord__sec": "978:36faaca4970f",
  "s7_help__sec": "22810:932552e4df5c",
- "s7_knowledgebase__sec": "110637:5e6221e8c635",
+ "s7_knowledgebase__sec": "111134:05dab5f109a9",
  "s7_settings__sec": "1213:737ba50cc929",
  "s7b_strategies_open__list": "1824:47094a85e8f0",
  "s7b_strategies_open__main": "21246:b07205fcc807",
@@ -135,6 +135,6 @@
  "s7k_business_matched_toggle__detailOnlyMatched": "4:5ffe533b830f",
  "s7k_business_matched_toggle__backToAll": "4:5ffe533b830f",
  "z_final__localStorage": "3297:93de739d7ba1",
- "z_final__db": "15667:1aa66465dc9d",
+ "z_final__db": "16762:6fb94a7f5120",
  "z_console__logs": "900:2b84de01f4ea"
 }
