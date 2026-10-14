@@ -451,6 +451,20 @@ async function techScenarios(){
     const r = await run(page, 'tech'); ok(r.cls === 'err' && /integrity check failed, nothing was written/.test(r.text) && /no stock in the file matched a stock on the dashboard/.test(r.text), r.text.slice(0, 260));
     const a = await readDb(page); eq(a.meta.version, 5, 'nothing written'); eq(a.backups.length, 1, 'backup taken first'); ok(a.job.status === 'failed', 'lock released as failed');
   });
+  // pressing Import while the new file is still being saved must import that new file, not the older one that is still waiting
+  await runScenario('tech import: Import pressed while a new upload is still being saved uses the new file', { docs: seedRec('tech', 'old1', 'old.csv') }, async page => {
+    page.blobs.set('old1', techFile({ seed: 11 }).csv);
+    const fresh = techFile({ seed: 22 });
+    await page.evaluate(() => { window.__uploadDelay = 1500; });
+    await page.setInputFiles('#technicalCsvInput', { name: 'today.csv', mimeType: 'text/csv', buffer: Buffer.from(fresh.csv) });
+    await page.waitForFunction(() => /Will update/.test(document.getElementById('technicalUploadResult').textContent), null, { timeout: 30000 });
+    const r = await run(page, 'tech');
+    ok(r.cls === 'ok', 'the import ends green: ' + r.text.slice(0, 200));
+    const db = await readDb(page);
+    const done = db.techLog.filter(x => x.status === 'processed').map(x => x.filename);
+    eq(done, ['today.csv'], 'the new file is the one imported');
+    ok(db.techLog.some(x => x.filename === 'old.csv' && x.status === 'uploaded'), 'the older file is left alone');
+  });
   await runScenario('tech import: no file has been uploaded', {}, async page => { const r = await run(page, 'tech'); ok(r.cls === 'err' && /there is no uploaded file waiting\. Use "Browse CSV…" to upload the TradingView Growth List export first\./.test(r.text), r.text.slice(0, 200)); });
   await runScenario('tech import: another import holds the lock', { docs: { 'importJobs/fundamental': { status: 'running', startedAt: new Date().toISOString() } } }, async page => {
     await upload(page, 'tech', 'growth.csv', techFile().csv); const r = await run(page, 'tech'); ok(r.cls === 'err' && /another import is already running/.test(r.text), r.text.slice(0, 200));

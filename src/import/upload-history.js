@@ -3,6 +3,12 @@ import { fundamentalCsvUploadLog, getDb, technicalCsvUploadLog } from '../core/s
 import { sanitizeDocId } from '../core/util.js';
 import { pruneLogCollection } from '../joblogs/panels.js';
 
+// A file is saved in the background after its preview shows. The Import buttons wait for these saves, so pressing Import right
+// after choosing a file imports THAT file and never an older one that is still waiting.
+const saving = new Set();
+function track(promise){ saving.add(promise); const done = () => saving.delete(promise); promise.then(done, done); return promise; }
+async function uploadsSettled(){ while(saving.size) await Promise.allSettled(Array.from(saving)); }
+
 // Saves the raw uploaded file to the artifact's own asset store (the `assets` capability — a
 // separate, larger file-storage area alongside the shared `db`) and writes a metadata record to
 // the `technicalCsvUploadLog` collection, so a future Claude
@@ -11,7 +17,8 @@ import { pruneLogCollection } from '../joblogs/panels.js';
 // preview has already rendered successfully, so a storage hiccup here shouldn't look like the
 // upload itself failed — it just means this particular upload won't be
 // fetchable by Claude later.
-async function recordTechnicalCsvUpload(file, text, stats){
+function recordTechnicalCsvUpload(file, text, stats){ return track(saveTechnicalCsvUpload(file, text, stats)); }
+async function saveTechnicalCsvUpload(file, text, stats){
   if(!stats) return; // preview itself failed — nothing meaningful to log
   try {
     if(!(typeof claude !== 'undefined' && claude && typeof claude.use === 'function')){
@@ -50,7 +57,8 @@ async function recordTechnicalCsvUpload(file, text, stats){
 
 // Same as recordTechnicalCsvUpload, but for the Fundamental Score / screener.in upload flow and
 // its own `fundamentalCsvUploadLog` collection.
-async function recordFundamentalCsvUpload(file, text, stats){
+function recordFundamentalCsvUpload(file, text, stats){ return track(saveFundamentalCsvUpload(file, text, stats)); }
+async function saveFundamentalCsvUpload(file, text, stats){
   if(!stats) return; // preview itself failed — nothing meaningful to log
   try {
     if(!(typeof claude !== 'undefined' && claude && typeof claude.use === 'function')){
@@ -86,4 +94,4 @@ async function recordFundamentalCsvUpload(file, text, stats){
   }
 }
 
-export { recordFundamentalCsvUpload, recordTechnicalCsvUpload };
+export { recordFundamentalCsvUpload, recordTechnicalCsvUpload, uploadsSettled };

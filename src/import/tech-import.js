@@ -1,6 +1,7 @@
 // Technical Score import: apply and run.
 import { lockBusy, lockText, startBeat, tabId } from './joblock.js';
 import { technicalCsvUploadLog } from '../core/store.js';
+import { uploadsSettled } from './upload-history.js';
 import { formatBytes } from '../core/util.js';
 import { recordAttempt, saveRecord } from './last-file.js';
 import { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
@@ -86,7 +87,8 @@ async function albaTiRunImport(){
     await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString(), kind: 'technical', owner: tabId })); locked = true; stopBeat = startBeat(job);
 
     // 1. the uploaded file (always the one recorded in the upload log, never a cached copy)
-    current = 'read'; fiSet('read', 'running', '', 0.3);
+    current = 'read'; fiSet('read', 'running', 'Waiting for the file to finish saving…', 0.3);
+    await uploadsSettled();
     for(const [id, r] of technicalCsvUploadLog.entries()){ if(r.status === 'uploaded' && (!rec || String(r.uploadedAt) > String(rec.uploadedAt))){ rec = r; recId = id; } }
     if(!rec) throw new Error('there is no uploaded file waiting. Use "Browse CSV…" to upload the TradingView Growth List export first.');
     const resp = await fetch('/_blob/' + rec.assetId);
