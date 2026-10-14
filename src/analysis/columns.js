@@ -7,7 +7,7 @@ import { getAnalysisColumnsPanelOpen, analysisFilters } from './state.js';
 import { tvUrlFor } from '../tv/links.js';
 import { pcTickerKey, priceLoaded } from '../prices/store.js';
 import { isPinned } from '../core/pins.js';
-import { mosPct, mosRatingAny } from '../list/metrics.js';
+import { mosPct, mosRatingAny, scoreBand } from '../list/metrics.js';
 import { techRatingInfo } from '../detail/technical.js';
 import { newsCellHtml } from '../strategies/news.js';
 import { getRefreshKit } from '../refresh/hook.js';
@@ -19,7 +19,8 @@ import { getRefreshKit } from '../refresh/hook.js';
 const ANALYSIS_LB_COLUMNS = [
   { id: 'pin', label: '' },
   { id: 'rank', label: '#', num: true },
-  { id: 'score', label: 'Score', num: true },
+  { id: 'score', label: 'Fund', num: true, title: 'Fundamental score (0-10)' },
+  { id: 'techScore', label: 'Tech', num: true, title: 'Technical score (0-10): momentum from price trend and RSI' },
   { id: 'mos', label: 'MoS', num: true },
   { id: 'stock', label: 'Stock' },
   { id: 'weekChg', label: 'W % chg', num: true },
@@ -68,6 +69,10 @@ function analysisLbCellRaw(colId, ctx){
   const { s, i, idx, r, mosLabel, mosClass, price, pinned, scoreLabel, techWCell, techMCell } = ctx;
   switch(colId){
     case 'score': return !scoreLabel ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge b-${s.verdict}" style="padding:1px 8px;font-size:.68rem;">${scoreLabel}</span></td>`;
+    case 'techScore': {
+      const ts = s.technical && typeof s.technical.score === 'number' ? s.technical.score : null;
+      return ts === null ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge b-${scoreBand(ts).replace('fs-', '')}" style="padding:1px 8px;font-size:.68rem;">${ts.toFixed(1)}</span></td>`;
+    }
     case 'pin': return `<td><button type="button" class="pin-btn${pinned ? ' pinned' : ''}" data-ticker="${escapeHtml(s.ticker)}" title="${pinned ? 'Unpin' : 'Pin to top'}">${pinned ? '★' : '☆'}</button></td>`;
     case 'rank': return `<td class="analysis-lb-rank">${i + 1}</td>`;
     case 'stock': return `<td><a class="stock-link" href="${escapeHtml(stockShareLink(s))}"><span class="analysis-lb-name">${escapeHtml(s.name)}</span></a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}</span>${getRefreshKit() ? getRefreshKit().dots(s) : ''}</td>`;
