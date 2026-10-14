@@ -81,6 +81,7 @@ async function albaTiClearOlderUpdates(db, res, asof){
   let cleared = 0;
   try {
     const snap = await albaFiRetry(() => db.collection('stockUpdates').get());
+    const todo = [];
     for(const d of snap.docs){
       const data = d.data(), id = d.id;
       const dropPrice = res.priceDocs.has(id) && data && data.valuation && typeof data.valuation.asof === 'string' && data.valuation.asof <= asof;
@@ -89,9 +90,19 @@ async function albaTiClearOlderUpdates(db, res, asof){
       const next = Object.assign({}, data);
       if(dropPrice) delete next.valuation;
       if(dropTech) delete next.technical;
-      await albaFiRetry(() => db.doc('stockUpdates/' + id).set(next));
-      cleared++;
+      todo.push({ id, next });
     }
+    let i = 0;
+    const worker = async () => {
+      while(i < todo.length){
+        const { id, next } = todo[i++];
+        await albaFiRetry(() => db.doc('stockUpdates/' + id).set(next));
+        cleared++;
+        if(cleared % 10 === 0 || cleared === todo.length) fiSet('verify', 'running', 'Replacing older saved updates ' + cleared + ' / ' + todo.length + '…', 0.3 + 0.4 * cleared / todo.length);
+      }
+    };
+    if(todo.length) fiSet('verify', 'running', 'Replacing older saved updates 0 / ' + todo.length + '…', 0.3);
+    await Promise.all(Array.from({ length: Math.min(6, todo.length) }, worker));
   } catch(e){ console.error('Could not clear older saved updates', e); }
   return cleared;
 }
