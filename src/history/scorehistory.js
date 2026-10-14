@@ -6,7 +6,7 @@
 // the chart can mark where the scoring rules changed (a jump there is the rules, not the company).
 import { dbCapabilityPromise } from '../core/store.js';
 
-const SCORE_ENGINE = 2;        // 1 = before v1.171 scoring fixes, 2 = v1.171 onward. Raise it whenever the scoring rules change.
+const SCORE_ENGINE = 3;        // 1 = before v1.171 scoring fixes, 2 = v1.171 onward, 3 = v1.181 onward (live refresh scores completed bars only). Raise it whenever the scoring rules change.
 const BUCKETS = 64;
 const KEEP_YEARS = 3;
 
@@ -98,4 +98,4 @@ async function loadScoreHistory(s){
   return Array.isArray(all[key]) ? all[key] : [];
 }
 
-export { loadScoreHistory, recordScoreHistory, tickerKey, ymdOf, ymdToDate };
+export { SCORE_ENGINE, loadScoreHistory, recordScoreHistory, tickerKey, ymdOf, ymdToDate };

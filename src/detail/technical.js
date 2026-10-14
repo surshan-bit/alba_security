@@ -47,6 +47,13 @@ function techTimeframeSummary(pct, macdState, rsi){
     + cell('pcs-sig ' + (rating ? 'sig-' + rating.cls.slice(2) : ''), 'Trend signal from the MACD', 'Signal', `<span class="pcs-val"><i class="pcs-dot"></i>${rating ? rating.label : '&mdash;'}</span>`)
     + '</div>';
 }
+// The score is saved from completed weeks and months only. While a week or month is still in progress its reading is shown
+// here, labelled provisional, so a half-finished bar never moves the saved score.
+function provisionalNote(t){
+  const p = t.provisional;
+  if(!p || typeof p.score !== 'number' || !isFinite(p.score)) return '';
+  return `<div class="tech-prov"><b>Provisional ${p.score.toFixed(2)}/10</b><span>This week or month is still in progress. The score above uses completed weeks and months only${t.basis && t.basis.week ? ' (latest completed week from ' + t.basis.week + ')' : ''}.</span></div>`;
+}
 function renderTechPanel(s){
   const t = s.technical;
   if(!t){
@@ -74,7 +81,7 @@ function renderTechPanel(s){
         <div class="tech-panel-title">${panelIcon('tech')}Technical Score &middot; ${t.score.toFixed(2)}/10</div>
         <span class="badge b-${bandKey}">${verdictLabel[bandKey] || ''}</span>
       </div>
-      ${t.newsNote ? `<div class="tech-news-note"><span class="tech-news-label">What happened</span><span>${t.newsNote}</span></div>` : ''}
+      ${provisionalNote(t)}${t.newsNote ? `<div class="tech-news-note"><span class="tech-news-label">What happened</span><span>${t.newsNote}</span></div>` : ''}
       ${chartHtml || `<div class="tech-fallback"><div class="pc-psum"><b>Weekly</b>${sums['1W']}</div><div class="pc-psum"><b>Monthly</b>${sums['1M']}</div></div>`}
     </div>
   `;
