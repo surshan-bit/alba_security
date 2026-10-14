@@ -73,7 +73,8 @@ function applyUpdatesOverlay(docs){
   }
   for(const [id, { s, data }] of next){
     revertUpdates(s);
-    applyUpdatesDoc(s, data);
+    // One odd document must never stop the others from being applied.
+    try { applyUpdatesDoc(s, data); } catch(e){ console.error('Stock update ' + id + ' could not be applied', e); }
     changed = true;
   }
   updatesOverlayApplied.clear();

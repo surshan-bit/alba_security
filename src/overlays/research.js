@@ -20,9 +20,14 @@ import { rerenderDetail } from '../detail/render.js';
 //                          positives[], negatives[], sources[{title,url}]} } } }
 // Deleting a document reverts that stock to its base (pipeline) values.
 const researchOverlayApplied = new Map(); // docId -> stock
-let stockByDocIdCache = null;
+let stockByDocIdCache = null, cacheFirst = null, cacheLast = null;
 function stockByDocId(){
-  if(!stockByDocIdCache || stockByDocIdCache.size !== stocks.length) stockByDocIdCache = new Map(stocks.map(s => [sanitizeDocId(tickerSymbol(s)), s]));
+  // Rebuilt whenever the list changed in size or the first/last entry is a different object, so an overlay never lands on a stock that is no longer shown.
+  const first = stocks[0], last = stocks[stocks.length - 1];
+  if(!stockByDocIdCache || stockByDocIdCache.size !== stocks.length || cacheFirst !== first || cacheLast !== last){
+    stockByDocIdCache = new Map(stocks.map(s => [sanitizeDocId(tickerSymbol(s)), s]));
+    cacheFirst = first; cacheLast = last;
+  }
   return stockByDocIdCache;
 }
 function recomputeFundamentals(s){

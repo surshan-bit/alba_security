@@ -1,7 +1,7 @@
 // Live Data Refresh: Fundamental Info (asks Claude, writes research).
 import { dbCapabilityPromise } from '../core/store.js';
 import { daysSinceDate, escapeHtml, sanitizeDocId, tickerIndustry, tickerSymbol } from '../core/util.js';
-import { fundamentalPendingItems, technicalPendingItems } from '../detail/pending.js';
+import { fundamentalPendingItems, globalPendingInfo, technicalPendingItems } from '../detail/pending.js';
 import { pcTickerKey } from '../prices/store.js';
 import { tvCall, tvErrorText, tvIstDate, tvMcp } from '../tv/connector.js';
 import { priceJobs, refreshOneNow } from '../prices/refresh.js';
@@ -137,7 +137,9 @@ async function ldRunFundamental(s){
     const newestNews = news.reduce((m, n) => (n.date && n.date > m ? n.date : m), '');
     const researchFresh = !!asofR && daysSinceDate(asofR) !== null && daysSinceDate(asofR) <= LD_FRESH_DAYS && !(newestNews && newestNews > asofR);
     const forced = ldForce.has(key);
-    if(researchFresh && !withGaps.length && !forced){
+    // Global & Macro with nothing in it counts as missing, so a stock whose earlier Global & Macro step failed is not skipped as 'up to date'.
+    const gfMissing = globalPendingInfo(s) === 'not yet researched';
+    if(researchFresh && !withGaps.length && !forced && !gfMissing){
       ldForce.add(key); setTimeout(() => ldForce.delete(key), 120000);
       return 'Already up to date: researched ' + asofR + ', no missing metrics and no newer news' + (newestNews ? ' (latest ' + newestNews + ')' : '') + '. ' + (labelled ? 'Claude only labelled ' + labelled + ' news headline' + (labelled === 1 ? '' : 's') + ' for the price chart.' : 'No Claude usage.') + ' Click again within 2 minutes to refresh anyway.';
     }
@@ -239,8 +241,9 @@ async function ldRunFundamental(s){
     // ---- 3. Global & Macro plus recent news ----
     setLdPhase('claude');
     let gfOut = null;
-    if(needCards) set(78, 'Researching Global & Macro and recent news…');
-    if(needCards) try {
+    const needGlobal = needCards || gfMissing;
+    if(needGlobal) set(78, 'Researching Global & Macro and recent news…');
+    if(needGlobal) try {
       const g0 = s.globalFactors || {};
       const r = await ask(headFor(null, ['news', 'stories', 'docs']) + 'TASK: Write this company\'s Global & Macro Information: macro, commodity, currency and trade-policy linkages that could move its price, plus recent company-specific news and events from the last few weeks that matter for a decision now.\nRules: at most 5 positive and 5 negative items, each one short bullet-style sentence under 25 words. Each item needs "source": a news item or filing from the supplied data (use "<provider>, <date>" and its exact url), or, for a general sector or macro linkage the supplied data does not cover, the source "Claude analysis, no live source" with url "". Never invent a url. Prefer items backed by the supplied news. Current stored sector label: ' + (g0.sectorLabel || 'none') + '.\nALSO add "events": up to 4 CRITICAL news items or world events (wars and geopolitical conflicts, sanctions, oil or commodity shocks, major policy, tariff or regulatory changes, big currency or interest-rate moves) that could materially affect THIS company, even indirectly (for example how a Middle East conflict could change crude oil, freight or input costs for this business). Use events found in the supplied news first; you may add well-known major events from your own knowledge, but say so in the source ("Claude knowledge, may be dated") and never claim a recent event you cannot support. Each event: "headline" (under 12 words), "impact" ("positive", "negative" or "mixed"), "why" (one plain sentence under 30 words on how it reaches this company: cost, demand, currency or regulation), "source" and "url" as above. If nothing critical applies, return an empty list.\nReply with only JSON: {"positive":[{"text":"...","source":"...","url":"..."}],"negative":[{"text":"...","source":"...","url":"..."}],"events":[{"headline":"...","impact":"negative","why":"...","source":"...","url":"..."}]}', 78, 83, 3200, 'quick');
       const clean = a => (Array.isArray(a) ? a : []).filter(x => x && typeof x.text === 'string' && x.text.trim()).slice(0, 5).map(x => {

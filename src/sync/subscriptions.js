@@ -53,18 +53,23 @@ function init_sync_subscriptions(){
     console.error('Stock research overlay unavailable', e);
   }
 
-  try {
-    db.collection('stockUpdates').onSnapshot(
-      (snap) => {
-        const docs = [];
-        snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
-        applyUpdatesOverlay(docs);
-      },
-      (err) => console.error('Stock updates sync error', err)
-    );
-  } catch(e){
-    console.error('Stock updates overlay unavailable', e);
-  }
+  // Saved Global & Macro, technical and price updates. If the listener fails it is started again after a pause, so the
+  // overlay does not silently disappear until the page is reloaded.
+  const watchUpdates = (attempt) => {
+    try {
+      db.collection('stockUpdates').onSnapshot(
+        (snap) => {
+          const docs = [];
+          snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
+          try { applyUpdatesOverlay(docs); } catch(e){ console.error('Stock updates could not be applied', e); }
+        },
+        (err) => { console.error('Stock updates sync error', err); if(attempt < 5) setTimeout(() => watchUpdates(attempt + 1), 3000 * (attempt + 1)); }
+      );
+    } catch(e){
+      console.error('Stock updates overlay unavailable', e);
+    }
+  };
+  watchUpdates(0);
 
   try {
     db.collection('researchTriggers').onSnapshot(

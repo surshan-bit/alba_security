@@ -225,6 +225,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.166 &middot; 2026-10-14</h3>
+            <ul>
+              <li><b>Global &amp; Macro no longer left empty by a refresh:</b> a Fundamental refresh used to skip a stock as &ldquo;already up to date&rdquo; when its factor cards were recent, even if its Global &amp; Macro step had failed earlier and the panel still said &ldquo;Not yet researched&rdquo;. Such a stock now gets its Global &amp; Macro researched again (without redoing the factor cards).</li>
+              <li><b>Saved updates are applied more reliably:</b> one unreadable update can no longer stop the others from showing, the stock lookup is rebuilt if the list changes, and the live link to saved Global &amp; Macro, technical and price updates restarts by itself after an error instead of staying silent until you reload.</li>
+            </ul>
             <h3>v1.165 &middot; 2026-10-14</h3>
             <ul>
               <li><b>Technical score beside the Fundamental score:</b> the Analysis, Strategies and Explorer grids now show a <b>Tech</b> column (0&ndash;10, coloured like the Fundamental score) right after <b>Fund</b>, so you can see at a glance which stocks are strong or weak on both. You can hide or move it from the Columns panel.</li>
