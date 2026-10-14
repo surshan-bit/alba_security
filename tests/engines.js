@@ -65,7 +65,7 @@ test('tech symbols: normalisation, hyphen/underscore variants, ticker prefix', (
   assert.strictEqual(Te.tickerSymbol('abc · Some Industry'), 'ABC'); assert.strictEqual(Te.tickerSymbol('500112'), '500112');
 });
 
-const stk = (ticker, val) => ({ ticker, pillars: val === undefined ? undefined : { val } });
+const ist = (ticker, val) => ({ ticker, pillars: val === undefined ? undefined : { val } });
 
 test('tech columns: every field found by header text, in any order, with TradingView wording', () => {
   const m = Te.buildColumnMap(TV_HEADER);
@@ -80,14 +80,14 @@ test('tech columns: every field found by header text, in any order, with Trading
 test('tech score: hand-computed composite (all five components present)', () => {
   // month MACD bullish above zero = 1 -> 2.5; week MACD bearish above zero = 0.5 -> 0.75; month RSI 60 -> 2.0; week RSI 50 -> 1.2; valuation 6/10*2 = 1.2
   const csv = tvCsv([['AAA1', 'x', '100', '2.5', '-1', '3', '2', '1', '2', '60', '50']]);
-  const r = Te.matchAndScore(csv, [stk('AAA1 · Test', 6)]);
+  const r = Te.matchAndScore(csv, [ist('AAA1 · Test', 6)]);
   assert.strictEqual(r.matched.length, 1); assert.strictEqual(r.matched[0].score, 7.65);
   assert.deepStrictEqual(r.matched[0].states, { monthMacd: 'bull_above', weekMacd: 'bear_above', monthRsi: 'strong', weekRsi: 'neutral' });
   assert.strictEqual(r.matched[0].raw.weekPctChange, 2.5); assert.strictEqual(r.matched[0].raw.monthPctChange, -1);
   assert.deepStrictEqual(r.matched[0].missing, []); assert.deepStrictEqual(r.missingColumns, []);
 });
 test('tech score: MACD states and RSI bands (boundaries included)', () => {
-  const score = (ml, ms, wl, ws, mr, wr, val = 5) => Te.matchAndScore(tvCsv([['Q', '', '', '', '', ml, ms, wl, ws, mr, wr]]), [stk('Q', val)]).matched[0];
+  const score = (ml, ms, wl, ws, mr, wr, val = 5) => Te.matchAndScore(tvCsv([['Q', '', '', '', '', ml, ms, wl, ws, mr, wr]]), [ist('Q', val)]).matched[0];
   assert.strictEqual(score(1, 0, 1, 0, 50, 50).states.monthMacd, 'bull_above');
   assert.strictEqual(score(-1, -2, 1, 0, 50, 50).states.monthMacd, 'bull_below');
   assert.strictEqual(score(1, 2, 1, 0, 50, 50).states.monthMacd, 'bear_above');
@@ -101,31 +101,31 @@ test('tech score: MACD states and RSI bands (boundaries included)', () => {
 test('tech score: a missing component is dropped and the rest are rescaled', () => {
   // week RSI blank: points 2.5 + 0.75 + 2.0 + 1.2 (val 6) = 6.45 over weight 8 -> 8.0625 -> 8.06
   const csv = tvCsv([['AAA1', '', '', '', '', '3', '2', '1', '2', '60', '']]);
-  const r = Te.matchAndScore(csv, [stk('AAA1', 6)]).matched[0];
+  const r = Te.matchAndScore(csv, [ist('AAA1', 6)]).matched[0];
   assert.strictEqual(r.score, 8.06); assert.deepStrictEqual(r.missing, ['weekly RSI']); assert.strictEqual(r.states.weekRsi, null);
   // no indicators at all: only the valuation anchor would be left, which would copy the valuation score as a technical score, so the stock is not scored
-  const bare = Te.matchAndScore(tvCsv([['AAA1', '', '', '', '', '', '', '', '', '', '']]), [stk('AAA1', 6)]);
+  const bare = Te.matchAndScore(tvCsv([['AAA1', '', '', '', '', '', '', '', '', '', '']]), [ist('AAA1', 6)]);
   assert.strictEqual(bare.matched.length, 0); assert.strictEqual(bare.frozen.length, 1); assert.ok(/no technical indicators/.test(bare.frozen[0].reason));
   assert.deepStrictEqual(bare.unmatchedCsvSymbols, []);
   // one indicator is enough to score (weekly RSI 60 = 2.0 points, valuation 6 -> 1.2, over weight 4)
-  const one = Te.matchAndScore(tvCsv([['AAA1', '', '', '', '', '', '', '', '', '', '60']]), [stk('AAA1', 6)]).matched[0];
+  const one = Te.matchAndScore(tvCsv([['AAA1', '', '', '', '', '', '', '', '', '', '60']]), [ist('AAA1', 6)]).matched[0];
   assert.strictEqual(one.score, 8); assert.strictEqual(one.missing.length, 3);
 });
 test('tech matching: BSE number via alpha map, hyphen/underscore variants, case, unmatched rows', () => {
   const csv = tvCsv([['ABC', '', '', '', '', '3', '2', '1', '0', '60', '60'], ['BAJAJ_AUTO', '', '', '', '', '3', '2', '1', '0', '60', '60'], ['zzz', '', '', '', '', '3', '2', '1', '0', '60', '60'], ['LONE', '', '', '', '', '', '', '', '', '', '']]);
-  const stocks = [stk('500001 · Ind', 5), stk('BAJAJ-AUTO · Ind', 5), stk('ZZZ · Ind', 5), stk('NOPE · Ind', 5)];
+  const stocks = [ist('500001 · Ind', 5), ist('BAJAJ-AUTO · Ind', 5), ist('ZZZ · Ind', 5), ist('NOPE · Ind', 5)];
   const r = Te.matchAndScore(csv, stocks, { '500001': 'NSE:ABC' });
   assert.deepStrictEqual(r.matched.map(m => m.matchedSymbol), ['ABC', 'BAJAJ-AUTO', 'ZZZ']);   // the file's BAJAJ_AUTO row is indexed under both spellings
   assert.deepStrictEqual(r.unmatchedCsvSymbols, ['LONE']);
   assert.strictEqual(r.matched.find(m => m.stock.ticker.startsWith('NOPE')), undefined);
   // an alpha map entry without an exchange prefix works too, and a numeric ticker with no map entry is simply not matched
-  assert.strictEqual(Te.matchAndScore(csv, [stk('500001', 5)], { '500001': 'ABC' }).matched.length, 1);
-  assert.strictEqual(Te.matchAndScore(csv, [stk('500001', 5)], { '500001': 'nse: abc ' }).matched.length, 1);   // case and spaces in the map are tolerated
-  assert.strictEqual(Te.matchAndScore(csv, [stk('500001', 5)]).matched.length, 0);
+  assert.strictEqual(Te.matchAndScore(csv, [ist('500001', 5)], { '500001': 'ABC' }).matched.length, 1);
+  assert.strictEqual(Te.matchAndScore(csv, [ist('500001', 5)], { '500001': 'nse: abc ' }).matched.length, 1);   // case and spaces in the map are tolerated
+  assert.strictEqual(Te.matchAndScore(csv, [ist('500001', 5)]).matched.length, 0);
 });
 test('tech matching: a stock without a valuation anchor is frozen, not scored', () => {
   const csv = tvCsv([['AAA1', '', '', '', '', '3', '2', '1', '0', '60', '60']]);
-  const r = Te.matchAndScore(csv, [stk('AAA1 · T'), { ticker: 'AAA1 · T', pillars: {} }]);
+  const r = Te.matchAndScore(csv, [ist('AAA1 · T'), { ticker: 'AAA1 · T', pillars: {} }]);
   assert.strictEqual(r.matched.length, 0); assert.strictEqual(r.frozen.length, 2); assert.ok(/pillars\.val missing/.test(r.frozen[0].reason));
   assert.deepStrictEqual(r.unmatchedCsvSymbols, []);   // the row was used, just not scoreable
 });
@@ -133,13 +133,13 @@ test('tech: bad files are rejected with a clear message and missing columns are 
   throwsMsg(() => Te.matchAndScore('', []), /No data rows/);
   throwsMsg(() => Te.matchAndScore('Symbol\n', []), /No data rows/);
   throwsMsg(() => Te.matchAndScore('Ticker,Price\nABC,1\n', []), /"Symbol" column/);
-  const r = Te.matchAndScore('Symbol,RSI 1 month\nAAA1,55\n', [stk('AAA1', 5)]);
+  const r = Te.matchAndScore('Symbol,RSI 1 month\nAAA1,55\n', [ist('AAA1', 5)]);
   assert.deepStrictEqual(r.missingColumns, ['weekPctChange', 'monthPctChange', 'monthMacdSignal', 'monthMacdLevel', 'weekMacdSignal', 'weekMacdLevel', 'weekRsi']);
   assert.strictEqual(r.matched[0].score, Math.round(((2.0 + 1.0) / 4) * 10 * 100) / 100);   // month RSI 55 = 2.0, valuation 5 -> 1.0, weights 4
 });
 test('tech: duplicate symbols in the file, thousands separators and percent signs do not break scoring', () => {
   const csv = tvCsv([['AAA1', '', '', '1.5%', '2,000.5', '3', '2', '1', '0', '60', '60'], ['AAA1', '', '', '', '', '-3', '2', '-1', '0', '20', '20']]);
-  const r = Te.matchAndScore(csv, [stk('AAA1', 5)]);
+  const r = Te.matchAndScore(csv, [ist('AAA1', 5)]);
   assert.strictEqual(r.matched.length, 1);                 // the last row for a symbol wins, exactly one result per stock
   assert.strictEqual(r.matched[0].states.monthRsi, 'oversold');
 });
@@ -418,7 +418,7 @@ for(const r of Fe.scoreCsv(csv, { exactIndustryBySym: exactMap }).records){
 }
 {
   D.setSeed(777); const rows = []; const tvStocks = [];
-  for(let i = 0; i < 14; i++){ rows.push(['TV' + i, '', '', rv(-5, 5, 2), rv(-10, 10, 2), rv(-3, 3, 3), rv(-3, 3, 3), rv(-3, 3, 3), rv(-3, 3, 3), rv(15, 85, 1), rv(15, 85, 1)]); tvStocks.push(stk('TV' + i + ' · I', +rv(0, 10, 1))); }
+  for(let i = 0; i < 14; i++){ rows.push(['TV' + i, '', '', rv(-5, 5, 2), rv(-10, 10, 2), rv(-3, 3, 3), rv(-3, 3, 3), rv(-3, 3, 3), rv(-3, 3, 3), rv(15, 85, 1), rv(15, 85, 1)]); tvStocks.push(ist('TV' + i + ' · I', +rv(0, 10, 1))); }
   for(const m of Te.matchAndScore(tvCsv(rows), tvStocks).matched) golden['tech:' + m.matchedSymbol] = [m.score, m.states.monthMacd, m.states.weekMacd, m.states.monthRsi, m.states.weekRsi];
 }
 const goldenFile = path.join(__dirname, 'engines.golden.json');
@@ -510,6 +510,26 @@ test('trade call: missing data never crashes and never invents a call', () => {
   assert.strictEqual(s.call, 'hold'); assert.strictEqual(s.gain, null);
   assert.strictEqual(G.factsFor({ buy: { price: 10 } }, null).price, null);
 });
+const I = load('src/tradelog/ideacall.js');
+const idea = (o) => ({ name: 'X', score: 7.2, verdict: 'buy', valuation: { currentPrice: 100, intrinsicValue: 160 }, technical: { raw: { weekRsi: 55, monthRsi: 60 } }, ...o });
+test('ideas: a strong verdict, roomy cushion and calm RSI is Buy; a stretched, overvalued weak one is Avoid; the middle is Wait', () => {
+  assert.strictEqual(I.ideaCall(idea({}), null).call, 'buy');
+  assert.strictEqual(I.ideaCall(idea({ verdict: 'avoid', score: 4, valuation: { currentPrice: 100, intrinsicValue: 80 }, technical: { raw: { weekRsi: 85, monthRsi: 80 } } }), null).call, 'sell');
+  assert.strictEqual(I.ideaCall(idea({ verdict: 'hold', score: 6, valuation: { currentPrice: 100, intrinsicValue: 105 }, technical: { raw: { weekRsi: 70, monthRsi: 60 } } }), null).call, 'hold');
+  assert.strictEqual(I.ideaCall(idea({ technical: { raw: { weekRsi: 82, monthRsi: 60 } } }), null).call !== 'buy', true, 'a stretched weekly RSI is never a Buy');
+});
+test('ideas: a stock you hold gets its trade call (add is Buy, trim and review are Sell)', () => {
+  const tr = { buy: { price: 100, snapshot: { score: 7.2 } } };
+  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 102, intrinsicValue: 160 } }), tr).label, 'Add more');
+  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 150, intrinsicValue: 300 }, technical: { raw: { weekRsi: 85, monthRsi: 80 } } }), tr).call, 'sell');
+  assert.strictEqual(I.ideaCall(idea({}), tr).held, true);
+});
+test('ideas: ranking puts Buy first (most points first), then Hold, then the weakest Sell first', () => {
+  const mk = (n, call, pts) => ({ s: { name: n }, c: { call, pts } });
+  const r = I.rankIdeas([mk('a', 'sell', -1), mk('b', 'hold', 1), mk('c', 'buy', 4), mk('d', 'buy', 6), mk('e', 'sell', -4)]).map(x => x.s.name).join('');
+  assert.strictEqual(r, 'dcbea');
+});
+test('ideas: missing data never crashes', () => { assert.strictEqual(I.ideaCall({}, null).call, 'hold'); });
 test('trade call: history keeps one point a day and lists when the call changed', () => {
   let h = G.addSignalPoint([], 20261001, { call: 'hold', mos: 40, gain: 5 }, { price: 105, score: 6.5, rsiWeek: 55 });
   h = G.addSignalPoint(h, 20261002, { call: 'hold', mos: 39, gain: 6 }, { price: 106, score: 6.5, rsiWeek: 57 });

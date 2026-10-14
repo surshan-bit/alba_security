@@ -164,6 +164,22 @@ async function tradeScenarios(){
     await until(page, () => !document.querySelector('#tradeLogPanelBody table') && !!document.querySelector('#tradeLogPanelBody .tl-card'), null, 'the Cards button shows the cards again');
   });
 
+  // Buy / Sell ideas: pick a strategy, the qualifying stocks are listed with a call, and a name opens the stock page
+  await scenario('trade log: Buy / Sell ideas for a chosen strategy', { section: 'trackrecord' }, { [TRADES + '/' + idA]: openTrade(A, '2026-10-01', 100, 5) }, async page => {
+    await goto(page, 'trackrecord');
+    await until(page, () => !!document.querySelector('#tradeIdeasStrategy') && document.querySelectorAll('#tradeIdeasStrategy option').length > 1, null, 'the strategy picker lists the strategies');
+    await until(page, () => /Choose a strategy/.test((document.getElementById('tradeIdeasBody') || {}).textContent || ''), null, 'it asks for a strategy first');
+    await page.selectOption('#tradeIdeasStrategy', 'starter-deep-value');
+    await until(page, () => !!document.querySelector('#tradeIdeasBody table, #tradeIdeasBody .upload-hint'), null, 'choosing a strategy shows its stocks or says none qualify');
+    const n = await page.evaluate(() => document.querySelectorAll('#tradeIdeasBody tbody tr').length);
+    if(n > 0){
+      const calls = await page.evaluate(() => Array.from(document.querySelectorAll('#tradeIdeasBody tbody .tl-signal-badge')).map(b => b.textContent));
+      ok(calls.every(c => ['Buy', 'Wait', 'Avoid', 'Add more', 'Hold', 'Trim', 'Review'].includes(c)), 'every listed stock has a call, got ' + JSON.stringify(calls.slice(0, 5)));
+      await domClick(page, '#tradeIdeasBody a[data-idea-open]');
+      await until(page, () => document.getElementById('section-trackrecord').classList.contains('inline-detail-open'), null, 'a stock name in the ideas opens its page');
+    } else ok(true, 'no stock qualifies in the fixtures for this strategy');
+  });
+
   // a failed delete tells the viewer, and the trade stays
   await scenario('trade log: a refused remove shows a notice and keeps the trade', { section: 'trackrecord', liveCollections: true, rules: [{ op: 'delete', prefix: TRADES, error: { message: 'refused' } }] }, { [TRADES + '/' + idA]: openTrade(A, '2026-10-01', 100, 5) }, async page => {
     await goto(page, 'trackrecord');

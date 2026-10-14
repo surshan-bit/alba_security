@@ -53,3 +53,10 @@
 .tl-live{color:var(--accent);font-weight:700;text-transform:none;letter-spacing:0;}
 .tl-name-link{color:inherit;text-decoration:none;border-bottom:1px dotted var(--muted,#8a94a3);cursor:pointer;}
 .tl-name-link:hover{color:var(--accent);border-bottom-color:var(--accent);}
+.tl-ideas{margin-top:18px;}
+.tl-ideas-select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:.82rem;max-width:260px;}
+.tl-ideas-bar{margin:0 0 10px;}
+.tl-idea-buy{background:rgba(60,180,110,.18);border-color:rgba(60,180,110,.5);}
+.tl-idea-hold{background:rgba(120,140,160,.15);}
+.tl-idea-sell{background:rgba(220,80,80,.18);border-color:rgba(220,80,80,.5);}
+.tl-idea-why{font-size:.76rem;color:var(--muted);min-width:220px;}
