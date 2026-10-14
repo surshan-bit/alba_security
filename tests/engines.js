@@ -17,7 +17,11 @@ const P = load('src/import/csvparse.js');
 const Fe = F.AlbaFundEngine, Te = T.AlbaTechEngine;
 
 let passed = 0; const failures = [];
-function test(name, fn){ try { fn(); passed++; } catch(e){ failures.push(name + ": " + String(e.message || e).split("\n").slice(0, 6).join(" | ")); } }
+const pending = [];   // async tests: awaited before the summary
+function test(name, fn){
+  const bad = e => failures.push(name + ": " + String(e.message || e).split("\n").slice(0, 6).join(" | "));
+  try { const r = fn(); if(r && typeof r.then === 'function') pending.push(r.then(() => { passed++; }, bad)); else passed++; } catch(e){ bad(e); }
+}
 const near = (a, b, d = 1e-9) => assert.ok(Math.abs(a - b) <= d, `${a} is not within ${d} of ${b}`);
 const throwsMsg = (fn, re) => assert.throws(fn, e => re.test(e.message));
 
@@ -425,5 +429,62 @@ test('golden: the scores for the made-up universe have not moved', () => {
   assert.strictEqual(moved.length, 0, moved.length + ' entries differ (e.g. ' + moved.slice(0, 3).join(', ') + '); if intended run: node tests/engines.js --update');
 });
 
+// =========================================================== score history (the trend on the stock page)
+const H = load('src/history/scorehistory.js', 'export { BUCKETS, SCORE_ENGINE, addPoint, bucketId, bucketOf, pointFor };');
+const R = load('src/detail/scoretrend.js', 'export { scoreTrendHtml };');
+test('history: a stock always lands in the same one of 64 buckets', () => {
+  assert.strictEqual(H.bucketOf('AAA1'), H.bucketOf('AAA1'));
+  for(const k of ['AAA1', 'BBB2', '500325', 'X-Y_Z']) assert.ok(H.bucketOf(k) >= 0 && H.bucketOf(k) < H.BUCKETS);
+  assert.strictEqual(H.bucketId(5), 'h05');
+  assert.strictEqual(H.tickerKey({ ticker: 'AAA1 · Some Co' }), 'AAA1');
+});
+test('history: addPoint appends, replaces the same date, skips repeats, and drops points over three years old', () => {
+  const a = H.addPoint(null, [20261001, 6, 5, 100, 2]);
+  assert.deepStrictEqual(a, [[20261001, 6, 5, 100, 2]]);
+  assert.strictEqual(H.addPoint(a, [20261008, 6, 5, 100, 2]), null, 'identical to the newest point: nothing to add');
+  const b = H.addPoint(a, [20261008, 6.5, 5, 101, 2]);
+  assert.strictEqual(b.length, 2);
+  const c = H.addPoint(b, [20261008, 7, 5, 101, 2]);
+  assert.strictEqual(c.length, 2); assert.strictEqual(c[1][1], 7, 'same date is replaced');
+  const old = [[20230901, 5, 5, 1, 1], [20231101, 5, 5, 1, 1]];
+  const d = H.addPoint(old, [20261014, 6, 6, 1, 2]);
+  assert.deepStrictEqual(d.map(p => p[0]), [20231101, 20261014], 'the point from before the three-year window is dropped');
+});
+test('history: pointFor rounds, reads the price from the valuation, and skips a stock with no scores', () => {
+  assert.deepStrictEqual(H.pointFor({ score: 6.456, technical: { score: 4.2 }, valuation: { currentPrice: 99.999 } }, 20261014), [20261014, 6.46, 4.2, 100, H.SCORE_ENGINE]);
+  assert.deepStrictEqual(H.pointFor({ score: 6, technical: null }, 20261014), [20261014, 6, null, null, H.SCORE_ENGINE]);
+  assert.strictEqual(H.pointFor({ technical: { score: null } }, 20261014), null);
+});
+test('history: recordScoreHistory writes one document per bucket, is idempotent, and never throws', async () => {
+  const store = new Map(), sets = [];
+  const db = { doc: p => ({ get: async () => ({ exists: store.has(p), data: () => store.get(p) }), set: async d => { sets.push(p); store.set(p, JSON.parse(JSON.stringify(d))); } }) };
+  const list = ['AAA1', 'BBB2', 'CCC3'].map((k, i) => ({ ticker: k + ' · Co', score: 5 + i, technical: { score: 4 + i }, valuation: { currentPrice: 10 * (i + 1) } }));
+  const r1 = await H.recordScoreHistory(db, list, 20261001);
+  assert.strictEqual(r1.stocks, 3); assert.ok(!r1.error);
+  const buckets = new Set(list.map(s => H.bucketId(H.bucketOf(H.tickerKey(s)))));
+  assert.strictEqual(store.size, buckets.size);
+  const n = sets.length;
+  const r2 = await H.recordScoreHistory(db, list, 20261008);
+  assert.strictEqual(r2.stocks, 0); assert.strictEqual(sets.length, n, 'an import that changed nothing writes nothing');
+  list[0].score = 7;
+  const r3 = await H.recordScoreHistory(db, list, 20261015);
+  assert.strictEqual(r3.stocks, 1);
+  const doc = store.get('scoreHistory/' + H.bucketId(H.bucketOf('AAA1')));
+  assert.deepStrictEqual(doc.stocks.AAA1.map(p => p[0]), [20261001, 20261015]);
+  const bad = await H.recordScoreHistory({ doc: () => { throw new Error('db down'); } }, list, 20261016);
+  assert.match(bad.error, /db down/);
+});
+test('history: the trend chart needs two points, marks engine changes, and says so when short', () => {
+  assert.match(R.scoreTrendHtml([]), /appears after the next import/);
+  assert.match(R.scoreTrendHtml([[20261001, 6, 5, 100, 2]]), /One reading so far/);
+  const html = R.scoreTrendHtml([[20261001, 6, 5, 100, 1], [20261008, 6.5, 4, 110, 2], [20261015, 7, null, null, 2]]);
+  assert.match(html, /<svg/); assert.match(html, /trend-engine/); assert.match(html, /Fundamental \+1\.00/);
+  assert.ok(!/NaN/.test(html));
+  assert.ok(!/trend-engine/.test(R.scoreTrendHtml([[20261001, 6, 5, 1, 2], [20261008, 7, 5, 1, 2]])));
+});
+
+(async () => {
+await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
 console.log('engine tests: ' + passed + ' passed');
+})();

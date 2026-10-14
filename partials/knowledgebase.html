@@ -220,6 +220,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.172 &middot; 2026-10-14</h3>
+            <ul>
+              <li><b>Score trend:</b> every stock page now has a Score trend panel under the Technical Score, drawing the Fundamental and Technical score (0&ndash;10) over time with the price faintly behind them. A dashed line marks a day the scoring rules changed, so a jump there is the rules, not the company.</li>
+              <li>The history is recorded automatically by each Fundamental and each Technical import (one small point per stock, only when something changed) and about three years are kept. It starts with the readings already on file, so a stock shows its first trend after the next import adds a second point.</li>
+            </ul>
             <h3>v1.171 &middot; 2026-10-14</h3>
             <ul>
               <li><b>Scoring fixes (fundamental and technical):</b> a blank current ROCE or ROE is now treated as missing and the 10-year / 7-year figure is used on its own, instead of being averaged with a hidden zero (which roughly halved the value and dragged the percentile down).</li>

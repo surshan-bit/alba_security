@@ -9,6 +9,7 @@ import { albaApplyFundamental } from './fund-engine.js';
 import { albaTiRunImport } from './tech-import.js';
 import { albaWlRunSync } from './wlsync.js';
 import { registerBusy } from '../core/busy.js';
+import { recordScoreHistory } from '../history/scorehistory.js';
 
 // ====================================================================================================
 // FUNDAMENTAL IMPORT, IN THE PAGE (added 2026-10-09). "Import data" no longer opens a Claude chat:
@@ -310,6 +311,7 @@ async function albaFiRunImport(){
     current = 'write';
     const out = await albaFiPersist(db, raw, raw.stocks, 'import');
     current = 'verify';
+    await recordScoreHistory(db, raw.stocks);   // the trend on the stock page; never fails the import
     const dataVer = out.nothing ? raw.meta.version : out.plan.newMeta.version;
     if(out.nothing){ fiSet('write', 'done', 'nothing changed'); }
     const mixAfter = res.verdictMix;

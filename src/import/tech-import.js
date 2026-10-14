@@ -8,6 +8,7 @@ import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './pan
 import { AlbaTechEngine } from './tech-engine.js';
 import { techValLabel } from '../engine/technical.js';
 import { albaWlResolveBse } from './wlsync.js';
+import { recordScoreHistory } from '../history/scorehistory.js';
 
 const ALBA_TI_COMP = { 'monthly MACD': 'monthMacd', 'weekly MACD': 'weekMacd', 'monthly RSI': 'monthRsi', 'weekly RSI': 'weekRsi' };
 // Scores every stock found in the Growth List (never adds stocks) and refreshes price / margin of safety.
@@ -155,6 +156,7 @@ async function albaTiRunImport(){
     current = 'write';
     const out = await albaFiPersist(db, raw, raw.stocks, 'import');
     current = 'verify';
+    await recordScoreHistory(db, raw.stocks);   // the trend on the stock page; never fails the import
     const dataVer = out.nothing ? raw.meta.version : out.plan.newMeta.version;
     if(out.nothing) fiSet('write', 'done', 'nothing changed');
     const note = 'Imported in the page: ' + res.rescored + ' rescored, ' + res.kept.length + ' kept (curated), ' + res.priced + ' prices refreshed, ' + res.frozen + ' not scored. Average technical score ' + avgBefore.toFixed(2) + '→' + avgAfter.toFixed(2) + '.';
