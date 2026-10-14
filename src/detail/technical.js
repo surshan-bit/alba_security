@@ -3,6 +3,7 @@ import { panelIcon } from './icons.js';
 import { verdictLabel } from '../core/stocks.js';
 import { scoreBand } from '../list/metrics.js';
 import { renderPriceChartMount } from '../prices/chart.js';
+import { formatDate } from '../core/util.js';
 
 // ---- Technical Score, translated into plain business language ----
 // The underlying signal is still a technical-analysis composite (MACD trend + RSI momentum +
@@ -47,6 +48,20 @@ function techTimeframeSummary(pct, macdState, rsi){
     + cell('pcs-sig ' + (rating ? 'sig-' + rating.cls.slice(2) : ''), 'Trend signal from the MACD', 'Signal', `<span class="pcs-val"><i class="pcs-dot"></i>${rating ? rating.label : '&mdash;'}</span>`)
     + '</div>';
 }
+// Which bars the score was read from. The bar-based refresh scores completed weeks and months only and keeps the reading with
+// the week / month in progress as `provisional`; a TradingView export's readings always include the bars in progress.
+function techBasisNote(t){
+  const b = t.basis;
+  if(!b) return '';
+  let text;
+  if(b.source === 'bars'){
+    const month = b.month ? new Date(b.month + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : '';
+    text = 'Completed bars only' + (b.week ? ': weeks to the week of ' + formatDate(b.week) : '') + (month ? (b.week ? ', months to ' : ': months to ') + month : '') + '.';
+    if(t.provisional && typeof t.provisional.score === 'number') text += ' With the week / month in progress: ' + t.provisional.score.toFixed(2) + ' (provisional).';
+  } else if(b.source === 'csv') text = 'From the TradingView export: its readings include the week and month still in progress.';
+  else return '';
+  return `<div class="tech-basis">${text}</div>`;
+}
 function renderTechPanel(s){
   const t = s.technical;
   if(!t){
@@ -74,7 +89,7 @@ function renderTechPanel(s){
         <div class="tech-panel-title">${panelIcon('tech')}Technical Score &middot; ${t.score.toFixed(2)}/10</div>
         <span class="badge b-${bandKey}">${verdictLabel[bandKey] || ''}</span>
       </div>
-      ${t.newsNote ? `<div class="tech-news-note"><span class="tech-news-label">What happened</span><span>${t.newsNote}</span></div>` : ''}
+      ${techBasisNote(t)}${t.newsNote ? `<div class="tech-news-note"><span class="tech-news-label">What happened</span><span>${t.newsNote}</span></div>` : ''}
       ${chartHtml || `<div class="tech-fallback"><div class="pc-psum"><b>Weekly</b>${sums['1W']}</div><div class="pc-psum"><b>Monthly</b>${sums['1M']}</div></div>`}
     </div>
   `;

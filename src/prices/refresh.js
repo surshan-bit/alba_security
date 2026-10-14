@@ -3,7 +3,7 @@ import { dbCapabilityPromise } from '../core/store.js';
 import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { priceHistoryStatus } from '../detail/pending.js';
 import { ensurePriceBars, pcTickerKey, priceApply, priceHistoryByTicker } from './store.js';
-import { computeTechnical } from '../engine/technical.js';
+import { computeTechnical, techCompletedBars } from '../engine/technical.js';
 import { tvCall, tvErrorText, tvIstDate, tvMcp, tvMergeDelta, tvResolveSymbol, tvToRows, tvValidate } from '../tv/connector.js';
 
 const priceJobs = new Map();   // dashboard ticker key -> { state: 'queued'|'running'|'ok'|'error', msg, at }
@@ -59,7 +59,16 @@ async function refreshOneStock(s, db){
   const pv = s.pillars && typeof s.pillars.val === 'number' ? s.pillars.val : null;
   if(pv == null){ techMsg = '; technical score not updated (no valuation reading)'; }
   else {
-    const t = computeTechnical(W, M, pv, tvIstDate());
+    // The saved score uses completed bars only (as back-tested); the reading with the week / month in progress is kept beside it as provisional.
+    const now = Date.now() / 1000, Wc = techCompletedBars(W, '1W', now), Mc = techCompletedBars(M, '1M', now);
+    const t = computeTechnical(Wc, Mc, pv, tvIstDate());
+    if(t){
+      t.basis = { source: 'bars', week: Wc.length ? tvIstDate(Wc[Wc.length - 1][0]) : null, month: Mc.length ? tvIstDate(Mc[Mc.length - 1][0]) : null };
+      if(Wc.length < W.length || Mc.length < M.length){
+        const p = computeTechnical(W, M, pv, tvIstDate());
+        if(p && p.score != null) t.provisional = { score: p.score, states: p.states };
+      }
+    }
     if(!t){ techMsg = '; not enough history for a technical score'; }
     else {
       set('saving technical score…');

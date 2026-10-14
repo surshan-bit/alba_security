@@ -51,7 +51,7 @@ tests/fixtures/stocks.json    anonymised sample of the stock list used by the ha
 | `research/` | research age and trigger status |
 | `overlays/` | applying saved research and updates on top of the base stock data |
 | `prices/` | price history: `store` (lazy per-stock loading), `chart`, `events` (event tags under the charts), `refresh` |
-| `engine/` | `technical` (EMA, MACD, RSI, composite score) |
+| `engine/` | `technical` (EMA, MACD, RSI, composite score): the one set of Technical Score rules, used by both the bar-based refresh and the CSV import (`import/tech-engine.js`). The bar-based refresh saves a score from completed weeks and months only (`techCompletedBars`) and keeps the reading with the bars in progress as `technical.provisional`; `technical.basis` records which kind of reading a stock has (a TradingView export always includes the bars in progress) |
 | `tv/` | TradingView: `connector` (calls, retries, symbols, bars), `links` |
 | `live/` | `ticker`: the live price ticker. On weekdays during the market session it asks TradingView for the stocks on screen and updates Price, Margin of Safety, W % chg and M % chg in place (nothing is saved); the stock page shows a small live price beside the ticker |
 | `livedata/` | the Live Data Refresh buttons: `bar`, `fundamental`, `technical`, `claude`, `symbols`, `panel` (markup shared by the Analysis and Strategies panels), `batch`, `events` (dated news / results / company events saved for the chart tags) |

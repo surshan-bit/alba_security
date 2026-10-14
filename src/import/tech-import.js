@@ -7,7 +7,6 @@ import { recordAttempt, saveRecord } from './last-file.js';
 import { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 import { AlbaTechEngine } from './tech-engine.js';
-import { techValLabel } from '../engine/technical.js';
 import { albaWlResolveBse } from './wlsync.js';
 import { recordScoreHistory } from '../history/scorehistory.js';
 
@@ -17,25 +16,13 @@ const ALBA_TI_COMP = { 'monthly MACD': 'monthMacd', 'weekly MACD': 'weekMacd', '
 // has (the hand-curated / BSE-derived blocks) keeps that block: the weekly CSV must not wipe curated data.
 function albaApplyTechnical(csvText, stocks, bseMap, asof){
   const res = AlbaTechEngine.matchAndScore(csvText, stocks, bseMap || {});
-  const MACD = { bull_above: 'bullish, above zero', bear_above: 'bearish, above zero', bull_below: 'bullish, below zero', bear_below: 'bearish, below zero' };
   const f1 = x => (Math.round(x * 10) / 10).toFixed(1);
   const kept = [], rescored = [], techDocs = new Set(), priceDocs = new Set();
   for(const m of res.matched){
-    const s = m.stock, st = m.states, r = m.raw, v = s.pillars.val, old = s.technical;
+    const s = m.stock, old = s.technical;
     if(m.missing.length && old && old.states && m.missing.some(c => old.states[ALBA_TI_COMP[c]] != null)){ kept.push(albaFiSym(s)); continue; }
-    const parts = [];
-    if(st.monthMacd && st.weekMacd) parts.push('monthly MACD ' + MACD[st.monthMacd] + ', weekly MACD ' + MACD[st.weekMacd] + '.');
-    else {
-      if(st.monthMacd) parts.push('monthly MACD ' + MACD[st.monthMacd] + '.');
-      if(st.weekMacd) parts.push('weekly MACD ' + MACD[st.weekMacd] + '.');
-    }
-    const rs = [];
-    if(st.monthRsi) rs.push('monthly RSI ' + f1(r.monthRsi) + ' (' + st.monthRsi + ')');
-    if(st.weekRsi) rs.push('weekly RSI ' + f1(r.weekRsi) + ' (' + st.weekRsi + ')');
-    if(rs.length) parts.push(rs.join(', ') + '.');
-    parts.push('Valuation pillar reading of ' + f1(v) + '/10 (' + techValLabel(v) + ').');
-    if(m.missing.length) parts.push('(' + m.missing.join(', ') + ' not available in this export — composite computed from available components only, rescaled to a 0–10 scale.)');
-    s.technical = { asof, score: m.score, states: Object.assign({}, st, { valuation: techValLabel(v) }), raw: Object.assign({}, r, { valuationScore: v }), reason: parts.join(' ') };
+    // The readings come from TradingView's export, which includes the week and month still in progress (unlike the bar-based refresh).
+    s.technical = { asof, score: m.score, states: m.states, raw: m.raw, reason: m.reason, basis: { source: 'csv' } };
     rescored.push(albaFiSym(s)); techDocs.add(sanitizeDocId(tickerSymbol(s)));
   }
   // ---- Price & MoS refresh: the Price column (INR rows only) is the CURRENT PRICE of every matched stock that has

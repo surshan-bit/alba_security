@@ -81,8 +81,8 @@ const e2eStubs = {
     if(tool === 'mcp-tv-search-symbols') return { payload: { data: { symbols: [{ symbol: 'NSE:' + String(input.query).replace(/\W/g, '').toUpperCase(), exchange: 'NSE', description: String(input.query) }] } } };
     if(tool === 'mcp-tv-get-symbol-data') return { payload: { data: { close: 123.4 } } };
     if(tool === 'mcp-tv-get-news') return { payload: { data: { headlines: [{ id: 'n1', title: 'News ' + 'x'.repeat(60), provider: { name: 'P' }, published: Date.now() / 1000 - 86400, link: 'https://e.com/1', paywall: false }] } } };
-    if(tool === 'mcp-tv-get-ohlcv'){   // consistent, ascending bars ending at 2026-10-05
-      const step = input.interval === '1W' ? 7 * 86400 : 30 * 86400, n = Math.min(input.count || 100, 300), end = Date.parse('2026-10-05T00:00:00Z') / 1000;
+    if(tool === 'mcp-tv-get-ohlcv'){   // consistent, ascending bars ending at 2026-10-05 (weekly) / 2026-09-01 (monthly): all completed bars, whatever day the tests run
+      const step = input.interval === '1W' ? 7 * 86400 : 30 * 86400, n = Math.min(input.count || 100, 300), end = Date.parse(input.interval === '1W' ? '2026-10-05T00:00:00Z' : '2026-09-01T00:00:00Z') / 1000;
       const b = { t: [], o: [], h: [], l: [], c: [], v: [] };
       for(let i = 0; i < n; i++){ const px = 100 + i * 0.5 + (i % 5); b.t.push(end - (n - 1 - i) * step); b.o.push(px); b.c.push(px + 1); b.h.push(px + 2); b.l.push(px - 1); b.v.push(1000 + i); }
       return { payload: { bars: b } };

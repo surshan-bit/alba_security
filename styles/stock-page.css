@@ -121,6 +121,7 @@
      Past Week / Past Month cells (added 2026-10-06) — same RSI number and same rating label
      (techRatingInfo) as the Analysis section leaderboard's Weekly RSI / Tech Rating W columns. */
 .tech-empty{color:var(--muted);font-size:.86rem;}
+.tech-basis{color:var(--muted);font-size:.78rem;line-height:1.5;margin:-6px 0 12px;}
 /* Positive and Negative sit side by side and share rows: the cards on the same row stretch to the tallest one (subgrid).
      When the panel is narrow they stack instead (see the container query below). */
 .global-panel{margin-top:6px;padding-top:12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;container-type:inline-size;}

@@ -82,7 +82,7 @@ test('tech score: hand-computed composite (all five components present)', () => 
   const csv = tvCsv([['AAA1', 'x', '100', '2.5', '-1', '3', '2', '1', '2', '60', '50']]);
   const r = Te.matchAndScore(csv, [ist('AAA1 · Test', 6)]);
   assert.strictEqual(r.matched.length, 1); assert.strictEqual(r.matched[0].score, 7.65);
-  assert.deepStrictEqual(r.matched[0].states, { monthMacd: 'bull_above', weekMacd: 'bear_above', monthRsi: 'strong', weekRsi: 'neutral' });
+  assert.deepStrictEqual(r.matched[0].states, { monthMacd: 'bull_above', weekMacd: 'bear_above', monthRsi: 'strong', weekRsi: 'neutral', valuation: 'reasonably valued' });
   assert.strictEqual(r.matched[0].raw.weekPctChange, 2.5); assert.strictEqual(r.matched[0].raw.monthPctChange, -1);
   assert.deepStrictEqual(r.matched[0].missing, []); assert.deepStrictEqual(r.missingColumns, []);
 });
@@ -407,8 +407,42 @@ test('fix: a flat price series has no RSI (not 100)', () => {
   assert.strictEqual(TECH.computeTechnical(rising, rising, 5, '2026-10-14').raw.weekRsi, 100);
 });
 test('fix: both technical paths call a 4/10 valuation "fully valued"', () => {
-  const TECH = load('src/engine/technical.js');
+  const TECH = load('src/engine/technical.js', 'export { techValLabel };');
   assert.strictEqual(TECH.techValLabel(4), 'fully valued'); assert.strictEqual(TECH.techValLabel(3.9), 'expensive / stretched valuation');
+});
+test('one engine: the CSV import and the bar refresh give the same block for the same readings', () => {
+  const TECH = load('src/engine/technical.js', 'export { techMacd, techRsi };');
+  const closes = Array.from({ length: 60 }, (_, i) => 100 + i * 0.7 + 6 * Math.sin(i / 3));
+  const bars = closes.map((c, i) => [i, c, c, c, c, 0]);
+  const fromBars = TECH.computeTechnical(bars, bars, 6.2, '2026-10-14');
+  const m = TECH.techMacd(closes), r = TECH.techRsi(closes);
+  const pctCol = ((closes[59] / closes[58]) - 1) * 100;
+  const csv = tvCsv([['SAME', '', '', pctCol, pctCol, m.level, m.signal, m.level, m.signal, r, r]]);
+  const fromCsv = Te.matchAndScore(csv, [ist('SAME · Co', 6.2)]).matched[0];
+  assert.strictEqual(fromCsv.score, fromBars.score);
+  assert.deepStrictEqual(fromCsv.states, fromBars.states);
+  assert.strictEqual(fromCsv.reason, fromBars.reason);
+});
+test('one engine: a missing component is named the same way on both paths, only the reason differs', () => {
+  const TECH = load('src/engine/technical.js');
+  const b = TECH.techBlock({ monthRsi: 60, weekRsi: 40, weekMacdLevel: 1, weekMacdSignal: 0.5 }, 5, 'd', 'not in this export');
+  assert.match(b.reason, /\(monthly MACD not available: not in this export\. Composite computed/);
+  assert.strictEqual(TECH.techBlock({}, 5, 'd', 'x'), null, 'no MACD or RSI reading: no block (the valuation alone is not a technical score)');
+});
+test('completed bars: the still-forming weekly and monthly bar is left out of the saved score', () => {
+  const TECH = load('src/engine/technical.js', 'export { techBarClosesAt };');
+  const ist = (s) => Date.parse(s + '+05:30') / 1000;
+  const mon = ist('2026-10-12T00:00:00');   // weekly bar opening Monday 12 Oct (IST)
+  assert.strictEqual(TECH.techBarClosesAt(mon, '1W'), ist('2026-10-16T15:30:00'), 'a week closes at 15:30 IST on its Friday');
+  assert.strictEqual(TECH.techBarClosesAt(mon + 19800, '1W'), ist('2026-10-16T15:30:00'), 'also when the bar time is midnight UTC');
+  assert.strictEqual(TECH.techBarClosesAt(ist('2026-10-01T00:00:00'), '1M'), ist('2026-10-30T15:30:00'), 'October 2026 ends on Saturday 31: Friday 30 is its last weekday');
+  assert.strictEqual(TECH.techBarClosesAt(ist('2026-09-01T00:00:00'), '1M'), ist('2026-09-30T15:30:00'));
+  const w = [[mon - 7 * 86400, 1, 1, 1, 1, 0], [mon, 1, 1, 1, 1, 0]];
+  assert.strictEqual(TECH.techCompletedBars(w, '1W', ist('2026-10-14T12:00:00')).length, 1, 'Wednesday: this week is still forming');
+  assert.strictEqual(TECH.techCompletedBars(w, '1W', ist('2026-10-16T15:29:00')).length, 1);
+  assert.strictEqual(TECH.techCompletedBars(w, '1W', ist('2026-10-16T15:30:00')).length, 2, 'from the Friday close the week counts');
+  assert.strictEqual(TECH.techCompletedBars(w, '1W', ist('2026-10-17T10:00:00')).length, 2, 'a weekend refresh keeps the finished week');
+  assert.deepStrictEqual(TECH.techCompletedBars([], '1M', 0), []);
 });
 
 // =========================================================== Characterisation: today's exact numbers on the made-up universe
