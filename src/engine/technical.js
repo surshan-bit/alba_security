@@ -58,6 +58,23 @@ function techReading(wc, mc, pillarsVal){
   const raw = { monthMacdLevel: mm ? mm.level : null, monthMacdSignal: mm ? mm.signal : null, weekMacdLevel: wm ? wm.level : null, weekMacdSignal: wm ? wm.signal : null, monthRsi: mr, weekRsi: wr };
   return { states, raw, score: techComposite(states, pillarsVal) };
 }
+// The plain-English line saved with a technical block (states, RSI figures, valuation, and which components were missing).
+function techReason(states, r, pillarsVal){
+  const mt = s => s ? (s.startsWith('bull') ? 'bullish' : 'bearish') + ', ' + (s.endsWith('above') ? 'above' : 'below') + ' zero' : null;
+  const parts = [];
+  if(states.monthMacd) parts.push('monthly MACD ' + mt(states.monthMacd));
+  if(states.weekMacd) parts.push('weekly MACD ' + mt(states.weekMacd));
+  const rs = [];
+  if(r.monthRsi != null) rs.push('monthly RSI ' + r.monthRsi.toFixed(1) + ' (' + states.monthRsi + ')');
+  if(r.weekRsi != null) rs.push('weekly RSI ' + r.weekRsi.toFixed(1) + ' (' + states.weekRsi + ')');
+  let reason = parts.join(', ') + (parts.length ? '. ' : '') + rs.join(', ') + (rs.length ? '. ' : '');
+  if(pillarsVal != null) reason += 'Valuation pillar reading of ' + pillarsVal.toFixed(1) + '/10 (' + states.valuation + ').';
+  const missing = [];
+  if(!states.monthMacd) missing.push('monthly MACD'); if(r.monthRsi == null) missing.push('monthly RSI');
+  if(!states.weekMacd) missing.push('weekly MACD'); if(r.weekRsi == null) missing.push('weekly RSI');
+  if(missing.length) reason += ' (' + missing.join(' and ') + ' not available: too little price history. Composite computed from available components only, rescaled to a 0–10 scale.)';
+  return reason.trim();
+}
 // Technical block from [t,o,h,l,c,v] bars (weekly, monthly) and the stock's valuation pillar (0-10). Returns null without any usable component.
 // The score uses completed bars only; when a week or month is still in progress its reading is kept as `provisional`.
 function computeTechnical(weekBars, monthBars, pillarsVal, today){
@@ -73,20 +90,8 @@ function computeTechnical(weekBars, monthBars, pillarsVal, today){
   // The price changes show the current move, so they use every bar; the score inputs use completed bars.
   const raw = { monthMacdLevel: r.monthMacdLevel, monthMacdSignal: r.monthMacdSignal, weekMacdLevel: r.weekMacdLevel, weekMacdSignal: r.weekMacdSignal,
     weekPctChange: pct(wp), monthPctChange: pct(mp), monthRsi: r.monthRsi, weekRsi: r.weekRsi, valuationScore: pillarsVal == null ? null : pillarsVal };
-  const mt = s => s ? (s.startsWith('bull') ? 'bullish' : 'bearish') + ', ' + (s.endsWith('above') ? 'above' : 'below') + ' zero' : null;
-  const parts = [];
-  if(states.monthMacd) parts.push('monthly MACD ' + mt(states.monthMacd));
-  if(states.weekMacd) parts.push('weekly MACD ' + mt(states.weekMacd));
-  const rs = [];
-  if(r.monthRsi != null) rs.push('monthly RSI ' + r.monthRsi.toFixed(1) + ' (' + states.monthRsi + ')');
-  if(r.weekRsi != null) rs.push('weekly RSI ' + r.weekRsi.toFixed(1) + ' (' + states.weekRsi + ')');
-  let reason = parts.join(', ') + (parts.length ? '. ' : '') + rs.join(', ') + (rs.length ? '. ' : '');
-  if(pillarsVal != null) reason += 'Valuation pillar reading of ' + pillarsVal.toFixed(1) + '/10 (' + states.valuation + ').';
-  const missing = [];
-  if(!states.monthMacd) missing.push('monthly MACD'); if(r.monthRsi == null) missing.push('monthly RSI');
-  if(!states.weekMacd) missing.push('weekly MACD'); if(r.weekRsi == null) missing.push('weekly RSI');
-  if(missing.length) reason += ' (' + missing.join(' and ') + ' not available: too little price history. Composite computed from available components only, rescaled to a 0–10 scale.)';
-  const out = { score: techComposite(states, pillarsVal), reason: reason.trim(), states, raw, asof: today };
+  const reason = techReason(states, r, pillarsVal);
+  const out = { score: techComposite(states, pillarsVal), reason, states, raw, asof: today };
   // Which bars the score rests on, and the in-progress reading when a week or month is not finished yet.
   out.basis = { week: wDone.length ? techIstDate(wDone[wDone.length - 1][0]) : null, month: mDone.length ? techIstDate(mDone[mDone.length - 1][0]) : null };
   if(wDone.length !== wAll.length || mDone.length !== mAll.length){
@@ -96,4 +101,23 @@ function computeTechnical(weekBars, monthBars, pillarsVal, today){
   return out;
 }
 
-export { computeTechnical, techComposite, techMacdStateOf, techRsiState, techValLabel };
+// Technical block from the MACD / RSI figures TradingView calculated for a symbol (the batch snapshot), with no bars at hand.
+// TradingView's figures include the week and month still in progress, so the block is marked src 'snapshot' and carries no
+// completed-bar dates (basis). `r` = { monthMacdLevel, monthMacdSignal, weekMacdLevel, weekMacdSignal, monthRsi, weekRsi, weekPctChange, monthPctChange }.
+// Returns null when none of the four indicators is available.
+function snapshotTechnical(r, pillarsVal, today){
+  const states = { monthMacd: techMacdStateOf(r.monthMacdLevel, r.monthMacdSignal), weekMacd: techMacdStateOf(r.weekMacdLevel, r.weekMacdSignal),
+    monthRsi: techRsiState(r.monthRsi), weekRsi: techRsiState(r.weekRsi), valuation: techValLabel(pillarsVal) };
+  if(!states.monthMacd && !states.weekMacd && !states.monthRsi && !states.weekRsi) return null;
+  const n = v => (typeof v === 'number' && isFinite(v)) ? v : null;
+  const raw = { monthMacdLevel: n(r.monthMacdLevel), monthMacdSignal: n(r.monthMacdSignal), weekMacdLevel: n(r.weekMacdLevel), weekMacdSignal: n(r.weekMacdSignal),
+    weekPctChange: n(r.weekPctChange), monthPctChange: n(r.monthPctChange), monthRsi: n(r.monthRsi), weekRsi: n(r.weekRsi), valuationScore: pillarsVal == null ? null : pillarsVal };
+  return { score: techComposite(states, pillarsVal), reason: techReason(states, raw, pillarsVal) + ' Read from TradingView, including the week and month in progress.', states, raw, asof: today, src: 'snapshot', basis: { week: null, month: null } };
+}
+// True when a saved block was built from completed bars and is recent enough that a snapshot (which includes the bar in progress) should not replace it.
+function techKeepsBarsBlock(t, today, days = 3){
+  if(!t || t.src === 'snapshot' || !t.basis || !t.basis.week || typeof t.asof !== 'string') return false;
+  return techDayNo(today) - techDayNo(t.asof) <= days;
+}
+
+export { computeTechnical, snapshotTechnical, techComposite, techKeepsBarsBlock, techMacdStateOf, techRsiState, techValLabel };

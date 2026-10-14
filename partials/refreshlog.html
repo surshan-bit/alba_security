@@ -61,6 +61,22 @@
 
         <div class="upload-panel last-file" id="technicalLastFile" aria-live="polite"></div>
 
+        <div class="upload-panel">
+          <div class="upload-row">
+            <div class="upload-text">
+              <div class="upload-title">Refresh from TradingView (no file needed)</div>
+              <div class="upload-hint">“Refresh all stocks” reads price, MACD and RSI for every stock straight from TradingView (about 45 calls). “Fill missing history” downloads weekly and monthly bars for stocks that have none, tracked picks first, up to 100 per run.</div>
+              <div class="upload-hint" id="tvRefreshHint">The count of stocks with saved history appears after the first run.</div>
+            </div>
+            <button type="button" class="select-mode-btn fi-btn-primary" id="tvSnapshotBtn" title="Saves a fresh price and technical reading for every stock, from TradingView">Refresh all stocks</button>
+            <button type="button" class="select-mode-btn" id="tvHistoryBtn" title="Downloads weekly and monthly price history for stocks that have none saved">Fill missing history</button>
+            <button type="button" class="select-mode-btn" id="tvStopBtn" hidden>Stop</button>
+          </div>
+        </div>
+
+        <div data-import-panel="tv_" data-title="Refresh" data-label="Refresh progress"></div>
+
+
         <div data-import-panel="ti_" data-title="Import" data-label="Import progress" data-backups></div>
 
 
