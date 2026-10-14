@@ -106,7 +106,7 @@ function tlTradeModel(t){
   return {
     t, buy, sell, isClosed, curPx, isLive, facts, sig,
     signalHtml: sig ? tlSignalHtml(t._id, sig) : '',
-    name: escapeHtml(t.name || t.ticker || ''),
+    name: nameLink(t, live),
     ticker: escapeHtml(t.ticker || ''),
     boughtOn: escapeHtml(formatDate(buy.date)),
     qtyText: buy.quantity != null ? buy.quantity : '—',
@@ -122,6 +122,11 @@ function tlTradeModel(t){
     exitScore: isClosed ? tlScoreCell(sell.snapshot) : '<span class="analysis-lb-empty">—</span>',
     actions: `<div class="tl-row-actions">${isClosed ? '' : `<button type="button" class="refresh-btn" data-tl-sell="${id}">Sell</button>`}<button type="button" class="refresh-btn tl-danger" data-tl-remove="${id}">Remove</button></div>`
   };
+}
+// The company name opens its stock page when the stock is in the dashboard; otherwise it is plain text.
+function nameLink(t, stock){
+  const text = escapeHtml(t.name || t.ticker || '');
+  return stock ? `<a href="#" class="tl-name-link" data-tl-open="${escapeHtml(t.ticker || '')}" title="Open stock details">${text}</a>` : text;
 }
 function tlCardHtml(m){
   const pnlHtml = m.pnl != null ? ` &middot; <span class="${m.pnl >= 0 ? 'chg-up' : 'chg-down'}">${m.pnl >= 0 ? '+' : '&minus;'}${tlInr(Math.abs(m.pnl))}</span>` : '';
