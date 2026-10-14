@@ -4,3 +4,4 @@ cmp
 live_ref
 *.log
 dist
+publish
