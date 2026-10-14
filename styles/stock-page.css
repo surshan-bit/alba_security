@@ -359,3 +359,17 @@ html{scrollbar-color:var(--line) transparent;}
 .biz-main.biz-full{position:fixed;inset:0;z-index:70;margin:0;padding:12px 20px 16px;background:var(--bg);display:flex;flex-direction:column;overflow:auto;}
 .biz-main.biz-full .biz-toolbar{flex:none;}
 .biz-main.biz-full .biz-refresh{display:none;}
+/* ---- Score trend panel ---- */
+.trend-panel{margin-top:22px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-width:0;}
+.trend-title{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:8px;}
+.trend-svg{width:100%;height:auto;display:block;}
+.trend-grid{stroke:var(--line);stroke-width:1;}
+.trend-axis{fill:var(--muted);font-size:10px;}
+.trend-fund,.trend-tech,.trend-price{stroke-width:2;stroke-linejoin:round;}
+.trend-fund{stroke:#4f8cff;}.trend-tech{stroke:#e0a030;}.trend-price{stroke:var(--muted);stroke-width:1.5;opacity:.45;}
+.trend-fund-dot{fill:#4f8cff;}.trend-tech-dot{fill:#e0a030;}
+.trend-engine{stroke:var(--muted);stroke-dasharray:3 3;stroke-width:1;}
+.trend-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.74rem;color:var(--muted);margin-bottom:6px;}
+.trend-legend span::before{content:"";display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:3px;background:var(--muted);}
+.trend-legend .tl-fund::before{background:#4f8cff;}.trend-legend .tl-tech::before{background:#e0a030;}.trend-legend .tl-price::before{opacity:.45;}
+.trend-note{font-size:.78rem;color:var(--muted);margin-top:6px;}
