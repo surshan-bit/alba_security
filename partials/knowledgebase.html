@@ -75,7 +75,7 @@
           </ul>
         </li>
         <li><b>Fundamental/Valuation research pass:</b> retired 2026-09-29. These now update only from a fresh screener.in CSV.</li>
-        <li><b>Global &amp; Macro Factors:</b> its own manual "Refresh Data" button, limited to Strong/Good stocks. See <a href="#kb-global">Knowledge Base §6</a>.</li>
+        <li><b>Global &amp; Macro Factors:</b> researched by the Fundamental refresh, for any stock whatever its rating. See <a href="#kb-global">Knowledge Base §6</a>.</li>
         <li><b>Manual refresh queue:</b> the &#8635; button on a stock writes a timestamped request to the database; Claude clears it when asked.</li>
         <li><b>TradingView Watchlist Sync:</b> manual only, no schedule. Rebuilds four lists from scratch on every run:
           <ul>
@@ -164,12 +164,7 @@
       <ul>
         <li><b>What it is:</b> a curated, sourced list of macro, commodity, currency and trade-policy linkages that can move the stock. No scoring.</li>
         <li><b>Sources:</b> sector-level web research for most stocks, individual research for large or newsworthy names.</li>
-        <li><b>Scope (since 2026-09-30):</b> Strong or Good stocks only, about 487 of them, the same set the Watchlist Sync targets.
-          <ul>
-            <li>Hold and Avoid stocks keep an empty record until they reach Strong or Good.</li>
-            <li>The reason is the shared web-search quota (&sect;2).</li>
-          </ul>
-        </li>
+        <li><b>Scope:</b> any stock. Refresh &rarr; Fundamental researches Global &amp; Macro for every stock you choose, whatever its rating (the Strong/Good-only limit of 2026-09-30 applied to the old bulk research, not to this refresh). Only the Watchlist Sync lists still use Strong or Good stocks.</li>
         <li><b>Bulk refresh:</b> its own manual trigger on the Data Refresh page, independent of the Fundamental CSV, and needed less often since these linkages move slowly.
           <ul>
             <li>Prioritizes in-scope stocks with no research, then the most out of date, or a subset you name.</li>
@@ -225,6 +220,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.168 &middot; 2026-10-14</h3>
+            <ul>
+              <li><b>Fundamental refresh is for every stock:</b> the stock page and the Knowledge Base no longer say Global &amp; Macro is limited to Strong and Good stocks. Refresh &rarr; Fundamental already worked for any stock (Hold, Avoid or Pending too); only the wording was out of date.</li>
+            </ul>
             <h3>v1.167 &middot; 2026-10-14</h3>
             <ul>
               <li><b>Pinned stocks can no longer be wiped:</b> pinning or unpinning a stock now changes only that one stock in the saved list, instead of saving this page&rsquo;s whole copy. Before, a page that had not finished loading its pins (for example right after a new release reloaded it) or an older open tab could overwrite the saved list and leave it empty. A late update from the database also no longer undoes a pin you have just clicked.</li>

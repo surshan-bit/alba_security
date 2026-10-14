@@ -18,7 +18,7 @@ function renderGlobalFactorsPanel(s){
         <div class="global-panel-head">
           <div class="global-panel-title">${panelIcon('global')}Global &amp; Macro Information</div>
         </div>
-        <p class="global-panel-sub">Not yet researched for this stock &mdash; the regular refresh only covers Strong/Good-rated stocks (see Knowledge Base §6). If you need this to decide on this stock right now, use the Refresh button at the top of this page and choose Fundamental.</p>
+        <p class="global-panel-sub">Not yet researched for this stock. Use the Refresh button at the top of this page and choose Fundamental to research it now; this works for any stock, whatever its rating.</p>
       </div>
     `;
   }
