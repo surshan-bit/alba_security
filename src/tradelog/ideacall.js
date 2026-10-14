@@ -25,12 +25,16 @@ function ideaPoints(f){
   if(f.rsiWeek != null){
     if(f.rsiWeek >= 80) add(-2, 'weekly RSI stretched at ' + fx(f.rsiWeek));
     else if(f.rsiWeek >= 75) add(-1, 'weekly RSI warm at ' + fx(f.rsiWeek));
-    else if(f.rsiWeek <= 60) add(1, 'weekly RSI ' + fx(f.rsiWeek) + ', not stretched');
   }
   if(f.rsiMonth != null && f.rsiMonth >= 75) add(-1, 'monthly RSI high at ' + fx(f.rsiMonth));
   if(f.score != null){
     if(f.score >= 7) add(1, 'Fundamental score ' + fx(f.score, 2));
     else if(f.score < 5) add(-1, 'Fundamental score only ' + fx(f.score, 2));
+  }
+  // The Technical score already folds in the weekly and monthly MACD and RSI, so it replaces the old "calm RSI" point.
+  if(f.techScore != null){
+    if(f.techScore >= 7) add(1, 'Technical score ' + fx(f.techScore, 1));
+    else if(f.techScore < 4) add(-1, 'Technical score only ' + fx(f.techScore, 1));
   }
   return { pts, why, mos };
 }

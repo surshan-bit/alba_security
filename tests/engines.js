@@ -511,7 +511,7 @@ test('trade call: missing data never crashes and never invents a call', () => {
   assert.strictEqual(G.factsFor({ buy: { price: 10 } }, null).price, null);
 });
 const I = load('src/tradelog/ideacall.js');
-const idea = (o) => ({ name: 'X', score: 7.2, verdict: 'buy', valuation: { currentPrice: 100, intrinsicValue: 160 }, technical: { raw: { weekRsi: 55, monthRsi: 60 } }, ...o });
+const idea = (o) => ({ name: 'X', score: 7.2, verdict: 'buy', valuation: { currentPrice: 100, intrinsicValue: 160 }, technical: { score: 7.5, raw: { weekRsi: 55, monthRsi: 60 } }, ...o });
 test('ideas: a strong verdict, roomy cushion and calm RSI is Buy; a stretched, overvalued weak one is Avoid; the middle is Wait', () => {
   assert.strictEqual(I.ideaCall(idea({}), null).call, 'buy');
   assert.strictEqual(I.ideaCall(idea({ verdict: 'avoid', score: 4, valuation: { currentPrice: 100, intrinsicValue: 80 }, technical: { raw: { weekRsi: 85, monthRsi: 80 } } }), null).call, 'sell');
@@ -528,6 +528,14 @@ test('ideas: ranking puts Buy first (most points first), then Hold, then the wea
   const mk = (n, call, pts) => ({ s: { name: n }, c: { call, pts } });
   const r = I.rankIdeas([mk('a', 'sell', -1), mk('b', 'hold', 1), mk('c', 'buy', 4), mk('d', 'buy', 6), mk('e', 'sell', -4)]).map(x => x.s.name).join('');
   assert.strictEqual(r, 'dcbea');
+});
+test('ideas: the Technical score adds a point at 7 or more, takes one below 4, and a weak chart can keep a stock out of Buy', () => {
+  const p = (ts) => I.ideaCall(idea({ technical: { score: ts, raw: { weekRsi: 55, monthRsi: 60 } } }), null);
+  assert.strictEqual(p(8).pts - p(5.5).pts, 1); assert.strictEqual(p(5.5).pts - p(3).pts, 1);
+  assert.ok(p(8).reasons.some(r => /Technical score 8\.0/.test(r)));
+  const edge = idea({ verdict: 'mbuy', score: 6, valuation: { currentPrice: 100, intrinsicValue: 150 }, technical: { score: 7.5, raw: { weekRsi: 55, monthRsi: 60 } } });
+  assert.strictEqual(I.ideaCall(edge, null).call, 'buy');
+  assert.notStrictEqual(I.ideaCall({ ...edge, technical: { score: 3, raw: { weekRsi: 55, monthRsi: 60 } } }, null).call, 'buy');
 });
 test('ideas: missing data never crashes', () => { assert.strictEqual(I.ideaCall({}, null).call, 'hold'); });
 test('trade call: history keeps one point a day and lists when the call changed', () => {
