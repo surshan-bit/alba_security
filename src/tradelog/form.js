@@ -7,6 +7,8 @@ import { buildSuggestions, sgMark } from '../ui/suggest.js';
 import { holdingDaysBetween, tlSetView } from './panel.js';
 import { tradeCol } from '../identity/session.js';
 import { tellUser } from '../ui/confirm.js';
+import { appSections } from '../ui/navigation.js';
+import { openStockInline } from '../ui/inlinedetail.js';
 
 // ---- Trade Log: add / sell / remove from this page (added 2026-10-06) ----
 function tlToday(){
@@ -228,6 +230,13 @@ function init_tradelog_form(){
   const panel = document.getElementById('tradeLogPanelBody');
   if(panel){
     panel.addEventListener('click', (e) => {
+      const a = /** @type {Element} */ (e.target).closest('a[data-tl-open]');
+      if(a){
+        e.preventDefault();
+        const s = stockByTickerSymbol.get(a.getAttribute('data-tl-open')), idx = s ? stocks.indexOf(s) : -1;
+        if(idx >= 0) openStockInline(appSections.trackrecord, 'Trade Log', idx);
+        return;
+      }
       const b = e.target.closest('button'); if(!b) return;
       if(b.hasAttribute('data-tl-sell')) tlOpenSellForm(b.getAttribute('data-tl-sell'));
       else if(b.hasAttribute('data-tl-remove')){

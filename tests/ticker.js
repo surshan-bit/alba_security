@@ -80,6 +80,13 @@ const rowsNow = page => page.evaluate(() => {
       ok(g2, 'an open trade on the Trade Log shows the live price (150) with the live tag');
       const txt = await page.evaluate(() => (document.querySelector('#tradeLogPanelBody .tl-card') || {}).textContent || '');
       ok(/\+50\.00%/.test(txt), 'its unrealized return follows the live price (+50% on a buy at 100), got ' + JSON.stringify(txt.slice(0, 160)));
+      // the company name on the card opens that stock's page
+      let opened = true;
+      try {
+        await page.click('#tradeLogPanelBody .tl-name-link');
+        await page.waitForFunction(() => { const d = document.getElementById('detail'); return !!d && d.offsetParent !== null && !!document.querySelector('#section-trackrecord.inline-detail-open'); }, null, { timeout: 8000 });
+      } catch(e){ opened = false; }
+      ok(opened, 'clicking the stock name on a Trade Log card opens the stock page');
     }
 
     // 3. nothing is saved by the ticker
