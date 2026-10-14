@@ -97,13 +97,14 @@ function tlTradeModel(t){
   const live = stockByTickerSymbol.get(t.ticker);
   const livePx = live && live.valuation && live.valuation.currentPrice != null ? live.valuation.currentPrice : null;
   const curPx = isClosed ? sell.price : livePx;
+  const isLive = !isClosed && !!live && typeof live.liveAt === 'number' && Date.now() - live.liveAt < 90000;
   const qty = buy.quantity || 0;
   const ret = tradeReturnPct(t);
   const id = escapeHtml(t._id || '');
   const facts = isClosed ? null : factsFor(t, live);
   const sig = facts ? tradeSignal(facts) : null;
   return {
-    t, buy, sell, isClosed, curPx, facts, sig,
+    t, buy, sell, isClosed, curPx, isLive, facts, sig,
     signalHtml: sig ? tlSignalHtml(t._id, sig) : '',
     name: escapeHtml(t.name || t.ticker || ''),
     ticker: escapeHtml(t.ticker || ''),
@@ -135,7 +136,7 @@ function tlCardHtml(m){
           <div><dt>Bought</dt><dd>${m.boughtOn}</dd></div>
           <div><dt>Buy price &times; qty</dt><dd>${tlInr(m.buy.price)} &times; ${m.qtyText}</dd></div>
           <div><dt>Invested</dt><dd>${tlInr(m.invested)}</dd></div>
-          <div><dt>${m.isClosed ? 'Sold at' : 'Current price'}</dt><dd>${tlInr(m.curPx)}${m.isClosed ? `<br><span class="row-ticker">${escapeHtml(formatDate(m.sell.date))}</span>` : ''}</dd></div>
+          <div><dt>${m.isClosed ? 'Sold at' : 'Current price' + (m.isLive ? ' <span class="tl-live">&bull; live</span>' : '')}</dt><dd>${tlInr(m.curPx)}${m.isClosed ? `<br><span class="row-ticker">${escapeHtml(formatDate(m.sell.date))}</span>` : ''}</dd></div>
           <div><dt>Held</dt><dd>${m.held != null ? m.held + ' days' : '—'}</dd></div>
           <div><dt>Entry score</dt><dd>${m.entryScore}</dd></div>
           <div><dt>Data at entry</dt><dd>${m.entryBadge}</dd></div>

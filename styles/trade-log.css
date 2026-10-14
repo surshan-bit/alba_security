@@ -50,3 +50,4 @@
 .tl-signal-why li{margin:2px 0;}
 .tl-signal-notes p{margin:4px 0;}
 .tl-signal-hist,.tl-signal-foot{color:var(--muted);font-size:.72rem;}
+.tl-live{color:var(--accent);font-weight:700;text-transform:none;letter-spacing:0;}

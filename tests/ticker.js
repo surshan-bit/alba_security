@@ -68,6 +68,20 @@ const rowsNow = page => page.evaluate(() => {
     const monthCalls = await page.evaluate(() => window.__tvMonthCalls || []);
     ok(weekCalls.length > 0 && weekCalls.length === new Set(weekCalls).size && monthCalls.length === new Set(monthCalls).size && monthCalls.length === weekCalls.length, 'last week\'s and last month\'s close are read once per stock, got ' + weekCalls.length + ' / ' + monthCalls.length + ' reads for ' + new Set(weekCalls).size + ' stocks');
 
+    // 2b. the Trade Log: an open position is watched too, so its price, return and live tag follow the live price
+    {
+      const s0 = FIXTURE[0], sym0 = s0.ticker.split('·')[0].trim();
+      const id0 = sym0.replace(/[^A-Za-z0-9_-]/g, '_') + '-2026-10-01';
+      const snap = { score: s0.score, verdict: s0.verdict, currentPriceAtSnapshot: 100, intrinsicValue: null, marginOfSafetyPct: null, fundamentalFactorsComplete: 9, fundamentalFactorsTotal: 9, technicalComponentsComplete: 5, technicalComponentsTotal: 5 };
+      await page.evaluate(([id, rec]) => { window.__setDoc('data/users/u_SMOKE/portfolio/trades/' + id, rec); }, [id0, { ticker: sym0, name: s0.name, status: 'open', buy: { date: '2026-10-01', price: 100, quantity: 5, snapshot: snap }, sell: null, loggedAt: '2026-10-01T10:00:00.000Z' }]);
+      await page.evaluate(() => { window.__tvQuote = { close: 150 }; document.querySelector('.nav-item[data-section="trackrecord"]').click(); });
+      let g2 = true;
+      try { await page.waitForFunction(() => { const c = document.querySelector('#tradeLogPanelBody .tl-card'); return !!c && /150/.test(c.textContent) && !!c.querySelector('.tl-live'); }, null, { timeout: 30000 }); } catch(e){ g2 = false; }
+      ok(g2, 'an open trade on the Trade Log shows the live price (150) with the live tag');
+      const txt = await page.evaluate(() => (document.querySelector('#tradeLogPanelBody .tl-card') || {}).textContent || '');
+      ok(/\+50\.00%/.test(txt), 'its unrealized return follows the live price (+50% on a buy at 100), got ' + JSON.stringify(txt.slice(0, 160)));
+    }
+
     // 3. nothing is saved by the ticker
     const saved = await page.evaluate(() => (window.__sets || []).filter(p => /^stockUpdates\//.test(p) || /^stockData\//.test(p) || /^priceHistory\//.test(p)));
     ok(saved.length === 0, 'the live ticker saves nothing, but wrote ' + JSON.stringify(saved.slice(0, 3)));
