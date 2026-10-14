@@ -34,6 +34,7 @@ function userRef(path){
   return (state.db && state.uid) ? state.db.doc(path.replace('{uid}', state.uid)) : null;
 }
 function pinsRef(db){ return (db && state.uid) ? db.doc('data/users/' + state.uid + '/pins') : null; }
+function signalCol(db){ return (db && state.uid) ? db.doc('data/users/' + state.uid + '/portfolio').collection('signals') : null; }
 function tradeCol(db){ return (db && state.uid) ? db.doc('data/users/' + state.uid + '/portfolio').collection('trades') : null; }
 
 // Keeps the user record current (created on first visit, last-seen refreshed at most every 6 hours).
@@ -47,4 +48,4 @@ async function touchUser(){
   } catch(e){ /* the user record is optional */ }
 }
 
-export { getIdentityDb, getUid, loadIdentity, pinsRef, touchUser, tradeCol, userRef };
+export { getIdentityDb, getUid, loadIdentity, pinsRef, signalCol, touchUser, tradeCol, userRef };
