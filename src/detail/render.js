@@ -90,12 +90,12 @@ function renderDetail(idx){
   if(peersPanel){
     peersPanel.querySelectorAll('tbody tr[data-idx]').forEach(tr => {
       tr.addEventListener('click', () => {
-        const i = Number(tr.dataset.idx);
+        const i = Number(/** @type {HTMLElement} */ (tr).dataset.idx);
         if(i !== idx){ renderDetail(i); syncStockHash(stocks[i]); }
       });
     });
     const scroller = peersPanel.querySelector('.peers-scroll');
-    const selfRow = peersPanel.querySelector('tr.peers-self');
+    const selfRow = /** @type {HTMLElement} */ (peersPanel.querySelector('tr.peers-self'));
     if(scroller && selfRow){
       scroller.scrollTop = Math.max(0, selfRow.offsetTop - scroller.clientHeight / 2 + selfRow.offsetHeight / 2);
     }
@@ -132,7 +132,7 @@ function renderDetail(idx){
     detailPinBtn.onclick = () => togglePin(s.ticker);
   }
 
-  const requestRefreshBtn = document.getElementById('requestRefreshBtn');
+  const requestRefreshBtn = /** @type {HTMLButtonElement} */ (document.getElementById('requestRefreshBtn'));
   if(requestRefreshBtn){
     requestRefreshBtn.onclick = () => {
       requestRefreshBtn.disabled = true;

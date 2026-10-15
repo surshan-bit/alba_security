@@ -211,8 +211,8 @@ function renderAnalysisFilterPanel(rerender){
   if(host) host.innerHTML = analysisFiltersHtml();
   const panel = document.getElementById('analysisFilterPanel'), toggle = document.getElementById('analysisFiltersToggle'), summary = document.getElementById('analysisFiltersSummary');
   if(panel && toggle && summary){
-    const names = Array.from(panel.querySelectorAll('.filter-btn.active')).filter(b => !['all'].includes(b.dataset.averdict || b.dataset.amos || b.dataset.atechw || b.dataset.atechm || b.dataset.astrat)).map(b => {
-      const c = b.cloneNode(true); c.querySelectorAll('.filter-n').forEach(n => n.remove()); return c.textContent.trim();
+    const names = Array.from(panel.querySelectorAll('.filter-btn.active')).filter(b => !['all'].includes(/** @type {HTMLElement} */ (b).dataset.averdict || /** @type {HTMLElement} */ (b).dataset.amos || /** @type {HTMLElement} */ (b).dataset.atechw || /** @type {HTMLElement} */ (b).dataset.atechm || /** @type {HTMLElement} */ (b).dataset.astrat)).map(b => {
+      const c = b.cloneNode(true); /** @type {Element} */ (c).querySelectorAll('.filter-n').forEach(n => n.remove()); return c.textContent.trim();
     });
     summary.textContent = names.length ? names.join(', ') : 'All stocks';
     toggle.addEventListener('click', () => {
@@ -221,7 +221,7 @@ function renderAnalysisFilterPanel(rerender){
     });
   }
   document.querySelectorAll('#analysisStrategyFilter .filter-btn').forEach(btn => btn.addEventListener('click', () => {
-    const id = btn.dataset.astrat === 'all' ? '' : btn.dataset.astrat;
+    const id = /** @type {HTMLElement} */ (btn).dataset.astrat === 'all' ? '' : /** @type {HTMLElement} */ (btn).dataset.astrat;
     analysisFilters.strategyId = (id && id === analysisFilters.strategyId) ? '' : id;   // clicking the chosen one again goes back to All
     saveAnalysisFilters(analysisFilters);
     rerender();

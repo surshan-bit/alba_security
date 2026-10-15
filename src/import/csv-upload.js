@@ -3,6 +3,7 @@ import { stocks } from '../core/stocks.js';
 import { escapeHtml } from '../core/util.js';
 import { parseCSV } from './csvparse.js';
 import { recordFundamentalCsvUpload, recordTechnicalCsvUpload } from './upload-history.js';
+import { targetEl } from '../core/evt.js';
 
 function tickerFromString(t){
   return t.split('·')[0].trim().toUpperCase();
@@ -208,13 +209,13 @@ const fundamentalCsvInputEl = document.getElementById('fundamentalCsvInput');
 function init_import_csv_upload(){
 if(technicalCsvInputEl){
   technicalCsvInputEl.addEventListener('change', e => {
-    const file = e.target.files && e.target.files[0];
+    const file = targetEl(e).files && targetEl(e).files[0];
     if(file) handleTechnicalCsvFile(file);
   });
 }
 if(fundamentalCsvInputEl){
   fundamentalCsvInputEl.addEventListener('change', e => {
-    const file = e.target.files && e.target.files[0];
+    const file = targetEl(e).files && targetEl(e).files[0];
     if(file) handleFundamentalCsvFile(file);
   });
 }

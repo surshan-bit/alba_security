@@ -26,7 +26,7 @@ function holdingDaysBetween(startIso, endIso){
   const start = new Date(startIso + 'T00:00:00');
   const end = endIso ? new Date(endIso + 'T00:00:00') : new Date();
   if(isNaN(start.getTime()) || isNaN(end.getTime())) return null;
-  return Math.max(0, Math.round((end - start) / 86400000));
+  return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
 }
 function tradeReturnPct(t){
   // Realized return for a closed trade, else unrealized return against the stock's current live

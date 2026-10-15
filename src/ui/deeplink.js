@@ -3,6 +3,7 @@ import { stocks } from '../core/stocks.js';
 import { tickerSymbol } from '../core/util.js';
 import { appSections, showSection } from './navigation.js';
 import { openStockInline } from './inlinedetail.js';
+import { closestEl } from '../core/evt.js';
 
 // ---- Deep link to a stock (added 2026-10-06) ----
 // A link such as <artifact URL>#OCCLLTD (or ?stock=OCCLLTD) opens that stock's detail view.
@@ -90,7 +91,7 @@ const noteLink = e => { const a = e.target.closest && e.target.closest('a.stock-
 document.addEventListener('contextmenu', noteLink, true);
 document.addEventListener('auxclick', noteLink, true);
 document.addEventListener('click', e => { if(e.ctrlKey || e.metaKey || e.shiftKey) noteLink(e); });
-document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a.stock-link'); if(a && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) e.preventDefault(); }, true);
+document.addEventListener('click', e => { const a = /** @type {Element} */ (e.target).closest && closestEl(e, 'a.stock-link'); if(a && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) e.preventDefault(); }, true);
 (() => { const c = stockCodeFromAddress(); if(c) openStockByCode(c); })();
 
 }

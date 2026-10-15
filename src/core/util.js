@@ -18,14 +18,14 @@ function tickerIndustry(s){
 function formatDeepRefreshTimestamp(iso){
   if(!iso) return '';
   const d = new Date(iso);
-  if(isNaN(d)) return iso;
+  if(isNaN(d.getTime())) return iso;
   return d.toLocaleString('en-IN', {day:'numeric', month:'short', hour:'numeric', minute:'2-digit', timeZone:'Asia/Kolkata'}) + ' IST';
 }
 
 function formatRequestedAt(iso){
   if(!iso) return '';
   const d = new Date(iso);
-  if(isNaN(d)) return iso;
+  if(isNaN(d.getTime())) return iso;
   return d.toLocaleString('en-IN', {day:'numeric', month:'short', hour:'numeric', minute:'2-digit'});
 }
 function daysSinceDate(str){
@@ -42,7 +42,7 @@ function daysSinceDate(str){
 function formatDate(iso){
   if(!iso) return '';
   const d = new Date(iso + 'T00:00:00');
-  if(isNaN(d)) return iso;
+  if(isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'});
 }
 // ---- Weekly CSV upload / diff ----
@@ -58,7 +58,7 @@ function escapeHtml(str){
 function formatUploadTimestamp(iso){
   if(!iso) return '';
   const d = new Date(iso);
-  if(isNaN(d)) return iso;
+  if(isNaN(d.getTime())) return iso;
   return d.toLocaleString('en-IN', {day:'numeric', month:'short', year:'numeric', hour:'numeric', minute:'2-digit', timeZone:'Asia/Kolkata'}) + ' IST';
 }
 

@@ -5,6 +5,7 @@
 // This module only displays. The code that runs a refresh (livedata/batch.js, livedata/bar.js) reports into it and
 // supplies what Stop does; nothing here knows how a refresh works.
 import { escapeHtml } from '../core/util.js';
+import { closestEl } from '../core/evt.js';
 
 const MAX_NOTICES = 20;
 const running = new Map();   // id -> { title, text, pct, section, onStop, stopping }
@@ -20,7 +21,7 @@ const byId = (id) => document.getElementById(id);
 // "View" opens the screen that started the refresh.
 function openSection(section){
   const btn = section ? document.querySelector('.nav-item[data-section="' + section + '"]') : null;
-  if(btn) btn.click();
+  if(btn) /** @type {HTMLElement} */ (btn).click();
 }
 
 function itemHtml(id, kind, section){
@@ -130,17 +131,17 @@ function init_ui_activity(){
   if(!bell || !panel) return;
   bell.addEventListener('click', () => setOpen(!panelOpen));
   panel.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-act]');
+    const btn = closestEl(e, '[data-act]');
     if(!btn) return;
     const item = btn.closest('.activity-item'), act = btn.dataset.act;
     if(act === 'clearall'){ const gone = notices; notices = []; render(); if(onDismiss) onDismiss(gone); return; }
     if(!item) return;
-    const id = item.dataset.id;
-    if(act === 'view'){ openSection(item.dataset.section); setOpen(false); }
+    const id = /** @type {HTMLElement} */ (item).dataset.id;
+    if(act === 'view'){ openSection(/** @type {HTMLElement} */ (item).dataset.section); setOpen(false); }
     else if(act === 'stop'){ const r = running.get(id); if(r && r.onStop) r.onStop(); }
     else if(act === 'close'){ const gone = notices.filter(n => n.id === id); notices = notices.filter(n => n.id !== id); render(); if(onDismiss) onDismiss(gone); }
   });
-  document.addEventListener('mousedown', (e) => { if(panelOpen && !e.target.closest('#activityWrap')) setOpen(false); });
+  document.addEventListener('mousedown', (e) => { if(panelOpen && !closestEl(e, '#activityWrap')) setOpen(false); });
   // Esc closes the panel first (capture phase, and marked handled so "Back to ..." does not also act on it).
   document.addEventListener('keydown', (e) => {
     if(e.key !== 'Escape' || !panelOpen) return;

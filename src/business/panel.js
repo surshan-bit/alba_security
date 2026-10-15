@@ -13,6 +13,7 @@ import { browserFullscreen, fullscreenLabel, watchFullscreenExit } from '../ui/f
 import { kit } from '../refresh/kit.js';
 import { heatmapHtml } from './heatmap.js';
 import { PERIODS, industryTable, needsBars, periodOf } from './calc.js';
+import { closestEl } from '../core/evt.js';
 
 const KEY = 'albaDashboard.business.v1';
 let bizFull = false;   // the table fills the whole window
@@ -88,7 +89,7 @@ function runNews(spec){
 function paintNewsStatus(){
   const el = document.getElementById('bizNewsStatus'), html = newsStatusHtml();
   if(el && html){ const t = document.createElement('div'); t.innerHTML = html; el.replaceWith(t.firstChild); } else render();
-  document.querySelectorAll('.biz-newsbtn').forEach(b => { b.disabled = true; });
+  document.querySelectorAll('.biz-newsbtn').forEach(b => { /** @type {HTMLButtonElement} */ (b).disabled = true; });
 }
 
 function newsHtml(r){
@@ -203,47 +204,47 @@ function init(){
   const el = bodyEl(); if(!el) return;
   watchFullscreenExit(() => bizFull, () => { bizFull = false; render(); });
   el.addEventListener('click', (e) => {
-    const nt = e.target.closest('[data-biz-newstoggle]');
+    const nt = closestEl(e, '[data-biz-newstoggle]');
     if(nt){ const n = nt.dataset.bizNewstoggle; if(newsOpen.has(n)) newsOpen.delete(n); else newsOpen.add(n); render(); return; }
-    if(e.target.closest('[data-biz-filters]')){ bizFiltersOpen = !bizFiltersOpen; render(); return; }
-    if(e.target.closest('[data-biz-full]')){ bizFull = !bizFull; browserFullscreen(bizFull); render(); return; }
-    const sb = e.target.closest('[data-biz-strat]');
+    if(closestEl(e, '[data-biz-filters]')){ bizFiltersOpen = !bizFiltersOpen; render(); return; }
+    if(closestEl(e, '[data-biz-full]')){ bizFull = !bizFull; browserFullscreen(bizFull); render(); return; }
+    const sb = closestEl(e, '[data-biz-strat]');
     if(sb){ strategyId = sb.dataset.bizStrat; save(); render(); return; }
-    const shw = e.target.closest('[data-biz-show]');
-    if(shw){ if(shw.disabled) return; showMatched = shw.dataset.bizShow === 'matched'; save(); render(); return; }
-    const vb = e.target.closest('[data-biz-view]'), ht = e.target.closest('[data-biz-heat]');
+    const shw = closestEl(e, '[data-biz-show]');
+    if(shw){ if(/** @type {HTMLButtonElement} */ (shw).disabled) return; showMatched = shw.dataset.bizShow === 'matched'; save(); render(); return; }
+    const vb = closestEl(e, '[data-biz-view]'), ht = closestEl(e, '[data-biz-heat]');
     if(vb){ view = vb.dataset.bizView; save(); render(); return; }
     if(ht){   // a heat-map tile: back to the table with that industry opened
       view = 'table'; save(); open.add(ht.dataset.bizHeat); render();
-      const row = Array.from(el.querySelectorAll('.biz-row')).find(r => r.dataset.bizName === ht.dataset.bizHeat);
+      const row = Array.from(el.querySelectorAll('.biz-row')).find(r => /** @type {HTMLElement} */ (r).dataset.bizName === ht.dataset.bizHeat);
       if(row && row.scrollIntoView) row.scrollIntoView({ block: 'center' });
       return;
     }
-    const pb = e.target.closest('[data-biz-period]'), gb = e.target.closest('[data-biz-by]');
+    const pb = closestEl(e, '[data-biz-period]'), gb = closestEl(e, '[data-biz-by]');
     if(pb){ period = pb.dataset.bizPeriod; save(); open.clear(); render(); ensureData(); return; }
     if(gb){ by = gb.dataset.bizBy; save(); open.clear(); render(); return; }
-    if(e.target.closest('[data-biz-newsstop]')){ stopNewsCollect(); return; }
-        const all = e.target.closest('[data-biz-all]');
+    if(closestEl(e, '[data-biz-newsstop]')){ stopNewsCollect(); return; }
+        const all = closestEl(e, '[data-biz-all]');
     if(all){
       if(all.dataset.bizAll === 'collapse') open.clear();
       else visibleRows().forEach(r => open.add(r.name));
       render(); return;
     }
-    if(e.target.closest('[data-biz-retry]')){ loadState = 'idle'; ensureData(); return; }
-    if(e.target.closest('a:not(.stock-link)')) return;
-    const sr = e.target.closest('.strat-row');
+    if(closestEl(e, '[data-biz-retry]')){ loadState = 'idle'; ensureData(); return; }
+    if(closestEl(e, 'a:not(.stock-link)')) return;
+    const sr = closestEl(e, '.strat-row');
     if(sr){ openStockFromBusiness(Number(sr.dataset.idx)); return; }
-    const row = e.target.closest('.biz-row'); if(row) toggleRow(row);
+    const row = closestEl(e, '.biz-row'); if(row) toggleRow(row);
   });
   el.addEventListener('keydown', (e) => {
-    if(e.key === 'Enter'){ const sr = e.target.closest('.strat-row'); if(sr){ openStockFromBusiness(Number(sr.dataset.idx)); return; } }
+    if(e.key === 'Enter'){ const sr = closestEl(e, '.strat-row'); if(sr){ openStockFromBusiness(Number(sr.dataset.idx)); return; } }
     if(e.key !== 'Enter' && e.key !== ' ') return;
-    const row = e.target.closest('.biz-row'); if(row){ e.preventDefault(); toggleRow(row); }
+    const row = closestEl(e, '.biz-row'); if(row){ e.preventDefault(); toggleRow(row); }
   });
 }
 
 // After a refresh started here has saved its stocks, redraw so the grid shows the new numbers.
-document.addEventListener('alba-batch-done', (e) => { const sec = appSections.business; if(e.detail && /^biz-/.test(e.detail.source) && sec && sec.classList.contains('active')) render(); });
+document.addEventListener('alba-batch-done', (e) => { const sec = appSections.business; if(/** @type {CustomEvent} */ (e).detail && /^biz-/.test(/** @type {CustomEvent} */ (e).detail.source) && sec && sec.classList.contains('active')) render(); });
 function show(){ render(); ensureData(); }
 // The tiles' text depends on the width, so redraw the heat map when the window is resized.
 let resizeT = null;

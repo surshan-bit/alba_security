@@ -59,7 +59,7 @@ function paintLivePanel(P){
   for(const kind of ['fund', 'tech']){
     const x = state[kind], card = document.getElementById(P + 'Card-' + kind);
     if(!card) continue;
-    const btn = card.querySelector('.refresh-btn');
+    const btn = /** @type {HTMLButtonElement} */ (card.querySelector('.refresh-btn'));
     const bar = document.getElementById(P + 'Bar-' + kind), fill = document.getElementById(P + 'Fill-' + kind);
     const st = document.getElementById(P + 'Status-' + kind), stop = document.getElementById(P + 'Stop-' + kind);
     if(btn){
@@ -75,7 +75,7 @@ function paintLivePanel(P){
     }
     if(stop){
       const r = !!x && x.state === 'running';
-      stop.hidden = !r; stop.disabled = !!(r && ldBatch.stop); stop.textContent = r && ldBatch.stop ? 'Stopping…' : 'Stop';
+      stop.hidden = !r; /** @type {HTMLButtonElement} */ (stop).disabled = !!(r && ldBatch.stop); stop.textContent = r && ldBatch.stop ? 'Stopping…' : 'Stop';
     }
     if(st){
       st.textContent = x ? x.text : running && !mine ? 'A refresh started from ' + otherScreen(P) + ' is running.' : (card.dataset.idle || '');
@@ -102,7 +102,7 @@ function ldBatchPaint(){
   if(kit) kit.repaint();
   paintLivePanel('analysis');
   paintLivePanel('strat');
-  document.querySelectorAll('[data-live-panel]').forEach(el => paintLivePanel(el.dataset.livePanel));
+  document.querySelectorAll('[data-live-panel]').forEach(el => paintLivePanel(/** @type {HTMLElement} */ (el).dataset.livePanel));
 }
 function ldBatchStop(){
   if(!ldBatch || !ldBatch.running) return;

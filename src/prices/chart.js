@@ -119,12 +119,12 @@ function initPriceChart(s){
     const px = (e.clientX - rect.left) * (G.W / rect.width);
     const i = Math.max(0, Math.min(G.n - 1, Math.floor((px - G.padL) / G.step))), r = G.b[i];
     hover[k] = G.off + i; drawBands();
-    const xh = el.querySelector('.pc-xh'); xh.setAttribute('x1', G.X(i)); xh.setAttribute('x2', G.X(i)); xh.setAttribute('opacity', 1);
+    const xh = el.querySelector('.pc-xh'); xh.setAttribute('x1', String(G.X(i))); xh.setAttribute('x2', String(G.X(i))); xh.setAttribute('opacity', '1');
     const chg = (r[4] / r[1] - 1) * 100, tip = el.querySelector('.pc-tip');
     const label = k === '1W' ? 'Week of ' + fmtD(r[0], {day:'numeric', month:'short', year:'numeric'}) : fmtD(r[0], {month:'long', year:'numeric'});
     tip.innerHTML = `<b>${label}</b><div class="r"><span>Open</span><span>${rs(r[1])}</span></div><div class="r"><span>High</span><span>${rs(r[2])}</span></div><div class="r"><span>Low</span><span>${rs(r[3])}</span></div><div class="r"><span>Close</span><span>${rs(r[4])}</span></div><div class="r"><span>Change</span><span>${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div><div class="r"><span>Volume</span><span>${vol(r[5])}</span></div>${eventTipHtml(byBar[k].get(G.off + i), barReaction(bars[k], G.off + i), k === '1W' ? 'week' : 'month')}`;
-    const tw = tip.offsetWidth, xx = G.X(i) * (rect.width / G.W);
-    tip.style.left = Math.max(0, Math.min(rect.width - tw, xx + 14 + tw > rect.width ? xx - tw - 14 : xx + 14)) + 'px'; tip.style.top = '6px'; tip.style.opacity = 1;
+    const tw = /** @type {HTMLElement} */ (tip).offsetWidth, xx = G.X(i) * (rect.width / G.W);
+    /** @type {HTMLElement} */ (tip).style.left = Math.max(0, Math.min(rect.width - tw, xx + 14 + tw > rect.width ? xx - tw - 14 : xx + 14)) + 'px'; /** @type {HTMLElement} */ (tip).style.top = '6px'; /** @type {HTMLElement} */ (tip).style.opacity = '1';
   }
   // Colour of a news tag: green / red when all its labelled items agree, amber when they disagree, grey when neutral, purple when unlabelled.
   const sentimentOf = (list) => {
@@ -150,9 +150,9 @@ function initPriceChart(s){
     keyBtn.textContent = pcKeyOpen ? 'Hide legend' : 'Legend';
   });
   root.querySelectorAll('.pc-evtoggle').forEach(btn => btn.addEventListener('click', () => {
-    const id = btn.dataset.g, on = !shown.has(id);
+    const id = /** @type {HTMLElement} */ (btn).dataset.g, on = !shown.has(id);
     if(on) shown.add(id); else shown.delete(id);
-    btn.setAttribute('aria-pressed', on);
+    btn.setAttribute('aria-pressed', String(on));
     rebuildEvents(); order.forEach(draw);
   }));
   order.forEach(k => {
@@ -161,10 +161,10 @@ function initPriceChart(s){
     el.innerHTML = `<div class="pc-ph"><div class="pc-ptitle">${c.title}<small>${bars[k].length} bars</small></div><div class="pc-psum">${(root.querySelector('.pc-sums [data-k="' + k + '"]') || {}).innerHTML || ''}</div><div class="pc-pills" role="group" aria-label="${c.title} range">${c.ranges.map((r, i) => `<button type="button" class="pc-pill" data-i="${i}" aria-pressed="${i === state[k]}">${r[0]}</button>`).join('')}</div></div>
       <div class="pc-chart"><svg role="img" aria-label="${c.title} candlestick chart with volume"></svg><div class="pc-tip"></div></div>`;
     panels.appendChild(el);
-    el.querySelectorAll('.pc-pill').forEach(btn => btn.onclick = () => { state[k] = +btn.dataset.i; el.querySelectorAll('.pc-pill').forEach(x => x.setAttribute('aria-pressed', x === btn)); draw(k); });
+    el.querySelectorAll('.pc-pill').forEach(btn => /** @type {HTMLElement} */ (btn).onclick = () => { state[k] = +/** @type {HTMLElement} */ (btn).dataset.i; el.querySelectorAll('.pc-pill').forEach(x => x.setAttribute('aria-pressed', String(x === btn))); draw(k); });
     const ch = el.querySelector('.pc-chart');
     ch.addEventListener('pointermove', e => { pend[k] = e; if(!raf[k]) raf[k] = requestAnimationFrame(() => { raf[k] = 0; if(pend[k]) onMove(k, pend[k]); }); });
-    ch.addEventListener('pointerleave', () => { pend[k] = null; delete hover[k]; drawBands(); el.querySelector('.pc-tip').style.opacity = 0; el.querySelector('.pc-xh').setAttribute('opacity', 0); });
+    ch.addEventListener('pointerleave', () => { pend[k] = null; delete hover[k]; drawBands(); /** @type {HTMLElement} */ (el.querySelector('.pc-tip')).style.opacity = '0'; el.querySelector('.pc-xh').setAttribute('opacity', '0'); });
   });
   order.forEach(draw);
   let rz; pcObserver = new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { if(root.isConnected) order.forEach(draw); }, 80); });

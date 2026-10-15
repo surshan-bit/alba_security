@@ -33,7 +33,7 @@ function renderFreshnessPanel(cfg){
   stocks.forEach(s => {
     const d = parseFundamentalAsof(cfg.getAsof(s));
     if(!d){ unparsed++; return; }
-    ages.push(Math.max(0, Math.floor((now - d) / 86400000)));
+    ages.push(Math.max(0, Math.floor((now.getTime() - d.getTime()) / 86400000)));
   });
 
   if(ages.length === 0){

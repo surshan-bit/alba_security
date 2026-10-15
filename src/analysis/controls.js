@@ -56,10 +56,10 @@ function wireSliders(schedule, onRelease){
   const monthMinInput = el('monthRsiMinInput'), monthMaxInput = el('monthRsiMaxInput');
   const weekLabel = el('weekRsiRangeLabel'), monthLabel = el('monthRsiRangeLabel');
   function syncSliderInputs(){
-    weekMinInput.value = f.weekMin;
-    weekMaxInput.value = f.weekMax;
-    monthMinInput.value = f.monthMin;
-    monthMaxInput.value = f.monthMax;
+    /** @type {HTMLInputElement} */ (weekMinInput).value = /** @type {any} */ (f.weekMin);
+    /** @type {HTMLInputElement} */ (weekMaxInput).value = /** @type {any} */ (f.weekMax);
+    /** @type {HTMLInputElement} */ (monthMinInput).value = /** @type {any} */ (f.monthMin);
+    /** @type {HTMLInputElement} */ (monthMaxInput).value = /** @type {any} */ (f.monthMax);
     weekLabel.textContent = `${f.weekMin}–${f.weekMax}`;
     monthLabel.textContent = `${f.monthMin}–${f.monthMax}`;
   }
@@ -76,8 +76,8 @@ function wireSliders(schedule, onRelease){
 function wireMosSlider(mosBoundLo, mosBoundHi, schedule, onRelease){
   const f = analysisFilters;
   const mosClamp = mosClamper(mosBoundLo, mosBoundHi);
-  const mosMinInput = document.getElementById('mosMinInput');
-  const mosMaxInput = document.getElementById('mosMaxInput');
+  const mosMinInput = /** @type {HTMLInputElement} */ (document.getElementById('mosMinInput'));
+  const mosMaxInput = /** @type {HTMLInputElement} */ (document.getElementById('mosMaxInput'));
   const mosLabel = document.getElementById('mosRangeLabel');
   function syncMosInputs(){
     const lo = f.mosLo === null ? mosBoundLo : mosClamp(f.mosLo);

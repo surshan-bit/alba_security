@@ -46,7 +46,7 @@ function watched(){
   if(isShown(detailEl)){ const d = getShownIndex(); if(d >= 0 && stocks[d]) out.push(d); }
   const rows = [];
   document.querySelectorAll('.app-section.active tr[data-idx]').forEach(tr => {
-    const idx = Number(tr.dataset.idx);
+    const idx = Number(/** @type {HTMLElement} */ (tr).dataset.idx);
     if(isShown(tr) && stocks[idx] && !out.includes(idx) && !rows.includes(idx)) rows.push(idx);
   });
   const room = MAX_ROWS - out.length;
@@ -101,7 +101,7 @@ function paintDetail(){
   const host = detailEl.querySelector('.detail-ticker');
   if(!host || !s) return;
   const v = livePrice.get(pcTickerKey(s));
-  let chip = host.querySelector('.live-px');
+  let chip = /** @type {HTMLElement} */ (host.querySelector('.live-px'));
   if(v == null){ if(chip) chip.remove(); return; }
   if(!chip){ chip = document.createElement('span'); chip.className = 'live-px'; host.appendChild(chip); }
   const t = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
