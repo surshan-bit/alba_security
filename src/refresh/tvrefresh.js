@@ -19,6 +19,7 @@ import { fiEl, fiReset, fiSet, fiShowResult, setFiPfx } from '../import/panel.js
 import { registerBusy } from '../core/busy.js';
 
 const BATCH = 50;                 // symbols per TradingView call (the tool's limit)
+const WRITE_PARALLEL = 16;        // stocks saved at the same time: a save waits on the database (about 4 s each), so more at once finishes the run sooner (6 before v1.197)
 const HISTORY_CAP = 100;          // stocks per "Fill missing history" run
 const SKIP_RETRY_DAYS = 14;       // a stock that failed history fill is not retried for this long
 const COLS = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M', 'average_volume_30d_calc'];
@@ -177,7 +178,7 @@ async function runSnapshot(){
           } catch(e){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: 'could not be saved: ' + String((e && e.message) || e).slice(0, 80) }); }
         }
       };
-      await Promise.all(Array.from({ length: 6 }, worker));
+      await Promise.all(Array.from({ length: WRITE_PARALLEL }, worker));
       saveMs += Date.now() - s0;
       batchSecs.push(Math.round((Date.now() - b0) / 100) / 10);
     }
@@ -194,7 +195,7 @@ async function runSnapshot(){
     runError = tvErrorText(e);
     fiShowResult('err', [{ text: 'Stopped: ' + tvErrorText(e), cls: 'fi-line fi-line-strong' }, { text: num(updated) + ' stocks were saved before this.', cls: 'fi-line fi-line-muted' }], true);
   } finally {
-    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
+    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, writeParallel: WRITE_PARALLEL, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
     end();
   }
 }
