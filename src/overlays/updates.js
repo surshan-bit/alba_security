@@ -29,6 +29,7 @@ function revertUpdates(s){
   if(b.technical === undefined) delete s.technical; else s.technical = clone(b.technical);
   if(s.valuation){ if(b.currentPrice === undefined) delete s.valuation.currentPrice; else s.valuation.currentPrice = b.currentPrice; }
   delete s.__livePrice;
+  delete s.__snapAsof;
   delete s.liquidity;
   delete s.__updBase;
   delete s.__updAsof;
@@ -66,6 +67,7 @@ function applyUpdatesDoc(s, doc){
       s.technical = cur;
     }
   }
+  if(doc && typeof doc.snapAsof === 'string') s.__snapAsof = doc.snapAsof;
   const ua = doc && typeof doc.asof === 'string' ? doc.asof : null;
   if(ua) s.__updAsof = ua; else delete s.__updAsof;
 }

@@ -60,7 +60,9 @@ async function result(page, kind){
   }, p);
 }
 async function waitResult(page, kind, timeout){ await page.waitForSelector(RESULT_SEL(PFX[kind]), { timeout: timeout || 240000 }); return result(page, kind); }
-async function run(page, kind){ await page.click(BTN[kind]); return waitResult(page, kind); }
+// The Technical CSV import is hidden in the product (v1.199); the tests show it again to drive it.
+async function showTechCsv(page){ await page.evaluate(() => { const e = document.getElementById('techCsvOption'); if(e) e.hidden = false; }); }
+async function run(page, kind){ if(kind === 'tech') await showTechCsv(page); await page.click(BTN[kind]); return waitResult(page, kind); }
 async function waitPrompt(page, kind){ await page.waitForSelector(`#${PFX[kind]}fiPrompt .fi-prompt-msg`, { timeout: 240000 }); return result(page, kind); }
 const answer = (page, kind, yes) => page.click(`#${PFX[kind]}fiPrompt ${yes ? '.fi-btn-primary' : 'button:not(.fi-btn-primary)'}`);
 async function upload(page, which, name, text){
@@ -84,7 +86,6 @@ function diffStocks(actual, expectedList){
   return out;
 }
 const sameStocks = (actual, expectedList, msg) => { const d = diffStocks(actual, expectedList); return ok(!d.missing.length && !d.extra.length && !d.differ.length, `${msg}: ${d.missing.length} missing, ${d.extra.length} extra, ${d.differ.length} differ (e.g. ${[...d.missing, ...d.extra, ...d.differ].slice(0, 4).join(', ')})`); };
-async function backupsInfo(page){ return page.evaluate(() => Array.from(document.querySelectorAll('#fiBackups .fi-backup-row')).map(r => ({ title: r.querySelector('.fi-backup-title').textContent, btn: !!r.querySelector('.fi-restore-btn') }))); }
 
 // ---------------------------------------------------------------- made-up files
 const rowsCopy = () => DS.rows.map(r => Object.assign({}, r));
@@ -185,11 +186,11 @@ async function uploadScenarios(){
     eq(db.techLog.map(r => r.filename), ['t2.csv', 't3.csv', 'new-growth.csv'], 'technical history after an upload: the oldest record is gone');
   });
 }
-// ---------------------------------------------------------------- 2. fundamental import, backups, restore, failures
-const allDone = r => r.steps.length === 7 && r.steps.every(x => x[0] === 'done');
+// ---------------------------------------------------------------- 2. fundamental import, failures
+const allDone = r => r.steps.length === 6 && r.steps.every(x => x[0] === 'done');
 const fmtIn = n => n.toLocaleString('en-IN');
 async function fundScenarios(){
-  await runScenario('fund import: full cycle (import, repeat import, restore)', {}, async page => {
+  await runScenario('fund import: full cycle (import, repeat import), with no backup taken', {}, async page => {
     const f = fundFileChanged();
     await upload(page, 'fund', 'may.csv', f.csv);
     const orig = await readDb(page); const flatOrig = JSON.stringify([].concat(...orig.meta.chunks.map(c => orig.chunkDocs[c].stocks)));
@@ -201,7 +202,7 @@ async function fundScenarios(){
     // ---- import
     const r = await run(page, 'fund');
     ok(r.cls === 'ok', 'import ends green, got ' + r.cls + ': ' + r.text.slice(0, 200));
-    ok(allDone(r) && r.pct === '100%', 'all seven steps done at 100%: ' + JSON.stringify(r.steps.map(x => x[0])) + ' ' + r.pct);
+    ok(allDone(r) && r.pct === '100%', 'all six steps done at 100%: ' + JSON.stringify(r.steps.map(x => x[0])) + ' ' + r.pct);
     ok(r.lines[0] === 'Import complete.', 'first line: ' + r.lines[0]);
     ok(r.text.includes(`${fmtIn(exp.res.rescored)} stocks rescored · 3 new · 5 not in the file`), 'summary line: ' + r.lines[1]);
     ok(/Strong 2 → \d+ · Good 184 → \d+/.test(r.text), 'verdict mix line: ' + r.lines[2]);
@@ -216,10 +217,7 @@ async function fundScenarios(){
     const writes = await page.evaluate(() => window.__sets.filter(p => p.startsWith('stockData/')));
     const changedChunks = c0 => a.meta.chunks.filter(c => !c0.chunkDocs[c] || canon(c0.chunkDocs[c]) !== canon(a.chunkDocs[c]));
     ok(writes.length === changedChunks(orig).length && changedChunks(orig).every(c => writes.includes('stockData/' + c)), `exactly the changed chunks were written (${writes.length} writes, ${changedChunks(orig).length} changed; every stock's date moved, so all of them)`);
-    // backup of what was there before
-    eq(a.backups.length, 1, 'one backup after the first import'); const bk = a.backups[0];
-    ok(bk.label === 'Before importing may.csv (data v5)' && bk.stockCount === 2004 && bk.dataVersion === 5 && bk.kind === 'stocks-backup' && bk.format === 'stocks.json', 'backup record: ' + JSON.stringify(bk));
-    ok(page.blobs.get(bk.assetId) === flatOrig, 'the backup file is the complete previous stock list');
+    eq(a.backups.length, 0, 'no backup is taken'); ok(!(await page.evaluate(() => window.__sets.some(p => /^backupLog\//.test(p)))) && !(await page.evaluate(() => document.getElementById('fiBackups'))), 'nothing is written to the backup log and the page has no backups list');
     // upload record + lock
     const rec = a.fundLog[0]; ok(rec.status === 'processed' && /^Imported in the page: 1999 rescored, 3 new, 5 left unchanged/.test(rec.processedNote), 'upload record marked processed: ' + rec.status + ' ' + (rec.processedNote || '').slice(0, 80));
     ok(a.job.status === 'done' && a.job.finishedAt, 'lock released: ' + JSON.stringify(a.job));
@@ -228,7 +226,6 @@ async function fundScenarios(){
     ok(Array.isArray(cached) && cached.join() === 'v6', 'the new list is saved in the browser cache under the new version, so the reload is quick: ' + JSON.stringify(cached));
     const lf = await page.evaluate(() => document.getElementById('fundamentalLastFile').innerText);
     ok(/may\.csv/.test(lf) && /Imported/.test(lf) && !/not imported/i.test(lf), 'the last-file card says the file was imported: ' + lf.replace(/\s+/g, ' ').slice(0, 160));
-    const rows1 = await backupsInfo(page); ok(rows1.length === 1 && rows1[0].btn && /Before importing may\.csv/.test(rows1[0].title), 'backups list shows it with a Restore button');
 
     // ---- the same file again: the three new companies now count as peers, so some ranks move once; the engine output is the oracle
     await upload(page, 'fund', 'may-again.csv', f.csv);
@@ -239,34 +236,16 @@ async function fundScenarios(){
     const writes2 = (await page.evaluate(() => window.__sets.filter(p => p.startsWith('stockData/')))).slice(writes.length);
     const changed2 = a2.meta.chunks.filter(c => canon(a.chunkDocs[c]) !== canon(a2.chunkDocs[c]));
     ok(changed2.length > 0 && changed2.length < a2.meta.chunks.length && writes2.length === changed2.length && changed2.every(c => writes2.includes('stockData/' + c)), `only the chunks that changed were rewritten (${writes2.length} of ${a2.meta.chunks.length})`);
-    eq(a2.meta.version, 7, 'second import bumps the version'); eq(a2.backups.length, 2, 'and takes another backup');
+    eq(a2.meta.version, 7, 'second import bumps the version');
 
     // ---- and a third time: nothing at all changes
     await upload(page, 'fund', 'may-third.csv', f.csv);
     const r3 = await run(page, 'fund');
     ok(r3.cls === 'ok' && /the file produced no changes/.test(r3.text), 'a repeat of a repeat reports no changes: ' + r3.lines[0]);
     const a2b = await readDb(page);
-    eq(a2b.meta.version, 7, 'no version bump when nothing changed'); eq(a2b.backups.length, 2, 'still backs up first, and only the newest two are kept');
+    eq(a2b.meta.version, 7, 'no version bump when nothing changed');
     eq(await page.evaluate(() => window.__sets.filter(p => p.startsWith('stockData/')).length), writes.length + writes2.length, 'no chunk is written');
     sameStocks(a2b.stocks, exp2.list, 'data unchanged');
-
-    // ---- restore the older of the two kept backups (the data as it was after the first import)
-    eq((await backupsInfo(page)).length, 2, 'two backups listed');
-    await page.locator('#fiBackups .fi-restore-btn').last().click();
-    const ask = await waitPrompt(page, 'fund');
-    ok(/^Restore the stock data saved on .* \(2007 stocks\)\? Today's data is backed up first, so this can be undone\.$/.test(ask.prompt), 'restore asks first: ' + ask.prompt);
-    await answer(page, 'fund', true);
-    const rr = await waitResult(page, 'fund');
-    ok(rr.cls === 'ok' && rr.lines[0] === 'Restore complete.' && /\(2,007 stocks\)/.test(rr.text), 'restore result: ' + rr.text.slice(0, 160));
-    const a3 = await readDb(page);
-    sameStocks(a3.stocks, exp.list, 'after the restore the list from after the first import is back');
-    ok(a.meta.chunks.every(c => a3.chunkDocs[c] && canon(a3.chunkDocs[c]) === canon(a.chunkDocs[c])) && JSON.stringify(a3.meta.chunks) === JSON.stringify(a.meta.chunks), 'after the restore every chunk document is exactly as it was');
-    eq(a3.meta.version, 8, 'restore bumps the version (so open pages reload)'); eq(a3.meta.count, 2007, 'count back to 2007');
-    eq(a3.backups.length, 2, "restore backs up today's data first (and the oldest backup is dropped)"); const last = a3.backups[a3.backups.length - 1];
-    ok(/^Before restoring the backup of/.test(last.label), 'the restore backup is labelled: ' + last.label);
-    ok(page.blobs.get(last.assetId) === JSON.stringify([].concat(...a2b.meta.chunks.map(c => a2b.chunkDocs[c].stocks))), 'that backup holds the data that was live before the restore');
-    ok(a3.job.status === 'done', 'lock released after the restore');
-    ok(!(await page.evaluate(() => Array.from(document.querySelectorAll('#fiBackups .fi-backup-row')).length === 0)), 'backup list refreshed');
   });
 
   // ---- a write fails halfway: everything is put back
@@ -282,7 +261,6 @@ async function fundScenarios(){
     sameStocks(after.stocks, DS.stocks, name + ': stock list as before');
     eq(after.meta.version, expectMeta, name + ': index version');
     ok(after.job.status === 'failed' && after.job.error, name + ': lock marked failed: ' + JSON.stringify(after.job));
-    eq(after.backups.length, 1, name + ': the backup taken before the write is kept');
     ok(after.fundLog[0].status === 'uploaded', name + ': the file stays "uploaded", not processed');
     ok(await page.evaluate(() => !document.getElementById('importFundamentalDataBtn').disabled), name + ': button usable again');
   });
@@ -298,10 +276,16 @@ async function fundScenarios(){
     ok(!/No changes were published/.test(r.text) && /The new data had already been saved when this failed, so it is live\./.test(r.text), 'the message must not claim nothing was published when it was: "' + r.lines.slice(-1)[0] + '"');
   });
 
+  // v1.199: the Technical CSV import is hidden, the TradingView refresh is the only visible route
+  await runScenario('technical: the CSV import is hidden and the refresh options are shown', {}, async page => {
+    const v = await page.evaluate(() => ({ csv: document.getElementById('techCsvOption').offsetParent === null, snap: document.getElementById('tvSnapshotBtn').offsetParent !== null, hist: document.getElementById('tvHistoryBtn').offsetParent !== null, backups: !!document.getElementById('fiBackups') || !!document.getElementById('ti_fiBackups') }));
+    ok(v.csv && v.snap && v.hist && !v.backups, 'CSV hidden, refresh and history shown, no backups list: ' + JSON.stringify(v));
+  });
+
   // ---- guards
   await runScenario('fund import: only the owner can import', { nonOwner: true, cfg: { owner: false } }, async page => {
-    const s = await page.evaluate(() => ({ dis: ['importFundamentalDataBtn', 'importTechnicalDataBtn', 'refreshWatchlistBtn'].map(i => document.getElementById(i).disabled), titles: ['importFundamentalDataBtn', 'importTechnicalDataBtn', 'refreshWatchlistBtn'].map(i => document.getElementById(i).title), bk: document.getElementById('fiBackups').hidden }));
-    eq(s.dis, [true, true, true], 'all three buttons disabled'); ok(s.titles.every(t => /Only the owner/.test(t)), 'each explains why: ' + s.titles.join(' | ')); ok(s.bk, 'backups are hidden');
+    const s = await page.evaluate(() => ({ dis: ['importFundamentalDataBtn', 'importTechnicalDataBtn', 'refreshWatchlistBtn'].map(i => document.getElementById(i).disabled), titles: ['importFundamentalDataBtn', 'importTechnicalDataBtn', 'refreshWatchlistBtn'].map(i => document.getElementById(i).title), bk: !document.getElementById('fiBackups') }));
+    eq(s.dis, [true, true, true], 'all three buttons disabled'); ok(s.titles.every(t => /Only the owner/.test(t)), 'each explains why: ' + s.titles.join(' | ')); ok(s.bk, 'there is no backups list');
     await page.evaluate(() => { for(const i of ['importFundamentalDataBtn', 'importTechnicalDataBtn', 'refreshWatchlistBtn']) document.getElementById(i).click(); }); await page.waitForTimeout(400);
     ok(await page.evaluate(() => ['fundImportPanel', 'ti_fundImportPanel', 'wl_fundImportPanel'].every(i => document.getElementById(i).hidden)), 'nothing starts');
     ok(!(await page.evaluate(() => window.__sets.some(p => /^(stockData|stockMeta|backupLog|importJobs|fundamentalCsvUploadLog|technicalCsvUploadLog)\//.test(p)))), 'nothing is written');
@@ -346,12 +330,12 @@ async function fundScenarios(){
     const r = await run(page, 'fund'); ok(r.cls === 'ok', 'the import goes ahead: ' + r.text.slice(0, 160));
     ok((await readDb(page)).job.status === 'done', 'lock is now done');
   });
-  await runScenario('fund import: too few stocks in the result is refused (and the backup is already saved)', { small: true }, async page => {
+  await runScenario('fund import: too few stocks in the result is refused', { small: true }, async page => {
     await upload(page, 'fund', 'tiny.csv', DS.fundCsv(DS.rows.slice(0, 12)));
     const r = await run(page, 'fund');
     ok(r.cls === 'err' && /integrity check failed, nothing was written:\n?• only \d+ stocks in the result/.test(r.text.replace(/\n/g, '\n')) || (r.cls === 'err' && /integrity check failed, nothing was written/.test(r.text) && /only \d+ stocks in the result/.test(r.text)), 'message: ' + r.text.slice(0, 260));
     ok(r.steps.find(x => x[1] === 'Run integrity checks')[0] === 'error', 'the check step is the failed one');
-    const a = await readDb(page); ok(a.meta.version === 3 && !(await page.evaluate(() => window.__sets.some(p => p.startsWith('stockData/')))), 'no stock data written'); eq(a.backups.length, 1, 'the backup is taken before the checks');
+    const a = await readDb(page); ok(a.meta.version === 3 && !(await page.evaluate(() => window.__sets.some(p => p.startsWith('stockData/')))), 'no stock data written');
     ok(a.fundLog[0].status === 'uploaded' && a.fundLog[0].lastAttempt && a.fundLog[0].lastAttempt.outcome === 'failed', 'the failed attempt is recorded on the file: ' + JSON.stringify(a.fundLog[0].lastAttempt));
     const lf = await page.evaluate(() => document.getElementById('fundamentalLastFile').innerText);
     ok(/tiny\.csv/.test(lf) && /last attempt failed/.test(lf) && /only \d+ stocks/.test(lf), 'the last-file card shows the failure: ' + lf.replace(/\s+/g, ' ').slice(0, 200));
@@ -370,15 +354,6 @@ async function fundScenarios(){
     const g = await waitResult(page, 'fund'); ok(g.cls === 'ok', 'second time, "Import anyway" goes through: ' + g.text.slice(0, 120));
     a = await readDb(page); sameStocks(a.stocks, exp.list, 'imported list equals the engine output'); eq(a.meta.version, 6, 'version bumped');
   });
-  await runScenario('fund import: only the newest two backups are kept', { docs: Object.fromEntries([1, 2, 3, 4, 5].map(i => ['backupLog/old' + i, { kind: 'stocks-backup', format: 'stocks.json', label: 'old ' + i, createdAt: '2026-08-0' + i + 'T00:00:00.000Z', stockCount: 10, bytes: 5, assetId: 'oldasset' + i, assetUrl: '/_blob/oldasset' + i, dataVersion: i }])) }, async page => {
-    await page.waitForFunction(() => document.querySelectorAll('#fiBackups .fi-backup-row').length === 2, null, { timeout: 15000 });
-    await upload(page, 'fund', 'may.csv', fundFileChanged().csv);
-    const r = await run(page, 'fund'); ok(r.cls === 'ok', 'import ok');
-    const a = await readDb(page);
-    eq(a.backups.map(b => b.label.replace(/ \(data.*/, '')), ['old 5', 'Before importing may.csv'], 'older backups are gone, the newest two remain');
-    eq((await page.evaluate(() => window.__deletedAssets)).slice().sort(), ['oldasset1', 'oldasset2', 'oldasset3', 'oldasset4'], 'their files were deleted from storage too');
-    eq((await backupsInfo(page)).length, 2, 'the list on the page shows two');
-  });
 }
 const BTN_FUND = '#importFundamentalDataBtn';
 // ---------------------------------------------------------------- 3. technical import
@@ -387,15 +362,11 @@ const f1 = x => (Math.round(x * 10) / 10).toFixed(1);
 const seedRec = (which, id, name) => ({ [(which === 'fund' ? 'fundamentalCsvUploadLog/' : 'technicalCsvUploadLog/') + id]: { assetId: id, url: '/_blob/' + id, filename: name, uploadedAt: new Date().toISOString(), status: 'uploaded', rowCount: 1, newCount: 0, droppedCount: 0, sizeBytes: 10 } });
 const csvRows = csv => { const rows = T.AlbaTechEngine.parseCSV(csv), h = rows[0].map(x => x.trim().toLowerCase()); return { rows, sym: h.indexOf('symbol'), price: h.indexOf('price') }; };
 async function techScenarios(){
-  // v1.185: the website keeps files in a private store with no public link; imports and restores must read them through assets.read()
-  await runScenario('private file store: an import and a restore read the files through read(), never through a /_blob/ link', { cfg: { privateAssets: true } }, async page => {
+  // v1.185: the website keeps files in a private store with no public link; imports must read them through assets.read()
+  await runScenario('private file store: an import reads the file through read(), never through a /_blob/ link', { cfg: { privateAssets: true } }, async page => {
     const file = techFile({}); await upload(page, 'tech', 'growth.csv', file.csv);
     const rec = (await readDb(page)).techLog[0]; ok(rec.url === null && !!rec.assetId, 'the upload record holds no public link: ' + JSON.stringify(rec.url));
     const r = await run(page, 'tech'); ok(r.cls === 'ok', 'the technical import ends green: ' + r.cls + ' ' + r.text.slice(0, 200));
-    const a = await readDb(page); ok(a.backups.length === 1 && a.backups[0].assetUrl === null, 'the backup record holds no public link');
-    await page.locator('#fiBackups .fi-restore-btn').last().click();
-    await waitPrompt(page, 'fund'); await answer(page, 'fund', true);
-    const rr = await waitResult(page, 'fund'); ok(rr.cls === 'ok' && rr.lines[0] === 'Restore complete.', 'the restore from the backup works: ' + rr.text.slice(0, 160));
     ok(page.blobRequests.length === 0, 'no /_blob/ link was used: ' + page.blobRequests.join(','));
   });
   await runScenario('tech import: full cycle with prices, kept readings and BSE symbols', {}, async page => {
@@ -410,7 +381,7 @@ async function techScenarios(){
     ok(m.matched.length > 1700 && kept.length > 10 && kept.length <= 25, `test file shape: ${m.matched.length} matched, ${kept.length} kept`);
     const r = await run(page, 'tech');
     ok(r.cls === 'ok', 'technical import ends green: ' + r.cls + ' ' + r.text.slice(0, 240));
-    ok(r.steps.length === 7 && r.steps.every(x => x[0] === 'done') && r.pct === '100%', 'seven steps done: ' + JSON.stringify(r.steps.map(x => x[0])));
+    ok(r.steps.length === 6 && r.steps.every(x => x[0] === 'done') && r.pct === '100%', 'six steps done: ' + JSON.stringify(r.steps.map(x => x[0])));
     ok(r.lines[0] === 'Import complete.', 'first line: ' + r.lines[0]);
     ok(r.text.includes(`${fmtIn(m.matched.length - kept.length)} stocks rescored · ${kept.length} kept as they were (curated)`), 'summary: ' + r.lines[1]);
     ok(/Average technical score \d\.\d\d → \d\.\d\d\./.test(r.text), 'average line'); ok(/No new BSE symbols needed\./.test(r.text), 'BSE line: ' + r.text.slice(-300));
@@ -437,8 +408,9 @@ async function techScenarios(){
     ok(bad.length === 0, `${bad.length} stocks wrong after the import (${priced} prices checked): ${bad.slice(0, 5).join('; ')}`);
     ok(r.text.includes(`${fmtIn(priced)} current prices and margins of safety refreshed.`), 'price line should say ' + priced + ' but lines are: ' + r.lines.map(l => l.slice(0, 90)).join(' | '));
     // bookkeeping
-    eq(a.backups.length, 1, 'one backup'); ok(/^Before importing growth\.csv \(data v5\)$/.test(a.backups[0].label), 'backup label: ' + a.backups[0].label);
-    ok(page.blobs.get(a.backups[0].assetId) === JSON.stringify([].concat(...orig.meta.chunks.map(c => orig.chunkDocs[c].stocks))), 'backup holds the previous list');
+    const csvRuns = Object.entries(a.all).filter(([k]) => k.startsWith('refreshRunLog/csv-')).map(([, v]) => v);
+    ok(csvRuns.length === 1 && csvRuns[0].kind === 'csv' && csvRuns[0].trigger === 'manual' && csvRuns[0].saved > 0 && csvRuns[0].saved + csvRuns[0].kept === csvRuns[0].planned && csvRuns[0].error === null && csvRuns[0].durationMs >= 0, 'the import leaves one run record: ' + JSON.stringify(csvRuns));
+    const csvTxt = await page.evaluate(() => document.getElementById('lastRuns_csv').innerText); ok(/Last 2 runs/.test(csvTxt) && /manual/.test(csvTxt) && /saved/.test(csvTxt), 'and the Last 2 runs list shows it: ' + csvTxt.replace(/\s+/g, ' '));
     ok(a.techLog[0].status === 'processed' && /^Imported in the page: /.test(a.techLog[0].processedNote), 'upload record processed');
     ok(a.job.status === 'done' && a.job.kind === 'technical', 'lock released: ' + JSON.stringify(a.job));
     // BSE-only stocks without a TradingView symbol were looked up once and the misses remembered
@@ -457,9 +429,9 @@ async function techScenarios(){
   await seedBad('a file without a Symbol column is refused', 'Ticker,Price\nABC,1\nDEF,2\n', async page => { const r = await run(page, 'tech'); ok(r.cls === 'err' && /the file has no "Symbol" column, so it does not look like a TradingView export\./.test(r.text) && /No changes were published/.test(r.text), r.text.slice(0, 220)); eq((await readDb(page)).backups.length, 0, 'no backup yet'); });
   await seedBad('a file with only a header is refused', header + '\n', async page => { const r = await run(page, 'tech'); ok(r.cls === 'err' && /the file has no data rows\./.test(r.text), r.text.slice(0, 200)); });
   await seedBad('a file without the technical columns is refused', 'Symbol,Price\nABC,1\nDEF,2\n', async page => { const r = await run(page, 'tech'); ok(r.cls === 'err' && /missing most of the MACD \/ RSI columns \(monthMacdSignal, monthMacdLevel, weekMacdSignal, weekMacdLevel, monthRsi, weekRsi\)\. Re-export/.test(r.text), r.text.slice(0, 260)); });
-  await seedBad('a file where no symbol matches any stock is refused after the backup', header + '\nQQQ1,10,1,1,1,0,1,0,50,50\nQQQ2,10,1,1,1,0,1,0,50,50\n', async page => {
+  await seedBad('a file where no symbol matches any stock is refused', header + '\nQQQ1,10,1,1,1,0,1,0,50,50\nQQQ2,10,1,1,1,0,1,0,50,50\n', async page => {
     const r = await run(page, 'tech'); ok(r.cls === 'err' && /integrity check failed, nothing was written/.test(r.text) && /no stock in the file matched a stock on the dashboard/.test(r.text), r.text.slice(0, 260));
-    const a = await readDb(page); eq(a.meta.version, 5, 'nothing written'); eq(a.backups.length, 1, 'backup taken first'); ok(a.job.status === 'failed', 'lock released as failed');
+    const a = await readDb(page); eq(a.meta.version, 5, 'nothing written'); ok(a.job.status === 'failed', 'lock released as failed');
   });
   // pressing Import while the new file is still being saved must import that new file, not the older one that is still waiting
   await runScenario('tech import: Import pressed while a new upload is still being saved uses the new file', { docs: seedRec('tech', 'old1', 'old.csv') }, async page => {
@@ -500,17 +472,17 @@ async function techScenarios(){
   });
   await runScenario('tech import: a partial file asks first (cancel, then go ahead)', {}, async page => {
     const file = techFile({ limit: 900 }); await upload(page, 'tech', 'partial.csv', file.csv);
-    await page.click(BTN_TECH); const p = await waitPrompt(page, 'tech');
+    await showTechCsv(page); await page.click(BTN_TECH); const p = await waitPrompt(page, 'tech');
     ok(/^Only \d+ dashboard stocks matched a row in the file \(normally about 2,100\)\. That can mean a partial export or the wrong file\. Nothing has been written yet\.$/.test(p.prompt), 'warning: ' + p.prompt);
     await answer(page, 'tech', false); const c = await waitResult(page, 'tech');
     ok(c.cls === 'warn' && c.lines[0] === 'Import cancelled before anything was written.', 'cancel: ' + c.lines[0]);
     let a = await readDb(page); ok(a.meta.version === 5 && a.job.status === 'failed', 'nothing written, lock released'); eq(a.techLog[0].status, 'uploaded', 'file still waiting');
-    await page.click(BTN_TECH); await waitPrompt(page, 'tech'); await answer(page, 'tech', true); const g = await waitResult(page, 'tech');
+    await showTechCsv(page); await page.click(BTN_TECH); await waitPrompt(page, 'tech'); await answer(page, 'tech', true); const g = await waitResult(page, 'tech');
     ok(g.cls === 'ok', 'import anyway: ' + g.text.slice(0, 100)); a = await readDb(page); eq(a.meta.version, 6, 'version bumped'); eq(a.techLog[0].status, 'processed', 'file processed');
   });
   await runScenario('tech import: many readings kept because the file lacks a column asks first', {}, async page => {
     await upload(page, 'tech', 'growth.csv', techFile({ blankWeekRsi: 'many' }).csv);
-    await page.click(BTN_TECH); const p = await waitPrompt(page, 'tech');
+    await showTechCsv(page); await page.click(BTN_TECH); const p = await waitPrompt(page, 'tech');
     ok(/^\d+ stocks have a component missing from this file that they had before, so their previous reading was kept\. Nothing has been written yet\.$/.test(p.prompt) && parseInt(p.prompt, 10) > 25, 'warning: ' + p.prompt);
     await answer(page, 'tech', false); const c = await waitResult(page, 'tech'); ok(c.cls === 'warn', 'cancel');
     ok((await readDb(page)).meta.version === 5, 'nothing written');
@@ -530,31 +502,6 @@ async function techScenarios(){
     const r = await run(page, 'tech'); ok(r.cls === 'err' && /Could not save the stock data \(not_granted: write refused\)\. Your previous data was put back\./.test(r.text) && /The previous data is back in place\./.test(r.text), r.text.slice(0, 260));
     const a = await readDb(page); ok(before.meta.chunks.every(c => canon(a.chunkDocs[c]) === canon(before.chunkDocs[c])) && a.meta.version === 5, 'every chunk and the index are as before'); sameStocks(a.stocks, DS.stocks, 'stock list as before');
     ok(a.job.status === 'failed' && a.job.kind === 'technical' && a.techLog[0].status === 'uploaded', 'lock failed, file still waiting');
-  });
-  await runScenario('restore: a backup that is not a stock list is refused; cancelling does nothing', { docs: { 'backupLog/junk': { kind: 'stocks-backup', format: 'stocks.json', label: 'junk', createdAt: '2026-09-01T00:00:00.000Z', stockCount: 3, bytes: 7, assetId: 'junkasset', assetUrl: '/_blob/junkasset', dataVersion: 1 } } }, async page => {
-    page.blobs.set('junkasset', '[1,2,3]');
-    await page.waitForSelector('#fiBackups .fi-restore-btn');
-    await page.click('#fiBackups .fi-restore-btn'); await waitPrompt(page, 'fund'); await answer(page, 'fund', false);
-    ok(await page.evaluate(() => document.getElementById('fundImportPanel').hidden), 'cancel closes the panel'); ok(!(await page.evaluate(() => window.__sets.some(p => /^(stockData|stockMeta|backupLog)\//.test(p)))), 'cancel writes nothing');
-    await page.click('#fiBackups .fi-restore-btn'); await waitPrompt(page, 'fund'); await answer(page, 'fund', true);
-    const r = await waitResult(page, 'fund'); ok(r.cls === 'err' && /Restore stopped: the backup file does not look like a stock list/.test(r.text) && /No changes were published/.test(r.text), r.text.slice(0, 220));
-    const a = await readDb(page); ok(a.meta.version === 5 && a.job.status === 'failed' && a.backups.length === 1, 'nothing changed, lock released');
-  });
-  await runScenario('restore: a short or malformed stock list is refused', { docs: {
-      'backupLog/short': { kind: 'stocks-backup', format: 'stocks.json', label: 'short', createdAt: '2026-09-02T00:00:00.000Z', stockCount: 50, bytes: 7, assetId: 'shortasset', assetUrl: '/_blob/shortasset', dataVersion: 1 },
-      'backupLog/shaped': { kind: 'stocks-backup', format: 'stocks.json', label: 'shaped', createdAt: '2026-09-01T00:00:00.000Z', stockCount: 2004, bytes: 7, assetId: 'shapedasset', assetUrl: '/_blob/shapedasset', dataVersion: 1 } } }, async page => {
-    page.blobs.set('shortasset', JSON.stringify(DS.stocks.slice(0, 50)));
-    const bad = clone(DS.stocks); delete bad[1000].ticker; page.blobs.set('shapedasset', JSON.stringify(bad));
-    await page.waitForFunction(() => document.querySelectorAll('#fiBackups .fi-restore-btn').length === 2);
-    for(const n of [0, 1]){
-      await page.locator('#fiBackups .fi-restore-btn').nth(n).click(); await waitPrompt(page, 'fund'); await answer(page, 'fund', true);
-      const r = await waitResult(page, 'fund'); ok(r.cls === 'err' && /the backup file does not look like a stock list/.test(r.text), `backup ${n}: ` + r.text.slice(0, 200));
-    }
-    const a = await readDb(page); ok(a.meta.version === 5 && !(await page.evaluate(() => window.__sets.some(p => /^stockData\//.test(p)))), 'nothing written');
-  });
-  await runScenario('restore: a backup whose file is gone is refused', { docs: { 'backupLog/gone': { kind: 'stocks-backup', format: 'stocks.json', label: 'gone', createdAt: '2026-09-01T00:00:00.000Z', stockCount: 3, bytes: 7, assetId: 'goneasset', assetUrl: '/_blob/goneasset', dataVersion: 1 } } }, async page => {
-    await page.waitForSelector('#fiBackups .fi-restore-btn'); await page.click('#fiBackups .fi-restore-btn'); await waitPrompt(page, 'fund'); await answer(page, 'fund', true);
-    const r = await waitResult(page, 'fund'); ok(r.cls === 'err' && /Restore stopped: the backup file could not be read \(404\)/.test(r.text), r.text.slice(0, 200));
   });
 }
 const BTN_TECH = '#importTechnicalDataBtn';
@@ -694,9 +641,10 @@ async function tvRefreshScenarios(){
     ok(rows.filter(x => x.c[9] === 50000).length === rows.length, 'every row carries its average daily volume');
     ok(Object.keys(a.all).filter(k => k.startsWith('stockUpdates/')).length === 1, 'no per-stock record was written');
     // what the page shows after merging: snapshot scores for most stocks, the fresh completed-weeks score and note kept for the stock that had one
-    const m = await page.evaluate(first => { const S = window.__alba.stocks; const one = S.filter(s => s.technical && s.technical.src === 'snapshot').length; const k = S.find(s => (window.__alba.sanitizeDocId ? window.__alba.sanitizeDocId(window.__alba.tickerSymbol(s)) : '') === first); return { snap: one, priced: S.filter(s => s.valuation && s.valuation.currentPrice === 111.1).length, kept: k && { px: k.valuation.currentPrice, score: k.technical.score, reason: k.technical.reason } }; }, first);
-    ok(m.snap > 100 && m.priced > 100, 'merged into the stock list: ' + m.snap + ' snapshot scores, ' + m.priced + ' prices');
+    const m = await page.evaluate(first => { const S = window.__alba.stocks; const one = S.filter(s => s.technical && s.technical.src === 'snapshot').length; const k = S.find(s => (window.__alba.sanitizeDocId ? window.__alba.sanitizeDocId(window.__alba.tickerSymbol(s)) : '') === first); return { snapCount: one, priced: S.filter(s => s.valuation && s.valuation.currentPrice === 111.1).length, kept: k && { px: k.valuation.currentPrice, score: k.technical.score, reason: k.technical.reason, snap: k.__snapAsof } }; }, first);
+    ok(m.snapCount > 100 && m.priced > 100, 'merged into the stock list: ' + m.snapCount + ' snapshot scores, ' + m.priced + ' prices');
     ok(m.kept && m.kept.px === 111.1 && m.kept.reason === 'kept' && m.kept.score === 7, 'the fresh completed-weeks score is kept and only the price changes: ' + JSON.stringify(m.kept));
+    ok(m.kept.snap === today, 'it still counts as confirmed today for the Technical data age: ' + JSON.stringify(m.kept));
     ok(r.btn && /skipped/.test(r.text), 'a skipped-stocks file is offered: ' + r.text.slice(0, 300));
     ok(await page.evaluate(() => !document.getElementById('tvStopBtn') || document.getElementById('tvStopBtn').hidden), 'the Stop button is hidden again');
   });
@@ -722,6 +670,15 @@ async function tvRefreshScenarios(){
     ok(runs[0].saved > 100 && runs[0].unchanged === 0 && runs[1].saved === 0 && runs[1].unchanged === runs[0].saved, 'the records say how many stocks each run saved and left alone: ' + JSON.stringify(runs.map(r => [r.saved, r.unchanged])));
     ok(runs.every(r => Array.isArray(r.batchSecs) && r.batchSecs.length === r.batches && r.batches > 0 && typeof r.tvWaitSecs === 'number' && typeof r.saveSecs === 'number' && typeof r.chunks === 'number' && r.error === null), 'the records hold the seconds each batch took and the time spent waiting on TradingView and saving');
     ok(runs[0].chunks === runs[0].batches && runs[1].chunks === 0, 'one save per batch, none the second time: ' + JSON.stringify(runs.map(r => [r.batches, r.chunks])));
+    // v1.199: the Last 2 runs list under the option, and only the newest two records are kept
+    const lastTxt = await page.evaluate(() => document.getElementById('lastRuns_snapshot').innerText);
+    ok(/Last 2 runs/.test(lastTxt) && (lastTxt.match(/manual/g) || []).length === 2 && /2,?\d{3} saved/.test(lastTxt) && /unchanged/.test(lastTxt), 'the list shows both runs: ' + lastTxt.replace(/\s+/g, ' ').slice(0, 300));
+    await page.waitForFunction(() => !document.getElementById('tvSnapshotBtn').disabled, null, { timeout: 30000 });
+    await page.click('#tvSnapshotBtn');
+    await page.waitForFunction(() => document.getElementById('tvSnapshotBtn').disabled === false && /Took/.test(document.getElementById('tv_fiResult').textContent), null, { timeout: 120000 });
+    await page.waitForFunction(() => (document.getElementById('lastRuns_snapshot').innerText.match(/manual/g) || []).length === 2, null, { timeout: 15000 });
+    const keptRuns = Object.keys((await readDb(page)).all).filter(k => k.startsWith('refreshRunLog/'));
+    eq(keptRuns.length, 2, 'a third run leaves only the newest two records');
   });
   // v1.198: the snapshot is saved apart from the per-stock records, so a run never touches (or needs to read) research notes
   const research = { ticker: first, globalFactors: { scope: 'sector', asof: '2999-01-01', positive: ['kept note'], negative: [] }, technical: { score: 3, asof: '2020-01-01', states: {}, raw: {}, reason: 'old' } };
@@ -765,8 +722,8 @@ async function tvRefreshScenarios(){
   const old = {}; DS.stocks.filter(s => !/^\d/.test(symOf(s))).forEach(s => { old[symOf(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_')] = '2020-01-01T00:00:00.000Z'; });
   await runScenario('fill missing history: a saved failure list that cannot be changed in place does not stop the run', { docs: { 'stockMeta/histFillTried': Object.assign({ uploadedAt: '2026-10-01' }, old) } }, async page => {
     await page.click('#tvHistoryBtn');
-    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 200000 });
-    const text = await page.textContent('#tv_fiResult');
+    await page.waitForSelector('#th_fiResult.fi-result-ok, #th_fiResult.fi-result-err', { timeout: 200000 });
+    const text = await page.textContent('#th_fiResult');
     ok(!/Cannot|not extensible|Stopped/.test(text), 'the run finishes: ' + text.slice(0, 200));
   });
   await runScenario('refresh from TradingView: without a connection nothing is attempted', { cfg: { noMcp: true } }, async page => {

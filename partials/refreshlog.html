@@ -29,7 +29,7 @@
 
         <div class="upload-panel last-file" id="fundamentalLastFile" aria-live="polite"></div>
 
-        <div data-import-panel="" data-title="Import" data-label="Import progress" data-backups></div>
+        <div data-import-panel="" data-title="Import" data-label="Import progress"></div>
 
 
       </div>
@@ -45,40 +45,56 @@
           <div class="refreshlog-freshness-bars" id="techFreshnessBars"></div>
         </div>
 
-        <div class="upload-panel">
-          <div class="upload-row">
-            <div class="upload-text">
-              <div class="upload-title">TradingView Growth List (.csv)</div>
+        <div class="refreshlog-sub">
+          <h3 class="refreshlog-sub-title">Refresh all stocks <span class="refreshlog-sub-note">the daily update, straight from TradingView</span></h3>
+          <div class="upload-panel">
+            <div class="upload-row">
+              <div class="upload-text">
+                <div class="upload-hint">Reads price, MACD and RSI for every stock from TradingView (about 45 calls) and recalculates every Technical Score. Takes about 3 minutes. Nothing is overwritten that cannot be refreshed again.</div>
+              </div>
+              <button type="button" class="select-mode-btn fi-btn-primary" id="tvSnapshotBtn" title="Saves a fresh price and technical reading for every stock, from TradingView">Refresh all stocks</button>
+              <button type="button" class="select-mode-btn" id="tvStopBtn" hidden>Stop</button>
             </div>
-            <div class="browse-wrap">
-              <button type="button" class="browse-btn" tabindex="-1">Browse CSV…</button>
-              <input type="file" id="technicalCsvInput" class="csv-file-input" accept=".csv,text/csv">
-            </div>
-            <button type="button" class="select-mode-btn fi-btn-primary" id="importTechnicalDataBtn" title="Scores the uploaded Growth List and updates the technical data, right here on this page" disabled>Import data</button>
           </div>
-          <div class="upload-result" id="technicalUploadResult"></div>
+          <div data-import-panel="tv_" data-title="Refresh" data-label="Refresh progress"></div>
+          <div class="refreshlog-lastruns" id="lastRuns_snapshot" aria-live="polite"></div>
         </div>
 
-        <div class="upload-panel last-file" id="technicalLastFile" aria-live="polite"></div>
-
-        <div class="upload-panel">
-          <div class="upload-row">
-            <div class="upload-text">
-              <div class="upload-title">Refresh from TradingView (no file needed)</div>
-              <div class="upload-hint">“Refresh all stocks” reads price, MACD and RSI for every stock straight from TradingView (about 45 calls). “Fill missing history” downloads weekly and monthly bars for stocks that have none, tracked picks first, up to 100 per run.</div>
-              <div class="upload-hint" id="tvRefreshHint">The count of stocks with saved history appears after the first run.</div>
+        <div class="refreshlog-sub" id="techCsvOption">
+          <h3 class="refreshlog-sub-title">Import CSV <span class="refreshlog-sub-note">the backup option if the TradingView refresh is not working</span></h3>
+          <div class="upload-panel">
+            <div class="upload-row">
+              <div class="upload-text">
+                <div class="upload-title">TradingView Growth List (.csv)</div>
+              </div>
+              <div class="browse-wrap">
+                <button type="button" class="browse-btn" tabindex="-1">Browse CSV…</button>
+                <input type="file" id="technicalCsvInput" class="csv-file-input" accept=".csv,text/csv">
+              </div>
+              <button type="button" class="select-mode-btn fi-btn-primary" id="importTechnicalDataBtn" title="Scores the uploaded Growth List and updates the technical data, right here on this page" disabled>Import data</button>
             </div>
-            <button type="button" class="select-mode-btn fi-btn-primary" id="tvSnapshotBtn" title="Saves a fresh price and technical reading for every stock, from TradingView">Refresh all stocks</button>
-            <button type="button" class="select-mode-btn" id="tvHistoryBtn" title="Downloads weekly and monthly price history for stocks that have none saved">Fill missing history</button>
-            <button type="button" class="select-mode-btn" id="tvStopBtn" hidden>Stop</button>
+            <div class="upload-result" id="technicalUploadResult"></div>
           </div>
+          <div class="upload-panel last-file" id="technicalLastFile" aria-live="polite"></div>
+          <div data-import-panel="ti_" data-title="Import" data-label="Import progress"></div>
+          <div class="refreshlog-lastruns" id="lastRuns_csv" aria-live="polite"></div>
         </div>
 
-        <div data-import-panel="tv_" data-title="Refresh" data-label="Refresh progress"></div>
-
-
-        <div data-import-panel="ti_" data-title="Import" data-label="Import progress" data-backups></div>
-
+        <div class="refreshlog-sub">
+          <h3 class="refreshlog-sub-title">Fill missing history <span class="refreshlog-sub-note">for stocks added for the first time</span></h3>
+          <div class="upload-panel">
+            <div class="upload-row">
+              <div class="upload-text">
+                <div class="upload-hint">Downloads weekly and monthly price bars, up to today, for every stock that has none saved (tracked picks first, then pinned, then strategy matches, then the rest) and calculates its completed-weeks Technical Score. Stop ends the run early; run it again to carry on.</div>
+                <div class="upload-hint" id="tvRefreshHint">The count of stocks with saved history appears after the first run.</div>
+              </div>
+              <button type="button" class="select-mode-btn fi-btn-primary" id="tvHistoryBtn" title="Downloads weekly and monthly price history for stocks that have none saved">Fill missing history</button>
+              <button type="button" class="select-mode-btn" id="thStopBtn" hidden>Stop</button>
+            </div>
+          </div>
+          <div data-import-panel="th_" data-title="Fill history" data-label="Fill history progress"></div>
+          <div class="refreshlog-lastruns" id="lastRuns_history" aria-live="polite"></div>
+        </div>
 
       </div>
 

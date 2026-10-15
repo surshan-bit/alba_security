@@ -54,6 +54,7 @@ function mergedDoc(s, real, snap){
   const u = snapshotUpdate(s, unpackValues(snap.row.c), snap.asof, snap.row.y, null);
   if(u.reason) return real;
   const out = Object.assign({}, real || {});
+  out.snapAsof = snap.asof;   // the day TradingView last confirmed this stock; the Data Refresh age bars count it even when the stock kept its completed-weeks score
   out.valuation = newerValuation(real && real.valuation, u.valuation, snap.at);
   if(u.liquidity) out.liquidity = newerByAsof(real && real.liquidity, u.liquidity);
   if(u.technical){

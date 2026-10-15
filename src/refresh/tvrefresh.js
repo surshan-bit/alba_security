@@ -5,7 +5,7 @@
 //     TradingView's figures include the week and month still in progress, so a stock whose saved block was built from completed
 //     bars in the last 3 days keeps that block (only its price is updated).
 //  2. Fill missing history: downloads weekly and monthly bars for stocks that have none saved (tracked picks first, then pinned,
-//     then strategy matches, then the rest), a limited number per run. Re-running carries on with the next ones.
+//     then strategy matches, then the rest), all of them in one run (Stop ends it early; a later run carries on).
 import { stocks, stockByTickerSymbol } from '../core/stocks.js';
 import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { COLS, packValues, snapshotUpdate } from '../overlays/livesnapshot.js';
@@ -18,9 +18,9 @@ import { priorityOrder } from './freshness.js';
 import { getFiDb, getFiOwner, getFiRunning, setFiRunning } from '../import/fund-import.js';
 import { fiEl, fiReset, fiSet, fiShowResult, setFiPfx } from '../import/panel.js';
 import { registerBusy } from '../core/busy.js';
+import { duration, paintLastRuns, saveRunLog } from './runlog.js';
 
 const BATCH = 50;                 // symbols per TradingView call (the tool's limit)
-const HISTORY_CAP = 100;          // stocks per "Fill missing history" run
 const SKIP_RETRY_DAYS = 14;       // a stock that failed history fill is not retried for this long
 const STEPS = [{ key: 'prepare', label: 'Prepare the stock list', w: 5 }, { key: 'run', label: 'Refresh', w: 90 }, { key: 'verify', label: 'Finish', w: 5 }];
 
@@ -38,27 +38,27 @@ let busy = false;
 registerBusy(() => busy);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const num = x => x.toLocaleString('en-IN');
-// "2 min 14 s" for a run time in milliseconds.
-function duration(ms){ const t = Math.max(0, Math.round(ms / 1000)), m = Math.floor(t / 60); return m ? m + ' min ' + (t % 60) + ' s' : t + ' s'; }
 // Compares two saved values by content, whatever order their keys are in.
 function stable(x){ return x && typeof x === 'object' ? (Array.isArray(x) ? x.map(stable) : Object.keys(x).sort().reduce((o, k) => { o[k] = stable(x[k]); return o; }, {})) : x; }
 const sameValue = (a, b) => JSON.stringify(stable(a)) === JSON.stringify(stable(b));
 
-function setButtons(running){
+function setButtons(running, kind){
   for(const id of ['tvSnapshotBtn', 'tvHistoryBtn']){ const b = /** @type {HTMLButtonElement|null} */ (document.getElementById(id)); if(b) b.disabled = running; }
-  const st = /** @type {HTMLButtonElement|null} */ (document.getElementById('tvStopBtn')); if(st){ st.hidden = !running; st.disabled = false; st.textContent = 'Stop'; }
+  for(const [id, k] of [['tvStopBtn', 'snapshot'], ['thStopBtn', 'history']]){
+    const st = /** @type {HTMLButtonElement|null} */ (document.getElementById(id)); if(st){ st.hidden = !(running && kind === k); st.disabled = false; st.textContent = 'Stop'; }
+  }
 }
 // Starts a run: checks the page can run it and takes the shared "a job is running" flag. Returns the database or null.
-async function begin(title){
+async function begin(title, pfx, kind){
   if(busy || getFiRunning()) return null;
   busy = true;   // taken first: the TradingView check below waits for an answer, and a second click meanwhile must not start a second run
-  setFiPfx('tv_');
+  setFiPfx(pfx);
   const db = getFiDb();
   if(!getFiOwner() || !db){ busy = false; fiReset(title, STEPS); fiShowResult('err', [{ text: 'Only the owner can run this, and the database must be available in this view.' }], true); return null; }
   let connected = false;
   try { connected = !!(await tvMcp()); } catch(e){ console.error('TradingView connector check failed', e); }
   if(!connected){ busy = false; fiReset(title, STEPS); fiShowResult('err', [{ text: 'The TradingView connector is not available in this view.' }], true); return null; }
-  stopAsked = false; setFiRunning(true); setButtons(true);
+  stopAsked = false; setFiRunning(true); setButtons(true, kind);
   fiReset(title, STEPS);
   return db;
 }
@@ -75,19 +75,9 @@ function skippedReport(skipped, kind){
   host.appendChild(b);
 }
 
-// One record per run in the database (refreshRunLog/<kind>-<start time>), so how long each run took, and where the time went, can be
-// measured later from the data: when it started and ended, how many stocks were saved, left alone or skipped, the seconds spent waiting on
-// TradingView and saving, and the seconds each batch took. Never stops a run: a failed save only means a missing record.
-async function saveRunLog(db, kind, startedAt, t0, rec){
-  try {
-    const endedAt = new Date().toISOString();
-    await db.doc('refreshRunLog/' + kind + '-' + startedAt.replace(/[-:.]/g, '')).set(Object.assign({ v: 1, kind, startedAt, endedAt, durationMs: Date.now() - t0 }, rec));
-  } catch(e){ console.error('Could not save the refresh run record', e); }
-}
-
 // ---- 1. Refresh all stocks ----
 async function runSnapshot(){
-  const db = await begin('Refreshing all stocks from TradingView');
+  const db = await begin('Refreshing all stocks from TradingView', 'tv_', 'snapshot');
   if(!db) return;
   const today = tvIstDate();
   const lines = [], skipped = [];
@@ -172,6 +162,7 @@ async function runSnapshot(){
   } finally {
     await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, chunks: chunksSaved, v: 2, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
     end();
+    paintLastRuns(db);
   }
 }
 
@@ -186,7 +177,7 @@ async function missingHistoryOrder(){
   return { missing, order: first.concat(priorityOrder('tech', rest)), trackedCount: first.length };
 }
 async function runHistory(){
-  const db = await begin('Filling missing price history');
+  const db = await begin('Filling missing price history', 'th_', 'history');
   if(!db) return;
   const failed = [];
   let done = 0, ok = 0, stopped = false, planned = 0, missingBefore = 0, runError = '';
@@ -198,7 +189,7 @@ async function runHistory(){
     const recent = id => tried[id] && Date.now() - (Date.parse(tried[id]) || 0) < SKIP_RETRY_DAYS * 86400000;
     const { missing, order, trackedCount } = await missingHistoryOrder();
     const eligible = order.filter(s => !recent(sanitizeDocId(tickerSymbol(s))));
-    const list = eligible.slice(0, HISTORY_CAP);
+    const list = eligible;
     planned = list.length; missingBefore = missing.length;
     fiSet('prepare', 'done', num(missing.length) + ' without history' + (trackedCount ? ', ' + trackedCount + ' are tracked picks' : ''));
     if(!list.length){
@@ -226,7 +217,7 @@ async function runHistory(){
     const left = missing.length - ok;
     fiShowResult(failed.length === done && done > 0 ? 'err' : 'ok', [
       { text: (stopped ? 'Stopped. ' : '') + ok + ' of ' + done + ' stocks now have price history and a completed-weeks technical score.', cls: 'fi-line fi-line-strong' },
-      { text: left > 0 ? num(left) + ' stocks still have none. Run this again to carry on with the next ' + HISTORY_CAP + '.' : 'Every stock now has saved price history.', cls: 'fi-line fi-line-muted' },
+      { text: left > 0 ? num(left) + ' stocks still have none (they failed and are retried later).' : 'Every stock now has saved price history.', cls: 'fi-line fi-line-muted' },
       ...(failed.length ? [{ text: failed.length + ' skipped (listed in the file below); they are retried after ' + SKIP_RETRY_DAYS + ' days.', cls: 'fi-line' }] : [])
     ], true);
     skippedReport(failed, 'history');
@@ -236,6 +227,7 @@ async function runHistory(){
   } finally {
     if(planned > 0 || runError) await saveRunLog(db, 'history', startedAt, t0, { planned, missingBefore, tried: done, saved: ok, failed: failed.length, stopped, error: runError || null });
     end();
+    paintLastRuns(db);
   }
 }
 
@@ -251,7 +243,7 @@ function init_refresh_tvrefresh(){
   const on = (id, fn) => { const b = document.getElementById(id); if(b) b.addEventListener('click', fn); };
   on('tvSnapshotBtn', () => runSnapshot().then(paintHint));
   on('tvHistoryBtn', () => runHistory().then(paintHint));
-  on('tvStopBtn', () => { stopAsked = true; const b = /** @type {HTMLButtonElement|null} */ (document.getElementById('tvStopBtn')); if(b){ b.disabled = true; b.textContent = 'Stopping…'; } });
+  for(const id of ['tvStopBtn', 'thStopBtn']) on(id, () => { stopAsked = true; const b = /** @type {HTMLButtonElement|null} */ (document.getElementById(id)); if(b){ b.disabled = true; b.textContent = 'Stopping…'; } });
 }
 
 export { init_refresh_tvrefresh };

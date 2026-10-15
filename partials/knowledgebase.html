@@ -221,6 +221,14 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.199 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>The TradingView refresh is now the only route for the Technical Score:</b> the Technical CSV import is hidden (the code is kept, and one switch brings it back). The Technical Score section shows <b>Refresh all stocks</b> and <b>Fill missing history</b>, each with its own progress panel and its own Stop button.</li>
+              <li><b>Backups removed:</b> the Fundamental and Technical imports no longer save a copy of the stock list first, and the Backups list and Restore buttons are gone, because everything in the list can be rebuilt by running a fresh import or refresh. If a write fails part way, the old data is still put back automatically. Backups already saved earlier are left in storage but are no longer shown.</li>
+              <li><b>Last 2 runs under each option:</b> date and time, manual or scheduled, how long it took, how many stocks were saved, left unchanged or skipped, and any error. Only the newest two run records of each kind are kept; older ones are deleted when a new run is saved.</li>
+              <li><b>Technical data age:</b> a stock that TradingView confirmed in a refresh counts as refreshed that day, even when it kept a completed-weeks score from the last 3 days.</li>
+              <li><b>Fill missing history</b> no longer stops after 100 stocks: it goes through every stock that has none (tracked picks first), and Stop ends it early. The first run over a large list can take a long time.</li>
+            </ul>
             <h3>v1.198 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Refresh all stocks now saves one record per batch of 50 stocks instead of one per stock:</b> the run records of v1.196 and v1.197 showed the database accepts only about 1.5 saves a second however many are sent at once, so about 2,000 saves took about 20 minutes. The refresh now saves about 44 records (collection <code>liveSnapshot</code>, ids c001, c002 ...), each holding the price, MACD, RSI and average volume of its 50 stocks. The page lays these under each stock's own saved update, so research notes, Global factors and completed-weeks scores are never touched: a newer price from a single-stock refresh wins over the snapshot, and a completed-weeks score from the last 3 days still beats the snapshot score. A batch that comes back exactly the same as last time is not saved again, a failed save is tried once more, and the stock list no longer has to be read before a run. The run record (<code>refreshRunLog</code>, now version 2) notes how many batch records were saved. Compare it with the earlier runs (about 21 minutes in v1.196, about 6 minutes with 16 saves at once in v1.197).</li>

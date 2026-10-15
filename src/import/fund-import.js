@@ -1,27 +1,27 @@
-// Fundamental Score import: steps, backups, restore and database writes.
+// Fundamental Score import: steps and database writes.
 import { fundamentalCsvUploadLog } from '../core/store.js';
-import { formatBytes, formatUploadTimestamp } from '../core/util.js';
 import { recordAttempt, saveRecord } from './last-file.js';
 import { lockBusy, lockText, startBeat, tabId } from './joblock.js';
 import { primeStockCache } from '../boot/stockdata.js';
 import { fiAsk, fiEl, fiReset, fiSet, fiShowResult, getFiState, setFiPfx } from './panel.js';
 import { albaApplyFundamental } from './fund-engine.js';
-import { albaTiRunImport } from './tech-import.js';
+import { SHOW_TECH_CSV, albaTiRunImport } from './tech-import.js';
 import { albaWlRunSync } from './wlsync.js';
 import { registerBusy } from '../core/busy.js';
+import { paintLastRuns } from '../refresh/runlog.js';
 import { uploadsSettled } from './upload-history.js';
 import { recordScoreHistory } from '../history/scorehistory.js';
 
 // ====================================================================================================
-// FUNDAMENTAL IMPORT, IN THE PAGE (added 2026-10-09). "Import data" no longer opens a Claude chat:
+// FUNDAMENTAL IMPORT, IN THE PAGE (added 2026-10-09; backups and Restore removed in v1.199). "Import data" no longer opens a Claude chat:
 // the uploaded CSV (kept in the asset store + fundamentalCsvUploadLog) is scored here with the same
-// v3 engine the saved scripts used, the current stock data is backed up first, the changed chunks are
-// written to the database with a progress bar, and a one-click Restore puts a backup back.
+// v3 engine the saved scripts used, and the changed chunks are written to the database with a progress bar
+// (a failed write puts the old chunks back; a finished import is corrected by importing a better file).
 // Owner only (writing stock data and the asset store need the artifact's write bit).
 // ====================================================================================================
-const ALBA_FI = { HARD: 240000, SOFT: 200000, KEEP: 2 };
+const ALBA_FI = { HARD: 240000, SOFT: 200000 };
 const ALBA_FI_COLUMNS = ['Name','BSE Code','NSE Code','ISIN Code','Industry Group','Industry','Current Price','Intrinsic Value','Book value','Profit growth','Profit growth 3Years','Profit growth 5Years','Sales growth 3Years','Return on invested capital','Return on capital employed','Return on equity','OPM','Price to Earning','Industry PE','PEG Ratio','Pledged percentage','Interest Coverage','Debt to equity','Change in promoter holding','Piotroski score','Quick ratio','Altman Z Score','Current ratio','Contingent liabilities','Average return on equity 7Years','Average return on equity 10Years','Median return on capital employed 10Years','Free cash flow 3years','Free cash flow 5years','Operating cash flow 3years','Operating cash flow 5years','CROIC','Graham','Change in FII holding 3Years','Change in DII holding 3Years','Historical PE 5Years','Average debtor days 3years','NCAVPS','Number of Shareholders'];
-const ALBA_FI_PUBLISHED = 'The new data had already been saved when this failed, so it is live. Check the stock list, or restore a backup below.';
+const ALBA_FI_PUBLISHED = 'The new data had already been saved when this failed, so it is live. Check the stock list; if it looks wrong, import a corrected file.';
 const albaFiSleep = ms => new Promise(r => setTimeout(r, ms));
 const albaFiSym = s => s.ticker.split('·')[0].trim();
 const albaFiSid = id => String(id).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_') || 'x';
@@ -159,31 +159,10 @@ function albaFiSplit(stocks, meta, oldCanon){
   return { changed, newMeta, emptied, finalIds };
 }
 
-// ---- Backups (kept in the asset store, listed in backupLog; newest 5 are kept) ----
-async function albaFiBackupLog(db){
-  const q = await albaFiRetry(() => db.collection('backupLog').get());
-  return q.docs.map(d => ({ id: d.id, ...(d.data() || {}) })).filter(b => b.kind === 'stocks-backup' && b.format === 'stocks.json' && b.assetId).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-}
 // Reads an uploaded file back. The website keeps files in a private store and reads them with the signed-in person's own access
 // (assets.read); inside claude.ai the file is served at /_blob/<id>. Either way the answer is a fetch-style Response.
 function albaFiReadAsset(assets, id){
   return assets && typeof assets.read === 'function' ? assets.read(id) : fetch('/_blob/' + id);
-}
-
-async function albaFiMakeBackup(db, assets, json, count, version, label){
-  const blob = new Blob([json], { type: 'application/json' });
-  const up = await albaFiRetry(() => assets.upload(blob));
-  const createdAt = new Date().toISOString();
-  const doc = { kind: 'stocks-backup', format: 'stocks.json', label, dataVersion: version, createdAt, stockCount: count, bytes: up.sizeBytes != null ? up.sizeBytes : blob.size, assetId: up.id, assetUrl: up.url };
-  await albaFiRetry(() => db.doc('backupLog/' + albaFiSid('stocks-' + createdAt)).set(doc));
-  try {     // keep only the newest ALBA_FI.KEEP
-    const all = await albaFiBackupLog(db);
-    for(const b of all.slice(ALBA_FI.KEEP)){
-      try { await assets.delete(b.assetId); } catch(e){ /* asset may already be gone */ }
-      await db.doc('backupLog/' + b.id).delete();
-    }
-  } catch(e){ console.error('Backup clean-up failed', e); }
-  return doc;
 }
 
 let fiRunning = false, fiUser = null, fiDb = null, fiAssets = null, fiOwner = false;
@@ -200,10 +179,9 @@ function fiSetButtons(){
     b.textContent = fiRunning ? (busy || 'Importing…') : (idle || 'Import data');
     b.title = fiOwner ? tip : 'Only the owner of this dashboard can import data';
   }
-  document.querySelectorAll('.fi-restore-btn').forEach(x => { /** @type {HTMLButtonElement} */ (x).disabled = fiRunning || !fiOwner; });
 }
 
-// ---- The shared "write it safely" tail used by both Import and Restore ----
+// ---- The shared "write it safely" tail used by the imports ----
 // raw = current stored data (albaFiLoadRaw), stocks = the full new list, summaryExtra = text lines for the result card.
 async function albaFiPersist(db, raw, stocks, jobLabel){
   const plan = albaFiSplit(stocks, raw.meta, raw.oldCanon);
@@ -292,12 +270,7 @@ async function albaFiRunImport(){
     const raw = await albaFiLoadRaw(db, (d, n) => fiSet('load', 'running', d + ' / ' + n + ' parts', d / n));
     fiSet('load', 'done', raw.stocks.length.toLocaleString('en-IN') + ' stocks (data v' + raw.meta.version + ')');
 
-    // 3. backup
-    current = 'backup'; fiSet('backup', 'running', 'Saving a copy…', 0.4);
-    const bk = await albaFiMakeBackup(db, assets, JSON.stringify(raw.stocks), raw.stocks.length, raw.meta.version, 'Before importing ' + rec.filename + ' (data v' + raw.meta.version + ')');
-    fiSet('backup', 'done', formatBytes(bk.bytes));
-
-    // 4. score
+    // 3. score
     current = 'score'; fiSet('score', 'running', '', 0.3); await albaFiSleep(30);
     const prev = albaFiPrevInfo(raw.stocks), mixBefore = {};
     for(const s of raw.stocks) mixBefore[s.verdict] = (mixBefore[s.verdict] || 0) + 1;
@@ -346,72 +319,7 @@ async function albaFiRunImport(){
     fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);
     if(locked){ try { await job.set({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500) }); } catch(x){} }
   } finally {
-    stopBeat(); fiRunning = false; fiSetButtons(); albaFiRenderBackups();
-  }
-}
-
-// ---- Restore ----
-async function albaFiRunRestore(b, pfx){
-  if(fiRunning || !fiOwner || !fiDb || !fiAssets) return;
-  setFiPfx(pfx || '');
-  const go = await (async () => { fiReset('Restore a backup'); return fiAsk('Restore the stock data saved on ' + formatUploadTimestamp(b.createdAt) + ' (' + (b.stockCount || '?') + ' stocks)? Today\'s data is backed up first, so this can be undone.', 'Restore'); })();
-  if(!go){ const p = fiEl('fundImportPanel'); if(p) p.hidden = true; return; }
-  fiRunning = true; fiSetButtons(); fiReset('Restoring a backup');
-  const db = fiDb, assets = fiAssets, job = db.doc('importJobs/fundamental'); let locked = false, current = 'read', stopBeat = () => {};
-  try {
-    const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
-    if(lockBusy(ld)) throw new Error('an import is already running (' + lockText(ld) + '). Try again in a few minutes.');
-    await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString(), owner: tabId })); locked = true; stopBeat = startBeat(job);
-    fiSet('read', 'running', 'Downloading the backup…', 0.3);
-    const resp = await albaFiReadAsset(assets, b.assetId); if(!resp.ok) throw new Error('the backup file could not be read (' + resp.status + ')');
-    const list = await resp.json();
-    if(!Array.isArray(list) || list.length < 2000 || !list.every(s => s && typeof s.ticker === 'string')) throw new Error('the backup file does not look like a stock list');
-    fiSet('read', 'done', list.length.toLocaleString('en-IN') + ' stocks');
-    current = 'load'; fiSet('load', 'running', '', 0);
-    const raw = await albaFiLoadRaw(db, (d, n) => fiSet('load', 'running', d + ' / ' + n + ' parts', d / n));
-    fiSet('load', 'done', raw.stocks.length.toLocaleString('en-IN') + ' stocks (data v' + raw.meta.version + ')');
-    current = 'backup'; fiSet('backup', 'running', 'Saving today\'s data…', 0.4);
-    const bk = await albaFiMakeBackup(db, assets, JSON.stringify(raw.stocks), raw.stocks.length, raw.meta.version, 'Before restoring the backup of ' + formatUploadTimestamp(b.createdAt) + ' (data v' + raw.meta.version + ')');
-    fiSet('backup', 'done', formatBytes(bk.bytes));
-    fiSet('score', 'done', 'not needed'); fiSet('check', 'done', 'not needed');
-    current = 'write';
-    const out = await albaFiPersist(db, raw, list, 'restore');
-    current = 'verify';
-    await albaFiRetry(() => job.set({ status: 'done', finishedAt: new Date().toISOString(), note: 'Restored the backup of ' + b.createdAt })); locked = false;
-    fiSet('verify', 'done', 'data v' + (out.nothing ? raw.meta.version : out.plan.newMeta.version));
-    fiShowResult('ok', [{ text: 'Restore complete.', cls: 'fi-line fi-line-strong' }, { text: 'The data saved on ' + formatUploadTimestamp(b.createdAt) + ' is live again (' + list.length.toLocaleString('en-IN') + ' stocks).' }]);
-  } catch(e){
-    console.error('Restore failed', e);
-    const st = getFiState(); if(st){ st.error = e; if(current && st.status[current] !== 'done') fiSet(current, 'error', ''); }
-    const msg = (e && e.message) ? e.message : String(e);
-    fiShowResult('err', [{ text: 'Restore stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The data that was live before is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);
-    if(locked){ try { await job.set({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500) }); } catch(x){} }
-  } finally {
-    stopBeat(); fiRunning = false; fiSetButtons(); albaFiRenderBackups();
-  }
-}
-
-async function albaFiRenderBackups(){
-  let list = null, err = null;
-  if(fiDb && fiOwner){ try { list = await albaFiBackupLog(fiDb); } catch(e){ err = e; } }
-  for(const pfx of ['', 'ti_']){
-    const host = document.getElementById(pfx + 'fiBackups'); if(!host) continue;
-    host.hidden = !(fiDb && fiOwner);
-    host.textContent = '';
-    if(!fiDb || !fiOwner) continue;
-    const t = document.createElement('div'); t.className = 'upload-title'; t.style.marginBottom = '10px'; t.textContent = 'Backups (newest ' + ALBA_FI.KEEP + ' kept)'; host.appendChild(t);
-    if(err){ const p = document.createElement('p'); p.className = 'upload-hint'; p.textContent = 'Could not list backups: ' + albaFiErr(err); host.appendChild(p); continue; }
-    if(!list.length){ const p = document.createElement('p'); p.className = 'upload-hint'; p.textContent = 'No backups yet. One is saved automatically before every import.'; host.appendChild(p); continue; }
-    for(const b of list.slice(0, ALBA_FI.KEEP)){
-      const row = document.createElement('div'); row.className = 'fi-backup-row';
-      const info = document.createElement('div'); info.className = 'fi-backup-info';
-      const a = document.createElement('div'); a.className = 'fi-backup-title'; a.textContent = b.label || 'Backup';
-      const c = document.createElement('div'); c.className = 'upload-hint'; c.textContent = formatUploadTimestamp(b.createdAt) + ' · ' + (b.stockCount || '?') + ' stocks · ' + formatBytes(b.bytes);
-      info.appendChild(a); info.appendChild(c);
-      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'select-mode-btn fi-restore-btn'; btn.textContent = 'Restore'; btn.disabled = fiRunning || !fiOwner;
-      btn.addEventListener('click', () => albaFiRunRestore(b, pfx));
-      row.appendChild(info); row.appendChild(btn); host.appendChild(row);
-    }
+    stopBeat(); fiRunning = false; fiSetButtons();
   }
 }
 
@@ -428,13 +336,14 @@ function init_import_fund_import(){
     fiOwner = !!(db && assets && user && user.isOwner());
   } catch(e){ fiOwner = false; }
   fiSetButtons();
+  paintLastRuns(fiDb);
+  const csvOption = document.getElementById('techCsvOption'); if(csvOption) csvOption.hidden = !SHOW_TECH_CSV;
   const b = fiEl('importFundamentalDataBtn');
   if(b) b.addEventListener('click', albaFiRunImport);
   const wb = document.getElementById('refreshWatchlistBtn');
   if(wb) wb.addEventListener('click', () => (typeof albaWlRunSync === 'function' ? albaWlRunSync() : undefined));
   const tb = document.getElementById('importTechnicalDataBtn');
   if(tb) tb.addEventListener('click', () => (typeof albaTiRunImport === 'function' ? albaTiRunImport() : undefined));
-  if(fiOwner) albaFiRenderBackups();
 })();
 }
 
@@ -444,4 +353,4 @@ function getFiAssets(){ return fiAssets; }
 function getFiOwner(){ return fiOwner; }
 function setFiRunning(v){ fiRunning = v; }
 
-export { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiErr, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, fiSetButtons, getFiAssets, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning, albaFiReadAsset };
+export { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiErr, albaFiLoadRaw, albaFiPersist, albaFiPrevInfo, albaFiRetry, albaFiSleep, albaFiSym, fiSetButtons, getFiAssets, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning, albaFiReadAsset };
