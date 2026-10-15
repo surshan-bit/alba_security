@@ -4,7 +4,7 @@ import { technicalCsvUploadLog } from '../core/store.js';
 import { uploadsSettled } from './upload-history.js';
 import { formatBytes, sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { recordAttempt, saveRecord } from './last-file.js';
-import { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiReadAsset, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 import { AlbaTechEngine } from './tech-engine.js';
 import { techValLabel } from '../engine/technical.js';
@@ -125,7 +125,7 @@ async function albaTiRunImport(){
     await uploadsSettled();
     for(const [id, r] of technicalCsvUploadLog.entries()){ if(r.status === 'uploaded' && (!rec || String(r.uploadedAt) > String(rec.uploadedAt))){ rec = r; recId = id; } }
     if(!rec) throw new Error('there is no uploaded file waiting. Use "Browse CSV…" to upload the TradingView Growth List export first.');
-    const resp = await fetch('/_blob/' + rec.assetId);
+    const resp = await albaFiReadAsset(assets, rec.assetId);
     if(!resp.ok) throw new Error('could not read the stored file "' + rec.filename + '" (' + resp.status + ')');
     const csvText = await resp.text();
     const rows0 = AlbaTechEngine.parseCSV(csvText);

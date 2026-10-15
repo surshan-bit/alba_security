@@ -126,6 +126,12 @@ function installStub(cfg){
     upload: async blob => { const text = await blob.text(); if(window.__uploadDelay) await new Promise(r => setTimeout(r, window.__uploadDelay)); const id = 'asset' + (uploads.length + 1); uploads.push(id); await window.__blobPut(id, text); return { id, url: '/_blob/' + id, sizeBytes: new Blob([text]).size, contentType: blob.type }; },
     delete: async id => { await window.__blobDel(id); window.__deletedAssets.push(id); }
   } : null;
+  // a private file store (the website): no /_blob/ link exists, files come back only through read(), as a fetch-style Response
+  if(assets && cfg.privateAssets){
+    const put = assets.upload;
+    assets.upload = async blob => Object.assign(await put(blob), { url: null });
+    assets.read = async id => { const t = await window.__blobGet(id); return t == null ? new Response('not found', { status: 404 }) : new Response(t); };
+  }
   const user = { id: async () => cfg.noUser ? null : 'u_SMOKE', isOwner: () => cfg.owner !== false };
   const stubs = { mcp: cfg.noMcp ? null : mcp, sample: async () => ({ text: '{}' }), permissions: { state: async () => 'granted', request: async () => ({}), manage: async () => {} }, assets, user };
   window.__gets = gets; window.__sets = sets; window.__uploads = uploads; window.__deletedAssets = [];
@@ -148,7 +154,9 @@ async function openPage(ctx, base, cfg, label, errsOut){
   page.on('console', m => { if(m.type() === 'error') errs.push(label + ' console.error: ' + m.text().slice(0, 300)); });
   await page.exposeFunction('__blobPut', (id, text) => { page.blobs.set(id, text); });
   await page.exposeFunction('__blobDel', id => { page.blobs.delete(id); });
-  await page.route('**/_blob/*', route => { const id = route.request().url().split('/_blob/')[1]; const t = page.blobs.get(id); if(t == null) route.fulfill({ status: 404, body: 'not found' }); else route.fulfill({ status: 200, contentType: 'text/plain', body: t }); });
+  await page.exposeFunction('__blobGet', id => { const t = page.blobs.get(id); return t == null ? null : t; });
+  page.blobRequests = [];
+  await page.route('**/_blob/*', route => { page.blobRequests.push(route.request().url()); const id = route.request().url().split('/_blob/')[1]; const t = page.blobs.get(id); if(t == null) route.fulfill({ status: 404, body: 'not found' }); else route.fulfill({ status: 200, contentType: 'text/plain', body: t }); });
   await page.addInitScript(installStub, cfg);
   await page.goto(base + '/index.html');
   return { page, errs };

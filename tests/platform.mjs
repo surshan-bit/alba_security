@@ -89,5 +89,28 @@ const sbBad = { functions: { invoke: async () => ({ data: null, error: { message
 let caught = null; try { await claudeSample(sbBad)('p'); } catch(e){ caught = e; }
 eq('sample error code', [caught && caught.code, caught && caught.message], ['rate_limited', 'slow down']);
 
+// file storage is private: no public link, files come back through read() with the person's own access
+import { supabaseAssets } from '../platform/shim.js';
+import { readFileSync } from 'node:fs';
+{
+  const log = [];
+  const sb = { auth: { getSession: async () => ({ data: { session: { user: { id: 'U1' } } } }) },
+    storage: { from: (bucket) => ({
+      upload: async (path, blob, o) => { log.push(['upload', bucket, path.startsWith('U1/'), o.contentType]); return { error: null }; },
+      getPublicUrl: () => { log.push(['PUBLIC LINK ASKED FOR']); return { data: { publicUrl: 'https://x/public' } }; },
+      download: async (path) => path === 'U1/ok' ? { data: new Blob(['a,b\n1,2']), error: null } : { data: null, error: { message: 'Object not found' } },
+      remove: async (ids) => { log.push(['remove', ids]); return { error: null }; } }) } };
+  const a = supabaseAssets(sb);
+  const up = await a.upload(new Blob(['hello'], { type: 'text/csv' }));
+  eq('upload: stored in the signed-in person\'s folder, no public link', [log[0], up.url, up.id.startsWith('U1/'), up.sizeBytes], [['upload', 'assets', true, 'text/csv'], null, true, 5]);
+  eq('upload: a public link is never requested', log.some(x => x[0] === 'PUBLIC LINK ASKED FOR'), false);
+  const r = await a.read('U1/ok'); eq('read: a fetch-style answer', [r.ok, r.status, await r.text()], [true, 200, 'a,b\n1,2']);
+  const miss = await a.read('U1/gone'); eq('read: a missing file answers 404 like /_blob/', [miss.ok, miss.status], [false, 404]);
+  await a.delete('U1/ok'); eq('delete', log[log.length - 1], ['remove', ['U1/ok']]);
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
+  eq('schema: the file bucket is created private', /values \('assets', 'assets', false\)/.test(schema) && /set public = false/.test(schema) && !/'assets', 'assets', true/.test(schema), true);
+  eq('migration for existing projects makes it private', /update storage\.buckets set public = false where id = 'assets'/.test(readFileSync(new URL('../supabase/003_private_assets.sql', import.meta.url), 'utf8')), true);
+}
+
 console.log(fails ? fails + ' FAILED' : 'OK: platform contract tests pass');
 process.exit(fails ? 1 : 0);

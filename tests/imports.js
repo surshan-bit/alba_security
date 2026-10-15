@@ -388,6 +388,17 @@ const f1 = x => (Math.round(x * 10) / 10).toFixed(1);
 const seedRec = (which, id, name) => ({ [(which === 'fund' ? 'fundamentalCsvUploadLog/' : 'technicalCsvUploadLog/') + id]: { assetId: id, url: '/_blob/' + id, filename: name, uploadedAt: new Date().toISOString(), status: 'uploaded', rowCount: 1, newCount: 0, droppedCount: 0, sizeBytes: 10 } });
 const csvRows = csv => { const rows = T.AlbaTechEngine.parseCSV(csv), h = rows[0].map(x => x.trim().toLowerCase()); return { rows, sym: h.indexOf('symbol'), price: h.indexOf('price') }; };
 async function techScenarios(){
+  // v1.185: the website keeps files in a private store with no public link; imports and restores must read them through assets.read()
+  await runScenario('private file store: an import and a restore read the files through read(), never through a /_blob/ link', { cfg: { privateAssets: true } }, async page => {
+    const file = techFile({}); await upload(page, 'tech', 'growth.csv', file.csv);
+    const rec = (await readDb(page)).techLog[0]; ok(rec.url === null && !!rec.assetId, 'the upload record holds no public link: ' + JSON.stringify(rec.url));
+    const r = await run(page, 'tech'); ok(r.cls === 'ok', 'the technical import ends green: ' + r.cls + ' ' + r.text.slice(0, 200));
+    const a = await readDb(page); ok(a.backups.length === 1 && a.backups[0].assetUrl === null, 'the backup record holds no public link');
+    await page.locator('#fiBackups .fi-restore-btn').last().click();
+    await waitPrompt(page, 'fund'); await answer(page, 'fund', true);
+    const rr = await waitResult(page, 'fund'); ok(rr.cls === 'ok' && rr.lines[0] === 'Restore complete.', 'the restore from the backup works: ' + rr.text.slice(0, 160));
+    ok(page.blobRequests.length === 0, 'no /_blob/ link was used: ' + page.blobRequests.join(','));
+  });
   await runScenario('tech import: full cycle with prices, kept readings and BSE symbols', {}, async page => {
     const file = techFile({ blankWeekRsi: true }); await upload(page, 'tech', 'growth.csv', file.csv);
     const orig = await readDb(page); const rec0 = orig.techLog[0], asof = indiaDay(rec0.uploadedAt);
