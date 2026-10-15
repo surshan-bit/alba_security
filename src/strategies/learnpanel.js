@@ -11,6 +11,7 @@ import { FIELD_BY_ID } from './fields.js';
 import { describeRule, qualifyingStocks } from './rules.js';
 import { saveStrategies } from './state.js';
 import { HORIZONS, applyPractice, hasPractice, practiceHtml, runPractice } from './practice.js';
+import { closestEl } from '../core/evt.js';
 
 const results = new Map();    // strategy id -> { key, ... } last result
 const running = new Map();    // strategy id -> progress text
@@ -110,7 +111,7 @@ async function runLearn(st, getStrategy){
     const data = finishSampleSet(set);
     const res = learnRules(data, H);
     if(!res){ results.set(st.id, { key, error: 'There is not enough price history yet to test rules for this goal.' }); return; }
-    res.suggestions.forEach(s => { s.nowCount = qualifyingStocks(stocks, s.rules).length; });
+    res.suggestions.forEach(s => { /** @type {any} */ (s).nowCount = qualifyingStocks(stocks, s.rules).length; });
     results.set(st.id, { key, res, nStocks: entries.length, news: newsEffect(data) });
   } catch(e){
     console.error('Learning rules failed', e);
@@ -145,16 +146,16 @@ function wireLearnPanel(root, getStrategy, rerender){
   });
   document.addEventListener('click', (e) => {
     const m = document.getElementById('stratLearnModal');
-    if(!m || !m.contains(e.target) && e.target !== m) return;
+    if(!m || !m.contains(/** @type {Node} */ (e.target)) && e.target !== m) return;
     const st = getStrategy();
-    if(e.target === m || e.target.closest('#stratLearnClose')){ closeLearnModal(); return; }
+    if(e.target === m || closestEl(e, '#stratLearnClose')){ closeLearnModal(); return; }
     if(!st) return;
-    const t = e.target.closest('.lm-tab');
+    const t = closestEl(e, '.lm-tab');
     if(t){ tab = t.dataset.tab; redraw(); if(tab !== 'past' && !hasPractice(tab)) ask(tab); return; }
-    const pa = e.target.closest('.pr-ask');
+    const pa = closestEl(e, '.pr-ask');
     if(pa){ ask(pa.dataset.h, !!pa.dataset.refresh); return; }
-    if(e.target.closest('#stratLearnRun')){ runLearn(st, getStrategy); return; }
-    const ap = e.target.closest('.learn-apply');
+    if(closestEl(e, '#stratLearnRun')){ runLearn(st, getStrategy); return; }
+    const ap = closestEl(e, '.learn-apply');
     if(!ap) return;
     const ok = ap.dataset.pr ? applyPractice(st, ap.dataset.pr, Number(ap.dataset.k)) : applySuggestion(st, Number(ap.dataset.k));
     if(ok){ closeLearnModal(); rerender(); }

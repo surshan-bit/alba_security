@@ -48,7 +48,7 @@ function newsOf(s, days, now){
 // barsFor(stock) returns that stock's weekly bars (or undefined).
 // matchSet (optional): the stocks that pass the Analysis filters. They are counted and averaged on their own and listed
 // first within the industry, but nothing is removed: the industry's own figures still cover all of its stocks.
-function industryTable(stocks, { by = 'industry', period = '1M', barsFor = () => undefined, now = Date.now(), matchSet = null } = {}){
+function industryTable(stocks, { by = 'industry', period = '1M', barsFor = /** @type {(s: any) => any} */ (() => undefined), now = Date.now(), matchSet = null } = {}){
   const days = periodOf(period).days, groups = new Map();
   stocks.forEach(s => {
     const name = by === 'group' ? (s.industryGroup || '—') : tickerIndustry(s);

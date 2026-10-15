@@ -194,13 +194,13 @@ function fiSetButtons(){
     ['refreshWatchlistBtn', 'Rebuilds the four Alba watchlists in TradingView from the current verdicts, right here on this page', 'Sync now', 'Syncing…']
   ];
   for(const [bid, tip, idle, busy] of defs){
-    const b = document.getElementById(bid);
+    const b = /** @type {HTMLButtonElement} */ (document.getElementById(bid));
     if(!b) continue;
     b.disabled = fiRunning || !fiOwner;
     b.textContent = fiRunning ? (busy || 'Importing…') : (idle || 'Import data');
     b.title = fiOwner ? tip : 'Only the owner of this dashboard can import data';
   }
-  document.querySelectorAll('.fi-restore-btn').forEach(x => { x.disabled = fiRunning || !fiOwner; });
+  document.querySelectorAll('.fi-restore-btn').forEach(x => { /** @type {HTMLButtonElement} */ (x).disabled = fiRunning || !fiOwner; });
 }
 
 // ---- The shared "write it safely" tail used by both Import and Restore ----
@@ -230,14 +230,14 @@ async function albaFiPersist(db, raw, stocks, jobLabel){
       } catch(e){ console.error('Rollback failed for ' + cid, e); }
     }
   };
-  if(failure){ await rollback(); const e = new Error('Could not save the stock data (' + albaFiErr(failure) + '). Your previous data was put back.'); e.rolledBack = true; throw e; }
+  if(failure){ await rollback(); const e = new Error('Could not save the stock data (' + albaFiErr(failure) + '). Your previous data was put back.'); /** @type {any} */ (e).rolledBack = true; throw e; }
   // The index document goes last, so open pages only switch over once everything else is saved.
   try {
     const cur = await albaFiRetry(() => db.doc('stockMeta/main').get());
     const cv = cur && cur.exists ? (cur.data() || {}).version : null;
     if(cv !== raw.meta.version) throw new Error('the stock data was changed by someone else while this import was running (version ' + raw.meta.version + ' → ' + cv + ')');
     await albaFiRetry(() => db.doc('stockMeta/main').set(plan.newMeta));
-  } catch(e){ await rollback(); const err = new Error('Could not publish the new data (' + albaFiErr(e) + '). Your previous data was put back.'); err.rolledBack = true; throw err; }
+  } catch(e){ await rollback(); const err = new Error('Could not publish the new data (' + albaFiErr(e) + '). Your previous data was put back.'); /** @type {any} */ (err).rolledBack = true; throw err; }
   for(const cid of plan.emptied){ try { await db.doc('stockData/' + cid).delete(); } catch(e){ /* orphan chunk is harmless */ } }
   fiSet('write', 'done', total + ' parts written');
   try {   // keep the new list in this browser too, so the reload that follows is quick

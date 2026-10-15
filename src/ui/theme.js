@@ -14,13 +14,13 @@ function saveThemePref(theme){
 function applyTheme(theme){
   const resolved = THEME_CHOICES.has(theme) ? theme : 'dark';
   document.documentElement.setAttribute('data-theme', resolved);
-  themeToggleBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.themeChoice === resolved));
+  themeToggleBtns.forEach(btn => btn.classList.toggle('active', /** @type {HTMLElement} */ (btn).dataset.themeChoice === resolved));
 }
 
 function init_ui_theme(){
 themeToggleBtns.forEach(btn=>{
   btn.addEventListener('click', ()=>{
-    const theme = btn.dataset.themeChoice;
+    const theme = /** @type {HTMLElement} */ (btn).dataset.themeChoice;
     applyTheme(theme);
     saveThemePref(theme);
   });

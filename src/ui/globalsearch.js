@@ -3,6 +3,7 @@ import { stockIndex } from '../core/stocks.js';
 import { buildSuggestions, sgMark } from './suggest.js';
 import { appSections, showSection } from './navigation.js';
 import { openStockInline } from './inlinedetail.js';
+import { closestEl } from '../core/evt.js';
 
 function init_ui_globalsearch(){
   const input = document.getElementById('globalSearch'), box = document.getElementById('globalSuggest'), clear = document.getElementById('globalSearchClear');
@@ -15,8 +16,8 @@ function init_ui_globalsearch(){
     const el = box.children[i]; if(el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
   };
   const show = () => {
-    const q = input.value.trim().toLowerCase();
-    clear.classList.toggle('show', input.value.length > 0);
+    const q = /** @type {HTMLInputElement} */ (input).value.trim().toLowerCase();
+    clear.classList.toggle('show', /** @type {HTMLInputElement} */ (input).value.length > 0);
     if(!q){ hide(); return; }
     items = buildSuggestions(q); active = -1;
     if(!items.length){ box.innerHTML = '<div class="sg-empty">No stock found</div>'; box.classList.add('show'); return; }
@@ -28,7 +29,7 @@ function init_ui_globalsearch(){
   };
   const pick = (s) => {
     const idx = stockIndex.get(s);
-    hide(); input.value = ''; clear.classList.remove('show'); input.blur();
+    hide(); /** @type {HTMLInputElement} */ (input).value = ''; clear.classList.remove('show'); input.blur();
     if(idx === undefined) return;
     // The full-width detail view, with "Back to <page>" to return to where the search was made.
     const labels = { analysis: 'Analysis', strategies: 'Strategies', business: 'Explorer' };
@@ -47,15 +48,15 @@ function init_ui_globalsearch(){
     else if(e.key === 'Enter'){ e.preventDefault(); pick(items[active >= 0 ? active : 0]); }
   });
   box.addEventListener('mousedown', (e) => {
-    const it = e.target.closest('.sg-item'); if(!it) return;
+    const it = closestEl(e, '.sg-item'); if(!it) return;
     e.preventDefault(); pick(items[Number(it.dataset.i)]);
   });
-  clear.addEventListener('click', () => { input.value = ''; clear.classList.remove('show'); hide(); input.focus(); });
-  document.addEventListener('mousedown', (e) => { if(!e.target.closest('.topbar-search')) hide(); });
+  clear.addEventListener('click', () => { /** @type {HTMLInputElement} */ (input).value = ''; clear.classList.remove('show'); hide(); input.focus(); });
+  document.addEventListener('mousedown', (e) => { if(!closestEl(e, '.topbar-search')) hide(); });
   // "/" jumps to the box from anywhere (unless typing in another field).
   document.addEventListener('keydown', (e) => {
     if(e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
-    const t = e.target; if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    const t = e.target; if(t && (/** @type {HTMLElement} */ (t).tagName === 'INPUT' || /** @type {HTMLElement} */ (t).tagName === 'TEXTAREA' || /** @type {HTMLElement} */ (t).tagName === 'SELECT' || /** @type {HTMLElement} */ (t).isContentEditable)) return;
     e.preventDefault(); input.focus();
   });
 }

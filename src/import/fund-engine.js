@@ -132,7 +132,7 @@ const COLUMN_MATCHERS = [
 function buildColumnMap(headerRow) {
   const header = headerRow.map(h => h.trim().toLowerCase());
   const map = {};
-  for (const [field, must, mustNot] of COLUMN_MATCHERS) {
+  for (const [field, must, mustNot] of /** @type {[string, string[], string[]?][]} */ (COLUMN_MATCHERS)) {
     if (map[field] !== undefined) continue;
     const idx = header.findIndex(h => must.every(p => h.includes(p)) && !(mustNot && mustNot.some(p => h.includes(p))));
     if (idx !== -1) map[field] = idx;
@@ -142,7 +142,7 @@ function buildColumnMap(headerRow) {
 
 function extractRecords(rows, colMap) {
   const get = (r, field) => (colMap[field] !== undefined ? r[colMap[field]] : undefined);
-  const records = [];
+  const records = /** @type {any[]} */ ([]);
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     const nseCode = (get(r, 'nseCode') || '').trim();

@@ -9,6 +9,7 @@ import { tradeCol } from '../identity/session.js';
 import { tellUser } from '../ui/confirm.js';
 import { appSections } from '../ui/navigation.js';
 import { openStockInline } from '../ui/inlinedetail.js';
+import { closestEl, targetEl } from '../core/evt.js';
 
 // ---- Trade Log: add / sell / remove from this page (added 2026-10-06) ----
 function tlToday(){
@@ -80,8 +81,8 @@ function tlSetActive(n){
 function tlShowSugg(){
   const inp = document.getElementById('tlStock'), el = document.getElementById('tlSuggest');
   if(!inp || !el) return;
-  const q = inp.value.trim().toLowerCase();
-  if(!q || (tlSel && inp.value === tlLabel(tlSel))){ tlHideSugg(); return; }
+  const q = /** @type {HTMLInputElement} */ (inp).value.trim().toLowerCase();
+  if(!q || (tlSel && /** @type {HTMLInputElement} */ (inp).value === tlLabel(tlSel))){ tlHideSugg(); return; }
   tlItems = buildSuggestions(q); tlActive = -1;
   if(!tlItems.length){ tlHideSugg(); return; }
   el.innerHTML = tlItems.map((st, i) => {
@@ -93,9 +94,9 @@ function tlShowSugg(){
 }
 function tlPick(st){
   tlSel = st;
-  const inp = document.getElementById('tlStock'); inp.value = tlLabel(st);
+  const inp = /** @type {HTMLInputElement} */ (document.getElementById('tlStock')); inp.value = tlLabel(st);
   tlHideSugg();
-  const p = document.getElementById('tlPrice');
+  const p = /** @type {HTMLInputElement} */ (document.getElementById('tlPrice'));
   const cur = st.valuation && st.valuation.currentPrice != null ? String(st.valuation.currentPrice) : '';
   if(p && cur && (!p.value || p.value === tlAutoPrice)){ p.value = cur; tlAutoPrice = cur; }
   tlSetMsg('');
@@ -112,11 +113,11 @@ function tlFindStock(label){
 async function tlSaveBuy(){
   const tradeDb = getTradeDb();
   if(!tradeDb){ tlSetMsg('The trade log database is not reachable in this view.', true); return; }
-  const stockText = document.getElementById('tlStock').value;
+  const stockText = /** @type {HTMLInputElement} */ (document.getElementById('tlStock')).value;
   const s = (tlSel && stockText === tlLabel(tlSel)) ? tlSel : tlFindStock(stockText);
-  const date = document.getElementById('tlDate').value;
-  const price = parseFloat(document.getElementById('tlPrice').value);
-  const qty = parseInt(document.getElementById('tlQty').value, 10);
+  const date = /** @type {HTMLInputElement} */ (document.getElementById('tlDate')).value;
+  const price = parseFloat(/** @type {HTMLInputElement} */ (document.getElementById('tlPrice')).value);
+  const qty = parseInt(/** @type {HTMLInputElement} */ (document.getElementById('tlQty')).value, 10);
   if(!s){ tlSetMsg('Pick a stock from the suggestions.', true); return; }
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ tlSetMsg('Enter the buy date.', true); return; }
   if(!(price > 0)){ tlSetMsg('Enter a buy price above 0.', true); return; }
@@ -124,7 +125,7 @@ async function tlSaveBuy(){
   const sym = tickerSymbol(s);
   const id = sanitizeDocId(sym + '-' + date);
   if(getTrade(id)){ tlSetMsg('A trade for ' + sym + ' on this date already exists. Remove it first or use another date.', true); return; }
-  const btn = document.getElementById('tlSave'); btn.disabled = true;
+  const btn = /** @type {HTMLButtonElement} */ (document.getElementById('tlSave')); btn.disabled = true;
   try {
     await tradeCol(tradeDb).doc(id).set({
       ticker: sym, name: s.name, status: 'open',
@@ -162,8 +163,8 @@ function tlOpenSellForm(id){
 async function tlSaveSell(id){
   const t = getTrade(id), tradeDb = getTradeDb();
   if(!t || !tradeDb) return;
-  const date = document.getElementById('tlSellDate').value;
-  const price = parseFloat(document.getElementById('tlSellPrice').value);
+  const date = /** @type {HTMLInputElement} */ (document.getElementById('tlSellDate')).value;
+  const price = parseFloat(/** @type {HTMLInputElement} */ (document.getElementById('tlSellPrice')).value);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < t.buy.date){ tlSetMsg('Enter a sell date on or after the buy date.', true); return; }
   if(!(price > 0)){ tlSetMsg('Enter a sell price above 0.', true); return; }
   const s = stockByTickerSymbol.get(t.ticker);
@@ -175,13 +176,13 @@ async function tlSaveSell(id){
     realizedReturnPct: ((price - t.buy.price) / t.buy.price) * 100,
     snapshot: s ? tlSnapshot(s) : null
   };
-  const btn = document.getElementById('tlSellSave'); btn.disabled = true;
+  const btn = document.getElementById('tlSellSave'); /** @type {HTMLButtonElement} */ (btn).disabled = true;
   try {
     await tradeCol(tradeDb).doc(id).set(rec);
     tlCloseForm();
   } catch(e){
     console.error('Failed to close trade', e);
-    btn.disabled = false;
+    /** @type {HTMLButtonElement} */ (btn).disabled = false;
     tlSetMsg('Could not save the sale. Please try again.', true);
   }
 }
@@ -201,20 +202,20 @@ function init_tradelog_form(){
   const host = document.getElementById('tradeFormHost');
   if(host){
     host.addEventListener('click', (e) => {
-      const b = e.target.closest('button'); if(!b) return;
+      const b = closestEl(e, 'button'); if(!b) return;
       if(b.id === 'tlCancel') tlCloseForm();
       else if(b.id === 'tlSave') tlSaveBuy();
       else if(b.id === 'tlSellSave'){ const f = b.closest('[data-tl-id]'); if(f) tlSaveSell(f.getAttribute('data-tl-id')); }
     });
     host.addEventListener('input', (e) => {
-      if(e.target.id !== 'tlStock') return;
-      if(tlSel && e.target.value !== tlLabel(tlSel)) tlSel = null;
+      if(targetEl(e).id !== 'tlStock') return;
+      if(tlSel && targetEl(e).value !== tlLabel(tlSel)) tlSel = null;
       tlShowSugg();
     });
-    host.addEventListener('focusin', (e) => { if(e.target.id === 'tlStock') tlShowSugg(); });
-    host.addEventListener('focusout', (e) => { if(e.target.id === 'tlStock') setTimeout(tlHideSugg, 120); });
+    host.addEventListener('focusin', (e) => { if(targetEl(e).id === 'tlStock') tlShowSugg(); });
+    host.addEventListener('focusout', (e) => { if(targetEl(e).id === 'tlStock') setTimeout(tlHideSugg, 120); });
     host.addEventListener('keydown', (e) => {
-      if(e.target.id !== 'tlStock') return;
+      if(targetEl(e).id !== 'tlStock') return;
       const el = document.getElementById('tlSuggest');
       if(!el || !el.classList.contains('show')) return;
       if(e.key === 'ArrowDown'){ e.preventDefault(); tlSetActive((tlActive + 1) % tlItems.length); }
@@ -223,7 +224,7 @@ function init_tradelog_form(){
       else if(e.key === 'Escape'){ tlHideSugg(); }
     });
     host.addEventListener('mousedown', (e) => {
-      const it = e.target.closest('.sg-item'); if(!it) return;
+      const it = closestEl(e, '.sg-item'); if(!it) return;
       e.preventDefault(); tlPick(tlItems[Number(it.dataset.i)]);
     });
   }
@@ -237,7 +238,7 @@ function init_tradelog_form(){
         if(idx >= 0) openStockInline(appSections.trackrecord, 'Trade Log', idx);
         return;
       }
-      const b = e.target.closest('button'); if(!b) return;
+      const b = closestEl(e, 'button'); if(!b) return;
       if(b.hasAttribute('data-tl-sell')) tlOpenSellForm(b.getAttribute('data-tl-sell'));
       else if(b.hasAttribute('data-tl-remove')){
         if(b.classList.contains('armed')){ tlRemove(b.getAttribute('data-tl-remove')); }

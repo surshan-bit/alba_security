@@ -16,6 +16,7 @@ import { forgetLearned, wireLearnPanel } from './learnpanel.js';
 import { askConfirm } from '../ui/confirm.js';
 import { renderTrackPanel, trackPanelHtml, wireTrackPanel } from './trackpanel.js';
 import { getStrategiesStatus } from '../identity/strategies.js';
+import { closestEl, targetEl } from '../core/evt.js';
 
 let whyQuery = '';
 
@@ -33,9 +34,9 @@ const selected = new Set();   // symbols ticked in the results table (kept while
 const symOf = (s) => tickerSymbol(s);
 // What is ticked on screen is the truth: bring the saved set in line with the visible tick boxes.
 function syncSelected(){
-  document.querySelectorAll('#stratResults tbody .strat-sel').forEach(b => { if(b.checked) selected.add(b.dataset.sym); else selected.delete(b.dataset.sym); });
+  document.querySelectorAll('#stratResults tbody .strat-sel').forEach(b => { if(/** @type {HTMLInputElement} */ (b).checked) selected.add(/** @type {HTMLElement} */ (b).dataset.sym); else selected.delete(/** @type {HTMLElement} */ (b).dataset.sym); });
   const head = document.querySelector('#stratResults thead .strat-sel'), rows = document.querySelectorAll('#stratResults tbody .strat-sel');
-  if(head) head.checked = rows.length > 0 && Array.from(rows).every(b => b.checked);
+  if(head) /** @type {HTMLInputElement} */ (head).checked = rows.length > 0 && Array.from(rows).every(b => /** @type {HTMLInputElement} */ (b).checked);
   return selected;
 }
 const trackLabel = (matches) => { const k = matches.filter(s => selected.has(symOf(s))).length; return k ? `Track ${k} ticked pick${k === 1 ? '' : 's'}` : 'Track these picks'; };
@@ -129,9 +130,9 @@ function renderStrategiesSection(){
 function init_strategies_section(){
   kit.useExternalSelection('strat', () => new Set(stocks.filter(s => selected.has(symOf(s))).map(pcTickerKey)));
   document.addEventListener('alba-rk-clear', (e) => {
-    if(!e.detail || e.detail.name !== 'strat') return;
+    if(!/** @type {CustomEvent} */ (e).detail || /** @type {CustomEvent} */ (e).detail.name !== 'strat') return;
     selected.clear();
-    document.querySelectorAll('.strat-sel').forEach(b => { b.checked = false; });
+    document.querySelectorAll('.strat-sel').forEach(b => { /** @type {HTMLInputElement} */ (b).checked = false; });
     const st = selectedStrategy(), tb = document.getElementById('stratTrackBtn');
     if(tb && st) tb.textContent = trackLabel(qualifyingStocks(stocks, st.rules));
   });
@@ -143,56 +144,56 @@ function init_strategies_section(){
   wireLearnPanel(sec, selectedStrategy, renderStrategiesSection);
   wireTrackPanel(sec, selectedStrategy, syncSelected);
   sec.addEventListener('toggle', (e) => {
-    const d = e.target.closest && e.target.closest('details.strat-fold');
-    if(d){ if(d.open) folds.add(d.dataset.fold); else folds.delete(d.dataset.fold); }
+    const d = /** @type {Element} */ (e.target).closest && closestEl(e, 'details.strat-fold');
+    if(d){ if(/** @type {HTMLDetailsElement} */ (d).open) folds.add(d.dataset.fold); else folds.delete(d.dataset.fold); }
   }, true);
   sec.addEventListener('click', (e) => {
-    const card = e.target.closest('.strat-card');
+    const card = closestEl(e, '.strat-card');
     if(card){ selectStrategy(card.dataset.id); renderStrategiesSection(); return; }
-    if(e.target.closest('#stratNew')){ addStrategy(); renderStrategiesSection(); return; }
-    if(e.target.closest('#stratRestore')){ restoreStarters(); renderStrategiesSection(); return; }
+    if(closestEl(e, '#stratNew')){ addStrategy(); renderStrategiesSection(); return; }
+    if(closestEl(e, '#stratRestore')){ restoreStarters(); renderStrategiesSection(); return; }
     const st = selectedStrategy();
-    const tick = e.target.closest('.strat-sel');
+    const tick = closestEl(e, '.strat-sel');
     if(tick){   // (a click on a tick box must not open the stock)
       const sym = tick.dataset.sym;
-      if(sym === '*'){ const all = st ? qualifyingStocks(stocks, st.rules) : []; if(tick.checked) all.forEach(s => selected.add(symOf(s))); else all.forEach(s => selected.delete(symOf(s))); document.querySelectorAll('.strat-sel').forEach(b => { b.checked = tick.checked; }); }
-      else if(tick.checked) selected.add(sym); else selected.delete(sym);
+      if(sym === '*'){ const all = st ? qualifyingStocks(stocks, st.rules) : []; if(/** @type {HTMLInputElement} */ (tick).checked) all.forEach(s => selected.add(symOf(s))); else all.forEach(s => selected.delete(symOf(s))); document.querySelectorAll('.strat-sel').forEach(b => { /** @type {HTMLInputElement} */ (b).checked = /** @type {HTMLInputElement} */ (tick).checked; }); }
+      else if(/** @type {HTMLInputElement} */ (tick).checked) selected.add(sym); else selected.delete(sym);
       syncSelected();
       const tb = document.getElementById('stratTrackBtn');
       if(tb && st) tb.textContent = trackLabel(qualifyingStocks(stocks, st.rules));
       kit.selectionChanged();
       return;
     }
-    if(e.target.closest('#stratPub') && st){ st.published = !st.published; saveStrategies(); renderStrategiesSection(); return; }
-    if(e.target.closest('#stratDup') && st){ duplicateStrategy(st); renderStrategiesSection(); return; }
-    if(e.target.closest('#stratDel') && st){
+    if(closestEl(e, '#stratPub') && st){ st.published = !st.published; saveStrategies(); renderStrategiesSection(); return; }
+    if(closestEl(e, '#stratDup') && st){ duplicateStrategy(st); renderStrategiesSection(); return; }
+    if(closestEl(e, '#stratDel') && st){
       askConfirm(`Delete the strategy "${st.name}"?`, 'Delete').then((yes) => { if(yes){ deleteStrategy(st); renderStrategiesSection(); } });
       return;
     }
-    const row = e.target.closest('.strat-row');
+    const row = closestEl(e, '.strat-row');
     if(row) openStockFromStrategies(Number(row.dataset.idx));
   });
   sec.addEventListener('keydown', (e) => {
     if(e.key !== 'Enter') return;
-    const row = e.target.closest && e.target.closest('.strat-row');
+    const row = /** @type {Element} */ (e.target).closest && closestEl(e, '.strat-row');
     if(row) openStockFromStrategies(Number(row.dataset.idx));
   });
   // Text boxes save when you leave them. The name also updates the list on the left.
   sec.addEventListener('change', (e) => {
     const st = selectedStrategy();
-    if(e.target.id === 'stratName' && st){ st.name = e.target.value.trim() || 'Untitled strategy'; saveStrategies(); renderStrategiesSection(); }
-    else if((e.target.id === 'goalTarget' || e.target.id === 'goalDays') && st){
-      st.goal = cleanGoal({ target: Number(document.getElementById('goalTarget').value), days: Number(document.getElementById('goalDays').value) });
+    if(targetEl(e).id === 'stratName' && st){ st.name = targetEl(e).value.trim() || 'Untitled strategy'; saveStrategies(); renderStrategiesSection(); }
+    else if((targetEl(e).id === 'goalTarget' || targetEl(e).id === 'goalDays') && st){
+      st.goal = cleanGoal({ target: Number(/** @type {HTMLInputElement} */ (document.getElementById('goalTarget')).value), days: Number(/** @type {HTMLInputElement} */ (document.getElementById('goalDays')).value) });
       forgetLearned(st.id); saveStrategies(); renderStrategiesSection();
     }
-    else if(e.target.id === 'stratSort' && st){
-      syncSelected(); setResultsSort(e.target.value);
+    else if(targetEl(e).id === 'stratSort' && st){
+      syncSelected(); setResultsSort(targetEl(e).value);
       document.getElementById('stratResults').innerHTML = resultsHtml(qualifyingStocks(stocks, st.rules), selected);
       syncSelected();
     }
-    else if(e.target.id === 'stratNote' && st){ st.note = e.target.value.trim(); saveStrategies(); }
-    else if(e.target.id === 'stratWhy' && st){
-      whyQuery = e.target.value;
+    else if(targetEl(e).id === 'stratNote' && st){ st.note = targetEl(e).value.trim(); saveStrategies(); }
+    else if(targetEl(e).id === 'stratWhy' && st){
+      whyQuery = targetEl(e).value;
       document.getElementById('stratWhyOut').innerHTML = whyHtml(whyQuery, st.rules);
     }
   });

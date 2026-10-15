@@ -9,6 +9,7 @@ import { ldOpenPermissions } from '../livedata/bar.js';
 import { ldBatchStart, ldBatchStop } from '../livedata/batch.js';
 import { browserFullscreen, fullscreenLabel, watchFullscreenExit } from '../ui/fullscreen.js';
 import { getRefreshKit } from '../refresh/hook.js';
+import { closestEl } from '../core/evt.js';
 
 // ---- full screen ----
 // The leaderboard can fill the whole window. The state lives here so a redraw of the section keeps it. Esc and the browser's own full screen are handled in ui/fullscreen.js.
@@ -102,21 +103,21 @@ function renderLeaderboardRows(filtered){
 function wireLeaderboard({ update, rerender, openStock, hideTooltip }){
   // Delegated: the table body persists across redraws, so one listener replaces rebinding every row and pin button.
   document.getElementById('analysisLeaderboardBody').addEventListener('click', (evt) => {
-    const pinBtn = evt.target.closest('.pin-btn');
+    const pinBtn = closestEl(evt, '.pin-btn');
     if(pinBtn){
       evt.stopPropagation();
       togglePin(pinBtn.dataset.ticker);
       update(); // togglePin() only re-renders the dashboard list/detail, so refresh this section too
       return;
     }
-    const row = evt.target.closest('.analysis-lb-row');
+    const row = closestEl(evt, '.analysis-lb-row');
     if(!row) return;
     hideTooltip();
     openStock(Number(row.dataset.idx));
   });
 
   // "Sort by" only reorders the rows, so it needs update(), not a full render.
-  const sortSelect = document.getElementById('analysisSortSelect');
+  const sortSelect = /** @type {HTMLInputElement} */ (document.getElementById('analysisSortSelect'));
   if(sortSelect){
     sortSelect.addEventListener('change', () => {
       analysisFilters.sortBy = ANALYSIS_SORT_KEYS.has(sortSelect.value) ? sortSelect.value : 'mos_desc';
@@ -149,17 +150,17 @@ function wireColumnDrag(rerender){
   if(!list) return;
   const rowsOf = () => Array.from(list.querySelectorAll('.analysis-column-row'));
   const commit = (focusCol) => {
-    const order = rowsOf().map(r => r.dataset.col);
+    const order = rowsOf().map(r => /** @type {HTMLElement} */ (r).dataset.col);
     if(order.join() === analysisColumnOrder().join()) return;
     analysisFilters.columnOrder = order;
     saveAnalysisFilters(analysisFilters);
     rerender();
     const g = focusCol && document.querySelector('.analysis-col-grip[data-col="' + focusCol + '"]');
-    if(g) g.focus();
+    if(g) /** @type {HTMLElement} */ (g).focus();
   };
   list.addEventListener('pointerdown', (e) => {
-    const grip = e.target.closest('.analysis-col-grip');
-    if(!grip || (e.button != null && e.button !== 0)) return;
+    const grip = closestEl(e, '.analysis-col-grip');
+    if(!grip || (/** @type {MouseEvent} */ (e).button != null && /** @type {MouseEvent} */ (e).button !== 0)) return;
     const row = grip.closest('.analysis-column-row');
     e.preventDefault();
     row.classList.add('dragging');
@@ -173,20 +174,20 @@ function wireColumnDrag(rerender){
     const end = () => {
       document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', end); document.removeEventListener('pointercancel', end);
       row.classList.remove('dragging');
-      commit(row.dataset.col);
+      commit(/** @type {HTMLElement} */ (row).dataset.col);
     };
     // listened for on the document: moving the row in the list would drop a pointer capture held by its handle
     document.addEventListener('pointermove', move); document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
   });
   list.addEventListener('keydown', (e) => {
-    const grip = e.target.closest('.analysis-col-grip');
-    if(!grip || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    const grip = closestEl(e, '.analysis-col-grip');
+    if(!grip || (/** @type {KeyboardEvent} */ (e).key !== 'ArrowUp' && /** @type {KeyboardEvent} */ (e).key !== 'ArrowDown')) return;
     e.preventDefault();
-    const row = grip.closest('.analysis-column-row'), up = e.key === 'ArrowUp';
+    const row = grip.closest('.analysis-column-row'), up = /** @type {KeyboardEvent} */ (e).key === 'ArrowUp';
     const other = up ? row.previousElementSibling : row.nextElementSibling;
     if(!other) return;
     if(up) list.insertBefore(row, other); else list.insertBefore(other, row);
-    commit(row.dataset.col);
+    commit(/** @type {HTMLElement} */ (row).dataset.col);
   });
 }
 

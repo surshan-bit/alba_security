@@ -118,7 +118,7 @@ function ldPaint(key){
     const fill = document.getElementById('ldFill-' + kind), st = document.getElementById('ldStatus-' + kind);
     const stop = document.getElementById('ldStop-' + kind);
     const running = !!(j && j.state === 'running');
-    if(btn){ btn.disabled = busy; btn.textContent = running ? 'Refreshing…' : LD_LABEL[kind]; }
+    if(btn){ /** @type {HTMLButtonElement} */ (btn).disabled = busy; btn.textContent = running ? 'Refreshing…' : LD_LABEL[kind]; }
     const pct = j ? Math.max(0, Math.min(100, Math.round(j.pct))) : 0;
     if(bar){ bar.hidden = !j || j.state === 'idle'; bar.setAttribute('aria-valuenow', String(pct)); }
     if(fill){
@@ -155,7 +155,7 @@ function bindLiveDataBar(s){
   if(f) f.onclick = () => (kit ? kit.enqueueOne(s, 'fund') : ldStart(s, 'fund'));
   if(t) t.onclick = () => (kit ? kit.enqueueOne(s, 'tech') : ldStart(s, 'tech'));
   document.querySelectorAll('[data-ld-stop]').forEach(b => {
-    b.onclick = () => { const c = ldAbort.get(key + '|' + b.dataset.ldStop); if(c) c.abort(); };
+    /** @type {HTMLElement} */ (b).onclick = () => { const c = ldAbort.get(key + '|' + /** @type {HTMLElement} */ (b).dataset.ldStop); if(c) c.abort(); };
   });
   const pb = document.getElementById('ldPerm');
   if(pb) pb.onclick = ldOpenPermissions;

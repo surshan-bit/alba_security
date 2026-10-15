@@ -5,7 +5,7 @@ function bootMessage(text, isError){
   const el = document.getElementById('bootStatus'); if(!el) return;
   el.hidden = false;
   el.querySelector('.boot-msg').textContent = text;
-  el.querySelector('.boot-retry').hidden = !isError;
+  /** @type {HTMLElement} */ (el.querySelector('.boot-retry')).hidden = !isError;
   el.classList.toggle('boot-error', !!isError);
 }
 function hideBootMessage(){

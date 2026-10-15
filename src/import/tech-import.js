@@ -54,9 +54,9 @@ function albaApplyTechnical(csvText, stocks, bseMap, asof){
   }
   const symsOf = s => { const a = String(s.ticker).split('·')[0].trim().toUpperCase(); const l = [a]; if(a.includes('-')) l.push(a.replace(/-/g, '_')); if(a.includes('_')) l.push(a.replace(/_/g, '-')); return l; };
   let priced = 0, noValuation = 0;
-  if(priceCol >= 0) for(const m of res.matched.concat(res.frozen)){
+  if(priceCol >= 0) for(const m of [...res.matched, ...res.frozen]){
     const s = m.stock;
-    const price = [m.matchedSymbol].concat(symsOf(s)).filter(Boolean).map(x => priceBySym.get(String(x).toUpperCase())).find(x => x != null);
+    const price = [/** @type {any} */ (m).matchedSymbol].concat(symsOf(s)).filter(Boolean).map(x => priceBySym.get(String(x).toUpperCase())).find(x => x != null);
     if(price == null) continue;
     const v = s.valuation;
     if(!v || !(v.intrinsicValue > 0)){ noValuation++; continue; }

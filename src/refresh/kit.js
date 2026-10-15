@@ -17,6 +17,7 @@ import { registerBusy } from '../core/busy.js';
 import { stocks } from '../core/stocks.js';
 import { userRef } from '../identity/session.js';
 import { ago, counts, dots, freshness, needs, priorityOrder } from './freshness.js';
+import { closestEl } from '../core/evt.js';
 
 const esc = escapeHtml;
 const KIND_LABEL = { fund: "Fundamental", tech: "Technical" };
@@ -353,12 +354,12 @@ function repaint() {
   requestAnimationFrame(() => {
     paintQueued = false;
     document.querySelectorAll("[data-rk-bar]").forEach((el) => {
-      const html = barInner(el.dataset.rkBar);
-      if (el.__rk !== html) { el.__rk = html; el.innerHTML = html; }
+      const html = barInner(/** @type {HTMLElement} */ (el).dataset.rkBar);
+      if (/** @type {any} */ (el).__rk !== html) { /** @type {any} */ (el).__rk = html; el.innerHTML = html; }
     });
     document.querySelectorAll("[data-rk-selbar]").forEach((el) => {
-      const html = selbarInner(el.dataset.rkSelbar);
-      if (el.__rk !== html) { el.__rk = html; el.innerHTML = html; }
+      const html = selbarInner(/** @type {HTMLElement} */ (el).dataset.rkSelbar);
+      if (/** @type {any} */ (el).__rk !== html) { /** @type {any} */ (el).__rk = html; el.innerHTML = html; }
     });
     /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".rk-toolbtn,.rk-choicebtn,.rk-barbtn")).forEach((b) => {
       const sc = b.dataset.rkScope ? scopes.get(b.dataset.rkScope) : null, sec = sc ? sectionOf(sc.source) : "business";
@@ -370,12 +371,12 @@ function repaint() {
   });
 }
 function syncChecks() {
-  document.querySelectorAll(".rk-chk").forEach((c) => { c.checked = selKeys(c.dataset.rkSel).has(c.dataset.rkKey); });
+  document.querySelectorAll(".rk-chk").forEach((c) => { /** @type {HTMLInputElement} */ (c).checked = selKeys(/** @type {HTMLElement} */ (c).dataset.rkSel).has(/** @type {HTMLElement} */ (c).dataset.rkKey); });
   document.querySelectorAll(".rk-chk-all").forEach((c) => {
-    const keys = scopeStocks(c.dataset.rkScope).map(pcTickerKey), set = selKeys(c.dataset.rkSel);
+    const keys = scopeStocks(/** @type {HTMLElement} */ (c).dataset.rkScope).map(pcTickerKey), set = selKeys(/** @type {HTMLElement} */ (c).dataset.rkSel);
     const n = keys.filter((k) => set.has(k)).length;
-    c.checked = keys.length > 0 && n === keys.length;
-    c.indeterminate = n > 0 && n < keys.length;
+    /** @type {HTMLInputElement} */ (c).checked = keys.length > 0 && n === keys.length;
+    /** @type {HTMLInputElement} */ (c).indeterminate = n > 0 && n < keys.length;
   });
   repaint();
 }
@@ -414,7 +415,7 @@ function openMenu(anchor, html, state) {
   if (anchor) anchor.setAttribute("aria-expanded", "true");
   placeMenu();
   const first = menuEl.querySelector("button:not(:disabled), input");
-  if (first) first.focus();
+  if (first) /** @type {HTMLElement} */ (first).focus();
 }
 function refillMenu(html) {
   if (!menuEl) return;
@@ -564,8 +565,8 @@ function installListeners() {
   document.addEventListener("click", onClick, true);
   document.addEventListener("change", onChange, true);
   document.addEventListener("keydown", onKeydown, true);
-  document.addEventListener("mousedown", (e) => { if (menuEl && !e.target.closest(".rk-menu") && !e.target.closest("[data-rk-act]") && !e.target.closest(".rk-row-btn")) closeMenu(false); }, true);
-  window.addEventListener("scroll", (e) => { if (menuEl && !(e.target && e.target.closest && e.target.closest(".rk-menu"))) closeMenu(false); }, true);
+  document.addEventListener("mousedown", (e) => { if (menuEl && !closestEl(e, ".rk-menu") && !closestEl(e, "[data-rk-act]") && !closestEl(e, ".rk-row-btn")) closeMenu(false); }, true);
+  window.addEventListener("scroll", (e) => { if (menuEl && !(e.target && /** @type {Element} */ (e.target).closest && closestEl(e, ".rk-menu"))) closeMenu(false); }, true);
   window.addEventListener("resize", () => closeMenu(false));
   window.addEventListener("pagehide", () => { if (queue.length) writeNow(); });
 }

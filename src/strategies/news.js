@@ -29,7 +29,7 @@ function newsCounts(s, days = NEWS_DAYS){
 function daysSinceEvent(s, kind){
   const evs = eventsOf(s);
   if(!evs) return null;
-  let latest = null;
+  let latest = /** @type {number | null} */ (null);
   evs.forEach(e => { if(e && e.k === kind){ const ms = eventMs(e.d); if(ms !== null && (latest === null || ms > latest)) latest = ms; } });
   if(latest === null) return null;
   const now = new Date();

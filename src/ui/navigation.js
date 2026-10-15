@@ -8,6 +8,7 @@ import { recordView } from './viewstack.js';
 import { uiStateSet } from '../identity/prefs.js';
 import { ensurePartial } from '../boot/partials.js';
 import { definePart, isPart, loadedPart, openPart } from '../core/lazy.js';
+import { closestEl } from '../core/evt.js';
 
 // ---- Sidebar / hamburger menu / section navigation ----
 const menuToggle = document.getElementById('menuToggle');
@@ -69,7 +70,7 @@ function showSection(key){
   Object.entries(appSections).forEach(([k, el])=>{
     if(el) el.classList.toggle('active', k === key);
   });
-  navItems.forEach(btn=> btn.classList.toggle('active', btn.dataset.section === key));
+  navItems.forEach(btn=> btn.classList.toggle('active', /** @type {HTMLElement} */ (btn).dataset.section === key));
   if(getUiStateTracking()) uiStateSet({ section: key }, 300);
   if(key === 'analysis') renderAnalysisSection();
   if(isPart(key)){
@@ -105,12 +106,12 @@ menuToggle.addEventListener('click', ()=>{
 });
 sidebarOverlay.addEventListener('click', closeSidebar);
 detailEl.addEventListener('click', (e)=>{
-  if(e.target.closest('.detail-back')) detailBackToAnalysis();
+  if(closestEl(e, '.detail-back')) detailBackToAnalysis();
 });
 // Esc is the keyboard shortcut for the "Back to ..." button (not while typing in a box or choosing from a list).
 document.addEventListener('keydown', (e)=>{
   if(e.key !== 'Escape' || e.defaultPrevented) return;
-  if(e.target && e.target.closest && e.target.closest('input, textarea, select')) return;
+  if(e.target && /** @type {Element} */ (e.target).closest && closestEl(e, 'input, textarea, select')) return;
   if(document.querySelector('.alba-confirm')) return;
   if(document.getElementById('detailBackBtn')) detailBackToAnalysis();
 });
@@ -119,13 +120,13 @@ navItems.forEach(btn=>{
     // Using the menu is a fresh navigation: drop the "Back to Analysis" shortcut.
     setDetailBackTo(null);
     document.querySelectorAll('.detail-back-bar, .detail-back').forEach(b=>b.remove());
-    showSection(btn.dataset.section);
+    showSection(/** @type {HTMLElement} */ (btn).dataset.section);
     closeSidebar();
   });
 });
 if(kbSection){
   kbSection.addEventListener('click', (e)=>{
-    const a = e.target.closest('a[href^="#help"]');
+    const a = closestEl(e, 'a[href^="#help"]');
     if(!a) return;
     e.preventDefault();
     const targetId = a.getAttribute('href').slice(1);
@@ -140,7 +141,7 @@ if(kbSection){
 }
 if(refreshlogSection){
   refreshlogSection.addEventListener('click', (e)=>{
-    const a = e.target.closest('a[href^="#help"], a[href^="#kb"]');
+    const a = closestEl(e, 'a[href^="#help"], a[href^="#kb"]');
     if(!a) return;
     e.preventDefault();
     const targetId = a.getAttribute('href').slice(1);
@@ -156,7 +157,7 @@ if(refreshlogSection){
 }
 if(helpSectionEl){
   helpSectionEl.addEventListener('click', (e)=>{
-    const a = e.target.closest('a[href^="#kb"]');
+    const a = closestEl(e, 'a[href^="#kb"]');
     if(!a) return;
     e.preventDefault();
     const targetId = a.getAttribute('href').slice(1);
