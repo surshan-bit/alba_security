@@ -13,6 +13,32 @@ const OPS = {
   'in': (a, b) => Array.isArray(b) && b.includes(a), 'array-contains': (a, b) => Array.isArray(a) && a.includes(b)
 };
 
+// Keeps one listener up to date without reading on every single change. A burst of changes (a refresh saves thousands of
+// stocks one by one, and each save also comes back through Realtime) used to cause one full re-read each, and two reads in
+// flight at once could finish out of order and leave the screen on old data. Now: only one read runs at a time, a change that
+// arrives meanwhile asks for one more read afterwards (so the last thing shown is always the newest), and reads are spaced
+// out in proportion to how long they take (a quick read waits for nothing, a 2,000-row collection at most MAX_GAP_MS).
+const MAX_GAP_MS = 3000, GAP_FACTOR = 2;
+function listener(load, deliver){
+  let live = true, running = false, dirty = false, timer = null, lastEnd = 0, lastCost = 0;
+  const pump = async () => {
+    if(!live || running) return;
+    running = true; dirty = false;
+    const t0 = Date.now();
+    try { const v = await load(); if(live) deliver(v); } catch(e){ /* the next change tries again */ }
+    lastEnd = Date.now(); lastCost = lastEnd - t0; running = false;
+    if(dirty && live) changed();
+  };
+  const changed = () => {
+    if(!live) return;
+    dirty = true;
+    if(running || timer) return;
+    const wait = Math.min(MAX_GAP_MS, lastCost * GAP_FACTOR) - (Date.now() - lastEnd);
+    if(wait <= 0) pump(); else timer = setTimeout(() => { timer = null; pump(); }, wait);
+  };
+  return { first: pump, changed, stop: () => { live = false; if(timer) clearTimeout(timer); timer = null; } };
+}
+
 function createDocStore(backend){
   const snap = (id, d) => ({ id, exists: d !== undefined, data: () => clone(d) });
   const colSnap = (rows) => {
@@ -28,11 +54,10 @@ function createDocStore(backend){
       update: async (d) => { await backend.merge(path, clone(d)); },
       delete: async () => { await backend.remove(path); },
       onSnapshot: (cb) => {
-        let live = true;
-        const push = async () => { try { const d = await backend.get(path); if(live) cb(snap(idOf(path), d)); } catch(e){ /* the next change tries again */ } };
-        const off = backend.onChange((p) => { if(p === path) push(); });
-        push();
-        return () => { live = false; off(); };
+        const l = listener(() => backend.get(path), (d) => cb(snap(idOf(path), d)));
+        const off = backend.onChange((p) => { if(p === path) l.changed(); });
+        l.first();
+        return () => { l.stop(); off(); };
       },
       collection: (n) => mkCol(path + '/' + n)
     };
@@ -53,11 +78,10 @@ function createDocStore(backend){
       doc: (id) => mkDoc(path + '/' + id),
       get: async () => colSnap(await run()),
       onSnapshot: (cb) => {
-        let live = true;
-        const push = async () => { try { const rows = await run(); if(live) cb(colSnap(rows)); } catch(e){ /* the next change tries again */ } };
-        const off = backend.onChange((p) => { if(parentOf(p) === path) push(); });
-        push();
-        return () => { live = false; off(); };
+        const l = listener(run, (rows) => cb(colSnap(rows)));
+        const off = backend.onChange((p) => { if(parentOf(p) === path) l.changed(); });
+        l.first();
+        return () => { l.stop(); off(); };
       },
       where: (f, op, v) => next({ where: q.where.concat([[f, op, v]]) }),
       orderBy: (f, d) => next({ order: { f, dir: d === 'desc' ? -1 : 1 } }),

@@ -37,6 +37,40 @@ const csz = []; const off2 = db.collection('lc').onSnapshot(sn => csz.push(sn.si
 await tick(); await db.doc('lc/a').set({}); await tick(); await db.doc('lc/b').set({}); await tick(); await db.doc('other/z').set({}); await tick(); off2();
 eq('collection listener', csz, [0, 1, 2]);
 
+// listeners under load (v1.185): a burst of saves must not cause a full re-read each, and the screen must end on the newest data
+{
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const seed = {}; for(let i = 0; i < 500; i++) seed['big/S' + i] = { ticker: 'S' + i, v: 0 };
+  const b = createMemoryBackend(seed); let lists = 0; const realList = b.list;
+  b.list = async (p) => { lists++; const out = await realList(p); await sleep(15); return out; };   // a read takes a little while, like a real database
+  const d2 = createDocStore(b); const got = [];
+  const stop = d2.collection('big').onSnapshot(sn => got.push(sn.docs.find(x => x.id === 'S0').data().v));
+  await sleep(40); const before = lists;
+  for(let i = 1; i <= 100; i++){ await d2.doc('big/S0').update({ v: i }); }   // 100 quick saves, one after the other
+  await sleep(700);
+  eq('burst: far fewer full reads than saves', (lists - before) < 25, true);
+  eq('burst: the last thing shown is the newest', got[got.length - 1], 100);
+  eq('burst: nothing is shown out of order', got.every((v, i) => i === 0 || v >= got[i - 1]), true);
+  stop(); const n = got.length; await d2.doc('big/S0').update({ v: 101 }); await sleep(100); eq('burst: silent after unsubscribe', got.length, n);
+}
+{
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const b = createMemoryBackend({ 'c/a': { v: 1 } }); let n = 0; const realList = b.list;
+  b.list = async (p) => { const mine = ++n; const rows = await realList(p); await sleep(mine === 1 ? 80 : 5); return rows; };   // the first read is slow
+  const d2 = createDocStore(b); const seen = [];
+  d2.collection('c').onSnapshot(sn => seen.push(sn.docs[0].data().v));
+  await sleep(1); await d2.doc('c/a').set({ v: 2 }); await sleep(500);
+  eq('slow older read cannot leave the screen on old data', seen[seen.length - 1], 2);
+  eq('slow older read: never goes back to an older value', seen.every((v, i) => i === 0 || v >= seen[i - 1]), true);
+}
+{
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const b = createMemoryBackend({ 'k/one': { v: 1 } }); const d2 = createDocStore(b); const got = [];
+  d2.doc('k/one').onSnapshot(sn => got.push(sn.data().v));
+  await sleep(10); for(let i = 2; i <= 6; i++) await d2.doc('k/one').set({ v: i }); await sleep(50);
+  eq('single document: ends on the newest value', got[got.length - 1], 6);
+}
+
 // the shim: claude.use never answers synchronously; unknown names answer null; db is present
 const host = {}; installPlatform({ backend: be, user: { id: async () => 'u', isOwner: () => false } }, host);
 const p = host.claude.use('db'); eq('use returns a promise', typeof p.then, 'function');
