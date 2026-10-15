@@ -217,7 +217,7 @@ async function runHistory(){
     const left = missing.length - ok;
     fiShowResult(failed.length === done && done > 0 ? 'err' : 'ok', [
       { text: (stopped ? 'Stopped. ' : '') + ok + ' of ' + done + ' stocks now have price history and a completed-weeks technical score.', cls: 'fi-line fi-line-strong' },
-      { text: left > 0 ? num(left) + ' stocks still have none (they failed and are retried later).' : 'Every stock now has saved price history.', cls: 'fi-line fi-line-muted' },
+      { text: left > 0 ? num(left) + ' stocks still have none. Run this again to carry on with the rest (a stock that failed is tried again after ' + SKIP_RETRY_DAYS + ' days).' : 'Every stock now has saved price history.', cls: 'fi-line fi-line-muted' },
       ...(failed.length ? [{ text: failed.length + ' skipped (listed in the file below); they are retried after ' + SKIP_RETRY_DAYS + ' days.', cls: 'fi-line' }] : [])
     ], true);
     skippedReport(failed, 'history');

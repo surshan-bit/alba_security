@@ -719,12 +719,15 @@ async function tvRefreshScenarios(){
     ok(/(^|\s)0 stocks refreshed.*\b0 technical scores updated/.test(text), 'nothing is counted as updated: ' + text.slice(0, 240));
   });
   // the real database hands out records that cannot be changed in place: the list of stocks that failed before must be copied first
-  const old = {}; DS.stocks.filter((s, i) => i >= 6).forEach(s => { old[symOf(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_')] = '2020-01-01T00:00:00.000Z'; });
+  const old = {}; DS.stocks.filter(s => !/^\d/.test(symOf(s))).forEach(s => { old[symOf(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_')] = '2020-01-01T00:00:00.000Z'; });
   await runScenario('fill missing history: a saved failure list that cannot be changed in place does not stop the run', { docs: { 'stockMeta/histFillTried': Object.assign({ uploadedAt: '2026-10-01' }, old) } }, async page => {
     await page.click('#tvHistoryBtn');
+    // there is no cap any more, so the run is stopped after a few stocks: what matters here is that the saved failure list can be extended
+    await page.waitForFunction(() => /\b[1-9]\d* of \d+ ·/.test((document.getElementById('th_fiSteps') || {}).innerText || ''), null, { timeout: 60000 });
+    await page.click('#thStopBtn');
     await page.waitForSelector('#th_fiResult.fi-result-ok, #th_fiResult.fi-result-err', { timeout: 200000 });
     const text = await page.textContent('#th_fiResult');
-    ok(!/Cannot|not extensible|Stopped/.test(text), 'the run finishes: ' + text.slice(0, 200));
+    ok(!/Cannot|not extensible|Stopped:/.test(text), 'the run finishes: ' + text.slice(0, 200));
   });
   await runScenario('refresh from TradingView: without a connection nothing is attempted', { cfg: { noMcp: true } }, async page => {
     await page.click('#tvSnapshotBtn');
