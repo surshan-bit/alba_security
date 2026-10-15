@@ -39,7 +39,7 @@ for(const f of dirFiles(path.join(DATA, 'stockUpdates'))) updates.set(path.basen
 // same rule as src/refresh/tvrefresh.js (snapshotSymbol)
 function symbolOf(s){
   const key = tickerOf(s);
-  if(!/^\d+$/.test(key)) return 'NSE:' + key.replace(/[-&]/g, '_');
+  if(!/^\d+$/.test(key)) return 'NSE:' + key.replace(/-/g, '_');
   return bse[key] ? 'BSE:' + String(bse[key]).replace(/^BSE:/, '') : null;
 }
 

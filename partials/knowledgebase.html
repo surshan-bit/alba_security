@@ -221,6 +221,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.183 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>Data age bars now update after a refresh:</b> the Technical and Fundamental data age panels on the Data Refresh screen were only drawn when the page opened, so they stayed stale after Refresh all stocks until the page was reloaded. They now redraw whenever saved updates arrive.</li>
+              <li><b>Fill missing history no longer stops on a stock that failed before:</b> the saved list of failed stocks could not be updated and the run ended with &ldquo;object is not extensible&rdquo;. It now works on a copy and carries on.</li>
+              <li><b>Tickers with &amp; are no longer skipped:</b> M&amp;M, J&amp;KBANK, GVT&amp;D and similar were looked up on TradingView with an underscore and not found. The &amp; is now kept; only a hyphen becomes an underscore (BAJAJ-AUTO becomes BAJAJ_AUTO).</li>
+            </ul>
             <h3>v1.182 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Refresh from TradingView, no CSV needed:</b> the Technical Score section of the Data Refresh screen has two new buttons. <i>Refresh all stocks</i> reads the price, MACD and RSI (weekly and monthly) of every stock straight from TradingView, 50 at a time, and saves them like a Live Data refresh. Stocks whose completed-weeks score was saved in the last 3 days keep it and get only the new price. Scores from this button include the week and month still in progress, like the CSV import, so they can change before the week ends.</li>

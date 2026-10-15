@@ -2,6 +2,7 @@
 import { renderAnalysisSection } from '../analysis/section.js';
 import { setPeerGroupCache } from '../detail/peers.js';
 import { rerenderDetail } from '../detail/render.js';
+import { paintFreshness } from '../joblogs/freshness.js';
 import { stockByDocId } from './research.js';
 
 // ---- stockUpdates overlay (added 2026-10-07) ----
@@ -82,6 +83,7 @@ function applyUpdatesOverlay(docs){
   if(!changed) return;
   setPeerGroupCache(null);
   rerenderDetail();
+  paintFreshness();   // the Data Refresh age bars follow every saved update, not only the page load
   const analysisSectionEl = document.getElementById('section-analysis');
   if(analysisSectionEl && analysisSectionEl.classList.contains('active')) renderAnalysisSection();
 }

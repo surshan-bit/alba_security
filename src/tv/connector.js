@@ -79,7 +79,7 @@ function tvMergeDelta(stored, fetched){
 async function tvResolveSymbol(s){
   const key = pcTickerKey(s);
   if(priceSymbolByTicker[key]) return priceSymbolByTicker[key];
-  if(!/^\d+$/.test(key)) return 'NSE:' + key.replace(/[-&]/g, '_');
+  if(!/^\d+$/.test(key)) return 'NSE:' + key.replace(/-/g, '_');
   if(BSE_ALPHA_MAP[key]) return 'BSE:' + String(BSE_ALPHA_MAP[key]).replace(/^BSE:/, '');
   // BSE-only stock (ticker is the numeric code): TradingView uses the alpha symbol, found by company name.
   const p = await tvCall('mcp-tv-search-symbols', { query: s.name, type_filter: 'stock' });

@@ -29,7 +29,7 @@ const STEPS = [{ key: 'prepare', label: 'Prepare the stock list', w: 5 }, { key:
 function snapshotSymbol(s, bseMap){
   const key = pcTickerKey(s);
   if(priceSymbolByTicker[key]) return priceSymbolByTicker[key];
-  if(!/^\d+$/.test(key)) return 'NSE:' + key.replace(/[-&]/g, '_');
+  if(!/^\d+$/.test(key)) return 'NSE:' + key.replace(/-/g, '_');
   const a = (bseMap || BSE_ALPHA_MAP)[key];
   return a ? 'BSE:' + String(a).replace(/^BSE:/, '') : null;
 }
@@ -160,7 +160,7 @@ async function runHistory(){
   try {
     fiSet('prepare', 'running', 'Finding stocks without history…', 0.3);
     let tried = {};
-    try { const t = await db.doc('stockMeta/histFillTried').get(); if(t && t.exists) tried = t.data() || {}; } catch(e){}
+    try { const t = await db.doc('stockMeta/histFillTried').get(); if(t && t.exists) tried = Object.assign({}, t.data() || {}); } catch(e){}
     const recent = id => tried[id] && Date.now() - (Date.parse(tried[id]) || 0) < SKIP_RETRY_DAYS * 86400000;
     const { missing, order, trackedCount } = await missingHistoryOrder();
     const eligible = order.filter(s => !recent(sanitizeDocId(tickerSymbol(s))));
