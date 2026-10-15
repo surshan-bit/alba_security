@@ -3,6 +3,7 @@ import { refreshAnalysisSoon } from '../analysis/section.js';
 import { setPeerGroupCache } from '../detail/peers.js';
 import { rerenderDetail } from '../detail/render.js';
 import { paintFreshness } from '../joblogs/freshness.js';
+import { mergedDoc } from './livesnapshot.js';
 import { stockByDocId } from './research.js';
 
 // ---- stockUpdates overlay (added 2026-10-07) ----
@@ -68,10 +69,40 @@ function applyUpdatesDoc(s, doc){
   const ua = doc && typeof doc.asof === 'string' ? doc.asof : null;
   if(ua) s.__updAsof = ua; else delete s.__updAsof;
 }
+let lastDocs = new Map();   // docId -> the stock's own saved update (stockUpdates)
+let snapRows = new Map();   // docId -> { row, asof, at } from the newest liveSnapshot chunk that carries the stock
 function applyUpdatesOverlay(docs){
+  lastDocs = new Map(docs.map(d => [d.id, d.data]));
+  rebuildOverlay();
+}
+// Chunk records of the live snapshot (collection liveSnapshot, see overlays/livesnapshot.js): one row per stock.
+function applySnapshotOverlay(chunkDocs){
+  const next = new Map();
+  chunkDocs.forEach(d => {
+    const c = d.data;
+    if(!c || !Array.isArray(c.rows) || typeof c.asof !== 'string') return;
+    const at = typeof c.at === 'string' ? c.at : null;
+    c.rows.forEach(row => {
+      if(!row || typeof row.k !== 'string' || !Array.isArray(row.c)) return;
+      const old = next.get(row.k);
+      if(old && (old.at || '') > (at || '')) return;
+      next.set(row.k, { row, asof: c.asof, at });
+    });
+  });
+  snapRows = next;
+  rebuildOverlay();
+}
+function rebuildOverlay(){
   const index = stockByDocId();
   const next = new Map();
-  docs.forEach(d => { const s = index.get(d.id); if(s) next.set(d.id, { s, data: d.data }); });
+  const ids = new Set([...lastDocs.keys(), ...snapRows.keys()]);
+  ids.forEach(id => {
+    const s = index.get(id);
+    if(!s) return;
+    let data = lastDocs.get(id);
+    try { data = mergedDoc(s, data, snapRows.get(id)); } catch(e){ console.error('Live snapshot row ' + id + ' could not be merged', e); }
+    if(data) next.set(id, { s, data });
+  });
   let changed = false;
   for(const [id, s] of updatesOverlayApplied){
     if(!next.has(id)){ revertUpdates(s); changed = true; }
@@ -92,4 +123,4 @@ function applyUpdatesOverlay(docs){
   if(analysisSectionEl && analysisSectionEl.classList.contains('active')) refreshAnalysisSoon();
 }
 
-export { applyUpdatesOverlay };
+export { applySnapshotOverlay, applyUpdatesOverlay };

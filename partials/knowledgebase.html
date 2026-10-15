@@ -221,6 +221,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.198 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>Refresh all stocks now saves one record per batch of 50 stocks instead of one per stock:</b> the run records of v1.196 and v1.197 showed the database accepts only about 1.5 saves a second however many are sent at once, so about 2,000 saves took about 20 minutes. The refresh now saves about 44 records (collection <code>liveSnapshot</code>, ids c001, c002 ...), each holding the price, MACD, RSI and average volume of its 50 stocks. The page lays these under each stock's own saved update, so research notes, Global factors and completed-weeks scores are never touched: a newer price from a single-stock refresh wins over the snapshot, and a completed-weeks score from the last 3 days still beats the snapshot score. A batch that comes back exactly the same as last time is not saved again, a failed save is tried once more, and the stock list no longer has to be read before a run. The run record (<code>refreshRunLog</code>, now version 2) notes how many batch records were saved. Compare it with the earlier runs (about 21 minutes in v1.196, about 6 minutes with 16 saves at once in v1.197).</li>
+            </ul>
             <h3>v1.197 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Refresh all stocks saves 16 stocks at a time instead of 6:</b> the run record added in v1.196 showed that 99% of a full refresh (about 21 minutes for 2,191 stocks) was spent saving to the database, one save taking around 4 seconds, and only about 4 seconds waiting on TradingView. Saving more at once should shorten the run. The run record now also notes how many saves ran at the same time, so the next run can be compared with the last.</li>

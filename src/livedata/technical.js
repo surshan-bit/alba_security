@@ -37,7 +37,7 @@ async function ldRunTechnical(s){
   const id = sanitizeDocId(tickerSymbol(s));
   const ref = db.doc('stockUpdates/' + id);
   const cur = await ref.get();
-  const val = { currentPrice: px, asof: tvIstDate(), source: 'TradingView (' + sym + ')' };
+  const val = { currentPrice: px, asof: tvIstDate(), at: new Date().toISOString(), source: 'TradingView (' + sym + ')' };
   if(cur && cur.exists) await ref.update({ valuation: val }); else await ref.set({ ticker: tickerSymbol(s), valuation: val });
 
   // 2 and 3. Weekly and monthly bars (delta only when bars are stored), then MACD/RSI and the Technical Score.

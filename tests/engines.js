@@ -642,6 +642,70 @@ test('trade call: history keeps one point a day and lists when the call changed'
   assert.deepStrictEqual(G.callChanges(h).map(c => c.call), ['trim', 'hold']);
 });
 
+// ---- live snapshot (v1.198): one record per batch, merged under each stock's own saved update ----
+{
+  const L = load('src/overlays/livesnapshot.js');
+  const tv = { close: 250.5, 'MACD.macd|1W': 2, 'MACD.signal|1W': 1, 'MACD.macd|1M': 3, 'MACD.signal|1M': 1, 'RSI|1W': 60, 'RSI|1M': 58, 'change|1W': 1.5, 'change|1M': 4, 'average_volume_30d_calc': 50000.4 };
+  const stock = { pillars: { val: 6 } };
+  const snap = (extra) => Object.assign({ row: { k: 'ABC', y: 'NSE:ABC', c: L.packValues(tv) }, asof: '2026-10-14', at: '2026-10-14T10:00:00.000Z' }, extra);
+  test('live snapshot: a row packs in column order and the merge reads the same figures back', () => {
+    const c = L.packValues(tv);
+    assert.strictEqual(c.length, L.COLS.length);
+    assert.strictEqual(L.mergedDoc(stock, undefined, snap()).valuation.currentPrice, tv.close);
+    assert.deepStrictEqual(L.packValues({ close: 'x', 'RSI|1W': NaN }).slice(0, 7), [null, null, null, null, null, null, null]);
+  });
+  test('live snapshot: with no saved update the row gives price, volume and a snapshot score', () => {
+    const d = L.mergedDoc(stock, undefined, snap());
+    assert.strictEqual(d.valuation.currentPrice, 250.5);
+    assert.strictEqual(d.valuation.at, '2026-10-14T10:00:00.000Z');
+    assert.strictEqual(d.liquidity.avgVolume, 50000);
+    assert.strictEqual(d.technical.src, 'snapshot');
+  });
+  test('live snapshot: nothing to merge, or a row without a price, leaves the stock record as it is', () => {
+    const real = { ticker: 'ABC', globalFactors: { positive: ['x'] } };
+    assert.strictEqual(L.mergedDoc(stock, real, undefined), real);
+    assert.strictEqual(L.mergedDoc(stock, real, snap({ row: { k: 'ABC', y: 'NSE:ABC', c: L.packValues({}) } })), real);
+  });
+  test('live snapshot: notes and Global factors in the stock record are kept', () => {
+    const real = { ticker: 'ABC', globalFactors: { scope: 's', positive: ['x'], negative: [] } };
+    const d = L.mergedDoc(stock, real, snap());
+    assert.deepStrictEqual(d.globalFactors, real.globalFactors);
+    assert.strictEqual(d.valuation.currentPrice, 250.5);
+    assert.strictEqual(real.valuation, undefined, 'the saved record is not changed in place');
+  });
+  test('live snapshot: a price saved later by a single-stock refresh wins; an earlier or undated one loses', () => {
+    const later = { valuation: { currentPrice: 300, asof: '2026-10-14', at: '2026-10-14T11:00:00.000Z' } };
+    const earlier = { valuation: { currentPrice: 300, asof: '2026-10-14', at: '2026-10-14T09:00:00.000Z' } };
+    const undatedSameDay = { valuation: { currentPrice: 300, asof: '2026-10-14' } };
+    const olderDay = { valuation: { currentPrice: 300, asof: '2026-10-13' } };
+    const newerDay = { valuation: { currentPrice: 300, asof: '2026-10-15' } };
+    assert.strictEqual(L.mergedDoc(stock, later, snap()).valuation.currentPrice, 300);
+    assert.strictEqual(L.mergedDoc(stock, earlier, snap()).valuation.currentPrice, 250.5);
+    assert.strictEqual(L.mergedDoc(stock, undatedSameDay, snap()).valuation.currentPrice, 250.5);
+    assert.strictEqual(L.mergedDoc(stock, olderDay, snap()).valuation.currentPrice, 250.5);
+    assert.strictEqual(L.mergedDoc(stock, newerDay, snap()).valuation.currentPrice, 300);
+  });
+  test('live snapshot: a completed-weeks score from the last 3 days beats the snapshot score, an older or imported one does not', () => {
+    const bars = (asof) => ({ valuation: { currentPrice: 1, asof: '2020-01-01' }, technical: { score: 7, asof, basis: { week: '2026-10-09', month: '2026-09-01' }, reason: 'bars' } });
+    assert.strictEqual(L.mergedDoc(stock, bars('2026-10-13'), snap()).technical.reason, 'bars');
+    assert.strictEqual(L.mergedDoc(stock, bars('2026-10-01'), snap()).technical.src, 'snapshot');
+    assert.strictEqual(L.mergedDoc(stock, { technical: { score: 4, asof: '2026-10-14', reason: 'import' } }, snap()).technical.reason, 'import', 'same day, not from a snapshot');
+    assert.strictEqual(L.mergedDoc(stock, { technical: { score: 4, asof: '2026-10-14', src: 'snapshot' } }, snap()).technical.src, 'snapshot');
+    assert.strictEqual(L.mergedDoc(stock, { technical: { score: 4, asof: '2026-10-20' } }, snap()).technical.score, 4, 'dated later');
+  });
+  test('live snapshot: a stock with no valuation reading gets the price but no technical score', () => {
+    const d = L.mergedDoc({ pillars: {} }, undefined, snap());
+    assert.strictEqual(d.valuation.currentPrice, 250.5);
+    assert.strictEqual(d.technical, undefined);
+  });
+  test('live snapshot: the saving side protects a recent completed-weeks block and reports missing prices', () => {
+    const keep = { technical: { asof: '2026-10-14', basis: { week: '2026-10-09', month: '2026-09-01' } } };
+    assert.strictEqual(L.snapshotUpdate(stock, tv, '2026-10-14', 'NSE:ABC', keep.technical).kept, true);
+    assert.ok(L.snapshotUpdate(stock, tv, '2026-10-14', 'NSE:ABC', null).technical);
+    assert.ok(L.snapshotUpdate(stock, {}, '2026-10-14', 'NSE:ABC', null).reason);
+  });
+}
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

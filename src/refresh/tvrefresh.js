@@ -1,13 +1,14 @@
 // "Refresh from TradingView" on the Data Refresh screen (Technical Score section): no CSV needed.
 //  1. Refresh all stocks: one TradingView snapshot of price, MACD and RSI (weekly, monthly) for every stock, 50 per call.
-//     It saves the price and a technical block per stock in stockUpdates, the same place the Live Data Refresh writes to.
+//     It saves one record per batch of 50 stocks in liveSnapshot (see overlays/livesnapshot.js), not one per stock: the database
+//     takes about 1.5 saves a second, so about 44 saves replace about 2,000.
 //     TradingView's figures include the week and month still in progress, so a stock whose saved block was built from completed
 //     bars in the last 3 days keeps that block (only its price is updated).
 //  2. Fill missing history: downloads weekly and monthly bars for stocks that have none saved (tracked picks first, then pinned,
 //     then strategy matches, then the rest), a limited number per run. Re-running carries on with the next ones.
 import { stocks, stockByTickerSymbol } from '../core/stocks.js';
 import { sanitizeDocId, tickerSymbol } from '../core/util.js';
-import { snapshotTechnical, techKeepsBarsBlock } from '../engine/technical.js';
+import { COLS, packValues, snapshotUpdate } from '../overlays/livesnapshot.js';
 import { priceHistoryByTicker, pcTickerKey, priceSymbolByTicker, ensureAllPriceBars } from '../prices/store.js';
 import { refreshOneNow, priceJobs } from '../prices/refresh.js';
 import { BSE_ALPHA_MAP } from '../tv/links.js';
@@ -19,10 +20,8 @@ import { fiEl, fiReset, fiSet, fiShowResult, setFiPfx } from '../import/panel.js
 import { registerBusy } from '../core/busy.js';
 
 const BATCH = 50;                 // symbols per TradingView call (the tool's limit)
-const WRITE_PARALLEL = 16;        // stocks saved at the same time: a save waits on the database (about 4 s each), so more at once finishes the run sooner (6 before v1.197)
 const HISTORY_CAP = 100;          // stocks per "Fill missing history" run
 const SKIP_RETRY_DAYS = 14;       // a stock that failed history fill is not retried for this long
-const COLS = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M', 'average_volume_30d_calc'];
 const STEPS = [{ key: 'prepare', label: 'Prepare the stock list', w: 5 }, { key: 'run', label: 'Refresh', w: 90 }, { key: 'verify', label: 'Finish', w: 5 }];
 
 // The TradingView symbol for a stock without asking TradingView: the one used before, the BSE alpha map for numeric BSE codes,
@@ -34,21 +33,6 @@ function snapshotSymbol(s, bseMap){
   const a = (bseMap || BSE_ALPHA_MAP)[key];
   return a ? 'BSE:' + String(a).replace(/^BSE:/, '') : null;
 }
-// What to save for one stock from its TradingView row: { valuation?, technical? }, or { reason } when nothing can be saved.
-function snapshotUpdate(s, row, today, sym){
-  const px = row && typeof row.close === 'number' && row.close > 0 ? row.close : null;
-  if(px == null) return { reason: 'TradingView returned no price' };
-  const out = { valuation: { currentPrice: px, asof: today, source: 'TradingView (' + sym + ')' } };
-  if(typeof row['average_volume_30d_calc'] === 'number' && row['average_volume_30d_calc'] >= 0) out.liquidity = { avgVolume: Math.round(row['average_volume_30d_calc']), asof: today };
-  const pv = s.pillars && typeof s.pillars.val === 'number' ? s.pillars.val : null;
-  if(pv == null){ out.note = 'no valuation reading, technical score not updated'; return out; }
-  if(techKeepsBarsBlock(s.technical, today)){ out.kept = true; return out; }
-  const t = snapshotTechnical({ monthMacdLevel: row['MACD.macd|1M'], monthMacdSignal: row['MACD.signal|1M'], weekMacdLevel: row['MACD.macd|1W'], weekMacdSignal: row['MACD.signal|1W'],
-    monthRsi: row['RSI|1M'], weekRsi: row['RSI|1W'], weekPctChange: row['change|1W'], monthPctChange: row['change|1M'] }, pv, today);
-  if(!t) out.note = 'TradingView returned no MACD or RSI'; else out.technical = t;
-  return out;
-}
-
 let stopAsked = false;
 let busy = false;
 registerBusy(() => busy);
@@ -59,8 +43,6 @@ function duration(ms){ const t = Math.max(0, Math.round(ms / 1000)), m = Math.fl
 // Compares two saved values by content, whatever order their keys are in.
 function stable(x){ return x && typeof x === 'object' ? (Array.isArray(x) ? x.map(stable) : Object.keys(x).sort().reduce((o, k) => { o[k] = stable(x[k]); return o; }, {})) : x; }
 const sameValue = (a, b) => JSON.stringify(stable(a)) === JSON.stringify(stable(b));
-// True when the saved record already holds exactly what this run would write (a second run the same day, or a weekend), so the write can be skipped.
-function alreadySaved(stored, body){ return !!stored && Object.keys(body).every(k => sameValue(stored[k], body[k])); }
 
 function setButtons(running){
   for(const id of ['tvSnapshotBtn', 'tvHistoryBtn']){ const b = /** @type {HTMLButtonElement|null} */ (document.getElementById(id)); if(b) b.disabled = running; }
@@ -111,18 +93,12 @@ async function runSnapshot(){
   const lines = [], skipped = [];
   let updated = 0, kept = 0, scored = 0, unchanged = 0, stopped = false;
   const t0 = Date.now(), startedAt = new Date().toISOString(), batchSecs = [];
-  let tvWaitMs = 0, saveMs = 0, planned = 0, runError = '';
+  let tvWaitMs = 0, saveMs = 0, planned = 0, chunksSaved = 0, runError = '';
   try {
     fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
-    // Which stocks already have a saved update. Without this list a save could not tell "change" from "create", and creating
-    // REPLACES the whole record (the Global factors and research notes in it would be lost), so a run never goes on without it.
-    const existing = new Set(), existingData = new Map();
-    let listed = false;
-    for(let attempt = 0; attempt < 2 && !listed; attempt++){
-      try { const snap = await db.collection('stockUpdates').get(); snap.docs.forEach(d => { if(!d.exists) return; existing.add(d.id); try { existingData.set(d.id, d.data()); } catch(e){ /* compared only when readable */ } }); listed = true; }
-      catch(e){ console.error('Could not list saved updates', e); if(attempt === 0) await sleep(1500); }
-    }
-    if(!listed) throw new Error('the saved updates could not be read, so nothing was changed (saving without them could overwrite research notes). Try again in a moment.');
+    // The chunks saved by the last run, so a batch that came back exactly the same is not written again. A failed read only means every chunk is written.
+    const stored = new Map();
+    try { const snap = await db.collection('liveSnapshot').get(); snap.docs.forEach(d => { if(d.exists) stored.set(d.id, d.data()); }); } catch(e){ console.error('Could not read the saved snapshot', e); }
     const todo = [];
     for(const s of stocks){
       const sym = snapshotSymbol(s);
@@ -155,30 +131,29 @@ async function runSnapshot(){
       if(res.error){ batch.forEach(x => skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: tvErrorText(res.error) })); backoff = 1500; batchSecs.push(Math.round((Date.now() - b0) / 100) / 10); continue; }
       const payload = res.payload;
       const data = (payload && payload.data) || {};
-      const writes = [];
+      const rows = [];
+      let rowScored = 0, rowKept = 0;
       for(const { s, sym } of batch){
-        const u = snapshotUpdate(s, data[sym], today, sym);
+        const u = snapshotUpdate(s, data[sym], today, sym, s.technical);
         if(u.reason){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: u.reason + ' (' + sym + ')' }); continue; }
-        const body = { valuation: u.valuation }; if(u.technical) body.technical = u.technical; if(u.liquidity) body.liquidity = u.liquidity;
-        writes.push({ id: sanitizeDocId(tickerSymbol(s)), body, s, kept: !!u.kept, scored: !!u.technical });
+        rows.push({ k: sanitizeDocId(tickerSymbol(s)), y: sym, c: packValues(data[sym]) });
+        if(u.technical) rowScored++; if(u.kept) rowKept++;
       }
-      let w = 0;
       const s0 = Date.now();
-      const worker = async () => {
-        while(w < writes.length){
-          const { id, body, s, kept: wasKept, scored: wasScored } = writes[w++];
-          if(alreadySaved(existingData.get(id), body)){ unchanged++; continue; }
-          try {
-            const ref = db.doc('stockUpdates/' + id);
-            // A stock missing from the list is checked once more just before it is created, in case a record appeared since.
-            if(!existing.has(id)){ const cur = await ref.get(); if(cur && cur.exists) existing.add(id); }
-            if(existing.has(id)) await ref.update(body); else { await ref.set(Object.assign({ ticker: tickerSymbol(s) }, body)); existing.add(id); }
-            existingData.set(id, Object.assign({}, existingData.get(id), body));
-            updated++; if(wasKept) kept++; if(wasScored) scored++;   // counted once saved, so a failed save never inflates the summary
-          } catch(e){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: 'could not be saved: ' + String((e && e.message) || e).slice(0, 80) }); }
+      if(rows.length){
+        const id = 'c' + String(bi + 1).padStart(3, '0');
+        const old = stored.get(id);
+        if(old && old.asof === today && sameValue(old.rows, rows)){ unchanged += rows.length; }
+        else {
+          const doc = { v: 1, asof: today, at: new Date().toISOString(), rows };
+          let saved = false, err = null;
+          for(let attempt = 0; attempt < 2 && !saved; attempt++){
+            try { await db.doc('liveSnapshot/' + id).set(doc); saved = true; } catch(e){ err = e; if(attempt === 0) await sleep(1500); }
+          }
+          if(saved){ stored.set(id, doc); updated += rows.length; scored += rowScored; kept += rowKept; chunksSaved++; }
+          else { const why = 'could not be saved: ' + String((err && err.message) || err).slice(0, 80); batch.forEach(x => { if(rows.some(r => r.k === sanitizeDocId(tickerSymbol(x.s)))) skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: why }); }); }
         }
-      };
-      await Promise.all(Array.from({ length: WRITE_PARALLEL }, worker));
+      }
       saveMs += Date.now() - s0;
       batchSecs.push(Math.round((Date.now() - b0) / 100) / 10);
     }
@@ -195,7 +170,7 @@ async function runSnapshot(){
     runError = tvErrorText(e);
     fiShowResult('err', [{ text: 'Stopped: ' + tvErrorText(e), cls: 'fi-line fi-line-strong' }, { text: num(updated) + ' stocks were saved before this.', cls: 'fi-line fi-line-muted' }], true);
   } finally {
-    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, writeParallel: WRITE_PARALLEL, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
+    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, chunks: chunksSaved, v: 2, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
     end();
   }
 }
