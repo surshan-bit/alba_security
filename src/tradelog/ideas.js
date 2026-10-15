@@ -6,7 +6,7 @@ import { publishedStrategies } from '../strategies/state.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { appSections } from '../ui/navigation.js';
 import { openStockInline } from '../ui/inlinedetail.js';
-import { ensureAllPriceBars, pcTickerKey, priceHistoryByTicker } from '../prices/store.js';
+import { ensurePriceBars, pcTickerKey, priceHistoryByTicker, priceLoaded } from '../prices/store.js';
 import { tvIstDate } from '../tv/connector.js';
 import { ideaCall, rankIdeas } from './ideacall.js';
 import { swingSetup } from './swing.js';
@@ -32,13 +32,31 @@ function ideasFor(strategyId){
   }));
 }
 
-let sid = '', filter = 'all', barsState = 'idle';   // idle | loading | ready: the weekly bars the timing check reads are loaded once per visit
-function loadBars(){
-  if(barsState !== 'idle') return;
-  barsState = 'loading';
-  ensureAllPriceBars().then(ok => { barsState = ok ? 'ready' : 'idle'; if(ok) refreshIdeasBody(); });
-}
+let sid = '', filter = 'all';
 try { sid = localStorage.getItem('albaDashboard.ideasStrategy.v1') || ''; } catch(e){ /* default */ }
+// The timing check reads weekly bars, so the bars of the stocks in the chosen strategy (and only those) are loaded, a few at a
+// time. A stock is tried once per visit, so a failed read does not retry on every redraw.
+const BARS_PARALLEL = 6;
+const barsTried = new Set();
+let barsBusy = false, barsDone = 0, barsTotal = 0;
+function loadBars(){
+  if(barsBusy) return;
+  const st = publishedStrategies().find(x => x.id === sid);
+  if(!st) return;
+  const need = qualifyingStocks(stocks, st.rules).filter(s => !priceLoaded.has(pcTickerKey(s)) && !barsTried.has(pcTickerKey(s)));
+  if(!need.length) return;
+  barsBusy = true; barsDone = 0; barsTotal = need.length;
+  let next = 0;
+  const worker = async () => {
+    while(next < need.length){
+      const s = need[next++]; barsTried.add(pcTickerKey(s));
+      try { await ensurePriceBars(s); } catch(e){ console.error('Price history unavailable', e); }
+      barsDone++;
+      if(barsDone % 10 === 0 && barsDone < barsTotal) refreshIdeasBody();
+    }
+  };
+  Promise.all(Array.from({ length: Math.min(BARS_PARALLEL, need.length) }, worker)).then(() => { barsBusy = false; refreshIdeasBody(); });
+}
 const remember = () => { try { localStorage.setItem('albaDashboard.ideasStrategy.v1', sid); } catch(e){ /* kept for this visit */ } };
 
 function rowHtml(x, rank){
@@ -66,7 +84,7 @@ function bodyHtml(){
   return `<div class="tl-ideas-bar"><div class="tl-view-toggle" role="group" aria-label="Call filter">${chip('all', 'All ' + list.length)}${chip('buy', 'Buy ' + n('buy'))}${chip('hold', 'Hold ' + n('hold'))}${chip('sell', 'Sell ' + n('sell'))}</div></div>
     <div class="help-table-wrap"><table class="help-table"><thead><tr><th>#</th><th>Stock</th><th>Today's call</th><th>Setup</th><th>Chance +5% in 2 wks</th><th>Price</th><th>Sell at +5%</th><th>MoS</th><th>Why</th></tr></thead>
     <tbody>${shown.slice(0, MAX_ROWS).map((x, i) => rowHtml(x, i + 1)).join('')}</tbody></table></div>
-    <p class="upload-hint">${barsState === 'ready' ? '' : 'Loading weekly price history for the timing check&hellip; '}<b>Setup</b> counts four timing checks (0 to 4). <b>Chance</b> is how often, in past weeks with that setup, a stock closed 5% or more higher two weeks later (about 7,200 stock-weeks from 43 stocks); an average stock does this about 25% of the time, so treat it as a guide, not a promise. Buy needs a stock worth owning and a setup of 2 or more.</p>
+    <p class="upload-hint">${barsBusy ? 'Loading weekly price history for the timing check (' + barsDone + ' of ' + barsTotal + ')&hellip; ' : ''}<b>Setup</b> counts four timing checks (0 to 4). <b>Chance</b> is how often, in past weeks with that setup, a stock closed 5% or more higher two weeks later (about 7,200 stock-weeks from 43 stocks); an average stock does this about 25% of the time, so treat it as a guide, not a promise. Buy needs a stock worth owning and a setup of 2 or more.</p>
     ${shown.length > MAX_ROWS ? '<p class="upload-hint">Showing the top ' + MAX_ROWS + ' of ' + shown.length + '.</p>' : ''}`;
 }
 // Only the table: used when trades or prices change, so the strategy list is not rebuilt under an open dropdown.

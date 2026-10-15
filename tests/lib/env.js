@@ -91,13 +91,14 @@ function installStub(cfg){
   }
   function colSnap(p){ const docs = []; for(const [k, v] of store){ if(k.startsWith(p + '/') && !k.slice(p.length + 1).includes('/')) docs.push(snap(k.slice(p.length + 1), v)); } return { docs, size: docs.length, empty: !docs.length, forEach: f => docs.forEach(f), docChanges: () => [] }; }
   function mkCol(p){
-    const c = { doc: id => mkDoc(p + '/' + id), get: async () => { await seedP; rule('get', p); return colSnap(p); },
+    const c = { doc: id => mkDoc(p + '/' + id), get: async () => { await seedP; rule('get', p); (window.__colGets = window.__colGets || []).push(p); return colSnap(p); },
       onSnapshot: cb => {
         if(cfg.liveCollections){ if(!colListeners.has(p)) colListeners.set(p, new Set()); colListeners.get(p).add(cb); }
         seedP.then(() => cb(colSnap(p)));
         return () => { if(colListeners.has(p)) colListeners.get(p).delete(cb); };
       },
-      where: () => c, orderBy: () => c, limit: () => c };
+      // a filtered read is logged apart from a read of the whole collection (window.__colGets lists the whole-collection reads)
+      where: (f, o, v) => Object.assign(Object.create(c), { get: async () => { await seedP; rule('get', p); (window.__filteredGets = window.__filteredGets || []).push(p + ' ' + f + ' ' + o + ' ' + v); return colSnap(p); } }), orderBy: () => c, limit: () => c };
     return c;
   }
   const db = { doc: p => mkDoc(p), collection: n => mkCol(n) };

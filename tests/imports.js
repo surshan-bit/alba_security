@@ -695,6 +695,22 @@ async function tvRefreshScenarios(){
     ok(r.btn && /skipped/.test(r.text), 'a skipped-stocks file is offered: ' + r.text.slice(0, 300));
     ok(await page.evaluate(() => !document.getElementById('tvStopBtn') || document.getElementById('tvStopBtn').hidden), 'the Stop button is hidden again');
   });
+  // v1.190: a second run with the same figures does not rewrite what is already saved, and the result says how long the run took
+  await runScenario('refresh from TradingView: a second run with the same figures rewrites nothing and reports its time', { cfg: { liveCollections: true } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
+    const first = await page.textContent('#tv_fiResult');
+    ok(/Took \d+ (s|min)/.test(first) && !/already held exactly/.test(first), 'the first run reports its time and has nothing unchanged: ' + first.slice(0, 260));
+    await page.waitForFunction(() => !document.getElementById('tvSnapshotBtn').disabled, null, { timeout: 30000 });
+    const before = await readDb(page);
+    await page.click('#tvSnapshotBtn');
+    await page.waitForFunction(() => /already held exactly/.test((document.getElementById('tv_fiResult') || {}).textContent || ''), null, { timeout: 120000 });
+    const second = await page.textContent('#tv_fiResult');
+    ok(/(^|\s)0 stocks refreshed/.test(second) && /already held exactly these figures/.test(second), 'the second run saves nothing and says why: ' + second.slice(0, 300));
+    ok(await page.evaluate(() => /fi-result-ok/.test(document.getElementById('tv_fiResult').className)), 'it still counts as a good run');
+    const after = await readDb(page);
+    ok(JSON.stringify(after.all) === JSON.stringify(before.all), 'the saved records are exactly as they were');
+  });
   // v1.185: if the list of saved updates cannot be read, saving blindly would REPLACE whole records and lose what else they hold
   const research = { ticker: first, globalFactors: { scope: 'sector', positive: ['kept note'], negative: [] }, technical: { score: 3, asof: '2020-01-01', states: {}, raw: {}, reason: 'old' } };
   await runScenario('refresh from TradingView: if the saved updates cannot be listed, nothing is written and no research is lost', { docs: { ['stockUpdates/' + first]: research }, cfg: { liveCollections: true, rules: [{ op: 'get', path: 'stockUpdates', error: { message: 'network down' } }] } }, async page => {
