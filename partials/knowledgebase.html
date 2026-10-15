@@ -221,6 +221,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.197 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>Refresh all stocks saves 16 stocks at a time instead of 6:</b> the run record added in v1.196 showed that 99% of a full refresh (about 21 minutes for 2,191 stocks) was spent saving to the database, one save taking around 4 seconds, and only about 4 seconds waiting on TradingView. Saving more at once should shorten the run. The run record now also notes how many saves ran at the same time, so the next run can be compared with the last.</li>
+            </ul>
             <h3>v1.196 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Every Refresh all stocks run is now recorded:</b> when a run finishes (or is stopped, or fails) one record is saved in the database (collection <code>refreshRunLog</code>) with when it started and ended, how long it took, how many stocks it saved, left alone because nothing had changed, or skipped, how many seconds were spent waiting on TradingView and saving, and how long each batch took. Fill missing history saves a similar record. Nothing changes on screen, and a failed save of the record never stops a refresh. It lets the speed of the refresh be measured from the data and compared run to run.</li>
