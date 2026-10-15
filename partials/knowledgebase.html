@@ -221,6 +221,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.194 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>Score trend is hidden for now:</b> the Score trend panel on each stock page (the Fundamental and Technical score over time) is switched off. Nothing is deleted: every import still records its scores, so when the panel is brought back it will show everything saved in the meantime.</li>
+            </ul>
             <h3>v1.193 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Behind the scenes only, nothing changes on screen:</b> the largest piece of the dashboard&rsquo;s code, the one behind the Refresh buttons and menus, was split into four smaller parts, each with one job: the saved queue and runner, the buttons and menus, the floating menu, and the lookup of stocks and selections. Before the split, new checks were added for the Refresh menu (arrow keys, Escape, clicking away), the confirmation for a big Fundamental run, and a refresh running on another device (it shows in the bell, no second run starts, and Stop asks it to stop). They pass before and after, and every screen snapshot is identical.</li>
