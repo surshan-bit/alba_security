@@ -6,6 +6,8 @@
 //  3. After a reload the saved queue is picked up: a fresh heartbeat from another (reloaded) copy is waited out, then the refresh carries
 //     on with "Refresh continuing", never the old "running in another window" dead end.
 //  4. The saved BSE symbol map is used as stored (BSE:AGVENTURES, never BSE:BSE:AGVENTURES).
+//  5. (v1.193) The Refresh menu (open, arrow keys, Escape, outside click), the confirmation for a big Fundamental run, and a run on another
+//     device (shown in the bell, no second run, Stop asks it to stop): the behaviour the split of src/refresh/kit.js must keep.
 // It uses the stand-in database and TradingView of tests/lib/env.js; it does not test the real claude.ai runtime. Playwright is optional.
 // Usage: node tests/refresh.js
 const fs = require('fs'), path = require('path');
@@ -110,9 +112,81 @@ async function symbolTests(){
   } finally { await ctx.close(); }
 }
 
+// ---- 5. v1.193: behaviour of the refresh controls that the split of src/refresh/kit.js must keep (written before the split)
+// 5a. the Analysis Refresh menu: opens, offers the six runs, moves with the arrow keys, closes with Escape (focus goes back) and on an outside click
+async function barMenuTests(){
+  const { ctx, page, errs } = await open('bar menu', {});
+  try {
+    await page.waitForSelector('.rk-barbtn', { timeout: 8000 });
+    const btn = '.rk-barbtn';
+    await page.click(btn); await page.waitForSelector('.rk-menu', { timeout: 3000 });
+    const t = await page.evaluate(() => ({ text: document.querySelector('.rk-menu').innerText, items: document.querySelectorAll('.rk-menu .rk-item').length, expanded: document.querySelector('.rk-barbtn').getAttribute('aria-expanded'), role: document.querySelector('.rk-menu').getAttribute('role') }));
+    ok(t.role === 'menu' && t.expanded === 'true', 'the Refresh menu opens as a menu and marks its button expanded: ' + JSON.stringify(t).slice(0, 160));
+    ok(t.items === 6 && /Fundamental/.test(t.text) && /Technical/.test(t.text) && /Both/.test(t.text) && /Only what is out of date/i.test(t.text), 'it offers Fundamental, Technical and Both for all stocks and for only those out of date: ' + JSON.stringify(t.text.slice(0, 200)));
+    const focusIdx = () => page.evaluate(() => Array.from(document.querySelectorAll('.rk-menu button:not(:disabled), .rk-menu input:not(:disabled)')).indexOf(document.activeElement));
+    const first = await focusIdx();
+    await page.keyboard.press('ArrowDown'); const second = await focusIdx();
+    await page.keyboard.press('ArrowUp'); const back = await focusIdx();
+    ok(first === 0 && second === 1 && back === 0, 'the first item has focus and the arrow keys move through the items: ' + [first, second, back]);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    const closed = await page.evaluate(() => ({ menu: !!document.querySelector('.rk-menu'), expanded: document.querySelector('.rk-barbtn').getAttribute('aria-expanded'), focused: document.activeElement === document.querySelector('.rk-barbtn') }));
+    ok(!closed.menu && closed.expanded === 'false' && closed.focused, 'Escape closes the menu and puts focus back on its button: ' + JSON.stringify(closed));
+    await page.click(btn); await page.waitForSelector('.rk-menu', { timeout: 3000 });
+    await page.mouse.click(5, 5); await page.waitForTimeout(150);
+    ok(!(await page.evaluate(() => !!document.querySelector('.rk-menu'))), 'a click elsewhere closes the menu');
+    await page.click(btn); await page.waitForSelector('.rk-menu', { timeout: 3000 });
+    await page.click(btn); await page.waitForTimeout(150);
+    ok(!(await page.evaluate(() => !!document.querySelector('.rk-menu'))), 'clicking the button again closes its menu');
+    ok(errs.length === 0, 'bar menu: errors in the page: ' + errs.slice(0, 2).join(' | '));
+  } finally { await ctx.close(); }
+}
+// 5b. a Fundamental refresh of more than 50 stocks asks first; Cancel starts nothing
+async function confirmTests(){
+  const wide = JSON.stringify({ weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortBy: 'mos_desc', verdicts: [], mosRatings: [], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', columnOrder: null });
+  const { ctx, page, errs } = await open('confirm', {}, { fn: v => localStorage.setItem('albaDashboard.analysisFilters.v1', v), arg: wide });
+  try {
+    await page.waitForSelector('.rk-barbtn', { timeout: 8000 });
+    await page.click('.rk-barbtn'); await page.waitForSelector('.rk-menu', { timeout: 3000 });
+    const n = await page.evaluate(() => { const b = Array.from(document.querySelectorAll('.rk-menu [data-rk-act="menu-run"]')).find(x => /Fundamental/.test(x.textContent) && x.getAttribute('data-rk-only') === '0'); const m = b && /all (\d+)/.exec(b.textContent); if(b && m && Number(m[1]) > 50) b.click(); return m ? Number(m[1]) : 0; });
+    if(n > 50){
+      await page.waitForSelector('.rk-menu [data-rk-act="confirm-run"]', { timeout: 3000 });
+      const t = await page.evaluate(() => document.querySelector('.rk-menu').innerText);
+      ok(/Refresh this many stocks\?/i.test(t) && /batches of 50/.test(t) && /Claude usage/.test(t), 'the confirmation says how many, the batch size and that Fundamental uses Claude usage: ' + JSON.stringify(t.slice(0, 200)));
+      await page.evaluate(() => document.querySelector('.rk-menu [data-rk-act="close"]').click()); await page.waitForTimeout(300);
+      const q = await page.evaluate(k => { const d = window.__store.get(k); return d ? (d.jobs || []).length : 0; }, QUEUE);
+      ok(q === 0 && !(await page.evaluate(() => !!document.querySelector('.rk-menu'))), 'Cancel closes the confirmation and queues nothing');
+    } else ok(false, 'expected more than 50 stocks with every filter off, the view lists ' + n);
+    ok(errs.length === 0, 'confirm: errors in the page: ' + errs.slice(0, 2).join(' | '));
+  } finally { await ctx.close(); }
+}
+// 5c. a refresh running on another device: this device shows it in the bell, will not start a second one, and Stop asks the other device to stop
+async function remoteTests(){
+  const s = FIXTURE[3], beat = '2026-10-11T04:59:50.000Z';   // 10 seconds before the fixed test clock
+  const doc = { v: 1, owner: 'another-device', heartbeatAt: beat, updatedAt: beat, notices: [], progress: { title: 'Refreshing Technical Info · 3 of 10 done', text: 'A STOCK · Running', pct: 30, section: 'analysis' }, jobs: [{ id: 'r1', kind: 'tech', keys: [symOf(s), symOf(FIXTURE[4])], total: 10, done: 8, source: 'analysis', label: 'Everything', createdAt: beat }] };
+  srv.seeds.set('remote', JSON.stringify({ docs: { [QUEUE]: doc } }));
+  const { ctx, page, errs } = await open('remote', { seedUrl: base + '/__seed/remote.json' });
+  try {
+    await page.click('#activityBell'); await page.waitForSelector('#activityPanel .activity-item', { timeout: 8000 });
+    const item = await page.evaluate(() => { const el = document.querySelector('#activityPanel .activity-item'); return { title: el.querySelector('.activity-title').textContent, text: el.querySelector('.activity-text').textContent, hasStop: !!el.querySelector('[data-act="stop"]') }; });
+    ok(/Refreshing Technical Info/.test(item.title) && /Running on another device/.test(item.text) && item.hasStop, 'the other device\'s run is in the bell with its progress and a Stop button: ' + JSON.stringify(item));
+    await page.click('#activityBell');   // close the panel again
+    await page.click('.rk-barbtn'); await page.waitForSelector('.rk-menu', { timeout: 3000 });
+    await page.evaluate(() => { const b = Array.from(document.querySelectorAll('.rk-menu [data-rk-act="menu-run"]')).find(x => /Technical/.test(x.textContent) && x.getAttribute('data-rk-only') === '0'); b.click(); });
+    await page.waitForTimeout(500);
+    const notices = await page.evaluate(k => { const d = window.__store.get(k); return d ? (d.notices || []).map(n => n.title) : []; }, QUEUE);
+    ok(notices.some(x => /A refresh is already in progress/.test(x)), 'starting a second refresh while another device runs one says so instead: ' + JSON.stringify(notices));
+    await page.click('#activityBell'); await page.waitForSelector('#activityPanel [data-act="stop"]', { timeout: 3000 });
+    await page.evaluate(() => document.querySelector('#activityPanel .activity-item.is-running [data-act="stop"]').click());
+    await page.waitForTimeout(600);
+    const stopReq = await page.evaluate(k => { const d = window.__store.get(k); return d ? d.stopRequest : null; }, QUEUE);
+    ok(typeof stopReq === 'number' && stopReq > 0, 'Stop on this device asks the running device to stop (stopRequest saved): ' + stopReq);
+    ok(errs.length === 0, 'remote: errors in the page: ' + errs.slice(0, 2).join(' | '));
+  } finally { await ctx.close(); }
+}
+
 (async () => {
   base = await srv.listen(); browser = await chromium.launch();
-  try { for(const f of [countTests, menuTests, resumeTests, symbolTests]){ try { await f(); } catch(e){ problems.push(f.name + ' crashed: ' + String(e && e.message || e).split('\n').slice(0, 3).join(' | ')); checks++; } } }
+  try { for(const f of [countTests, menuTests, resumeTests, symbolTests, barMenuTests, confirmTests, remoteTests]){ try { await f(); } catch(e){ problems.push(f.name + ' crashed: ' + String(e && e.message || e).split('\n').slice(0, 3).join(' | ')); checks++; } } }
   finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('refresh tests FAILED (' + problems.length + ' of ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('refresh tests: ' + checks + ' checks passed');
