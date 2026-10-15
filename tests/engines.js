@@ -460,6 +460,34 @@ test('v1.181: the score log row carries the score and its inputs; one row per da
   assert.strictEqual(rows.length, LOG.MAX_ROWS); assert.ok(rows[0].d < rows[1].d);
 });
 
+// ---- v1.182: refresh from TradingView (snapshot readings, no bars) ----
+test('v1.182: a TradingView snapshot is scored by the same rules as the CSV import and is marked as a snapshot', () => {
+  const TECH = load('src/engine/technical.js');
+  const r = { monthMacdLevel: 20.5, monthMacdSignal: 16.8, weekMacdLevel: 8.6, weekMacdSignal: 8.5, monthRsi: 62.7, weekRsi: 58.7, weekPctChange: 3.45, monthPctChange: 3.58 };
+  const t = TECH.snapshotTechnical(r, 6, '2026-10-15');
+  const csv = Te.matchAndScore(tvCsv([['Q', '', '', '', '', r.monthMacdLevel, r.monthMacdSignal, r.weekMacdLevel, r.weekMacdSignal, r.monthRsi, r.weekRsi]]), [ist('Q', 6)]).matched[0];
+  assert.strictEqual(t.score, csv.score); assert.strictEqual(t.states.monthMacd, 'bull_above'); assert.strictEqual(t.states.weekRsi, 'strong');
+  assert.strictEqual(t.src, 'snapshot'); assert.strictEqual(t.asof, '2026-10-15'); assert.deepStrictEqual(t.basis, { week: null, month: null });
+  assert.strictEqual(t.raw.valuationScore, 6); assert.ok(/in progress/.test(t.reason));
+  assert.strictEqual(TECH.snapshotTechnical({}, 6, '2026-10-15'), null);   // nothing to score
+  const part = TECH.snapshotTechnical({ weekRsi: 60 }, null, '2026-10-15'); assert.strictEqual(part.score, 10 * 2.0 / 2.0 * 1);   // one component, rescaled
+});
+test('v1.182: a recent completed-bars score is kept; an older one, a snapshot or an imported one is replaced', () => {
+  const TECH = load('src/engine/technical.js');
+  const bars = { asof: '2026-10-14', basis: { week: '2026-10-05', month: '2026-09-01' } };
+  assert.strictEqual(TECH.techKeepsBarsBlock(bars, '2026-10-15'), true);
+  assert.strictEqual(TECH.techKeepsBarsBlock(bars, '2026-10-17'), true);
+  assert.strictEqual(TECH.techKeepsBarsBlock(bars, '2026-10-18'), false);   // more than 3 days old
+  assert.strictEqual(TECH.techKeepsBarsBlock(Object.assign({}, bars, { src: 'snapshot' }), '2026-10-15'), false);
+  assert.strictEqual(TECH.techKeepsBarsBlock({ asof: '2026-10-14' }, '2026-10-15'), false);   // imported from a CSV: no completed-bar dates
+  assert.strictEqual(TECH.techKeepsBarsBlock(null, '2026-10-15'), false);
+});
+test('v1.182: the reason text of a bars-based score is unchanged by the shared helper', () => {
+  const TECH = load('src/engine/technical.js'), { W, M } = mkBars();
+  const t = TECH.computeTechnical(W.slice(0, -1), M.slice(0, -1), 6, '2026-10-14');
+  assert.ok(/^monthly MACD bullish, above zero, weekly MACD bullish, above zero\. monthly RSI [\d.]+ \(\w+\), weekly RSI [\d.]+ \(\w+\)\. Valuation pillar reading of 6\.0\/10 \(reasonably valued\)\.$/.test(t.reason), t.reason);
+});
+
 // =========================================================== Characterisation: today's exact numbers on the made-up universe
 const golden = {};
 for(const r of Fe.scoreCsv(csv, { exactIndustryBySym: exactMap }).records){

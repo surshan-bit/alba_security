@@ -10,6 +10,7 @@ import '../import/tech-import.js';
 import '../import/wlsync.js';
 import { refreshLastFiles, renderAllLastFiles } from '../import/last-file.js';
 import { init_joblogs_freshness } from '../joblogs/freshness.js';
+import { init_refresh_tvrefresh } from '../refresh/tvrefresh.js';
 import { renderWatchlistSyncLogPanel } from '../joblogs/panels.js';
 
 function init(){
@@ -17,6 +18,7 @@ function init(){
   init_import_csv_upload();
   init_import_fund_import();
   refreshLastFiles();
+  init_refresh_tvrefresh();
 }
 function render(){ renderWatchlistSyncLogPanel(); renderAllLastFiles(); }
 

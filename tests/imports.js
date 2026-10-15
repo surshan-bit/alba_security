@@ -119,7 +119,7 @@ function techFile(o){
 async function main(){
   base = await srv.listen(); browser = await chromium.launch();
   try {
-    await uploadScenarios(); await fundScenarios(); await techScenarios(); await watchlistScenarios();
+    await uploadScenarios(); await fundScenarios(); await techScenarios(); await watchlistScenarios(); await tvRefreshScenarios();
   } finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('import tests FAILED (' + problems.length + ' problems, ' + checks + ' checks, ' + scenarios + ' scenarios):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('import tests: ' + checks + ' checks passed in ' + scenarios + ' scenarios');
@@ -659,6 +659,30 @@ async function watchlistScenarios(){
     const a = await readDb(page); eq(a.all['stockMeta/bseAlpha'], { '512340': 'ALPHAONE' }, 'the exact match is saved, the near miss is not');
     const st = await tvState(page); const sec = st.lists.find(x => x.name === 'Alba Securities'); ok(sec.symbols.includes('BSE:ALPHAONE') && !sec.symbols.some(x => /ALPHAX|512341/.test(x)), 'the matched stock is on the list, the unmatched one left out');
     eq(a.wlLog[0].status, 'partial', 'logged as partial');
+  });
+}
+
+// ---------------------------------------------------------------- 5. Refresh from TradingView (snapshot and history)
+async function tvRefreshScenarios(){
+  const first = symOf(DS.stocks.find(s => !/^\d/.test(symOf(s)))), today = new Date(Date.now() + 19800000).toISOString().slice(0, 10);
+  const keep = { ticker: first, technical: { score: 7, asof: today, basis: { week: '2026-10-05', month: '2026-09-01' }, states: {}, raw: {}, reason: 'kept' } };
+  await runScenario('refresh from TradingView: every stock gets a price and a snapshot score, a fresh completed-weeks score is kept', { docs: { ['stockUpdates/' + first]: keep } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
+    const r = await page.evaluate(() => ({ cls: /fi-result-(ok|err)/.exec(document.getElementById('tv_fiResult').className)[1], text: document.getElementById('tv_fiResult').textContent, calls: (window.__tvBatchCalls || []).map(c => c.symbols.length), btn: !!document.getElementById('tv_fiResult').querySelector('button') }));
+    ok(r.cls === 'ok', 'finishes: ' + r.text.slice(0, 240));
+    ok(r.calls.length >= 1 && r.calls.every(n => n <= 50), 'batches of at most 50: ' + r.calls.join(','));
+    const a = await readDb(page), docs = Object.entries(a.all).filter(([k]) => k.startsWith('stockUpdates/'));
+    const snap = docs.filter(([, v]) => v.technical && v.technical.src === 'snapshot');
+    ok(snap.length > 100 && docs.every(([, v]) => v.valuation && v.valuation.currentPrice === 111.1), 'prices saved for every stock, snapshot scores for most: ' + snap.length + ' of ' + docs.length);
+    const kept = a.all['stockUpdates/' + first]; ok(kept.valuation.currentPrice === 111.1 && kept.technical.reason === 'kept' && kept.technical.score === 7, 'the fresh completed-weeks score is kept and only the price changes');
+    ok(r.btn && /skipped/.test(r.text), 'a skipped-stocks file is offered: ' + r.text.slice(0, 300));
+    ok(await page.evaluate(() => !document.getElementById('tvStopBtn') || document.getElementById('tvStopBtn').hidden), 'the Stop button is hidden again');
+  });
+  await runScenario('refresh from TradingView: without a connection nothing is attempted', { cfg: { noMcp: true } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-err', { timeout: 30000 });
+    ok(/not available in this view/.test(await page.textContent('#tv_fiResult')), 'message shown');
   });
 }
 if(require.main === module) main().catch(e => { console.error('import tests crashed:', e); process.exit(1); });
