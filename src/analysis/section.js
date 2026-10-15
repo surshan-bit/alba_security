@@ -22,6 +22,7 @@ import { chartGeometry, stocksInRange, valueFor } from './geometry.js';
 import { analysisControlsHtml, wireAnalysisControls } from './controls.js';
 import { TOOLTIP_HTML, createAnalysisTooltip, wireDotEvents } from './tooltip.js';
 import { leaderboardHtml, renderLeaderboardRows, wireLeaderboard } from './leaderboard.js';
+import { keepScroll, redrawWhenIdle } from '../ui/scrollkeep.js';
 
 function openStockFromAnalysis(idx){
   openStockInline(appSections.analysis, 'Analysis', idx);
@@ -84,7 +85,12 @@ function wireChartToggle(){
   };
 }
 
-function renderAnalysisSection(){
+// A full redraw puts the scrolled table and filter rows back where the viewer had them.
+function renderAnalysisSection(){ keepScroll(document.getElementById('section-analysis'), drawAnalysisSection); }
+// The redraw for a change that arrived in the background (saved prices, a refresh, another device): it waits until scrolling has stopped.
+function refreshAnalysisSoon(){ redrawWhenIdle('analysis', renderAnalysisSection); }
+
+function drawAnalysisSection(){
   const body = document.getElementById('analysisPanelBody');
   if(!body) return;
 
@@ -147,4 +153,4 @@ function init_analysis_section(){
   });
 }
 
-export { init_analysis_section, renderAnalysisSection };
+export { init_analysis_section, refreshAnalysisSoon, renderAnalysisSection };

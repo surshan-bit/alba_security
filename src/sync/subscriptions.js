@@ -1,6 +1,6 @@
 // Live database subscriptions (research, updates, triggers, pins, logs).
 import { attachDb, attachTradeDb, dbCapabilityPromise, fundamentalCsvUploadLog, replacePinnedTickers, replaceRefreshRequests, replaceTradeLog, technicalCsvUploadLog, watchlistSyncLog } from '../core/store.js';
-import { renderAnalysisSection } from '../analysis/section.js';
+import { refreshAnalysisSoon } from '../analysis/section.js';
 import { setResearchTriggerKinds, setResearchTriggers } from '../research/status.js';
 import { rerenderDetail } from '../detail/render.js';
 import { applyResearchOverlay } from '../overlays/research.js';
@@ -33,7 +33,7 @@ function init_sync_subscriptions(){
     // Keep the Analysis section's pin highlighting/leaderboard order in sync too, if it's
     // the section currently open (e.g. a pin change arriving from another open tab/device).
     const analysisSectionEl = document.getElementById('section-analysis');
-    if(analysisSectionEl && analysisSectionEl.classList.contains('active')) renderAnalysisSection();
+    if(analysisSectionEl && analysisSectionEl.classList.contains('active')) refreshAnalysisSoon();
   };
   const watchPins = (attempt) => {
     const ref = pinsRef(db);
@@ -101,7 +101,7 @@ function init_sync_subscriptions(){
         setResearchTriggers(next);
         setResearchTriggerKinds(nextKinds);
         const el = document.getElementById('section-analysis');
-        if(el && el.classList.contains('active')) renderAnalysisSection();
+        if(el && el.classList.contains('active')) refreshAnalysisSoon();
       },
       (err) => console.error('Research trigger sync error', err)
     );

@@ -1,6 +1,6 @@
 // Research age and trigger status helpers (when a stock was last researched or its research requested).
 import { daysSinceDate } from '../core/util.js';
-import { renderAnalysisSection } from '../analysis/section.js';
+import { refreshAnalysisSoon } from '../analysis/section.js';
 import { ensurePriceBars, pcTickerKey } from '../prices/store.js';
 
 // Days since a stock's research document (stockResearch overlay) was saved — null when the stock
@@ -53,7 +53,7 @@ function analysisQueuePriceLoad(s){
     clearTimeout(analysisPriceLoadTimer);
     analysisPriceLoadTimer = setTimeout(() => {
       const el = document.getElementById('section-analysis');
-      if(el && el.classList.contains('active')) renderAnalysisSection();
+      if(el && el.classList.contains('active')) refreshAnalysisSoon();
     }, 150);
   });
 }

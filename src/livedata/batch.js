@@ -1,6 +1,7 @@
 // Live Data Refresh for several stocks at once (started from the Analysis, Strategies or Explorer screen).
 import { tickerSymbol } from '../core/util.js';
-import { renderAnalysisSection } from '../analysis/section.js';
+import { refreshAnalysisSoon } from '../analysis/section.js';
+import { redrawWhenIdle } from '../ui/scrollkeep.js';
 import { renderLoadedPart } from '../core/lazy.js';
 import { pcTickerKey } from '../prices/store.js';
 import { LD_LABEL, ldAbort, ldGet, ldRunning, ldStart } from './bar.js';
@@ -164,9 +165,9 @@ async function ldBatchStart(kind, list, source = 'strat'){
       text: (clean ? '' : ldBatch.note + ' ') + batchTail(), section: sectionOf(ldBatch.source)
     });
   }
-  try { renderAnalysisSection(); } catch(e){ /* the leaderboard repaints on its next render */ }
+  try { refreshAnalysisSoon(); } catch(e){ /* the leaderboard repaints on its next render */ }
   // the refreshed numbers reach the stock list through the live subscription, a moment after the last save, so redraw twice
-  const redraw = () => { try { const sec = document.getElementById('section-strategies'); if(sec && sec.classList.contains('active') && !(ldBatch && ldBatch.running)) renderLoadedPart('strategies'); } catch(e){ /* repaints when opened again */ } };
+  const redraw = () => { try { const sec = document.getElementById('section-strategies'); if(sec && sec.classList.contains('active') && !(ldBatch && ldBatch.running)) redrawWhenIdle('strategies', () => renderLoadedPart('strategies')); } catch(e){ /* repaints when opened again */ } };
   if(source === 'strat'){ redraw(); setTimeout(redraw, 1500); }
   else { batchStockSaved(); setTimeout(batchStockSaved, 1500); }
   ldBatchPaint();

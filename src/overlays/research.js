@@ -3,7 +3,8 @@ import { stocks } from '../core/stocks.js';
 import { renderLoadedPart } from '../core/lazy.js';
 import { applyFundamentalConfidence } from '../core/fundscore.js';
 import { sanitizeDocId, tickerSymbol } from '../core/util.js';
-import { renderAnalysisSection } from '../analysis/section.js';
+import { refreshAnalysisSoon } from '../analysis/section.js';
+import { redrawWhenIdle } from '../ui/scrollkeep.js';
 import { setPeerGroupCache } from '../detail/peers.js';
 import { rerenderDetail } from '../detail/render.js';
 
@@ -116,7 +117,7 @@ function applyResearchOverlay(docs){
   setPeerGroupCache(null);
   rerenderDetail();
   const analysisSectionEl = document.getElementById('section-analysis');
-  if(analysisSectionEl && analysisSectionEl.classList.contains('active')) renderAnalysisSection();
+  if(analysisSectionEl && analysisSectionEl.classList.contains('active')) refreshAnalysisSoon();
   redrawStrategiesSoon();
 }
 // The Strategies table shows "Research done" too: redraw it as saved research arrives, so it fills in while a refresh runs.
@@ -127,7 +128,7 @@ function redrawStrategiesSoon(){
   strategiesRedrawTimer = setTimeout(() => {
     strategiesRedrawTimer = null;
     const el = document.getElementById('section-strategies');
-    try { if(el && el.classList.contains('active')) renderLoadedPart('strategies'); } catch(e){ /* repaints when opened again */ }
+    try { if(el && el.classList.contains('active')) redrawWhenIdle('strategies', () => renderLoadedPart('strategies')); } catch(e){ /* repaints when opened again */ }
   }, 1200);
 }
 
