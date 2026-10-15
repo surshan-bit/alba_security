@@ -221,6 +221,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.186 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>Website deployment only (outside claude.ai):</b> the preview build that Cloudflare makes for each branch failed at its last step, because Cloudflare's <code>wrangler preview</code> command needs a <code>previews</code> setting in <code>wrangler.jsonc</code>. The setting is now there. Nothing changes inside claude.ai.</li>
+            </ul>
             <h3>v1.185 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Analysis now lists every stock:</b> the <i>All</i> buttons and &ldquo;Showing N of N stocks&rdquo; now cover all stocks. About 300 stocks have no Intrinsic Value from Screener.in, so they have no Margin of Safety. Analysis used to leave them out completely, so <i>All</i> showed 1,900 next to a total of 2,196. They are now listed with the Margin of Safety left blank (in the table, the tooltip shows n/a, and the dot is drawn at the smallest size). They are left out only when you pick a <i>MoS Rating</i> button (Green, Orange or Red) or narrow the MoS range, because those need a Margin of Safety. Sorting by Margin of Safety, either way, puts the blank ones last.</li>
