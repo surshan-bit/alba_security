@@ -1,4 +1,5 @@
 // Renders the stock detail page and wires its buttons.
+import { keepScroll } from '../ui/scrollkeep.js';
 import { LINK_ICON } from './icons.js';
 import { detailEl } from '../core/dom.js';
 import { stocks } from '../core/stocks.js';
@@ -14,7 +15,7 @@ import { renderTechPanel } from './technical.js';
 import { renderStockResearchBar } from './pending.js';
 import { renderGlobalFactorsPanel } from './globalfactors.js';
 import { renderPeersPanel } from './peers.js';
-import { initScoreTrend, renderScoreTrendPanel } from './scoretrend.js';
+import { SHOW_SCORE_TREND, initScoreTrend, renderScoreTrendPanel } from './scoretrend.js';
 import { SHOW_CHANGE_NOTE, SHOW_REQUEST_REFRESH, bindDetailJumpNav, renderDetailJumpNav } from './jumpnav.js';
 import { loadPriceBarsFor } from '../prices/store.js';
 import { initPriceChart } from '../prices/chart.js';
@@ -38,7 +39,7 @@ function detailBackToAnalysis(){
 let shownIdx = -1;
 function getShownIndex(){ return shownIdx; }
 // Redraws whatever stock is open, e.g. after saved research or a pin change; does nothing if none is open.
-function rerenderDetail(){ if(stocks[shownIdx]) renderDetail(shownIdx); }
+function rerenderDetail(){ if(stocks[shownIdx]) keepScroll(detailEl, () => renderDetail(shownIdx)); }
 function renderDetail(idx){
   shownIdx = idx;
   const s = stocks[idx];
@@ -78,13 +79,13 @@ function renderDetail(idx){
     ${renderGlobalFactorsPanel(s)}
     ${renderFundamentals(s)}
     ${renderTechPanel(s)}
-    ${renderScoreTrendPanel(s)}
+    ${SHOW_SCORE_TREND ? renderScoreTrendPanel(s) : ''}
     ${renderPeersPanel(s, idx)}
   `;
 
   initPriceChart(s);
   loadPriceBarsFor(s, idx);
-  initScoreTrend(s);
+  if(SHOW_SCORE_TREND) initScoreTrend(s);
   bindDetailJumpNav(detailEl);
   const peersPanel = document.getElementById('peersPanel');
   if(peersPanel){

@@ -1,4 +1,5 @@
 // Trade Log panel: model, cards and table.
+import { keepScroll } from '../ui/scrollkeep.js';
 import { stockByTickerSymbol, verdictLabel } from '../core/stocks.js';
 import { allTrades, getTradeDb } from '../core/store.js';
 import { escapeHtml, formatDate, pctChangeSpan } from '../core/util.js';
@@ -218,7 +219,7 @@ function renderTradeLogPanel(){
       </table>
     </div>`;
   }
-  el.innerHTML = aggregateHtml + listHtml;
+  keepScroll(el, () => { el.innerHTML = aggregateHtml + listHtml; });
   syncSignals(models);
   refreshIdeasBody();
 }

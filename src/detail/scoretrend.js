@@ -5,6 +5,9 @@ import { escapeHtml } from '../core/util.js';
 import { loadScoreHistory, tickerKey, ymdToDate } from '../history/scorehistory.js';
 import { panelIcon } from './icons.js';
 
+// The panel is hidden for now (v1.194). Set to true to bring it back: the score history keeps being recorded by every import, so
+// the trend returns with everything saved in the meantime.
+const SHOW_SCORE_TREND = false;
 const W = 640, H = 200, PL = 30, PR = 10, PT = 10, PB = 22;
 const fmtDate = n => ymdToDate(n).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -52,4 +55,4 @@ function initScoreTrend(s){
   loadScoreHistory(s).then(p => fill(scoreTrendHtml(p)), () => fill('<div class="trend-note">The score history could not be loaded.</div>'));
 }
 
-export { initScoreTrend, renderScoreTrendPanel };
+export { SHOW_SCORE_TREND, initScoreTrend, renderScoreTrendPanel };
