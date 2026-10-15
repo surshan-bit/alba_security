@@ -666,18 +666,31 @@ async function watchlistScenarios(){
 async function tvRefreshScenarios(){
   const first = symOf(DS.stocks.find(s => !/^\d/.test(symOf(s)))), today = new Date(Date.now() + 19800000).toISOString().slice(0, 10);
   const keep = { ticker: first, technical: { score: 7, asof: today, basis: { week: '2026-10-05', month: '2026-09-01' }, states: {}, raw: {}, reason: 'kept' } };
-  await runScenario('refresh from TradingView: every stock gets a price and a snapshot score, a fresh completed-weeks score is kept', { docs: { ['stockUpdates/' + first]: keep } }, async page => {
+  await runScenario('refresh from TradingView: every stock gets a price and a snapshot score, a fresh completed-weeks score is kept', { docs: { ['stockUpdates/' + first]: keep }, cfg: { liveCollections: true } }, async page => {
     await page.click('#tvSnapshotBtn');
     await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
     const r = await page.evaluate(() => ({ cls: /fi-result-(ok|err)/.exec(document.getElementById('tv_fiResult').className)[1], text: document.getElementById('tv_fiResult').textContent, calls: (window.__tvBatchCalls || []).map(c => c.symbols.length), btn: !!document.getElementById('tv_fiResult').querySelector('button') }));
     ok(r.cls === 'ok', 'finishes: ' + r.text.slice(0, 240));
     ok(r.calls.length >= 1 && r.calls.every(n => n <= 50), 'batches of at most 50: ' + r.calls.join(','));
+    const asked = await page.evaluate(() => [].concat(...(window.__tvBatchCalls || []).map(c => c.symbols)));
+    ok(asked.includes('NSE:J&KBANK') && !asked.includes('NSE:J_KBANK') && asked.includes('NSE:BAJAJ_AUTO'), 'a & in a ticker is kept, a hyphen becomes an underscore');
+    await page.waitForFunction(() => { const row = [...document.querySelectorAll('#techFreshnessBars .refreshlog-freshness-row')].find(e => /Today/.test(e.textContent)); return row && parseInt(row.querySelector('.refreshlog-freshness-count').textContent, 10) > 100; }, null, { timeout: 15000 }).catch(() => {});
+    const today0 = await page.evaluate(() => { const row = [...document.querySelectorAll('#techFreshnessBars .refreshlog-freshness-row')].find(e => /Today/.test(e.textContent)); return row ? parseInt(row.querySelector('.refreshlog-freshness-count').textContent, 10) : -1; });
+    ok(today0 > 100, 'the technical data age bars show the refreshed stocks as Today without a reload: ' + today0);
     const a = await readDb(page), docs = Object.entries(a.all).filter(([k]) => k.startsWith('stockUpdates/'));
     const snap = docs.filter(([, v]) => v.technical && v.technical.src === 'snapshot');
     ok(snap.length > 100 && docs.every(([, v]) => v.valuation && v.valuation.currentPrice === 111.1), 'prices saved for every stock, snapshot scores for most: ' + snap.length + ' of ' + docs.length);
     const kept = a.all['stockUpdates/' + first]; ok(kept.valuation.currentPrice === 111.1 && kept.technical.reason === 'kept' && kept.technical.score === 7, 'the fresh completed-weeks score is kept and only the price changes');
     ok(r.btn && /skipped/.test(r.text), 'a skipped-stocks file is offered: ' + r.text.slice(0, 300));
     ok(await page.evaluate(() => !document.getElementById('tvStopBtn') || document.getElementById('tvStopBtn').hidden), 'the Stop button is hidden again');
+  });
+  // the real database hands out records that cannot be changed in place: the list of stocks that failed before must be copied first
+  const old = {}; DS.stocks.filter(s => !/^\d/.test(symOf(s))).forEach(s => { old[symOf(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_')] = '2020-01-01T00:00:00.000Z'; });
+  await runScenario('fill missing history: a saved failure list that cannot be changed in place does not stop the run', { docs: { 'stockMeta/histFillTried': Object.assign({ uploadedAt: '2026-10-01' }, old) } }, async page => {
+    await page.click('#tvHistoryBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 200000 });
+    const text = await page.textContent('#tv_fiResult');
+    ok(!/Cannot|not extensible|Stopped/.test(text), 'the run finishes: ' + text.slice(0, 200));
   });
   await runScenario('refresh from TradingView: without a connection nothing is attempted', { cfg: { noMcp: true } }, async page => {
     await page.click('#tvSnapshotBtn');

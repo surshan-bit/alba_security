@@ -73,9 +73,11 @@ function renderFreshnessPanel(cfg){
   }).join('');
 }
 
-function init_joblogs_freshness(){
+function paintFreshness(){
 renderFreshnessPanel({summaryElId:'fundFreshnessSummary', barsElId:'fundFreshnessBars', getAsof: s => s.asof, noDataText: 'No fundamental refresh dates recorded yet.'});
 renderFreshnessPanel({summaryElId:'techFreshnessSummary', barsElId:'techFreshnessBars', getAsof: s => s.technical && s.technical.asof, noDataText: 'No technical refresh dates recorded yet.'});
 }
 
-export { init_joblogs_freshness };
+function init_joblogs_freshness(){ paintFreshness(); }
+
+export { init_joblogs_freshness, paintFreshness };
