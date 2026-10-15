@@ -719,7 +719,7 @@ async function tvRefreshScenarios(){
     ok(/(^|\s)0 stocks refreshed.*\b0 technical scores updated/.test(text), 'nothing is counted as updated: ' + text.slice(0, 240));
   });
   // the real database hands out records that cannot be changed in place: the list of stocks that failed before must be copied first
-  const old = {}; DS.stocks.filter(s => !/^\d/.test(symOf(s))).forEach(s => { old[symOf(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_')] = '2020-01-01T00:00:00.000Z'; });
+  const old = {}; DS.stocks.filter((s, i) => i >= 6).forEach(s => { old[symOf(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_')] = '2020-01-01T00:00:00.000Z'; });
   await runScenario('fill missing history: a saved failure list that cannot be changed in place does not stop the run', { docs: { 'stockMeta/histFillTried': Object.assign({ uploadedAt: '2026-10-01' }, old) } }, async page => {
     await page.click('#tvHistoryBtn');
     await page.waitForSelector('#th_fiResult.fi-result-ok, #th_fiResult.fi-result-err', { timeout: 200000 });
