@@ -129,7 +129,7 @@ function renderAnalysisSection(){
   const tooltip = createAnalysisTooltip();
   wireDotEvents(document.getElementById('analysisDots'), tooltip, openStockFromAnalysis);
   wireLeaderboard({ update: updateAnalysisChart, rerender: renderAnalysisSection, openStock: openStockFromAnalysis, hideTooltip: tooltip.hide });
-  wireAnalysisControls({ mosBoundLo: geo.mosBoundLo, mosBoundHi: geo.mosBoundHi, update: updateAnalysisChart, schedule: scheduleAnalysisChartUpdate, rerender: renderAnalysisSection });
+  wireAnalysisControls({ mosBoundLo: geo.mosBoundLo, mosBoundHi: geo.mosBoundHi, update: updateAnalysisChart, schedule: scheduleAnalysisChartUpdate, rerender: renderAnalysisSection, onRelease: () => renderAnalysisFilterPanel(renderAnalysisSection) });
 
   updateAnalysisChart();
 }

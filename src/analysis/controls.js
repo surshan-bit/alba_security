@@ -49,7 +49,7 @@ function analysisControlsHtml(mosBoundLo, mosBoundHi){
 // CSS), so each can only be grabbed by its own handle. When the two handles meet, they lock together.
 // While a slider is dragged only `schedule()` (a redraw of the dots and table) runs, never a full render,
 // which would recreate the slider under the drag and kill it. Saving happens once, on 'change' (release).
-function wireSliders(schedule){
+function wireSliders(schedule, onRelease){
   const f = analysisFilters;
   const el = (id) => document.getElementById(id);
   const weekMinInput = el('weekRsiMinInput'), weekMaxInput = el('weekRsiMaxInput');
@@ -69,11 +69,11 @@ function wireSliders(schedule){
   onInput(monthMinInput, v => { f.monthMin = Math.min(v, f.monthMax); });
   onInput(monthMaxInput, v => { f.monthMax = Math.max(v, f.monthMin); });
   [weekMinInput, weekMaxInput, monthMinInput, monthMaxInput].forEach(input => {
-    input.addEventListener('change', () => saveAnalysisFilters(analysisFilters));
+    input.addEventListener('change', () => { saveAnalysisFilters(analysisFilters); onRelease(); });
   });
 }
 
-function wireMosSlider(mosBoundLo, mosBoundHi, schedule){
+function wireMosSlider(mosBoundLo, mosBoundHi, schedule, onRelease){
   const f = analysisFilters;
   const mosClamp = mosClamper(mosBoundLo, mosBoundHi);
   const mosMinInput = document.getElementById('mosMinInput');
@@ -94,7 +94,7 @@ function wireMosSlider(mosBoundLo, mosBoundHi, schedule){
   syncMosInputs();
   mosMinInput.addEventListener('input', () => setMosRange(Math.min(Number(mosMinInput.value), Number(mosMaxInput.value)), Number(mosMaxInput.value)));
   mosMaxInput.addEventListener('input', () => setMosRange(Number(mosMinInput.value), Math.max(Number(mosMaxInput.value), Number(mosMinInput.value))));
-  [mosMinInput, mosMaxInput].forEach(input => input.addEventListener('change', () => saveAnalysisFilters(analysisFilters)));
+  [mosMinInput, mosMaxInput].forEach(input => input.addEventListener('change', () => { saveAnalysisFilters(analysisFilters); onRelease(); }));
 }
 
 // Colour only recolours the dots, so it needs just `update()`. The X / Y axis toggles also re-label the axis
@@ -127,9 +127,11 @@ function wireToggles(update, rerender){
   axisButtons('y', 'yAxis', 'xAxis');
 }
 
-function wireAnalysisControls({ mosBoundLo, mosBoundHi, update, schedule, rerender }){
-  wireMosSlider(mosBoundLo, mosBoundHi, schedule);
-  wireSliders(schedule);
+// onRelease runs once when a slider is let go (not on every tick of a drag): it redraws the filter panel's counts and note, which
+// depend on the slider ranges but live outside the part of the page the drag redraws.
+function wireAnalysisControls({ mosBoundLo, mosBoundHi, update, schedule, rerender, onRelease }){
+  wireMosSlider(mosBoundLo, mosBoundHi, schedule, onRelease);
+  wireSliders(schedule, onRelease);
   wireToggles(update, rerender);
 }
 
