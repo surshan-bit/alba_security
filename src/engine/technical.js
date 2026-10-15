@@ -120,4 +120,4 @@ function techKeepsBarsBlock(t, today, days = 3){
   return techDayNo(today) - techDayNo(t.asof) <= days;
 }
 
-export { computeTechnical, snapshotTechnical, techComposite, techKeepsBarsBlock, techMacdStateOf, techRsiState, techValLabel };
+export { computeTechnical, snapshotTechnical, techCompleted, techComposite, techKeepsBarsBlock, techMacdStateOf, techRsiState, techValLabel };
