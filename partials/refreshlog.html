@@ -46,11 +46,12 @@
         </div>
 
         <div class="refreshlog-sub">
-          <h3 class="refreshlog-sub-title">Refresh all stocks <span class="refreshlog-sub-note">the daily update, straight from TradingView</span></h3>
+          <h3 class="refreshlog-sub-title">Refresh all stocks <span class="refreshlog-sub-note">the one daily route, straight from TradingView</span></h3>
           <div class="upload-panel">
             <div class="upload-row">
               <div class="upload-text">
-                <div class="upload-hint">Reads price, MACD and RSI for every stock from TradingView (about 45 calls) and recalculates every Technical Score. Takes about 3 minutes. Nothing is overwritten that cannot be refreshed again.</div>
+                <div class="upload-hint">1. Reads price, MACD and RSI for every stock from TradingView (about 45 calls, about 3 minutes) and recalculates every Technical Score. 2. Downloads the full price history, about 5 years up to today, for stocks that have none (tracked picks first); the first run can take an hour or more, and Stop then a later click carries on. 3. For stocks that already have history, adds only the weekly or monthly bars that have finished since their last saved bar.</div>
+                <div class="upload-hint" id="tvRefreshHint">The count of stocks with saved history appears after the first run.</div>
               </div>
               <button type="button" class="select-mode-btn fi-btn-primary" id="tvSnapshotBtn" title="Saves a fresh price and technical reading for every stock, from TradingView">Refresh all stocks</button>
               <button type="button" class="select-mode-btn" id="tvStopBtn" hidden>Stop</button>
@@ -78,22 +79,6 @@
           <div class="upload-panel last-file" id="technicalLastFile" aria-live="polite"></div>
           <div data-import-panel="ti_" data-title="Import" data-label="Import progress"></div>
           <div class="refreshlog-lastruns" id="lastRuns_csv" aria-live="polite"></div>
-        </div>
-
-        <div class="refreshlog-sub">
-          <h3 class="refreshlog-sub-title">Fill missing history <span class="refreshlog-sub-note">for stocks added for the first time</span></h3>
-          <div class="upload-panel">
-            <div class="upload-row">
-              <div class="upload-text">
-                <div class="upload-hint">Downloads weekly and monthly price bars, up to today, for every stock that has none saved (tracked picks first, then pinned, then strategy matches, then the rest) and calculates its completed-weeks Technical Score. Stop ends the run early; run it again to carry on.</div>
-                <div class="upload-hint" id="tvRefreshHint">The count of stocks with saved history appears after the first run.</div>
-              </div>
-              <button type="button" class="select-mode-btn fi-btn-primary" id="tvHistoryBtn" title="Downloads weekly and monthly price history for stocks that have none saved">Fill missing history</button>
-              <button type="button" class="select-mode-btn" id="thStopBtn" hidden>Stop</button>
-            </div>
-          </div>
-          <div data-import-panel="th_" data-title="Fill history" data-label="Fill history progress"></div>
-          <div class="refreshlog-lastruns" id="lastRuns_history" aria-live="polite"></div>
         </div>
 
       </div>

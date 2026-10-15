@@ -1,10 +1,10 @@
 // The run records of the Technical Score section: one record per run in refreshRunLog/<kind>-<start time>, and the "Last 2 runs" lists
-// under each option. Kinds: 'snapshot' (Refresh all stocks), 'csv' (Import CSV), 'history' (Fill missing history). Only the newest
+// under each option. Kinds: 'snapshot' (Refresh all stocks, including its price-bar stages) and 'csv' (Import CSV, hidden). Only the newest
 // KEEP records of each kind are kept; older ones are deleted when a new one is saved.
 import { escapeHtml, formatUploadTimestamp } from '../core/util.js';
 
 const KEEP = 2;
-const KINDS = ['snapshot', 'csv', 'history'];
+const KINDS = ['snapshot', 'csv'];
 const num = x => Number(x || 0).toLocaleString('en-IN');
 
 // "2 min 14 s" for a run time in milliseconds.
@@ -25,14 +25,13 @@ async function saveRunLog(db, kind, startedAt, t0, rec){
 
 function runLine(r){
   const when = formatUploadTimestamp(r.startedAt) + ' · ' + (r.trigger === 'scheduled' ? 'scheduled' : 'manual') + ' · ' + duration(r.durationMs || 0);
-  const what = r.kind === 'history'
-    ? num(r.saved) + ' of ' + num(r.tried) + ' stocks now have history' + (r.failed ? ', ' + num(r.failed) + ' skipped' : '')
-    : num(r.saved) + ' saved' + (r.unchanged ? ', ' + num(r.unchanged) + ' unchanged' : '') + (r.skipped ? ', ' + num(r.skipped) + ' skipped' : '');
+  const what = num(r.saved) + ' saved' + (r.unchanged ? ', ' + num(r.unchanged) + ' unchanged' : '') + (r.skipped ? ', ' + num(r.skipped) + ' skipped' : '')
+    + (r.filled || r.barsUpdated ? ' · bars: ' + num(r.filled) + ' full history, ' + num(r.barsUpdated) + ' updated' : '');
   const bad = r.error ? ' · stopped: ' + r.error : (r.stopped ? ' · stopped early' : '');
   return '<div class="refreshlog-run"><span class="refreshlog-run-time">' + escapeHtml(when) + '</span> · ' + escapeHtml(what + bad) + '</div>';
 }
 
-// Fills the "Last 2 runs" list under each option (elements lastRuns_snapshot, lastRuns_csv, lastRuns_history).
+// Fills the "Last 2 runs" list under each option (elements lastRuns_snapshot and lastRuns_csv).
 async function paintLastRuns(db){
   const hosts = KINDS.map(k => [k, document.getElementById('lastRuns_' + k)]).filter(/** @type {(x: any[]) => boolean} */ (x => x[1]));
   if(!hosts.length) return;
