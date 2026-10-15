@@ -221,6 +221,13 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.189 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>Buy / Sell ideas now aim at a 5% gain within a few weeks:</b> a stock you do not hold is judged on two separate things. <b>Worth owning</b> means a Strong or Good verdict, a margin of safety of 10% or more and a Fundamental score of 5 or more. <b>Setup</b> counts four timing checks on the weekly chart (0 to 4): within 10% of its 52-week high, weekly MACD bullish above zero, a typical weekly move of 4.5% or more, and weekly RSI between 60 and 80. <b>Buy</b> needs both a stock worth owning and a setup of 2 or more. Wait means a good company that is not set up yet. Avoid is unchanged in spirit (weak verdict, above fair value or a low score).</li>
+              <li><b>New columns:</b> Setup (0 to 4), Chance +5% in 2 wks, and Sell at +5% (the price 5% above today&rsquo;s). The chance comes from replaying about 7,200 past stock-weeks of 43 stocks: with all four checks a stock closed 5% or more higher two weeks later about 31% of the time, with none about 21%, and an average week about 25%. It is a guide, not a promise.</li>
+              <li><b>Ranking:</b> Buy stocks are ordered by setup, then quality, then how close they are to their high, so equal scores no longer fall back to alphabetical order. A stretched weekly RSI no longer blocks a Buy for a stock you do not hold, because the replay showed such weeks did no worse than average. Stocks you hold keep the same calls as before.</li>
+              <li><b>Behind the scenes:</b> the weekly price history is read once when you choose a strategy, because the timing checks need it. Stocks with no price history yet show a dash and cannot be a Buy.</li>
+            </ul>
             <h3>v1.188 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Removed the score log:</b> the daily record of each stock&rsquo;s technical score and its RSI and MACD figures, added in v1.181 for later back-testing, is gone. Nothing in the dashboard ever read it, only some refreshes wrote to it, and the scores it held can be recalculated from the saved price bars. Refreshes now save one record less per stock. Nothing you see changes. The 490 records it had already written (one per stock, from 15 Oct) were left in the database, unused.</li>

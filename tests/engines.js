@@ -582,33 +582,57 @@ test('trade call: missing data never crashes and never invents a call', () => {
   assert.strictEqual(G.factsFor({ buy: { price: 10 } }, null).price, null);
 });
 const I = load('src/tradelog/ideacall.js');
-const idea = (o) => ({ name: 'X', score: 7.2, verdict: 'buy', valuation: { currentPrice: 100, intrinsicValue: 160 }, technical: { score: 7.5, raw: { weekRsi: 55, monthRsi: 60 } }, ...o });
-test('ideas: a strong verdict, roomy cushion and calm RSI is Buy; a stretched, overvalued weak one is Avoid; the middle is Wait', () => {
-  assert.strictEqual(I.ideaCall(idea({}), null).call, 'buy');
-  assert.strictEqual(I.ideaCall(idea({ verdict: 'avoid', score: 4, valuation: { currentPrice: 100, intrinsicValue: 80 }, technical: { raw: { weekRsi: 85, monthRsi: 80 } } }), null).call, 'sell');
-  assert.strictEqual(I.ideaCall(idea({ verdict: 'hold', score: 6, valuation: { currentPrice: 100, intrinsicValue: 105 }, technical: { raw: { weekRsi: 70, monthRsi: 60 } } }), null).call, 'hold');
-  assert.strictEqual(I.ideaCall(idea({ technical: { raw: { weekRsi: 82, monthRsi: 60 } } }), null).call !== 'buy', true, 'a stretched weekly RSI is never a Buy');
+const SW = load('src/tradelog/swing.js');
+const idea = (o) => ({ name: 'X', score: 7.2, verdict: 'buy', valuation: { currentPrice: 100, intrinsicValue: 160 }, technical: { score: 7.5, states: { weekMacd: 'bull_above' }, raw: { weekRsi: 65, monthRsi: 60 } }, ...o });
+// Weekly bars [t,o,h,l,c,v] (t = unix seconds, Monday 2026-01-05 onwards) from a list of closes.
+const barsOf = (closes) => closes.map((c, i) => [Date.UTC(2026, 0, 5 + 7 * i) / 1000, c, c, c, c, 1000]);
+const rising = Array.from({ length: 30 }, (_, i) => 100 * Math.pow(1.05, i % 2 ? i : i - 1));   // choppy climb, ends at its high, moves ~5% a week
+const flat = Array.from({ length: 30 }, (_, i) => 100 + (i % 2 ? 0.5 : 0));                      // barely moves
+const SAT = '2027-01-02';
+test('swing: four checks, one point each, from the weekly bars and weekly indicators', () => {
+  const up = SW.swingSetup(idea({}), barsOf(rising), SAT);
+  assert.strictEqual(up.pts, 4); assert.strictEqual(up.chance, 31);
+  const calm = SW.swingSetup(idea({ technical: { states: { weekMacd: 'bear_below' }, raw: { weekRsi: 40 } } }), barsOf(flat), SAT);
+  assert.ok(calm.pts <= 1, 'a flat stock with a weak chart scores little, got ' + calm.pts);
+  assert.ok(calm.misses.some(m => /MACD/.test(m)) && calm.misses.some(m => /a week/.test(m)));
+  assert.strictEqual(SW.swingSetup(idea({}), barsOf(rising.slice(0, 8)), SAT), null, 'too little history gives no reading');
+  assert.strictEqual(SW.swingSetup(idea({}), null, SAT), null);
+});
+test('swing: a week still in progress is left out of the reading', () => {
+  const closes = rising.slice();
+  const full = SW.swingSetup(idea({}), barsOf(closes), '2027-01-02');
+  const crashed = closes.concat([60]);   // a new bar far below the high, but the week has not finished
+  const d = new Date(Date.UTC(2026, 0, 5 + 7 * closes.length) + 2 * 86400000).toISOString().slice(0, 10);   // Wednesday of that week
+  assert.strictEqual(SW.swingSetup(idea({}), barsOf(crashed), d).fromHigh, full.fromHigh, 'the forming week does not move the 52-week-high distance');
+});
+test('ideas: Buy needs a stock worth owning AND a setup of 2 or more; a good company with a poor chart is Wait; a weak overvalued one is Avoid', () => {
+  const good = SW.swingSetup(idea({}), barsOf(rising), SAT), poor = SW.swingSetup(idea({ technical: { states: { weekMacd: 'bear_above' }, raw: { weekRsi: 40 } } }), barsOf(flat), SAT);
+  assert.strictEqual(I.ideaCall(idea({}), null, good).call, 'buy');
+  const wait = I.ideaCall(idea({}), null, poor);
+  assert.strictEqual(wait.call, 'hold'); assert.strictEqual(wait.label, 'Wait');
+  assert.ok(wait.reasons.some(r => /setup \d\/4/.test(r)));
+  assert.strictEqual(I.ideaCall(idea({}), null, null).call, 'hold', 'no weekly bars: the timing cannot be judged, so not a Buy');
+  assert.strictEqual(I.ideaCall(idea({ verdict: 'avoid', score: 4, valuation: { currentPrice: 100, intrinsicValue: 80 } }), null, good).call, 'sell');
+  assert.strictEqual(I.ideaCall(idea({ verdict: 'hold', score: 6, valuation: { currentPrice: 100, intrinsicValue: 105 } }), null, good).call, 'hold', 'a Hold verdict is not worth owning, however good the chart');
+  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 100, intrinsicValue: 105 } }), null, good).call, 'hold', 'a cushion under 10% is not enough');
+  assert.strictEqual(I.ideaCall(idea({ technical: { states: { weekMacd: 'bear_below' }, raw: { weekRsi: 65 } } }), null, good).call, 'hold', 'bearish below zero is never a Buy');
+});
+test('ideas: a stretched weekly RSI no longer blocks a Buy (replayed history shows it does no worse than average)', () => {
+  const s = { pts: 2, of: 4, chance: 25, touch: 56, hits: ['x'], misses: [], fromHigh: -3, move: 6 };
+  assert.strictEqual(I.ideaCall(idea({ technical: { states: { weekMacd: 'bull_above' }, raw: { weekRsi: 82, monthRsi: 60 } } }), null, s).call, 'buy');
 });
 test('ideas: a stock you hold gets its trade call (add is Buy, trim and review are Sell)', () => {
   const tr = { buy: { price: 100, snapshot: { score: 7.2 } } };
-  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 102, intrinsicValue: 160 } }), tr).label, 'Add more');
-  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 150, intrinsicValue: 300 }, technical: { raw: { weekRsi: 85, monthRsi: 80 } } }), tr).call, 'sell');
-  assert.strictEqual(I.ideaCall(idea({}), tr).held, true);
+  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 102, intrinsicValue: 160 }, technical: { raw: { weekRsi: 55, monthRsi: 60 } } }), tr, null).label, 'Add more');
+  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 150, intrinsicValue: 300 }, technical: { raw: { weekRsi: 85, monthRsi: 80 } } }), tr, null).call, 'sell');
+  assert.strictEqual(I.ideaCall(idea({}), tr, null).held, true);
 });
-test('ideas: ranking puts Buy first (most points first), then Hold, then the weakest Sell first', () => {
-  const mk = (n, call, pts) => ({ s: { name: n }, c: { call, pts } });
-  const r = I.rankIdeas([mk('a', 'sell', -1), mk('b', 'hold', 1), mk('c', 'buy', 4), mk('d', 'buy', 6), mk('e', 'sell', -4)]).map(x => x.s.name).join('');
-  assert.strictEqual(r, 'dcbea');
+test('ideas: ranking puts Buy first by best setup, then quality, then nearness to the high; Wait next; the weakest Avoid first', () => {
+  const mk = (n, call, pts, setup, fromHigh) => ({ s: { name: n }, c: { call, pts, setup, fromHigh } });
+  const r = I.rankIdeas([mk('a', 'sell', -1), mk('b', 'hold', 1, 1, -5), mk('c', 'buy', 4, 2, -8), mk('d', 'buy', 4, 3, -9), mk('e', 'sell', -4), mk('f', 'buy', 4, 2, -2), mk('g', 'buy', 5, 2, -9)]).map(x => x.s.name).join('');
+  assert.strictEqual(r, 'dgfcbea', 'setup first, then quality, then closer to the high; ties no longer fall back to the alphabet');
 });
-test('ideas: the Technical score adds a point at 7 or more, takes one below 4, and a weak chart can keep a stock out of Buy', () => {
-  const p = (ts) => I.ideaCall(idea({ technical: { score: ts, raw: { weekRsi: 55, monthRsi: 60 } } }), null);
-  assert.strictEqual(p(8).pts - p(5.5).pts, 1); assert.strictEqual(p(5.5).pts - p(3).pts, 1);
-  assert.ok(p(8).reasons.some(r => /Technical score 8\.0/.test(r)));
-  const edge = idea({ verdict: 'mbuy', score: 6, valuation: { currentPrice: 100, intrinsicValue: 150 }, technical: { score: 7.5, raw: { weekRsi: 55, monthRsi: 60 } } });
-  assert.strictEqual(I.ideaCall(edge, null).call, 'buy');
-  assert.notStrictEqual(I.ideaCall({ ...edge, technical: { score: 3, raw: { weekRsi: 55, monthRsi: 60 } } }, null).call, 'buy');
-});
-test('ideas: missing data never crashes', () => { assert.strictEqual(I.ideaCall({}, null).call, 'hold'); });
+test('ideas: missing data never crashes', () => { assert.strictEqual(I.ideaCall({}, null, null).call, 'hold'); assert.strictEqual(I.ideaCall({}, null).call, 'hold'); });
 test('trade call: history keeps one point a day and lists when the call changed', () => {
   let h = G.addSignalPoint([], 20261001, { call: 'hold', mos: 40, gain: 5 }, { price: 105, score: 6.5, rsiWeek: 55 });
   h = G.addSignalPoint(h, 20261002, { call: 'hold', mos: 39, gain: 6 }, { price: 106, score: 6.5, rsiWeek: 57 });
