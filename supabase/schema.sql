@@ -70,8 +70,10 @@ create policy owner_read_users on public.docs for select to authenticated
 create policy profile_read_own on public.profiles for select to authenticated using (uid = auth.uid());
 -- no insert / update policy: profiles change only through the trigger above, the payment webhook (service key) or the owner in the dashboard.
 
--- file storage: a private-by-folder bucket for uploads
-insert into storage.buckets (id, name, public) values ('assets', 'assets', true) on conflict do nothing;
+-- file storage: a PRIVATE bucket for uploads (CSV files and full backups of the stock list). Each person reaches only their own
+-- folder, using their own sign-in; there are no public links (the app reads files through the storage API, see platform/shim.js).
+insert into storage.buckets (id, name, public) values ('assets', 'assets', false)
+  on conflict (id) do update set public = false;
 create policy assets_own on storage.objects for all to authenticated
   using (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text);

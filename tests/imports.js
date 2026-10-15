@@ -388,6 +388,17 @@ const f1 = x => (Math.round(x * 10) / 10).toFixed(1);
 const seedRec = (which, id, name) => ({ [(which === 'fund' ? 'fundamentalCsvUploadLog/' : 'technicalCsvUploadLog/') + id]: { assetId: id, url: '/_blob/' + id, filename: name, uploadedAt: new Date().toISOString(), status: 'uploaded', rowCount: 1, newCount: 0, droppedCount: 0, sizeBytes: 10 } });
 const csvRows = csv => { const rows = T.AlbaTechEngine.parseCSV(csv), h = rows[0].map(x => x.trim().toLowerCase()); return { rows, sym: h.indexOf('symbol'), price: h.indexOf('price') }; };
 async function techScenarios(){
+  // v1.185: the website keeps files in a private store with no public link; imports and restores must read them through assets.read()
+  await runScenario('private file store: an import and a restore read the files through read(), never through a /_blob/ link', { cfg: { privateAssets: true } }, async page => {
+    const file = techFile({}); await upload(page, 'tech', 'growth.csv', file.csv);
+    const rec = (await readDb(page)).techLog[0]; ok(rec.url === null && !!rec.assetId, 'the upload record holds no public link: ' + JSON.stringify(rec.url));
+    const r = await run(page, 'tech'); ok(r.cls === 'ok', 'the technical import ends green: ' + r.cls + ' ' + r.text.slice(0, 200));
+    const a = await readDb(page); ok(a.backups.length === 1 && a.backups[0].assetUrl === null, 'the backup record holds no public link');
+    await page.locator('#fiBackups .fi-restore-btn').last().click();
+    await waitPrompt(page, 'fund'); await answer(page, 'fund', true);
+    const rr = await waitResult(page, 'fund'); ok(rr.cls === 'ok' && rr.lines[0] === 'Restore complete.', 'the restore from the backup works: ' + rr.text.slice(0, 160));
+    ok(page.blobRequests.length === 0, 'no /_blob/ link was used: ' + page.blobRequests.join(','));
+  });
   await runScenario('tech import: full cycle with prices, kept readings and BSE symbols', {}, async page => {
     const file = techFile({ blankWeekRsi: true }); await upload(page, 'tech', 'growth.csv', file.csv);
     const orig = await readDb(page); const rec0 = orig.techLog[0], asof = indiaDay(rec0.uploadedAt);
@@ -684,6 +695,26 @@ async function tvRefreshScenarios(){
     const kept = a.all['stockUpdates/' + first]; ok(kept.valuation.currentPrice === 111.1 && kept.technical.reason === 'kept' && kept.technical.score === 7, 'the fresh completed-weeks score is kept and only the price changes');
     ok(r.btn && /skipped/.test(r.text), 'a skipped-stocks file is offered: ' + r.text.slice(0, 300));
     ok(await page.evaluate(() => !document.getElementById('tvStopBtn') || document.getElementById('tvStopBtn').hidden), 'the Stop button is hidden again');
+  });
+  // v1.185: if the list of saved updates cannot be read, saving blindly would REPLACE whole records and lose what else they hold
+  const research = { ticker: first, globalFactors: { scope: 'sector', positive: ['kept note'], negative: [] }, technical: { score: 3, asof: '2020-01-01', states: {}, raw: {}, reason: 'old' } };
+  await runScenario('refresh from TradingView: if the saved updates cannot be listed, nothing is written and no research is lost', { docs: { ['stockUpdates/' + first]: research }, cfg: { liveCollections: true, rules: [{ op: 'get', path: 'stockUpdates', error: { message: 'network down' } }] } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 60000 });
+    const text = await page.textContent('#tv_fiResult');
+    ok(await page.evaluate(() => /fi-result-err/.test(document.getElementById('tv_fiResult').className)), 'it says it stopped: ' + text.slice(0, 200));
+    ok(/nothing was changed|Nothing was changed/.test(text), 'it says nothing was changed: ' + text.slice(0, 300));
+    const a = await readDb(page), kept = a.all['stockUpdates/' + first];
+    ok(kept && kept.globalFactors && kept.globalFactors.positive[0] === 'kept note', 'the saved Global factors note is still there: ' + JSON.stringify(kept).slice(0, 200));
+    ok(Object.keys(a.all).filter(k => k.startsWith('stockUpdates/')).length === 1, 'no other record was written');
+    ok(await page.evaluate(() => !(window.__tvBatchCalls || []).length), 'TradingView was not even asked');
+  });
+  await runScenario('refresh from TradingView: a list that fails once is retried and the run goes on', { docs: { ['stockUpdates/' + first]: research }, cfg: { liveCollections: true, rules: [{ op: 'get', path: 'stockUpdates', times: 1, error: { message: 'temporary network error' } }] } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
+    ok(await page.evaluate(() => /fi-result-ok/.test(document.getElementById('tv_fiResult').className)), 'it finishes: ' + (await page.textContent('#tv_fiResult')).slice(0, 200));
+    const a = await readDb(page), rec = a.all['stockUpdates/' + first];
+    ok(rec.globalFactors && rec.globalFactors.positive[0] === 'kept note' && rec.valuation && rec.valuation.currentPrice === 111.1, 'the note is kept and the price is added: ' + JSON.stringify(Object.keys(rec)));
   });
   // the real database hands out records that cannot be changed in place: the list of stocks that failed before must be copied first
   const old = {}; DS.stocks.filter(s => !/^\d/.test(symOf(s))).forEach(s => { old[symOf(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_')] = '2020-01-01T00:00:00.000Z'; });

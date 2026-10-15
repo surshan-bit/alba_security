@@ -164,6 +164,12 @@ async function albaFiBackupLog(db){
   const q = await albaFiRetry(() => db.collection('backupLog').get());
   return q.docs.map(d => ({ id: d.id, ...(d.data() || {}) })).filter(b => b.kind === 'stocks-backup' && b.format === 'stocks.json' && b.assetId).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
+// Reads an uploaded file back. The website keeps files in a private store and reads them with the signed-in person's own access
+// (assets.read); inside claude.ai the file is served at /_blob/<id>. Either way the answer is a fetch-style Response.
+function albaFiReadAsset(assets, id){
+  return assets && typeof assets.read === 'function' ? assets.read(id) : fetch('/_blob/' + id);
+}
+
 async function albaFiMakeBackup(db, assets, json, count, version, label){
   const blob = new Blob([json], { type: 'application/json' });
   const up = await albaFiRetry(() => assets.upload(blob));
@@ -273,7 +279,7 @@ async function albaFiRunImport(){
     await uploadsSettled();
     for(const [id, r] of fundamentalCsvUploadLog.entries()){ if(r.status === 'uploaded' && (!rec || String(r.uploadedAt) > String(rec.uploadedAt))){ rec = r; recId = id; } }
     if(!rec) throw new Error('there is no uploaded file waiting. Use "Browse CSV…" to upload the screener.in export first.');
-    const resp = await fetch('/_blob/' + rec.assetId);
+    const resp = await albaFiReadAsset(assets, rec.assetId);
     if(!resp.ok) throw new Error('could not read the stored file "' + rec.filename + '" (' + resp.status + ')');
     const csvText = await resp.text();
     const header = (csvText.split(/\r?\n/, 1)[0] || '').split(',').map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
@@ -357,7 +363,7 @@ async function albaFiRunRestore(b, pfx){
     if(lockBusy(ld)) throw new Error('an import is already running (' + lockText(ld) + '). Try again in a few minutes.');
     await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString(), owner: tabId })); locked = true; stopBeat = startBeat(job);
     fiSet('read', 'running', 'Downloading the backup…', 0.3);
-    const resp = await fetch('/_blob/' + b.assetId); if(!resp.ok) throw new Error('the backup file could not be read (' + resp.status + ')');
+    const resp = await albaFiReadAsset(assets, b.assetId); if(!resp.ok) throw new Error('the backup file could not be read (' + resp.status + ')');
     const list = await resp.json();
     if(!Array.isArray(list) || list.length < 2000 || !list.every(s => s && typeof s.ticker === 'string')) throw new Error('the backup file does not look like a stock list');
     fiSet('read', 'done', list.length.toLocaleString('en-IN') + ' stocks');
@@ -438,4 +444,4 @@ function getFiAssets(){ return fiAssets; }
 function getFiOwner(){ return fiOwner; }
 function setFiRunning(v){ fiRunning = v; }
 
-export { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiErr, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, fiSetButtons, getFiAssets, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning };
+export { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiErr, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, fiSetButtons, getFiAssets, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning, albaFiReadAsset };

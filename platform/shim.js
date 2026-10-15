@@ -30,7 +30,8 @@ function supabaseUser(sb, ownerEmail){
   };
 }
 
-// assets: files go to a Supabase Storage bucket, under the signed-in user's folder.
+// assets: files go to a PRIVATE Supabase Storage bucket, under the signed-in user's folder. There is no public link to a file:
+// it is read back with read(id), using the person's own sign-in (the bucket's rules let each person reach only their folder).
 function supabaseAssets(sb, bucket = 'assets'){
   return {
     upload: async (blob) => {
@@ -39,8 +40,13 @@ function supabaseAssets(sb, bucket = 'assets'){
       const path = uid + '/' + id;
       const { error } = await sb.storage.from(bucket).upload(path, blob, { contentType: blob.type || 'application/octet-stream' });
       if(error) throw new Error(error.message);
-      const { data } = sb.storage.from(bucket).getPublicUrl(path);
-      return { id: path, url: data.publicUrl, sizeBytes: blob.size, contentType: blob.type };
+      return { id: path, url: null, sizeBytes: blob.size, contentType: blob.type };
+    },
+    // A fetch-style Response, so callers read it like the /_blob/<id> answer inside claude.ai: ok, status, text(), json().
+    read: async (id) => {
+      const { data, error } = await sb.storage.from(bucket).download(id);
+      if(error || !data){ const msg = String((error && error.message) || 'not found'); return new Response(msg, { status: /not.?found|404|does not exist/i.test(msg) ? 404 : 500 }); }
+      return new Response(data);
     },
     delete: async (id) => { const { error } = await sb.storage.from(bucket).remove([id]); if(error) throw new Error(error.message); }
   };
