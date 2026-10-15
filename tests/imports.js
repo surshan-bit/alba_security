@@ -70,7 +70,7 @@ async function upload(page, which, name, text){
   await page.waitForTimeout(100);
 }
 async function readDb(page){
-  const json = await page.evaluate(() => JSON.stringify(Object.fromEntries(Array.from(window.__store).filter(([k]) => /^(stockData|stockMeta|backupLog|importJobs|fundamentalCsvUploadLog|technicalCsvUploadLog|watchlistSyncLog|stockUpdates)\//.test(k)))));
+  const json = await page.evaluate(() => JSON.stringify(Object.fromEntries(Array.from(window.__store).filter(([k]) => /^(stockData|stockMeta|backupLog|importJobs|fundamentalCsvUploadLog|technicalCsvUploadLog|watchlistSyncLog|stockUpdates|refreshRunLog)\//.test(k)))));
   const all = JSON.parse(json), meta = all['stockMeta/main'], stocks = new Map(), chunkDocs = {};
   for(const cid of meta.chunks){ const d = all['stockData/' + cid]; chunkDocs[cid] = d; if(d) for(const s of d.stocks) stocks.set(symOf(s), s); }
   const col = c => Object.entries(all).filter(([k]) => k.startsWith(c + '/')).map(([k, v]) => Object.assign({ id: k.slice(c.length + 1) }, v)).sort((a, b) => String(a.createdAt || a.uploadedAt || a.startedAt || a.id).localeCompare(String(b.createdAt || b.uploadedAt || b.startedAt || b.id)));
@@ -709,7 +709,13 @@ async function tvRefreshScenarios(){
     ok(/(^|\s)0 stocks refreshed/.test(second) && /already held exactly these figures/.test(second), 'the second run saves nothing and says why: ' + second.slice(0, 300));
     ok(await page.evaluate(() => /fi-result-ok/.test(document.getElementById('tv_fiResult').className)), 'it still counts as a good run');
     const after = await readDb(page);
-    ok(JSON.stringify(after.all) === JSON.stringify(before.all), 'the saved records are exactly as they were');
+    const noLog = all => JSON.stringify(Object.keys(all).filter(k => !k.startsWith('refreshRunLog/')).sort().map(k => [k, all[k]]));
+    ok(noLog(after.all) === noLog(before.all), 'the saved stock records are exactly as they were');
+    // v1.196: each run leaves one record in the database with its timing and counts
+    const runs = Object.entries(after.all).filter(([k]) => k.startsWith('refreshRunLog/')).map(([, v]) => v).sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1));
+    ok(runs.length === 2 && runs.every(r => r.kind === 'snapshot' && r.v === 1 && typeof r.durationMs === 'number' && r.durationMs >= 0 && r.endedAt >= r.startedAt), 'each run saved one record with its start, end and duration: ' + JSON.stringify(runs.map(r => [r.kind, r.durationMs])));
+    ok(runs[0].saved > 100 && runs[0].unchanged === 0 && runs[1].saved === 0 && runs[1].unchanged === runs[0].saved, 'the records say how many stocks each run saved and left alone: ' + JSON.stringify(runs.map(r => [r.saved, r.unchanged])));
+    ok(runs.every(r => Array.isArray(r.batchSecs) && r.batchSecs.length === r.batches && r.batches > 0 && typeof r.tvWaitSecs === 'number' && typeof r.saveSecs === 'number' && r.error === null), 'the records hold the seconds each batch took and the time spent waiting on TradingView and saving');
   });
   // v1.185: if the list of saved updates cannot be read, saving blindly would REPLACE whole records and lose what else they hold
   const research = { ticker: first, globalFactors: { scope: 'sector', positive: ['kept note'], negative: [] }, technical: { score: 3, asof: '2020-01-01', states: {}, raw: {}, reason: 'old' } };
