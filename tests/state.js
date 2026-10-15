@@ -171,6 +171,10 @@ async function tradeScenarios(){
     await page.selectOption('#tradeIdeasStrategy', 'starter-deep-value');
     await until(page, () => !!document.querySelector('#tradeIdeasBody table, #tradeIdeasBody .upload-hint'), null, 'choosing a strategy shows its stocks or says none qualify');
     const n = await page.evaluate(() => document.querySelectorAll('#tradeIdeasBody tbody tr').length);
+    // v1.190: the timing check reads each listed stock's bars with its own filtered read, never the whole priceHistory collection
+    await page.waitForTimeout(400);
+    ok(await page.evaluate(() => !(window.__colGets || []).includes('priceHistory')), 'the whole price-history collection is not read for the ideas');
+    ok(await page.evaluate(n => (window.__filteredGets || []).filter(x => /^priceHistory /.test(x)).length >= Math.min(n, 1), n), 'each listed stock\'s bars are read with a filtered read');
     if(n > 0){
       const calls = await page.evaluate(() => Array.from(document.querySelectorAll('#tradeIdeasBody tbody .tl-signal-badge')).map(b => b.textContent));
       ok(calls.every(c => ['Buy', 'Wait', 'Avoid', 'Add more', 'Hold', 'Trim', 'Review'].includes(c)), 'every listed stock has a call, got ' + JSON.stringify(calls.slice(0, 5)));

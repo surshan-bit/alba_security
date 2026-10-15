@@ -221,6 +221,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.190 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>Buy / Sell ideas load only what they need:</b> picking a strategy used to read the price history of every stock. It now reads only the stocks in that strategy, a few at a time, and shows &ldquo;Loading weekly price history&hellip; (n of m)&rdquo; while it does. This keeps the panel fast once price history has been filled for all stocks.</li>
+              <li><b>Refresh all stocks is quicker and leaves unchanged stocks alone:</b> the next batch is requested from TradingView while the current one is being saved, and a stock whose saved price and scores already match what TradingView just returned is not rewritten (a second run the same day, or a weekend). The result says how many were unchanged and how long the run took.</li>
+              <li><b>Behind the scenes:</b> the project notes (README) now record the decisions about moving refreshes to the Cloudflare site later: what TradingView&rsquo;s own MCP server needs, that the Claude calls would be billed separately through an API key, and that only the written research (not the scores) uses Claude.</li>
+            </ul>
             <h3>v1.189 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Buy / Sell ideas now aim at a 5% gain within a few weeks:</b> a stock you do not hold is judged on two separate things. <b>Worth owning</b> means a Strong or Good verdict, a margin of safety of 10% or more and a Fundamental score of 5 or more. <b>Setup</b> counts four timing checks on the weekly chart (0 to 4): within 10% of its 52-week high, weekly MACD bullish above zero, a typical weekly move of 4.5% or more, and weekly RSI between 60 and 80. <b>Buy</b> needs both a stock worth owning and a setup of 2 or more. Wait means a good company that is not set up yet. Avoid is unchanged in spirit (weak verdict, above fair value or a low score).</li>

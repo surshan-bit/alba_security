@@ -53,6 +53,13 @@ let busy = false;
 registerBusy(() => busy);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const num = x => x.toLocaleString('en-IN');
+// "2 min 14 s" for a run time in milliseconds.
+function duration(ms){ const t = Math.max(0, Math.round(ms / 1000)), m = Math.floor(t / 60); return m ? m + ' min ' + (t % 60) + ' s' : t + ' s'; }
+// Compares two saved values by content, whatever order their keys are in.
+function stable(x){ return x && typeof x === 'object' ? (Array.isArray(x) ? x.map(stable) : Object.keys(x).sort().reduce((o, k) => { o[k] = stable(x[k]); return o; }, {})) : x; }
+const sameValue = (a, b) => JSON.stringify(stable(a)) === JSON.stringify(stable(b));
+// True when the saved record already holds exactly what this run would write (a second run the same day, or a weekend), so the write can be skipped.
+function alreadySaved(stored, body){ return !!stored && Object.keys(body).every(k => sameValue(stored[k], body[k])); }
 
 function setButtons(running){
   for(const id of ['tvSnapshotBtn', 'tvHistoryBtn']){ const b = /** @type {HTMLButtonElement|null} */ (document.getElementById(id)); if(b) b.disabled = running; }
@@ -91,15 +98,16 @@ async function runSnapshot(){
   if(!db) return;
   const today = tvIstDate();
   const lines = [], skipped = [];
-  let updated = 0, kept = 0, scored = 0, stopped = false;
+  let updated = 0, kept = 0, scored = 0, unchanged = 0, stopped = false;
   try {
     fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
     // Which stocks already have a saved update. Without this list a save could not tell "change" from "create", and creating
     // REPLACES the whole record (the Global factors and research notes in it would be lost), so a run never goes on without it.
-    const existing = new Set();
+    const existing = new Set(), existingData = new Map();
     let listed = false;
+    const t0 = Date.now();
     for(let attempt = 0; attempt < 2 && !listed; attempt++){
-      try { const snap = await db.collection('stockUpdates').get(); snap.docs.forEach(d => { if(d.exists) existing.add(d.id); }); listed = true; }
+      try { const snap = await db.collection('stockUpdates').get(); snap.docs.forEach(d => { if(!d.exists) return; existing.add(d.id); try { existingData.set(d.id, d.data()); } catch(e){ /* compared only when readable */ } }); listed = true; }
       catch(e){ console.error('Could not list saved updates', e); if(attempt === 0) await sleep(1500); }
     }
     if(!listed) throw new Error('the saved updates could not be read, so nothing was changed (saving without them could overwrite research notes). Try again in a moment.');
@@ -111,13 +119,26 @@ async function runSnapshot(){
     fiSet('prepare', 'done', num(todo.length) + ' stocks' + (skipped.length ? ', ' + skipped.length + ' without a symbol' : ''));
     const batches = [];
     for(let i = 0; i < todo.length; i += BATCH) batches.push(todo.slice(i, i + BATCH));
+    // The next batch is requested while the current one is being saved. TradingView answers "Too Many Requests" when called back
+    // to back, so a request waits until 300 ms after the previous one started (longer after a failed call).
+    let lastStart = 0, backoff = 0;
+    const fetchBatch = async (batch) => {
+      const wait = Math.max(300, backoff) - (Date.now() - lastStart);
+      backoff = 0;
+      if(wait > 0) await sleep(wait);
+      lastStart = Date.now();
+      try { return { payload: await tvCall('mcp-tv-get-symbol-data-batch', { symbols: batch.map(x => x.sym), columns: COLS }) }; }
+      catch(e){ return { error: e }; }
+    };
+    let pending = batches.length ? fetchBatch(batches[0]) : null;
     for(let bi = 0; bi < batches.length; bi++){
       if(stopAsked){ stopped = true; break; }
       const batch = batches[bi];
-      fiSet('run', 'running', 'Batch ' + (bi + 1) + ' of ' + batches.length + ' · ' + num(updated) + ' saved', bi / batches.length);
-      let payload;
-      try { payload = await tvCall('mcp-tv-get-symbol-data-batch', { symbols: batch.map(x => x.sym), columns: COLS }); }
-      catch(e){ batch.forEach(x => skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: tvErrorText(e) })); await sleep(1500); continue; }
+      fiSet('run', 'running', 'Batch ' + (bi + 1) + ' of ' + batches.length + ' · ' + num(updated + unchanged) + ' done', bi / batches.length);
+      const res = await pending;
+      pending = bi + 1 < batches.length && !stopAsked ? fetchBatch(batches[bi + 1]) : null;
+      if(res.error){ batch.forEach(x => skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: tvErrorText(res.error) })); backoff = 1500; continue; }
+      const payload = res.payload;
       const data = (payload && payload.data) || {};
       const writes = [];
       for(const { s, sym } of batch){
@@ -130,24 +151,27 @@ async function runSnapshot(){
       const worker = async () => {
         while(w < writes.length){
           const { id, body, s, kept: wasKept, scored: wasScored } = writes[w++];
+          if(alreadySaved(existingData.get(id), body)){ unchanged++; continue; }
           try {
             const ref = db.doc('stockUpdates/' + id);
             // A stock missing from the list is checked once more just before it is created, in case a record appeared since.
             if(!existing.has(id)){ const cur = await ref.get(); if(cur && cur.exists) existing.add(id); }
             if(existing.has(id)) await ref.update(body); else { await ref.set(Object.assign({ ticker: tickerSymbol(s) }, body)); existing.add(id); }
+            existingData.set(id, Object.assign({}, existingData.get(id), body));
             updated++; if(wasKept) kept++; if(wasScored) scored++;   // counted once saved, so a failed save never inflates the summary
           } catch(e){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: 'could not be saved: ' + String((e && e.message) || e).slice(0, 80) }); }
         }
       };
       await Promise.all(Array.from({ length: 6 }, worker));
-      await sleep(300);   // TradingView answers "Too Many Requests" when called back to back
     }
-    fiSet('run', 'done', num(updated) + ' saved');
+    fiSet('run', 'done', num(updated) + ' saved' + (unchanged ? ', ' + num(unchanged) + ' unchanged' : ''));
     fiSet('verify', 'done', '');
     lines.push({ text: (stopped ? 'Stopped. ' : '') + num(updated) + ' stocks refreshed: price saved for each, ' + num(scored) + ' technical scores updated, ' + num(kept) + ' kept their completed-week score (updated in the last 3 days).', cls: 'fi-line fi-line-strong' });
+    if(unchanged) lines.push({ text: num(unchanged) + ' stocks already held exactly these figures (same price and scores), so they were not rewritten.', cls: 'fi-line' });
+    lines.push({ text: 'Took ' + duration(Date.now() - t0) + '.', cls: 'fi-line fi-line-muted' });
     lines.push({ text: 'These scores include the week and month still in progress, so they can change before the week ends. Stocks with saved price bars get the stricter completed-weeks score when refreshed with the bar download.', cls: 'fi-line fi-line-muted' });
     if(skipped.length) lines.push({ text: num(skipped.length) + ' stocks skipped (listed in the file below).', cls: 'fi-line' });
-    fiShowResult(updated === 0 ? 'err' : 'ok', lines, true);
+    fiShowResult(updated + unchanged === 0 ? 'err' : 'ok', lines, true);
     skippedReport(skipped, 'snapshot');
   } catch(e){
     fiShowResult('err', [{ text: 'Stopped: ' + tvErrorText(e), cls: 'fi-line fi-line-strong' }, { text: num(updated) + ' stocks were saved before this.', cls: 'fi-line fi-line-muted' }], true);
