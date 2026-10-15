@@ -195,6 +195,19 @@ async function tradeScenarios(){
     ok(!(await page.evaluate(() => !!document.getElementById('albaConfirm'))), 'the notice closes');
   }, /Failed to remove trade/);
 
+  // v1.195: a redraw of the Trade Log (a live price, another device's save) keeps the table's sideways scroll
+  await scenario('trade log: a redraw keeps the table scrolled sideways', { section: 'trackrecord', liveCollections: true }, { [PREFS]: { v: 1, theme: 'dark', tradeView: 'table', updatedAt: '2026-10-10T00:00:00.000Z', uiState: { section: 'trackrecord' } }, [TRADES + '/' + idA]: openTrade(A, '2026-10-01', 100, 5) }, async page => {
+    await page.setViewportSize({ width: 600, height: 900 });
+    await goto(page, 'trackrecord');
+    await until(page, () => !!document.querySelector('#tradeLogPanelBody .help-table-wrap table'), null, 'the table is shown');
+    const before = await page.evaluate(() => { const w = document.querySelector('#tradeLogPanelBody .help-table-wrap'); w.scrollLeft = 150; window.__tw = w; return { left: w.scrollLeft, wide: w.scrollWidth > w.clientWidth + 150 }; });
+    if(before.wide){
+      await page.evaluate(([p, d]) => window.__setDoc(p, d), [TRADES + '/' + idA, Object.assign(openTrade(A, '2026-10-01', 100, 5), { note: 'changed' })]);
+      await until(page, () => document.querySelector('#tradeLogPanelBody .help-table-wrap') !== window.__tw, null, 'the Trade Log is redrawn after the save');
+      ok(await page.evaluate(() => document.querySelector('#tradeLogPanelBody .help-table-wrap').scrollLeft) === 150, 'the redrawn table is still scrolled to where it was');
+    } else ok(true, 'the Trade Log table is not wider than the screen in the fixtures');
+  });
+
   // the saved choice of view is read when the page loads
   const prefsTable = { v: 1, theme: 'dark', tradeView: 'table', updatedAt: '2026-10-10T00:00:00.000Z', uiState: { section: 'trackrecord' } };
   await scenario('trade log: the saved Table view is used on load', { section: 'trackrecord' }, { [PREFS]: prefsTable, [TRADES + '/' + idA]: openTrade(A, '2026-10-01', 100, 5) }, async page => {

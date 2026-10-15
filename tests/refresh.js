@@ -8,6 +8,7 @@
 //  4. The saved BSE symbol map is used as stored (BSE:AGVENTURES, never BSE:BSE:AGVENTURES).
 //  5. (v1.193) The Refresh menu (open, arrow keys, Escape, outside click), the confirmation for a big Fundamental run, and a run on another
 //     device (shown in the bell, no second run, Stop asks it to stop): the behaviour the split of src/refresh/kit.js must keep.
+//  6. (v1.194) A saved update redraws the Analysis grid but keeps its sideways scroll, and waits while the viewer is scrolling.
 // It uses the stand-in database and TradingView of tests/lib/env.js; it does not test the real claude.ai runtime. Playwright is optional.
 // Usage: node tests/refresh.js
 const fs = require('fs'), path = require('path');
@@ -184,9 +185,45 @@ async function remoteTests(){
   } finally { await ctx.close(); }
 }
 
+// ---- 6. v1.194: a background update (saved prices arriving) must not move a table the viewer has scrolled sideways, and waits for scrolling to stop
+async function scrollKeepTests(){
+  const { ctx, page, errs } = await open('scroll keep', {});
+  try {
+    await page.waitForSelector('#section-analysis .strat-table-wrap', { timeout: 8000 });
+    const t0 = symOf(FIXTURE[0]);
+    const info = await page.evaluate(() => { const w = document.querySelector('#section-analysis .strat-table-wrap'); w.scrollLeft = 300; window.__w = w; return { left: w.scrollLeft, wide: w.scrollWidth > w.clientWidth + 300 }; });
+    ok(info.wide && info.left === 300, 'the test needs a leaderboard wider than the screen and scrolled sideways: ' + JSON.stringify(info));
+    await page.waitForTimeout(600);   // let the scroll settle so the next update is not held back by it
+    await page.evaluate(t => window.__setDoc('stockUpdates/' + t, { ticker: t, valuation: { currentPrice: 151.5, asof: '2026-10-14', source: 'test' } }), t0);
+    await page.waitForFunction(() => document.querySelector('#section-analysis .strat-table-wrap') !== window.__w, null, { timeout: 5000 }).catch(() => {});
+    const after = await page.evaluate(() => ({ replaced: document.querySelector('#section-analysis .strat-table-wrap') !== window.__w, left: document.querySelector('#section-analysis .strat-table-wrap').scrollLeft }));
+    ok(after.replaced && after.left === 300, 'a saved update redraws the Analysis grid but keeps it scrolled where it was (replaced: ' + after.replaced + ', scrollLeft ' + after.left + ')');
+    // while the viewer is scrolling, the redraw waits
+    await page.evaluate(() => { const w = document.querySelector('#section-analysis .strat-table-wrap'); window.__w = w; w.scrollLeft = 200; });
+    await page.evaluate(t => window.__setDoc('stockUpdates/' + t, { ticker: t, valuation: { currentPrice: 152.5, asof: '2026-10-14', source: 'test' } }), t0);
+    await page.waitForTimeout(150);
+    ok(await page.evaluate(() => document.querySelector('#section-analysis .strat-table-wrap') === window.__w), 'while the viewer has just scrolled, the redraw is held back (the grid is not rebuilt under them)');
+    await page.waitForFunction(() => document.querySelector('#section-analysis .strat-table-wrap') !== window.__w, null, { timeout: 5000 }).catch(() => {});
+    const later = await page.evaluate(() => ({ replaced: document.querySelector('#section-analysis .strat-table-wrap') !== window.__w, left: document.querySelector('#section-analysis .strat-table-wrap').scrollLeft }));
+    ok(later.replaced && later.left === 200, 'once scrolling has stopped the update is drawn and the position is still kept: ' + JSON.stringify(later));
+    // the Strategies grid keeps its sideways scroll through a redraw too
+    await page.setViewportSize({ width: 700, height: 900 });
+    await goto(page, 'strategies');
+    await page.waitForSelector('#section-strategies .strat-table-wrap', { timeout: 8000 });
+    const st = await page.evaluate(() => { const w = document.querySelector('#section-strategies .strat-table-wrap'); w.scrollLeft = 120; return { left: w.scrollLeft, wide: w.scrollWidth > w.clientWidth + 120 }; });
+    if(st.wide){
+      await page.evaluate(() => { window.__sw = document.querySelector('#section-strategies .strat-table-wrap'); window.dispatchEvent(new Event('alba-strategies-reloaded')); });
+      await page.waitForTimeout(300);
+      const sa = await page.evaluate(() => ({ replaced: document.querySelector('#section-strategies .strat-table-wrap') !== window.__sw, left: document.querySelector('#section-strategies .strat-table-wrap').scrollLeft }));
+      ok(sa.replaced && sa.left === 120, 'the Strategies grid is redrawn and keeps its sideways scroll: ' + JSON.stringify(sa));
+    } else ok(true, 'the Strategies grid is not wider than the screen in the fixtures');
+    ok(errs.length === 0, 'scroll keep: errors in the page: ' + errs.slice(0, 2).join(' | '));
+  } finally { await ctx.close(); }
+}
+
 (async () => {
   base = await srv.listen(); browser = await chromium.launch();
-  try { for(const f of [countTests, menuTests, resumeTests, symbolTests, barMenuTests, confirmTests, remoteTests]){ try { await f(); } catch(e){ problems.push(f.name + ' crashed: ' + String(e && e.message || e).split('\n').slice(0, 3).join(' | ')); checks++; } } }
+  try { for(const f of [countTests, menuTests, resumeTests, symbolTests, barMenuTests, confirmTests, remoteTests, scrollKeepTests]){ try { await f(); } catch(e){ problems.push(f.name + ' crashed: ' + String(e && e.message || e).split('\n').slice(0, 3).join(' | ')); checks++; } } }
   finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('refresh tests FAILED (' + problems.length + ' of ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('refresh tests: ' + checks + ' checks passed');

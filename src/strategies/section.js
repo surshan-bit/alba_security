@@ -17,6 +17,7 @@ import { askConfirm } from '../ui/confirm.js';
 import { renderTrackPanel, trackPanelHtml, wireTrackPanel } from './trackpanel.js';
 import { getStrategiesStatus } from '../identity/strategies.js';
 import { closestEl, targetEl } from '../core/evt.js';
+import { keepScroll } from '../ui/scrollkeep.js';
 
 let whyQuery = '';
 
@@ -118,7 +119,8 @@ function mainHtml(st){
     </div>`;
 }
 
-function renderStrategiesSection(){
+function renderStrategiesSection(){ keepScroll(document.getElementById('section-strategies'), drawStrategiesSection); }
+function drawStrategiesSection(){
   const listEl = document.getElementById('stratList'), mainEl = document.getElementById('stratMain');
   if(!listEl || !mainEl) return;
   const sel = selectedStrategy();

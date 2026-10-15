@@ -1,4 +1,5 @@
 // Renders the stock detail page and wires its buttons.
+import { keepScroll } from '../ui/scrollkeep.js';
 import { LINK_ICON } from './icons.js';
 import { detailEl } from '../core/dom.js';
 import { stocks } from '../core/stocks.js';
@@ -38,7 +39,7 @@ function detailBackToAnalysis(){
 let shownIdx = -1;
 function getShownIndex(){ return shownIdx; }
 // Redraws whatever stock is open, e.g. after saved research or a pin change; does nothing if none is open.
-function rerenderDetail(){ if(stocks[shownIdx]) renderDetail(shownIdx); }
+function rerenderDetail(){ if(stocks[shownIdx]) keepScroll(detailEl, () => renderDetail(shownIdx)); }
 function renderDetail(idx){
   shownIdx = idx;
   const s = stocks[idx];

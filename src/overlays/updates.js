@@ -1,5 +1,5 @@
 // Applies saved updates (stockUpdates: price, technical, global) on top of the base stock data.
-import { renderAnalysisSection } from '../analysis/section.js';
+import { refreshAnalysisSoon } from '../analysis/section.js';
 import { setPeerGroupCache } from '../detail/peers.js';
 import { rerenderDetail } from '../detail/render.js';
 import { paintFreshness } from '../joblogs/freshness.js';
@@ -89,7 +89,7 @@ function applyUpdatesOverlay(docs){
   rerenderDetail();
   paintFreshness();   // the Data Refresh age bars follow every saved update, not only the page load
   const analysisSectionEl = document.getElementById('section-analysis');
-  if(analysisSectionEl && analysisSectionEl.classList.contains('active')) renderAnalysisSection();
+  if(analysisSectionEl && analysisSectionEl.classList.contains('active')) refreshAnalysisSoon();
 }
 
 export { applyUpdatesOverlay };

@@ -1,4 +1,5 @@
 // The Explorer page (code name "business"): every industry with its average price change over a chosen period, and the news of its stocks.
+import { keepScroll } from '../ui/scrollkeep.js';
 import { stockIndex, stocks } from '../core/stocks.js';
 import { escapeHtml } from '../core/util.js';
 import { ensureAllPriceBars, pcTickerKey, priceHistoryByTicker } from '../prices/store.js';
@@ -141,12 +142,10 @@ function filtersToggleHtml(){
 }
 const layoutHtml = (controls, main) => '<div class="biz-layout"><aside class="biz-side' + (bizFiltersOpen ? '' : ' filters-collapsed') + '">' + filtersToggleHtml() + controls + '</aside><div class="biz-main' + (bizFull ? ' biz-full' : '') + '">' + main + '</div></div>';
 
-// Redraws the page but keeps the sideways scroll of each stocks grid, so a redraw during a refresh does not jump the view.
+// Redraws the page but keeps the scroll of each stocks grid, so a redraw during a refresh does not jump the view.
 function render(){
   const el = bodyEl(); if(!el) return;
-  const lefts = Array.from(el.querySelectorAll('.strat-table-wrap, .biz-scroll')).map(w => w.scrollLeft);
-  draw(el);
-  el.querySelectorAll('.strat-table-wrap, .biz-scroll').forEach((w, i) => { if(lefts[i]) w.scrollLeft = lefts[i]; });
+  keepScroll(el, () => draw(el));
 }
 function draw(el){
   if(view === 'heat') bizFull = false;   // full screen is for the table

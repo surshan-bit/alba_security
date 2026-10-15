@@ -5,6 +5,7 @@
 import { stocks, stockByTickerSymbol } from '../core/stocks.js';
 import { allTrades } from '../core/store.js';
 import { renderTradeLogPanel } from '../tradelog/panel.js';
+import { redrawWhenIdle } from '../ui/scrollkeep.js';
 import { detailEl } from '../core/dom.js';
 import { getShownIndex } from '../detail/render.js';
 import { pcTickerKey, priceSymbolByTicker } from '../prices/store.js';
@@ -159,7 +160,7 @@ async function tick(){
   };
   try { await Promise.all(Array.from({ length: Math.min(PARALLEL, list.length) }, worker)); }
   finally { busy = false; }
-  if(ok){ fails = 0; lastAt = Date.now(); paintDetail(); if(tradeLogOpen()) renderTradeLogPanel(); } else if(bad) fails++;
+  if(ok){ fails = 0; lastAt = Date.now(); paintDetail(); if(tradeLogOpen()) redrawWhenIdle('tradelog', renderTradeLogPanel); } else if(bad) fails++;
   paintButton();
 }
 

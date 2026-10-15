@@ -1,4 +1,5 @@
 // Buy / Sell ideas panel (Trade Log): pick a strategy, see the stocks that qualify today ranked by Buy / Hold / Sell call (rules in ideacall.js).
+import { keepScroll } from '../ui/scrollkeep.js';
 import { stockByTickerSymbol, stocks } from '../core/stocks.js';
 import { allTrades } from '../core/store.js';
 import { escapeHtml, tickerSymbol } from '../core/util.js';
@@ -90,7 +91,7 @@ function bodyHtml(){
 // Only the table: used when trades or prices change, so the strategy list is not rebuilt under an open dropdown.
 function refreshIdeasBody(){
   const host = document.getElementById('tradeIdeasBody');
-  if(host) host.innerHTML = bodyHtml();
+  if(host) keepScroll(host, () => { host.innerHTML = bodyHtml(); });
 }
 function renderIdeas(){
   const host = document.getElementById('tradeIdeasBody');
@@ -101,7 +102,7 @@ function renderIdeas(){
   if(sel){
     sel.innerHTML = '<option value="">Choose a strategy&hellip;</option>' + strategies.map(x => `<option value="${escapeHtml(x.id)}"${x.id === sid ? ' selected' : ''}>${escapeHtml(x.name)}</option>`).join('');
   }
-  host.innerHTML = bodyHtml();
+  keepScroll(host, () => { host.innerHTML = bodyHtml(); });
 }
 function init_ideas(){
   const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('tradeIdeasStrategy')), host = document.getElementById('tradeIdeasBody');
