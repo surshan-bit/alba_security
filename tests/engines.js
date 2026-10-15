@@ -707,6 +707,43 @@ test('trade call: history keeps one point a day and lists when the call changed'
   });
 }
 
+// ---- history plan (v1.200): which stocks need their full history, which only the new bars, which nothing ----
+{
+  const H = load('src/refresh/historyplan.js', 'export { barsNeeded, monthStartS, weekStartS };');
+  const at = iso => Date.parse(iso) / 1000;
+  const bars = (w, m) => ({ '1W': w == null ? [] : [[at(w), 1, 1, 1, 1, 1]], '1M': m == null ? [] : [[at(m), 1, 1, 1, 1, 1]] });
+  test('history plan: the week starts on Monday and the month on the 1st, in Indian time', () => {
+    assert.strictEqual(H.weekStartS(at('2026-10-15T10:00:00Z')), at('2026-10-11T18:30:00Z'), 'Thursday 15 Oct 2026 -> Monday 12 Oct 00:00 IST');
+    assert.strictEqual(H.weekStartS(at('2026-10-18T10:00:00Z')), at('2026-10-11T18:30:00Z'), 'Sunday is still the same week');
+    assert.strictEqual(H.weekStartS(at('2026-10-11T19:00:00Z')), at('2026-10-11T18:30:00Z'), 'Monday 00:30 IST');
+    assert.strictEqual(H.weekStartS(at('2026-10-11T18:00:00Z')), at('2026-10-04T18:30:00Z'), 'Sunday 23:30 IST is still the old week');
+    assert.strictEqual(H.monthStartS(at('2026-10-15T10:00:00Z')), at('2026-09-30T18:30:00Z'));
+    assert.strictEqual(H.monthStartS(at('2026-10-31T19:00:00Z')), at('2026-10-31T18:30:00Z'), '1 Nov 00:30 IST is already November');
+  });
+  test('history plan: none, stale and current', () => {
+    const now = at('2026-10-15T10:00:00Z');
+    assert.strictEqual(H.barsNeeded(null, now), 'none');
+    assert.strictEqual(H.barsNeeded(bars(null, null), now), 'none', 'empty bars count as none');
+    assert.strictEqual(H.barsNeeded(bars('2026-10-12T03:45:00Z', '2026-10-01T03:45:00Z'), now), 'current', 'saved this week and this month');
+    assert.strictEqual(H.barsNeeded(bars('2026-10-11T18:30:00Z', '2026-09-30T18:30:00Z'), now), 'current', 'a bar that opens exactly at the start counts');
+    assert.strictEqual(H.barsNeeded(bars('2026-10-05T03:45:00Z', '2026-10-01T03:45:00Z'), now), 'stale', 'last weekly bar is last week: that week has finished');
+    assert.strictEqual(H.barsNeeded(bars('2026-10-12T03:45:00Z', '2026-09-01T03:45:00Z'), now), 'stale', 'last monthly bar is last month');
+    assert.strictEqual(H.barsNeeded(bars('2026-10-12T03:45:00Z', null), now), 'stale', 'weekly saved but no monthly bars');
+  });
+  test('history plan: a Saturday run does not chase the week that finished on Friday again', () => {
+    const sat = at('2026-10-17T10:00:00Z');
+    assert.strictEqual(H.barsNeeded(bars('2026-10-12T03:45:00Z', '2026-10-01T03:45:00Z'), sat), 'current');
+    const mon = at('2026-10-19T04:00:00Z');
+    assert.strictEqual(H.barsNeeded(bars('2026-10-12T03:45:00Z', '2026-10-01T03:45:00Z'), mon), 'stale', 'Monday: the week has rolled');
+  });
+  test('history plan: stocks are grouped and keep their order', () => {
+    const now = at('2026-10-15T10:00:00Z');
+    const data = { a: null, b: bars('2026-10-05T03:45:00Z', '2026-10-01T03:45:00Z'), c: bars('2026-10-12T03:45:00Z', '2026-10-01T03:45:00Z'), d: null, e: bars('2026-09-01T03:45:00Z', '2026-09-01T03:45:00Z') };
+    const p = H.planHistory(['a', 'b', 'c', 'd', 'e'], s => data[s], now);
+    assert.deepStrictEqual(p, { none: ['a', 'd'], stale: ['b', 'e'], current: ['c'] });
+  });
+}
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

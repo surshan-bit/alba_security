@@ -221,6 +221,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.200 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>One Refresh all stocks button does the whole Technical Score refresh:</b> Fill missing history is no longer a separate button. A run now goes through three stages with one progress panel: (1) the snapshot of every stock, as before (about 3 minutes); (2) the full price history, about 5 years up to today, for stocks that have none, tracked picks first, then pinned, strategy matches and the rest; (3) for stocks that already have history, only the weekly or monthly bars that have finished since their last saved bar, so on most days this stage has nothing to do and the run stays short.</li>
+              <li>Scores are current after the first stage even if you stop the run; Stop ends the history stages early and the next click carries on where it left off. The first run after this release downloads the history of every stock that has none, which can take an hour or more.</li>
+              <li>The result lists how many stocks were downloaded in full, how many got new bars and how many still have none, and the Last 2 runs list shows the same. A stock whose download fails is tried again after 14 days.</li>
+            </ul>
             <h3>v1.199 &middot; 2026-10-15</h3>
             <ul>
               <li><b>The TradingView refresh is now the only route for the Technical Score:</b> the Technical CSV import is hidden (the code is kept, and one switch brings it back). The Technical Score section shows <b>Refresh all stocks</b> and <b>Fill missing history</b>, each with its own progress panel and its own Stop button.</li>

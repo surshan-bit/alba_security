@@ -30,6 +30,8 @@ async function startScenario(name, o){
   const errs = [];
   const { page } = await openPage(ctx, base, Object.assign({ seedUrl: base + '/__seed/' + key + '.json', assets: true, tv: true, section: 'refreshlog' }, o.cfg || {}), name, errs);
   await page.waitForFunction(() => window.__alba && window.__alba.stocks && document.querySelector('.app-section.active'), null, { timeout: 90000 });
+  // the made-up database has no price history for any stock, so a normal run would download all of it: the history stages are off unless a scenario asks for them
+  await page.evaluate(h => { window.__alba.skipHistoryStage = !h; }, !!o.history);
   await goto(page, 'refreshlog');
   if(o.nonOwner) await page.waitForFunction(() => /Only the owner/.test((document.getElementById('importFundamentalDataBtn') || {}).title || ''), null, { timeout: 10000 });
   else if(o.noAssets) await page.waitForTimeout(800);
@@ -72,7 +74,7 @@ async function upload(page, which, name, text){
   await page.waitForTimeout(100);
 }
 async function readDb(page){
-  const json = await page.evaluate(() => JSON.stringify(Object.fromEntries(Array.from(window.__store).filter(([k]) => /^(stockData|stockMeta|backupLog|importJobs|fundamentalCsvUploadLog|technicalCsvUploadLog|watchlistSyncLog|stockUpdates|refreshRunLog|liveSnapshot)\//.test(k)))));
+  const json = await page.evaluate(() => JSON.stringify(Object.fromEntries(Array.from(window.__store).filter(([k]) => /^(stockData|stockMeta|backupLog|importJobs|fundamentalCsvUploadLog|technicalCsvUploadLog|watchlistSyncLog|stockUpdates|refreshRunLog|liveSnapshot|priceHistory)\//.test(k)))));
   const all = JSON.parse(json), meta = all['stockMeta/main'], stocks = new Map(), chunkDocs = {};
   for(const cid of meta.chunks){ const d = all['stockData/' + cid]; chunkDocs[cid] = d; if(d) for(const s of d.stocks) stocks.set(symOf(s), s); }
   const col = c => Object.entries(all).filter(([k]) => k.startsWith(c + '/')).map(([k, v]) => Object.assign({ id: k.slice(c.length + 1) }, v)).sort((a, b) => String(a.createdAt || a.uploadedAt || a.startedAt || a.id).localeCompare(String(b.createdAt || b.uploadedAt || b.startedAt || b.id)));
@@ -277,9 +279,9 @@ async function fundScenarios(){
   });
 
   // v1.199: the Technical CSV import is hidden, the TradingView refresh is the only visible route
-  await runScenario('technical: the CSV import is hidden and the refresh options are shown', {}, async page => {
-    const v = await page.evaluate(() => ({ csv: document.getElementById('techCsvOption').offsetParent === null, snap: document.getElementById('tvSnapshotBtn').offsetParent !== null, hist: document.getElementById('tvHistoryBtn').offsetParent !== null, backups: !!document.getElementById('fiBackups') || !!document.getElementById('ti_fiBackups') }));
-    ok(v.csv && v.snap && v.hist && !v.backups, 'CSV hidden, refresh and history shown, no backups list: ' + JSON.stringify(v));
+  await runScenario('technical: the CSV import is hidden and one Refresh all stocks option is shown', {}, async page => {
+    const v = await page.evaluate(() => ({ csv: document.getElementById('techCsvOption').offsetParent === null, snap: document.getElementById('tvSnapshotBtn').offsetParent !== null, hist: !document.getElementById('tvHistoryBtn'), backups: !!document.getElementById('fiBackups') || !!document.getElementById('ti_fiBackups') }));
+    ok(v.csv && v.snap && v.hist && !v.backups, 'CSV hidden, one refresh button and no separate history button, no backups list: ' + JSON.stringify(v));
   });
 
   // ---- guards
@@ -666,7 +668,7 @@ async function tvRefreshScenarios(){
     ok(noLog(after.all) === noLog(before.all), 'the saved stock records are exactly as they were');
     // v1.196: each run leaves one record in the database with its timing and counts
     const runs = Object.entries(after.all).filter(([k]) => k.startsWith('refreshRunLog/')).map(([, v]) => v).sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1));
-    ok(runs.length === 2 && runs.every(r => r.kind === 'snapshot' && r.v === 2 && typeof r.durationMs === 'number' && r.durationMs >= 0 && r.endedAt >= r.startedAt), 'each run saved one record with its start, end and duration: ' + JSON.stringify(runs.map(r => [r.kind, r.durationMs])));
+    ok(runs.length === 2 && runs.every(r => r.kind === 'snapshot' && r.v === 3 && typeof r.durationMs === 'number' && r.durationMs >= 0 && r.endedAt >= r.startedAt), 'each run saved one record with its start, end and duration: ' + JSON.stringify(runs.map(r => [r.kind, r.durationMs])));
     ok(runs[0].saved > 100 && runs[0].unchanged === 0 && runs[1].saved === 0 && runs[1].unchanged === runs[0].saved, 'the records say how many stocks each run saved and left alone: ' + JSON.stringify(runs.map(r => [r.saved, r.unchanged])));
     ok(runs.every(r => Array.isArray(r.batchSecs) && r.batchSecs.length === r.batches && r.batches > 0 && typeof r.tvWaitSecs === 'number' && typeof r.saveSecs === 'number' && typeof r.chunks === 'number' && r.error === null), 'the records hold the seconds each batch took and the time spent waiting on TradingView and saving');
     ok(runs[0].chunks === runs[0].batches && runs[1].chunks === 0, 'one save per batch, none the second time: ' + JSON.stringify(runs.map(r => [r.batches, r.chunks])));
@@ -718,16 +720,56 @@ async function tvRefreshScenarios(){
     const text = await page.textContent('#tv_fiResult');
     ok(/(^|\s)0 stocks refreshed.*\b0 technical scores updated/.test(text), 'nothing is counted as updated: ' + text.slice(0, 240));
   });
-  // the real database hands out records that cannot be changed in place: the list of stocks that failed before must be copied first
-  const old = {}; DS.stocks.filter(s => !/^\d/.test(symOf(s))).forEach(s => { old[symOf(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_')] = '2020-01-01T00:00:00.000Z'; });
-  await runScenario('fill missing history: a saved failure list that cannot be changed in place does not stop the run', { docs: { 'stockMeta/histFillTried': Object.assign({ uploadedAt: '2026-10-01' }, old) } }, async page => {
-    await page.click('#tvHistoryBtn');
-    // there is no cap any more, so the run is stopped after a few stocks: what matters here is that the saved failure list can be extended
-    await page.waitForFunction(() => /\b[1-9]\d* of \d+ ·/.test((document.getElementById('th_fiSteps') || {}).innerText || ''), null, { timeout: 60000 });
-    await page.click('#thStopBtn');
-    await page.waitForSelector('#th_fiResult.fi-result-ok, #th_fiResult.fi-result-err', { timeout: 200000 });
-    const text = await page.textContent('#th_fiResult');
-    ok(!/Cannot|not extensible|Stopped:/.test(text), 'the run finishes: ' + text.slice(0, 200));
+  // v1.200: the history stages of Refresh all stocks. The made-up database has about 2,000 stocks and none has bars, so each scenario
+  // marks all but a few stocks as "failed recently" (the list kept in stockMeta/histFillTried), which leaves only those to download.
+  const nowIso = new Date().toISOString();
+  const triedExcept = keep => ({ ['stockMeta/histFillTried']: Object.fromEntries(DS.stocks.filter(s => !keep.includes(symOf(s))).map(s => [sid(symOf(s)), nowIso])) });
+  const nonNumeric = DS.stocks.filter(s => !/^\d/.test(symOf(s))).map(s => symOf(s));
+  const waitDone = async (page, ms) => { await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: ms || 120000 }); return page.textContent('#tv_fiResult'); };
+  const plain = nonNumeric.filter(x => /^[A-Z0-9]+$/.test(x)), histKeep = plain.slice(0, 3);
+  await runScenario('refresh all stocks: stocks with no history get their full history and a completed-weeks score', { history: true, docs: triedExcept(histKeep) }, async page => {
+    await page.click('#tvSnapshotBtn');
+    const text = await waitDone(page);
+    ok(/fi-result-ok/.test(await page.evaluate(() => document.getElementById('tv_fiResult').className)), 'it finishes: ' + text.slice(0, 200));
+    ok(/Price bars: 3 stocks downloaded in full/.test(text), 'the result says what was downloaded: ' + text.slice(0, 400));
+    const a = await readDb(page);
+    for(const sym of histKeep){
+      const w = a.all['priceHistory/NSE_' + sid(sym) + '_1W'], m = a.all['priceHistory/NSE_' + sid(sym) + '_1M'];
+      ok(w && m && w.count === 261 && m.count === 60 && w.ticker === sym, sym + ': 261 weekly and 60 monthly bars saved: ' + JSON.stringify([w && w.count, m && m.count]));
+      const u = a.all['stockUpdates/' + sid(sym)]; ok(u && u.technical && u.technical.basis && u.technical.basis.week, sym + ': a completed-weeks technical score was saved');
+    }
+    ok(Object.keys(a.all).filter(k => k.startsWith('priceHistory/')).length === 6, 'nothing was downloaded for the stocks marked as failed recently');
+    const run = Object.values(a.all).find(v => v && v.kind === 'snapshot');
+    ok(run && run.filled === 3 && run.barsUpdated === 0 && run.noHistoryLeft > 1000 && run.historyFailed === 0, 'the run record counts the downloads: ' + JSON.stringify(run && [run.filled, run.barsUpdated, run.noHistoryLeft, run.historyFailed]));
+    const steps = await page.evaluate(() => Array.from(document.querySelectorAll('#tv_fiSteps li')).map(li => li.className.replace(/.*fi-/, '') + ':' + li.querySelector('.fi-label').textContent));
+    ok(steps.length === 5 && steps.every(x => /^done:/.test(x)), 'all five steps are done: ' + steps.join(' | '));
+    const last = await page.evaluate(() => document.getElementById('lastRuns_snapshot').innerText);
+    ok(/bars: 3 full history, 0 updated/.test(last), 'the Last 2 runs list mentions the bars: ' + last.replace(/\s+/g, ' '));
+  });
+  // a stock whose last saved bars are from before this week or month gets only the new bars; one saved this week is left alone
+  await runScenario('refresh all stocks: only stocks with a finished week or month get new bars', { history: true, docs: (() => {
+      const nowS = Math.floor(Date.now() / 1000), mon = nowS - ((new Date((nowS + 19800) * 1000).getUTCDay() + 6) % 7) * 86400 - ((nowS + 19800) % 86400) + 19800 + 3600;
+      const first = new Date((nowS + 19800) * 1000), mStart = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1) / 1000 - 19800 + 3600;
+      const bars = (last, step, n) => Array.from({ length: n }, (_, i) => [last - (n - 1 - i) * step, 10, 12, 9, 11 + i * 0.01, 100]);
+      const [x, y] = plain.slice(0, 2), mk = (sym, wLast, mLast) => ({ ['priceHistory/NSE_' + sid(sym) + '_1W']: { ticker: sym, symbol: 'NSE:' + sym, interval: '1W', bars: bars(wLast, 7 * 86400, 80), count: 80, fetchedAt: '2026-01-01T00:00:00Z' }, ['priceHistory/NSE_' + sid(sym) + '_1M']: { ticker: sym, symbol: 'NSE:' + sym, interval: '1M', bars: bars(mLast, 30 * 86400, 40), count: 40, fetchedAt: '2026-01-01T00:00:00Z' } });
+      return Object.assign({}, triedExcept([x, y]), mk(x, mon, mStart), mk(y, mon - 21 * 86400, mStart - 40 * 86400));
+    })() }, async page => {
+    await page.click('#tvSnapshotBtn');
+    const text = await waitDone(page);
+    ok(/Price bars: 0 stocks downloaded in full( \([\d,]+ still have none\))?, 1 given their new weekly and monthly bars/.test(text), 'the result says one stock got new bars: ' + text.slice(0, 400));
+    const [x, y] = plain.slice(0, 2), a = await readDb(page);
+    const fx = a.all['priceHistory/NSE_' + sid(x) + '_1W'].fetchedAt, fy = a.all['priceHistory/NSE_' + sid(y) + '_1W'].fetchedAt;
+    ok(fx === '2026-01-01T00:00:00Z' && fy !== '2026-01-01T00:00:00Z', 'the stock saved this week was left alone and the older one was updated: ' + fx + ' / ' + fy);
+    const run = Object.values(a.all).find(v => v && v.kind === 'snapshot'); ok(run && run.filled === 0 && run.barsUpdated === 1, 'the run record counts one update: ' + JSON.stringify(run && [run.filled, run.barsUpdated]));
+  });
+  // Stop ends the history stages early and the run is recorded as stopped
+  await runScenario('refresh all stocks: Stop during the history download ends the run and says so', { history: true }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await page.waitForFunction(() => Array.from(document.querySelectorAll('#tv_fiSteps li')).some(li => /Full history/.test(li.textContent) && /^[1-9][\d,]* of [\d,]+ ·/.test(li.querySelector('.fi-detail').textContent)), null, { timeout: 90000 });
+    await page.click('#tvStopBtn');
+    const text = await waitDone(page, 60000);
+    ok(/Stopped\./.test(text) && /Price bars: [1-9]/.test(text), 'the result says it stopped and what was downloaded: ' + text.slice(0, 300));
+    const run = Object.values((await readDb(page)).all).find(v => v && v.kind === 'snapshot'); ok(run && run.stopped === true && run.filled > 0 && run.filled < 2000, 'the run record says stopped: ' + JSON.stringify(run && [run.stopped, run.filled]));
   });
   await runScenario('refresh from TradingView: without a connection nothing is attempted', { cfg: { noMcp: true } }, async page => {
     await page.click('#tvSnapshotBtn');

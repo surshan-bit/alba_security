@@ -1,11 +1,11 @@
-// "Refresh from TradingView" on the Data Refresh screen (Technical Score section): no CSV needed.
-//  1. Refresh all stocks: one TradingView snapshot of price, MACD and RSI (weekly, monthly) for every stock, 50 per call.
-//     It saves one record per batch of 50 stocks in liveSnapshot (see overlays/livesnapshot.js), not one per stock: the database
-//     takes about 1.5 saves a second, so about 44 saves replace about 2,000.
-//     TradingView's figures include the week and month still in progress, so a stock whose saved block was built from completed
-//     bars in the last 3 days keeps that block (only its price is updated).
-//  2. Fill missing history: downloads weekly and monthly bars for stocks that have none saved (tracked picks first, then pinned,
-//     then strategy matches, then the rest), all of them in one run (Stop ends it early; a later run carries on).
+// "Refresh all stocks" on the Data Refresh screen (Technical Score section): the one daily route, straight from TradingView.
+//  1. Snapshot of every stock: price, MACD and RSI (weekly, monthly), 50 stocks per call. One record per batch of 50 stocks is saved in
+//     liveSnapshot (see overlays/livesnapshot.js), not one per stock: the database takes about 1.5 saves a second, so about 44 saves replace
+//     about 2,000. TradingView's figures include the week and month still in progress, so a stock whose saved block was built from
+//     completed bars in the last 3 days keeps that block (only its price is updated).
+//  2. Stocks with no saved bars: the full history (about 5 years, up to today) and the completed-weeks score, tracked picks first,
+//     then pinned, strategy matches and the rest. Stop ends the run; the next run carries on.
+//  3. Stocks with saved bars: only when a weekly or monthly bar has finished since the newest saved one (see historyplan.js), just the new bars.
 import { stocks, stockByTickerSymbol } from '../core/stocks.js';
 import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { COLS, packValues, snapshotUpdate } from '../overlays/livesnapshot.js';
@@ -15,14 +15,20 @@ import { BSE_ALPHA_MAP } from '../tv/links.js';
 import { tvCall, tvErrorText, tvIstDate, tvMcp } from '../tv/connector.js';
 import { loadRuns } from '../strategies/tracking.js';
 import { priorityOrder } from './freshness.js';
+import { planHistory } from './historyplan.js';
+import { debugHandle } from '../boot/handoff.js';
 import { getFiDb, getFiOwner, getFiRunning, setFiRunning } from '../import/fund-import.js';
 import { fiEl, fiReset, fiSet, fiShowResult, setFiPfx } from '../import/panel.js';
 import { registerBusy } from '../core/busy.js';
 import { duration, paintLastRuns, saveRunLog } from './runlog.js';
 
 const BATCH = 50;                 // symbols per TradingView call (the tool's limit)
-const SKIP_RETRY_DAYS = 14;       // a stock that failed history fill is not retried for this long
-const STEPS = [{ key: 'prepare', label: 'Prepare the stock list', w: 5 }, { key: 'run', label: 'Refresh', w: 90 }, { key: 'verify', label: 'Finish', w: 5 }];
+const SKIP_RETRY_DAYS = 14;       // a stock whose history download failed is not tried again for this long
+const BAR_WORKERS = 3;            // stocks whose bars are downloaded at the same time
+// Test hook: the browser tests switch the history stages off (the made-up database has no history for any stock, so every run would download all of it).
+const skipHistory = () => !!debugHandle().skipHistoryStage;
+const STEPS = [{ key: 'prepare', label: 'Prepare the stock list', w: 5 }, { key: 'run', label: 'Snapshot of every stock', w: 30 }, { key: 'fill', label: 'Full history for stocks that have none', w: 30 },
+  { key: 'update', label: 'New weekly and monthly bars for the rest', w: 30 }, { key: 'verify', label: 'Finish', w: 5 }];
 
 // The TradingView symbol for a stock without asking TradingView: the one used before, the BSE alpha map for numeric BSE codes,
 // otherwise NSE:<ticker>. null for a BSE-only stock whose symbol is not known yet.
@@ -42,23 +48,21 @@ const num = x => x.toLocaleString('en-IN');
 function stable(x){ return x && typeof x === 'object' ? (Array.isArray(x) ? x.map(stable) : Object.keys(x).sort().reduce((o, k) => { o[k] = stable(x[k]); return o; }, {})) : x; }
 const sameValue = (a, b) => JSON.stringify(stable(a)) === JSON.stringify(stable(b));
 
-function setButtons(running, kind){
-  for(const id of ['tvSnapshotBtn', 'tvHistoryBtn']){ const b = /** @type {HTMLButtonElement|null} */ (document.getElementById(id)); if(b) b.disabled = running; }
-  for(const [id, k] of [['tvStopBtn', 'snapshot'], ['thStopBtn', 'history']]){
-    const st = /** @type {HTMLButtonElement|null} */ (document.getElementById(id)); if(st){ st.hidden = !(running && kind === k); st.disabled = false; st.textContent = 'Stop'; }
-  }
+function setButtons(running){
+  const b = /** @type {HTMLButtonElement|null} */ (document.getElementById('tvSnapshotBtn')); if(b) b.disabled = running;
+  const st = /** @type {HTMLButtonElement|null} */ (document.getElementById('tvStopBtn')); if(st){ st.hidden = !running; st.disabled = false; st.textContent = 'Stop'; }
 }
 // Starts a run: checks the page can run it and takes the shared "a job is running" flag. Returns the database or null.
-async function begin(title, pfx, kind){
+async function begin(title){
   if(busy || getFiRunning()) return null;
   busy = true;   // taken first: the TradingView check below waits for an answer, and a second click meanwhile must not start a second run
-  setFiPfx(pfx);
+  setFiPfx('tv_');
   const db = getFiDb();
   if(!getFiOwner() || !db){ busy = false; fiReset(title, STEPS); fiShowResult('err', [{ text: 'Only the owner can run this, and the database must be available in this view.' }], true); return null; }
   let connected = false;
   try { connected = !!(await tvMcp()); } catch(e){ console.error('TradingView connector check failed', e); }
   if(!connected){ busy = false; fiReset(title, STEPS); fiShowResult('err', [{ text: 'The TradingView connector is not available in this view.' }], true); return null; }
-  stopAsked = false; setFiRunning(true); setButtons(true, kind);
+  stopAsked = false; setFiRunning(true); setButtons(true);
   fiReset(title, STEPS);
   return db;
 }
@@ -77,13 +81,14 @@ function skippedReport(skipped, kind){
 
 // ---- 1. Refresh all stocks ----
 async function runSnapshot(){
-  const db = await begin('Refreshing all stocks from TradingView', 'tv_', 'snapshot');
+  const db = await begin('Refreshing all stocks from TradingView');
   if(!db) return;
   const today = tvIstDate();
   const lines = [], skipped = [];
   let updated = 0, kept = 0, scored = 0, unchanged = 0, stopped = false;
   const t0 = Date.now(), startedAt = new Date().toISOString(), batchSecs = [];
   let tvWaitMs = 0, saveMs = 0, planned = 0, chunksSaved = 0, runError = '';
+  let filled = 0, barsUpdated = 0, histFailed = 0, noneBefore = 0, staleBefore = 0, noHistoryLeft = 0, histRan = false;
   try {
     fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
     // The chunks saved by the last run, so a batch that came back exactly the same is not written again. A failed read only means every chunk is written.
@@ -148,11 +153,55 @@ async function runSnapshot(){
       batchSecs.push(Math.round((Date.now() - b0) / 100) / 10);
     }
     fiSet('run', 'done', num(updated) + ' saved' + (unchanged ? ', ' + num(unchanged) + ' unchanged' : ''));
+    // ---- 2 + 3. price bars: full history for stocks that have none, only the new bars for the rest ----
+    if(stopped || stopAsked || skipHistory()){ stopped = stopped || stopAsked; fiSet('fill', 'done', 'skipped'); fiSet('update', 'done', 'skipped'); }
+    else {
+      histRan = true;
+      fiSet('fill', 'running', 'Looking at the saved bars…', 0.1);
+      await ensureAllPriceBars();
+      const plan = planHistory(stocks, s => priceHistoryByTicker[pcTickerKey(s)], Date.now() / 1000);
+      noneBefore = plan.none.length; staleBefore = plan.stale.length;
+      const tracked = new Set();
+      try { (await loadRuns()).forEach(r => (r.picks || []).forEach(p => { const s = stockByTickerSymbol.get(p.sym); if(s) tracked.add(s); })); } catch(e){ console.error('Could not read tracked picks', e); }
+      const byImportance = list => list.filter(s => tracked.has(s)).concat(priorityOrder('tech', list.filter(s => !tracked.has(s))));
+      let tried = {};
+      try { const tr = await db.doc('stockMeta/histFillTried').get(); if(tr && tr.exists) tried = Object.assign({}, tr.data() || {}); } catch(e){ /* the list only spares stocks that failed recently */ }
+      const recent = id => tried[id] && Date.now() - (Date.parse(tried[id]) || 0) < SKIP_RETRY_DAYS * 86400000;
+      const noneList = byImportance(plan.none).filter(s => !recent(sanitizeDocId(tickerSymbol(s))));
+      const failedBars = [];
+      const bars = async (list, key, track) => {
+        let next = 0, done = 0, ok = 0;
+        const worker = async () => {
+          while(next < list.length && !stopAsked){
+            const s = list[next++], pk = pcTickerKey(s), id = sanitizeDocId(tickerSymbol(s));
+            await refreshOneNow(s);
+            const j = priceJobs.get(pk);
+            if(j && j.state === 'ok'){ ok++; if(track) delete tried[id]; }
+            else { failedBars.push({ sym: tickerSymbol(s), name: s.name, reason: 'price bars: ' + ((j && j.msg) || 'did not finish') }); if(track) tried[id] = new Date().toISOString(); }
+            done++;
+            fiSet(key, 'running', num(done) + ' of ' + num(list.length) + ' · ' + tickerSymbol(s), done / list.length);
+          }
+        };
+        await Promise.all(Array.from({ length: BAR_WORKERS }, worker));
+        return ok;
+      };
+      if(noneList.length) filled = await bars(noneList, 'fill', true);
+      if(noneList.length){ try { await db.doc('stockMeta/histFillTried').set(tried); } catch(e){ console.error('Could not save the skipped list', e); } }
+      fiSet('fill', 'done', noneBefore ? num(filled) + ' of ' + num(noneBefore) + ' downloaded' : 'none needed');
+      if(stopAsked) stopped = true;
+      if(!stopped && plan.stale.length) barsUpdated = await bars(byImportance(plan.stale), 'update', false);
+      if(stopAsked) stopped = true;
+      fiSet('update', 'done', staleBefore ? num(barsUpdated) + ' of ' + num(staleBefore) + ' updated' : 'all up to date');
+      histFailed = failedBars.length;
+      noHistoryLeft = noneBefore - filled;
+      failedBars.forEach(x => skipped.push(x));
+    }
     fiSet('verify', 'done', '');
     lines.push({ text: (stopped ? 'Stopped. ' : '') + num(updated) + ' stocks refreshed: price saved for each, ' + num(scored) + ' technical scores updated, ' + num(kept) + ' kept their completed-week score (updated in the last 3 days).', cls: 'fi-line fi-line-strong' });
     if(unchanged) lines.push({ text: num(unchanged) + ' stocks already held exactly these figures (same price and scores), so they were not rewritten.', cls: 'fi-line' });
+    if(histRan) lines.push({ text: 'Price bars: ' + num(filled) + ' stocks downloaded in full' + (noHistoryLeft > 0 ? ' (' + num(noHistoryLeft) + ' still have none)' : '') + ', ' + num(barsUpdated) + ' given their new weekly and monthly bars' + (histFailed ? ', ' + num(histFailed) + ' failed' : '') + '.', cls: 'fi-line' });
     lines.push({ text: 'Took ' + duration(Date.now() - t0) + '.', cls: 'fi-line fi-line-muted' });
-    lines.push({ text: 'These scores include the week and month still in progress, so they can change before the week ends. Stocks with saved price bars get the stricter completed-weeks score when refreshed with the bar download.', cls: 'fi-line fi-line-muted' });
+    lines.push({ text: 'These scores include the week and month still in progress, so they can change before the week ends. Stocks with saved price bars get the stricter completed-weeks score once their bars are up to date.', cls: 'fi-line fi-line-muted' });
     if(skipped.length) lines.push({ text: num(skipped.length) + ' stocks skipped (listed in the file below).', cls: 'fi-line' });
     fiShowResult(updated + unchanged === 0 ? 'err' : 'ok', lines, true);
     skippedReport(skipped, 'snapshot');
@@ -160,72 +209,7 @@ async function runSnapshot(){
     runError = tvErrorText(e);
     fiShowResult('err', [{ text: 'Stopped: ' + tvErrorText(e), cls: 'fi-line fi-line-strong' }, { text: num(updated) + ' stocks were saved before this.', cls: 'fi-line fi-line-muted' }], true);
   } finally {
-    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, chunks: chunksSaved, v: 2, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
-    end();
-    paintLastRuns(db);
-  }
-}
-
-// ---- 2. Fill missing history ----
-// Stocks with no saved weekly bars, in the order they matter: tracked picks, then pinned / strategy matches / oldest.
-async function missingHistoryOrder(){
-  await ensureAllPriceBars();
-  const missing = stocks.filter(s => { const h = priceHistoryByTicker[pcTickerKey(s)]; return !(h && h['1W'] && h['1W'].length); });
-  const tracked = new Set();
-  try { (await loadRuns()).forEach(r => (r.picks || []).forEach(p => { const s = stockByTickerSymbol.get(p.sym); if(s) tracked.add(s); })); } catch(e){ console.error('Could not read tracked picks', e); }
-  const first = missing.filter(s => tracked.has(s)), rest = missing.filter(s => !tracked.has(s));
-  return { missing, order: first.concat(priorityOrder('tech', rest)), trackedCount: first.length };
-}
-async function runHistory(){
-  const db = await begin('Filling missing price history', 'th_', 'history');
-  if(!db) return;
-  const failed = [];
-  let done = 0, ok = 0, stopped = false, planned = 0, missingBefore = 0, runError = '';
-  const t0 = Date.now(), startedAt = new Date().toISOString();
-  try {
-    fiSet('prepare', 'running', 'Finding stocks without history…', 0.3);
-    let tried = {};
-    try { const t = await db.doc('stockMeta/histFillTried').get(); if(t && t.exists) tried = Object.assign({}, t.data() || {}); } catch(e){}
-    const recent = id => tried[id] && Date.now() - (Date.parse(tried[id]) || 0) < SKIP_RETRY_DAYS * 86400000;
-    const { missing, order, trackedCount } = await missingHistoryOrder();
-    const eligible = order.filter(s => !recent(sanitizeDocId(tickerSymbol(s))));
-    const list = eligible;
-    planned = list.length; missingBefore = missing.length;
-    fiSet('prepare', 'done', num(missing.length) + ' without history' + (trackedCount ? ', ' + trackedCount + ' are tracked picks' : ''));
-    if(!list.length){
-      fiSet('run', 'done', ''); fiSet('verify', 'done', '');
-      fiShowResult('ok', [{ text: missing.length ? 'Nothing to try now: the ' + missing.length + ' stocks still without history failed recently and are retried after ' + SKIP_RETRY_DAYS + ' days.' : 'Every stock already has saved price history.', cls: 'fi-line fi-line-strong' }], true);
-      return;
-    }
-    let next = 0;
-    const worker = async () => {
-      while(next < list.length && !stopAsked){
-        const s = list[next++], key = pcTickerKey(s), id = sanitizeDocId(tickerSymbol(s));
-        await refreshOneNow(s);
-        const j = priceJobs.get(key);
-        if(j && j.state === 'ok'){ ok++; delete tried[id]; }
-        else { failed.push({ sym: tickerSymbol(s), name: s.name, reason: (j && j.msg) || 'did not finish' }); tried[id] = new Date().toISOString(); }
-        done++;
-        fiSet('run', 'running', done + ' of ' + list.length + ' · ' + tickerSymbol(s), done / list.length);
-      }
-    };
-    await Promise.all(Array.from({ length: 3 }, worker));
-    stopped = stopAsked && done < list.length;
-    try { await db.doc('stockMeta/histFillTried').set(tried); } catch(e){ console.error('Could not save the skipped list', e); }
-    fiSet('run', 'done', done + ' tried');
-    fiSet('verify', 'done', '');
-    const left = missing.length - ok;
-    fiShowResult(failed.length === done && done > 0 ? 'err' : 'ok', [
-      { text: (stopped ? 'Stopped. ' : '') + ok + ' of ' + done + ' stocks now have price history and a completed-weeks technical score.', cls: 'fi-line fi-line-strong' },
-      { text: left > 0 ? num(left) + ' stocks still have none. Run this again to carry on with the rest (a stock that failed is tried again after ' + SKIP_RETRY_DAYS + ' days).' : 'Every stock now has saved price history.', cls: 'fi-line fi-line-muted' },
-      ...(failed.length ? [{ text: failed.length + ' skipped (listed in the file below); they are retried after ' + SKIP_RETRY_DAYS + ' days.', cls: 'fi-line' }] : [])
-    ], true);
-    skippedReport(failed, 'history');
-  } catch(e){
-    runError = tvErrorText(e);
-    fiShowResult('err', [{ text: 'Stopped: ' + tvErrorText(e), cls: 'fi-line fi-line-strong' }, { text: ok + ' stocks were completed before this.', cls: 'fi-line fi-line-muted' }], true);
-  } finally {
-    if(planned > 0 || runError) await saveRunLog(db, 'history', startedAt, t0, { planned, missingBefore, tried: done, saved: ok, failed: failed.length, stopped, error: runError || null });
+    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, chunks: chunksSaved, filled, barsUpdated, historyFailed: histFailed, noHistoryLeft: histRan ? noHistoryLeft : null, v: 3, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
     end();
     paintLastRuns(db);
   }
@@ -242,8 +226,7 @@ async function paintHint(){
 function init_refresh_tvrefresh(){
   const on = (id, fn) => { const b = document.getElementById(id); if(b) b.addEventListener('click', fn); };
   on('tvSnapshotBtn', () => runSnapshot().then(paintHint));
-  on('tvHistoryBtn', () => runHistory().then(paintHint));
-  for(const id of ['tvStopBtn', 'thStopBtn']) on(id, () => { stopAsked = true; const b = /** @type {HTMLButtonElement|null} */ (document.getElementById(id)); if(b){ b.disabled = true; b.textContent = 'Stopping…'; } });
+  on('tvStopBtn', () => { stopAsked = true; const b = /** @type {HTMLButtonElement|null} */ (document.getElementById('tvStopBtn')); if(b){ b.disabled = true; b.textContent = 'Stopping…'; } });
 }
 
 export { init_refresh_tvrefresh };
