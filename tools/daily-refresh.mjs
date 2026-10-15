@@ -3,7 +3,7 @@
 // (src/engine/technical.js), but the TradingView calls and the database writes are made by Claude's tools, so this script only
 // plans the calls and builds the writes from files.
 //
-//   node tools/daily-refresh.mjs plan  --data DIR --work DIR [--limit N] [--runs DIR]
+//   node tools/daily-refresh.mjs plan  --data DIR --work DIR [--limit N] [--runs DIR] [--tracked-only]
 //       DIR/stockData/c*.json, DIR/stockMeta/bseAlpha.json, DIR/stockUpdates/*.json (exports of the database collections)
 //       writes WORK/batches.json (symbols, 50 per call, tracked picks first), WORK/skipped.json
 //   node tools/daily-refresh.mjs apply --data DIR --work DIR --versions FILE [--today YYYY-MM-DD]
@@ -52,7 +52,8 @@ if(mode === 'plan'){
     if(!sym) skipped.push({ sym: tickerOf(s), name: s.name, reason: 'BSE-only stock with no TradingView symbol saved yet' }); else list.push({ s, sym });
   }
   list.sort((a, b) => (tracked.has(tickerOf(b.s)) ? 1 : 0) - (tracked.has(tickerOf(a.s)) ? 1 : 0));
-  const use = opt('limit') ? list.slice(0, Number(opt('limit'))) : list;
+  const only = args.includes('--tracked-only') ? list.filter(x => tracked.has(tickerOf(x.s))) : list;
+  const use = opt('limit') ? only.slice(0, Number(opt('limit'))) : only;
   const batches = [];
   for(let i = 0; i < use.length; i += 50) batches.push(use.slice(i, i + 50).map(x => x.sym));
   fs.writeFileSync(path.join(WORK, 'batches.json'), JSON.stringify(batches));
