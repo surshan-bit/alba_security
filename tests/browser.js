@@ -3,13 +3,12 @@
 //     banner, a chunk that fails once, and every failure message the user can see (no database, no index, missing chunk, wrong count, app.js missing).
 //  2. Layout and CSS: every section at desktop, tablet and phone width has no sideways scrolling, nothing sticking out of the
 //     screen, no errors in the console; the Live Data Refresh panels sit side by side on desktop and stacked on a phone; the three themes.
-// It does NOT test the real claude.ai runtime, real TradingView or Claude. Playwright is not an npm dependency of this project: the test
-// looks for it in node_modules and in /opt/npm-tools, and says "SKIPPED" (exit 0) if it is not there.
+// It does NOT test the real claude.ai runtime, real TradingView or Claude. Playwright is a pinned devDependency (`npm ci` installs it,
+// `npx playwright install chromium` fetches the browser). Without it the suite says "SKIPPED" (exit 0) on a developer machine, but fails in CI.
 // Usage: node tests/browser.js   (also run by `npm run check` when Playwright is available)
 const fs = require('fs'), path = require('path');
-const { findPlaywright, startServer, openPage: openPageEnv } = require('./lib/env.js');
-const chromium = findPlaywright();
-if(!chromium){ console.log('browser smoke test: SKIPPED (Playwright not installed)'); process.exit(0); }
+const { chromiumOrSkip, startServer, openPage: openPageEnv } = require('./lib/env.js');
+const chromium = chromiumOrSkip('browser smoke test');
 const srv = startServer();
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'stocks.json'), 'utf8')).stocks;
 const CHUNKS = [FIXTURE.slice(0, Math.ceil(FIXTURE.length / 2)), FIXTURE.slice(Math.ceil(FIXTURE.length / 2))];

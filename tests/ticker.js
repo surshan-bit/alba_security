@@ -4,12 +4,11 @@
 //  - the stand-in TradingView answers with a price, and with last week's and last month's closing prices from the weekly / monthly bars, set from the test;
 //  - checks: the call asks for all three columns; W% CHG and M% CHG show the week-to-date and month-to-date moves and so do the stocks themselves
 //    (sorting and filters read the same numbers); nothing is saved.
-// It does not test the real claude.ai runtime or real TradingView. Playwright is optional (SKIPPED if missing).
+// It does not test the real claude.ai runtime or real TradingView. Playwright is optional locally (SKIPPED if missing) but required in CI.
 // Usage: node tests/ticker.js   or   npm run ticker
 const fs = require('fs'), path = require('path');
-const { findPlaywright, startServer, openPage } = require('./lib/env.js');
-const chromium = findPlaywright();
-if(!chromium){ console.log('ticker test: SKIPPED (Playwright not installed)'); process.exit(0); }
+const { chromiumOrSkip, startServer, openPage } = require('./lib/env.js');
+const chromium = chromiumOrSkip('ticker test');
 const srv = startServer();
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'stocks.json'), 'utf8')).stocks;
 const CHUNKS = [FIXTURE.slice(0, Math.ceil(FIXTURE.length / 2)), FIXTURE.slice(Math.ceil(FIXTURE.length / 2))];

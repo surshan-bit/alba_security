@@ -9,9 +9,8 @@
 // It uses the stand-in database and TradingView of tests/lib/env.js; it does not test the real claude.ai runtime. Playwright is optional.
 // Usage: node tests/refresh.js
 const fs = require('fs'), path = require('path');
-const { findPlaywright, startServer, openPage } = require('./lib/env.js');
-const chromium = findPlaywright();
-if(!chromium){ console.log('refresh tests: SKIPPED (Playwright not installed)'); process.exit(0); }
+const { chromiumOrSkip, startServer, openPage } = require('./lib/env.js');
+const chromium = chromiumOrSkip('refresh tests');
 const srv = startServer();
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'stocks.json'), 'utf8')).stocks;
 const CHUNKS = [FIXTURE.slice(0, Math.ceil(FIXTURE.length / 2)), FIXTURE.slice(Math.ceil(FIXTURE.length / 2))];

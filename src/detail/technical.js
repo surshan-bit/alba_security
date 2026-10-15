@@ -81,7 +81,7 @@ function renderTechPanel(s){
         <div class="tech-panel-title">${panelIcon('tech')}Technical Score &middot; ${t.score.toFixed(2)}/10</div>
         <span class="badge b-${bandKey}">${verdictLabel[bandKey] || ''}</span>
       </div>
-      ${provisionalNote(t)}${t.newsNote ? `<div class="tech-news-note"><span class="tech-news-label">What happened</span><span>${t.newsNote}</span></div>` : ''}
+      ${provisionalNote(t)}
       ${chartHtml || `<div class="tech-fallback"><div class="pc-psum"><b>Weekly</b>${sums['1W']}</div><div class="pc-psum"><b>Monthly</b>${sums['1M']}</div></div>`}
     </div>
   `;

@@ -61,11 +61,14 @@ function setButtons(running){
 // Starts a run: checks the page can run it and takes the shared "a job is running" flag. Returns the database or null.
 async function begin(title){
   if(busy || getFiRunning()) return null;
+  busy = true;   // taken first: the TradingView check below waits for an answer, and a second click meanwhile must not start a second run
   setFiPfx('tv_');
   const db = getFiDb();
-  if(!getFiOwner() || !db){ fiReset(title, STEPS); fiShowResult('err', [{ text: 'Only the owner can run this, and the database must be available in this view.' }], true); return null; }
-  if(!(await tvMcp())){ fiReset(title, STEPS); fiShowResult('err', [{ text: 'The TradingView connector is not available in this view.' }], true); return null; }
-  busy = true; stopAsked = false; setFiRunning(true); setButtons(true);
+  if(!getFiOwner() || !db){ busy = false; fiReset(title, STEPS); fiShowResult('err', [{ text: 'Only the owner can run this, and the database must be available in this view.' }], true); return null; }
+  let connected = false;
+  try { connected = !!(await tvMcp()); } catch(e){ console.error('TradingView connector check failed', e); }
+  if(!connected){ busy = false; fiReset(title, STEPS); fiShowResult('err', [{ text: 'The TradingView connector is not available in this view.' }], true); return null; }
+  stopAsked = false; setFiRunning(true); setButtons(true);
   fiReset(title, STEPS);
   return db;
 }
@@ -121,19 +124,18 @@ async function runSnapshot(){
         const u = snapshotUpdate(s, data[sym], today, sym);
         if(u.reason){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: u.reason + ' (' + sym + ')' }); continue; }
         const body = { valuation: u.valuation }; if(u.technical) body.technical = u.technical; if(u.liquidity) body.liquidity = u.liquidity;
-        if(u.kept) kept++; if(u.technical) scored++;
-        writes.push({ id: sanitizeDocId(tickerSymbol(s)), body, s });
+        writes.push({ id: sanitizeDocId(tickerSymbol(s)), body, s, kept: !!u.kept, scored: !!u.technical });
       }
       let w = 0;
       const worker = async () => {
         while(w < writes.length){
-          const { id, body, s } = writes[w++];
+          const { id, body, s, kept: wasKept, scored: wasScored } = writes[w++];
           try {
             const ref = db.doc('stockUpdates/' + id);
             // A stock missing from the list is checked once more just before it is created, in case a record appeared since.
             if(!existing.has(id)){ const cur = await ref.get(); if(cur && cur.exists) existing.add(id); }
             if(existing.has(id)) await ref.update(body); else { await ref.set(Object.assign({ ticker: tickerSymbol(s) }, body)); existing.add(id); }
-            updated++;
+            updated++; if(wasKept) kept++; if(wasScored) scored++;   // counted once saved, so a failed save never inflates the summary
           } catch(e){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: 'could not be saved: ' + String((e && e.message) || e).slice(0, 80) }); }
         }
       };

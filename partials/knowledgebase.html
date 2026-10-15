@@ -221,6 +221,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.187 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>Refresh all stocks is safer to click:</b> a quick double-click could start two runs at once. The second click is now ignored. The summary also counts a technical score as updated only after it was saved; before, a refused save was still counted.</li>
+              <li><b>Removed an unused note from the Technical Score panel:</b> a &ldquo;What happened&rdquo; box that nothing ever filled in (no stock has one). It also showed its text without the usual safety escaping, so it is gone rather than patched.</li>
+              <li><b>Behind the scenes:</b> 15 unused style rules were removed (a before-and-after comparison of 192 screens showed no visible difference). The browser tests now use a fixed Playwright version, and on GitHub a missing Playwright fails the check instead of silently skipping those tests. The GitHub workflows now have read-only permissions.</li>
+            </ul>
             <h3>v1.186 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Website deployment only (outside claude.ai):</b> the preview build that Cloudflare makes for each branch failed at its last step, because Cloudflare's <code>wrangler preview</code> command needs a <code>previews</code> setting in <code>wrangler.jsonc</code>. The setting is now there. Nothing changes inside claude.ai.</li>

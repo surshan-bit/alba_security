@@ -87,10 +87,8 @@
 .fund-subsection .fund-cell-bar{margin-bottom:12px;}
 .tech-panel{margin-top:22px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
 .tech-panel-head{margin-bottom:12px;display:flex;align-items:center;justify-content:flex-start;gap:10px 14px;flex-wrap:wrap;}
-.tech-news-note{display:flex;gap:8px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--tech-sell);border-radius:8px;padding:10px 12px;margin:0 0 14px;font-size:.82rem;color:var(--text);line-height:1.5;}
 .tech-prov{display:flex;gap:8px;align-items:flex-start;margin:0 0 14px;font-size:.8rem;color:var(--muted);line-height:1.5;}
 .tech-prov b{color:var(--text);font-weight:700;white-space:nowrap;}
-.tech-news-label{color:var(--muted);font-weight:700;text-transform:uppercase;font-size:.68rem;letter-spacing:.04em;flex-shrink:0;margin-top:2px;white-space:nowrap;}
 /* Industry Peers panel — last section of the stock detail view (added 2026-10-06). Lists every
      stock sharing this stock's exact industry within its Industry Group (the Fundamental Score's peer set, with fallback). */
 /* Layout fix (2026-10-06): a grid item's default min-width is its content width, so the Industry Peers
@@ -333,7 +331,6 @@ html{scrollbar-color:var(--line) transparent;}
 .pcs-sig{width:96px;}
 /* Technical refresh under an industry's stocks. */
 }
-.biz-refresh{margin:10px 0 4px;}
 /* Live prices: the topbar switch, the open stock's live price and the brief flash when a number changes. */
 .live-toggle{color:var(--muted);flex:none;height:30px;margin-left:auto;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:transparent;font:inherit;font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;}
 .live-toggle:hover{border-color:var(--accent);}
@@ -360,7 +357,6 @@ html{scrollbar-color:var(--line) transparent;}
 /* Explorer full screen: the table fills the window, headings stay in view while the rows scroll. */
 .biz-main.biz-full{position:fixed;inset:0;z-index:70;margin:0;padding:12px 20px 16px;background:var(--bg);display:flex;flex-direction:column;overflow:auto;}
 .biz-main.biz-full .biz-toolbar{flex:none;}
-.biz-main.biz-full .biz-refresh{display:none;}
 /* ---- Score trend panel ---- */
 .trend-panel{margin-top:22px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-width:0;}
 .trend-title{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:8px;}

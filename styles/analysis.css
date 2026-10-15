@@ -113,9 +113,7 @@ body.lb-full-open{overflow:hidden;}
 #section-analysis .analysis-color-toggle-btns{background:transparent;}
 /* The RSI Quadrant (sliders, axis choices, chart) lives inside the leaderboard and shows when "Show chart" is opened. */
 .analysis-leaderboard.chart-hidden .analysis-chart-block{display:none;}
-.analysis-leaderboard.lb-full .analysis-refresh{display:none;}
 .topbar-search-clear.show{display:block;}
 a.stock-link:hover .analysis-lb-name{text-decoration:underline;}
-.strat-refresh,.analysis-refresh{margin:14px 0 4px;display:flex;flex-direction:column;gap:12px;}
 body.biz-full-open{overflow:hidden;}
 .filter-note{margin:8px 0 0;font-size:.74rem;line-height:1.4;color:var(--muted);}

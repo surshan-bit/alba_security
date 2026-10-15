@@ -3,11 +3,10 @@
 // injectable failures), an asset store and a fake TradingView watchlist service. The stock database is made up (~2,000 companies
 // scored by the real engines, see tests/lib/dataset.js). Each scenario checks both what the person sees and what ended up in the
 // database, and the new stock list is compared with what the engines produce for the same file (an independent oracle).
-// Playwright is optional (SKIPPED if missing). Usage: node tests/imports.js   or   npm run imports   [--only <text>]
+// Playwright is optional locally (SKIPPED if missing) but required in CI. Usage: node tests/imports.js   or   npm run imports   [--only <text>]
 const fs = require('fs'), path = require('path');
-const { findPlaywright, startServer, openPage } = require('./lib/env.js');
-const chromium = findPlaywright();
-if(!chromium){ console.log('import tests: SKIPPED (Playwright not installed)'); process.exit(0); }
+const { chromiumOrSkip, startServer, openPage } = require('./lib/env.js');
+const chromium = chromiumOrSkip('import tests');
 const { buildDataset, buildSmall, canon, symOf, sid, F, T } = require('./lib/dataset.js');
 
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null;
@@ -715,6 +714,20 @@ async function tvRefreshScenarios(){
     ok(await page.evaluate(() => /fi-result-ok/.test(document.getElementById('tv_fiResult').className)), 'it finishes: ' + (await page.textContent('#tv_fiResult')).slice(0, 200));
     const a = await readDb(page), rec = a.all['stockUpdates/' + first];
     ok(rec.globalFactors && rec.globalFactors.positive[0] === 'kept note' && rec.valuation && rec.valuation.currentPrice === 111.1, 'the note is kept and the price is added: ' + JSON.stringify(Object.keys(rec)));
+  });
+  // v1.187: a quick double click on Refresh all stocks must not start two runs (the first run takes its place before it waits for TradingView)
+  await runScenario('refresh from TradingView: a quick double click starts only one run', { cfg: { liveCollections: true } }, async page => {
+    await page.evaluate(() => { const b = document.getElementById('tvSnapshotBtn'); b.click(); b.click(); });
+    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
+    const asked = await page.evaluate(() => [].concat(...(window.__tvBatchCalls || []).map(c => c.symbols)));
+    ok(asked.length > 100 && new Set(asked).size === asked.length, 'each stock was asked for once: ' + asked.length + ' asked, ' + new Set(asked).size + ' different');
+  });
+  // v1.187: the summary counts a score only after it is saved, so refused saves never inflate it
+  await runScenario('refresh from TradingView: stocks whose save fails are not counted as updated', { cfg: { liveCollections: true, rules: [{ op: 'set', prefix: 'stockUpdates/', error: { message: 'write refused' } }] } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
+    const text = await page.textContent('#tv_fiResult');
+    ok(/(^|\s)0 stocks refreshed.*\b0 technical scores updated/.test(text), 'nothing is counted as updated: ' + text.slice(0, 240));
   });
   // the real database hands out records that cannot be changed in place: the list of stocks that failed before must be copied first
   const old = {}; DS.stocks.filter(s => !/^\d/.test(symOf(s))).forEach(s => { old[symOf(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_')] = '2020-01-01T00:00:00.000Z'; });
