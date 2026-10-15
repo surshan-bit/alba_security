@@ -680,6 +680,7 @@ async function tvRefreshScenarios(){
     const a = await readDb(page), docs = Object.entries(a.all).filter(([k]) => k.startsWith('stockUpdates/'));
     const snap = docs.filter(([, v]) => v.technical && v.technical.src === 'snapshot');
     ok(snap.length > 100 && docs.every(([, v]) => v.valuation && v.valuation.currentPrice === 111.1), 'prices saved for every stock, snapshot scores for most: ' + snap.length + ' of ' + docs.length);
+    ok(docs.filter(([, v]) => v.liquidity && v.liquidity.avgVolume === 50000).length === docs.length, 'every saved stock carries its average daily volume');
     const kept = a.all['stockUpdates/' + first]; ok(kept.valuation.currentPrice === 111.1 && kept.technical.reason === 'kept' && kept.technical.score === 7, 'the fresh completed-weeks score is kept and only the price changes');
     ok(r.btn && /skipped/.test(r.text), 'a skipped-stocks file is offered: ' + r.text.slice(0, 300));
     ok(await page.evaluate(() => !document.getElementById('tvStopBtn') || document.getElementById('tvStopBtn').hidden), 'the Stop button is hidden again');

@@ -21,7 +21,7 @@ import { registerBusy } from '../core/busy.js';
 const BATCH = 50;                 // symbols per TradingView call (the tool's limit)
 const HISTORY_CAP = 100;          // stocks per "Fill missing history" run
 const SKIP_RETRY_DAYS = 14;       // a stock that failed history fill is not retried for this long
-const COLS = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M'];
+const COLS = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M', 'average_volume_30d_calc'];
 const STEPS = [{ key: 'prepare', label: 'Prepare the stock list', w: 5 }, { key: 'run', label: 'Refresh', w: 90 }, { key: 'verify', label: 'Finish', w: 5 }];
 
 // The TradingView symbol for a stock without asking TradingView: the one used before, the BSE alpha map for numeric BSE codes,
@@ -38,6 +38,7 @@ function snapshotUpdate(s, row, today, sym){
   const px = row && typeof row.close === 'number' && row.close > 0 ? row.close : null;
   if(px == null) return { reason: 'TradingView returned no price' };
   const out = { valuation: { currentPrice: px, asof: today, source: 'TradingView (' + sym + ')' } };
+  if(typeof row['average_volume_30d_calc'] === 'number' && row['average_volume_30d_calc'] >= 0) out.liquidity = { avgVolume: Math.round(row['average_volume_30d_calc']), asof: today };
   const pv = s.pillars && typeof s.pillars.val === 'number' ? s.pillars.val : null;
   if(pv == null){ out.note = 'no valuation reading, technical score not updated'; return out; }
   if(techKeepsBarsBlock(s.technical, today)){ out.kept = true; return out; }
@@ -112,7 +113,7 @@ async function runSnapshot(){
       for(const { s, sym } of batch){
         const u = snapshotUpdate(s, data[sym], today, sym);
         if(u.reason){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: u.reason + ' (' + sym + ')' }); continue; }
-        const body = { valuation: u.valuation }; if(u.technical) body.technical = u.technical;
+        const body = { valuation: u.valuation }; if(u.technical) body.technical = u.technical; if(u.liquidity) body.liquidity = u.liquidity;
         if(u.kept) kept++; if(u.technical) scored++;
         writes.push({ id: sanitizeDocId(tickerSymbol(s)), body, s });
       }

@@ -72,11 +72,12 @@ fs.mkdirSync(path.join(WORK, 'docs'), { recursive: true });
 const writes = [], report = { updated: 0, scored: 0, kept: 0, noPrice: [], noValuation: 0, noIndicators: 0, missingVersion: [] };
 for(let [sym, row] of Object.entries(rows)){
   const s = bySym.get(sym); if(!s) continue;
-  if(Array.isArray(row)){ const c = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M']; row = Object.fromEntries(c.map((k, i) => [k, row[i]])); }
+  if(Array.isArray(row)){ const c = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M', 'average_volume_30d_calc']; row = Object.fromEntries(c.map((k, i) => [k, row[i]])); }
   const id = docIdOf(s);
   const px = row && typeof row.close === 'number' && row.close > 0 ? row.close : null;
   if(px == null){ report.noPrice.push(sym); continue; }
   const doc = { valuation: { currentPrice: px, asof: today, source: 'TradingView (' + sym + ')' } };
+  if(typeof row['average_volume_30d_calc'] === 'number' && row['average_volume_30d_calc'] >= 0) doc.liquidity = { avgVolume: Math.round(row['average_volume_30d_calc']), asof: today };
   const pv = s.pillars && typeof s.pillars.val === 'number' ? s.pillars.val : null;
   // the technical block in force: the saved update when it is at least as new as the stock's own, else the stock's own
   const up = updates.get(id), cur = up && up.technical && String(up.technical.asof) >= String((s.technical || {}).asof || '') ? up.technical : s.technical;

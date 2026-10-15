@@ -221,6 +221,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.184 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>Strategies can skip thinly traded stocks:</b> two new rule choices under <i>Liquidity</i>, <i>Average daily traded value (30 days, &#8377; lakh)</i> and <i>Average daily volume (30 days, shares)</i>. Add one with &ldquo;at least&rdquo; to leave out stocks that trade so little that buying or selling could be hard or move the price. Traded value is the 30-day average volume times the current price, in lakh rupees (1 lakh = 100,000).</li>
+              <li>The volume comes from <i>Refresh all stocks</i> and the 4 PM daily refresh. A stock with no volume saved yet fails a volume rule, so run Refresh all stocks once before using it. Volume is today&rsquo;s reading, so a volume rule is not used when replaying a strategy on old prices.</li>
+            </ul>
             <h3>v1.183 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Data age bars now update after a refresh:</b> the Technical and Fundamental data age panels on the Data Refresh screen were only drawn when the page opened, so they stayed stale after Refresh all stocks until the page was reloaded. They now redraw whenever saved updates arrive.</li>

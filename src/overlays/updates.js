@@ -28,6 +28,7 @@ function revertUpdates(s){
   if(b.technical === undefined) delete s.technical; else s.technical = clone(b.technical);
   if(s.valuation){ if(b.currentPrice === undefined) delete s.valuation.currentPrice; else s.valuation.currentPrice = b.currentPrice; }
   delete s.__livePrice;
+  delete s.liquidity;
   delete s.__updBase;
   delete s.__updAsof;
 }
@@ -49,6 +50,9 @@ function applyUpdatesDoc(s, doc){
       s.__livePrice = { asof: pv.asof || null, source: pv.source || '' };
     }
   }
+  // Average daily volume (30 days) from the TradingView refresh: kept as its own block, so a strategy can skip thinly traded stocks.
+  const lq = doc && doc.liquidity;
+  if(lq && typeof lq === 'object' && typeof lq.avgVolume === 'number' && lq.avgVolume >= 0) s.liquidity = { avgVolume: lq.avgVolume, asof: lq.asof || null };
   const t = doc && doc.technical;
   if(t && typeof t === 'object'){
     const bt = s.__updBase.technical;
