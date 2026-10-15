@@ -70,7 +70,7 @@ async function upload(page, which, name, text){
   await page.waitForTimeout(100);
 }
 async function readDb(page){
-  const json = await page.evaluate(() => JSON.stringify(Object.fromEntries(Array.from(window.__store).filter(([k]) => /^(stockData|stockMeta|backupLog|importJobs|fundamentalCsvUploadLog|technicalCsvUploadLog|watchlistSyncLog|stockUpdates|refreshRunLog)\//.test(k)))));
+  const json = await page.evaluate(() => JSON.stringify(Object.fromEntries(Array.from(window.__store).filter(([k]) => /^(stockData|stockMeta|backupLog|importJobs|fundamentalCsvUploadLog|technicalCsvUploadLog|watchlistSyncLog|stockUpdates|refreshRunLog|liveSnapshot)\//.test(k)))));
   const all = JSON.parse(json), meta = all['stockMeta/main'], stocks = new Map(), chunkDocs = {};
   for(const cid of meta.chunks){ const d = all['stockData/' + cid]; chunkDocs[cid] = d; if(d) for(const s of d.stocks) stocks.set(symOf(s), s); }
   const col = c => Object.entries(all).filter(([k]) => k.startsWith(c + '/')).map(([k, v]) => Object.assign({ id: k.slice(c.length + 1) }, v)).sort((a, b) => String(a.createdAt || a.uploadedAt || a.startedAt || a.id).localeCompare(String(b.createdAt || b.uploadedAt || b.startedAt || b.id)));
@@ -687,11 +687,16 @@ async function tvRefreshScenarios(){
     await page.waitForFunction(() => { const row = [...document.querySelectorAll('#techFreshnessBars .refreshlog-freshness-row')].find(e => /Today/.test(e.textContent)); return row && parseInt(row.querySelector('.refreshlog-freshness-count').textContent, 10) > 100; }, null, { timeout: 15000 }).catch(() => {});
     const today0 = await page.evaluate(() => { const row = [...document.querySelectorAll('#techFreshnessBars .refreshlog-freshness-row')].find(e => /Today/.test(e.textContent)); return row ? parseInt(row.querySelector('.refreshlog-freshness-count').textContent, 10) : -1; });
     ok(today0 > 100, 'the technical data age bars show the refreshed stocks as Today without a reload: ' + today0);
-    const a = await readDb(page), docs = Object.entries(a.all).filter(([k]) => k.startsWith('stockUpdates/'));
-    const snap = docs.filter(([, v]) => v.technical && v.technical.src === 'snapshot');
-    ok(snap.length > 100 && docs.every(([, v]) => v.valuation && v.valuation.currentPrice === 111.1), 'prices saved for every stock, snapshot scores for most: ' + snap.length + ' of ' + docs.length);
-    ok(docs.filter(([, v]) => v.liquidity && v.liquidity.avgVolume === 50000).length === docs.length, 'every saved stock carries its average daily volume');
-    const kept = a.all['stockUpdates/' + first]; ok(kept.valuation.currentPrice === 111.1 && kept.technical.reason === 'kept' && kept.technical.score === 7, 'the fresh completed-weeks score is kept and only the price changes');
+    const a = await readDb(page), chunks = Object.entries(a.all).filter(([k]) => k.startsWith('liveSnapshot/')).sort(([x], [y]) => (x < y ? -1 : 1));
+    const rows = [].concat(...chunks.map(([, v]) => v.rows));
+    ok(chunks.length >= 1 && chunks.length === r.calls.length && chunks.every(([k, v], i) => k === 'liveSnapshot/c' + String(i + 1).padStart(3, '0') && v.v === 1 && v.asof === today && typeof v.at === 'string' && v.rows.length <= 50), 'one record per TradingView batch: ' + r.calls.length + ' calls, today ' + today + ', ' + chunks.slice(-2).map(([k, v]) => k + ':' + v.rows.length + ':' + v.asof + ':' + v.v + ':' + v.at).join(','));
+    ok(rows.length > 100 && rows.every(x => x.c[0] === 111.1 && typeof x.k === 'string' && typeof x.y === 'string'), 'a price for every stock: ' + rows.length);
+    ok(rows.filter(x => x.c[9] === 50000).length === rows.length, 'every row carries its average daily volume');
+    ok(Object.keys(a.all).filter(k => k.startsWith('stockUpdates/')).length === 1, 'no per-stock record was written');
+    // what the page shows after merging: snapshot scores for most stocks, the fresh completed-weeks score and note kept for the stock that had one
+    const m = await page.evaluate(first => { const S = window.__alba.stocks; const one = S.filter(s => s.technical && s.technical.src === 'snapshot').length; const k = S.find(s => (window.__alba.sanitizeDocId ? window.__alba.sanitizeDocId(window.__alba.tickerSymbol(s)) : '') === first); return { snap: one, priced: S.filter(s => s.valuation && s.valuation.currentPrice === 111.1).length, kept: k && { px: k.valuation.currentPrice, score: k.technical.score, reason: k.technical.reason } }; }, first);
+    ok(m.snap > 100 && m.priced > 100, 'merged into the stock list: ' + m.snap + ' snapshot scores, ' + m.priced + ' prices');
+    ok(m.kept && m.kept.px === 111.1 && m.kept.reason === 'kept' && m.kept.score === 7, 'the fresh completed-weeks score is kept and only the price changes: ' + JSON.stringify(m.kept));
     ok(r.btn && /skipped/.test(r.text), 'a skipped-stocks file is offered: ' + r.text.slice(0, 300));
     ok(await page.evaluate(() => !document.getElementById('tvStopBtn') || document.getElementById('tvStopBtn').hidden), 'the Stop button is hidden again');
   });
@@ -713,29 +718,34 @@ async function tvRefreshScenarios(){
     ok(noLog(after.all) === noLog(before.all), 'the saved stock records are exactly as they were');
     // v1.196: each run leaves one record in the database with its timing and counts
     const runs = Object.entries(after.all).filter(([k]) => k.startsWith('refreshRunLog/')).map(([, v]) => v).sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1));
-    ok(runs.length === 2 && runs.every(r => r.kind === 'snapshot' && r.v === 1 && typeof r.durationMs === 'number' && r.durationMs >= 0 && r.endedAt >= r.startedAt), 'each run saved one record with its start, end and duration: ' + JSON.stringify(runs.map(r => [r.kind, r.durationMs])));
+    ok(runs.length === 2 && runs.every(r => r.kind === 'snapshot' && r.v === 2 && typeof r.durationMs === 'number' && r.durationMs >= 0 && r.endedAt >= r.startedAt), 'each run saved one record with its start, end and duration: ' + JSON.stringify(runs.map(r => [r.kind, r.durationMs])));
     ok(runs[0].saved > 100 && runs[0].unchanged === 0 && runs[1].saved === 0 && runs[1].unchanged === runs[0].saved, 'the records say how many stocks each run saved and left alone: ' + JSON.stringify(runs.map(r => [r.saved, r.unchanged])));
-    ok(runs.every(r => Array.isArray(r.batchSecs) && r.batchSecs.length === r.batches && r.batches > 0 && typeof r.tvWaitSecs === 'number' && typeof r.saveSecs === 'number' && r.writeParallel === 16 && r.error === null), 'the records hold the seconds each batch took and the time spent waiting on TradingView and saving');
+    ok(runs.every(r => Array.isArray(r.batchSecs) && r.batchSecs.length === r.batches && r.batches > 0 && typeof r.tvWaitSecs === 'number' && typeof r.saveSecs === 'number' && typeof r.chunks === 'number' && r.error === null), 'the records hold the seconds each batch took and the time spent waiting on TradingView and saving');
+    ok(runs[0].chunks === runs[0].batches && runs[1].chunks === 0, 'one save per batch, none the second time: ' + JSON.stringify(runs.map(r => [r.batches, r.chunks])));
   });
-  // v1.185: if the list of saved updates cannot be read, saving blindly would REPLACE whole records and lose what else they hold
-  const research = { ticker: first, globalFactors: { scope: 'sector', positive: ['kept note'], negative: [] }, technical: { score: 3, asof: '2020-01-01', states: {}, raw: {}, reason: 'old' } };
-  await runScenario('refresh from TradingView: if the saved updates cannot be listed, nothing is written and no research is lost', { docs: { ['stockUpdates/' + first]: research }, cfg: { liveCollections: true, rules: [{ op: 'get', path: 'stockUpdates', error: { message: 'network down' } }] } }, async page => {
-    await page.click('#tvSnapshotBtn');
-    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 60000 });
-    const text = await page.textContent('#tv_fiResult');
-    ok(await page.evaluate(() => /fi-result-err/.test(document.getElementById('tv_fiResult').className)), 'it says it stopped: ' + text.slice(0, 200));
-    ok(/nothing was changed|Nothing was changed/.test(text), 'it says nothing was changed: ' + text.slice(0, 300));
-    const a = await readDb(page), kept = a.all['stockUpdates/' + first];
-    ok(kept && kept.globalFactors && kept.globalFactors.positive[0] === 'kept note', 'the saved Global factors note is still there: ' + JSON.stringify(kept).slice(0, 200));
-    ok(Object.keys(a.all).filter(k => k.startsWith('stockUpdates/')).length === 1, 'no other record was written');
-    ok(await page.evaluate(() => !(window.__tvBatchCalls || []).length), 'TradingView was not even asked');
-  });
-  await runScenario('refresh from TradingView: a list that fails once is retried and the run goes on', { docs: { ['stockUpdates/' + first]: research }, cfg: { liveCollections: true, rules: [{ op: 'get', path: 'stockUpdates', times: 1, error: { message: 'temporary network error' } }] } }, async page => {
+  // v1.198: the snapshot is saved apart from the per-stock records, so a run never touches (or needs to read) research notes
+  const research = { ticker: first, globalFactors: { scope: 'sector', asof: '2999-01-01', positive: ['kept note'], negative: [] }, technical: { score: 3, asof: '2020-01-01', states: {}, raw: {}, reason: 'old' } };
+  await runScenario('refresh from TradingView: research notes in a stock record are never touched and still show next to the new price', { docs: { ['stockUpdates/' + first]: research }, cfg: { liveCollections: true } }, async page => {
     await page.click('#tvSnapshotBtn');
     await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
     ok(await page.evaluate(() => /fi-result-ok/.test(document.getElementById('tv_fiResult').className)), 'it finishes: ' + (await page.textContent('#tv_fiResult')).slice(0, 200));
-    const a = await readDb(page), rec = a.all['stockUpdates/' + first];
-    ok(rec.globalFactors && rec.globalFactors.positive[0] === 'kept note' && rec.valuation && rec.valuation.currentPrice === 111.1, 'the note is kept and the price is added: ' + JSON.stringify(Object.keys(rec)));
+    const a = await readDb(page);
+    eq(a.all['stockUpdates/' + first], research, 'the stock record is exactly as it was');
+    const m = await page.evaluate(first => { const k = window.__alba.stocks.find(s => window.__alba.sanitizeDocId(window.__alba.tickerSymbol(s)) === first); return { px: k.valuation.currentPrice, note: k.globalFactors && k.globalFactors.positive[0], snap: k.technical && k.technical.src }; }, first);
+    ok(m.px === 111.1 && m.note === 'kept note' && m.snap === 'snapshot', 'the page shows the new price, the note and the newer score: ' + JSON.stringify(m));
+  });
+  await runScenario('refresh from TradingView: a snapshot that cannot be read first still lets the run save everything', { cfg: { liveCollections: true, rules: [{ op: 'get', path: 'liveSnapshot', error: { message: 'network down' } }] } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
+    ok(await page.evaluate(() => /fi-result-ok/.test(document.getElementById('tv_fiResult').className)), 'it finishes: ' + (await page.textContent('#tv_fiResult')).slice(0, 200));
+    ok(Object.keys((await readDb(page)).all).some(k => k.startsWith('liveSnapshot/')), 'the chunks were saved');
+  });
+  await runScenario('refresh from TradingView: a save that fails once is retried', { cfg: { liveCollections: true, rules: [{ op: 'set', path: 'liveSnapshot/c001', times: 1, error: { message: 'temporary network error' } }] } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
+    const text = await page.textContent('#tv_fiResult');
+    ok(!/could not be saved/.test(text) && /fi-result-ok/.test(await page.evaluate(() => document.getElementById('tv_fiResult').className)), 'it finishes: ' + text.slice(0, 200));
+    ok(Object.keys((await readDb(page)).all).includes('liveSnapshot/c001'), 'the first chunk was saved on the second try');
   });
   // v1.187: a quick double click on Refresh all stocks must not start two runs (the first run takes its place before it waits for TradingView)
   await runScenario('refresh from TradingView: a quick double click starts only one run', { cfg: { liveCollections: true } }, async page => {
@@ -745,7 +755,7 @@ async function tvRefreshScenarios(){
     ok(asked.length > 100 && new Set(asked).size === asked.length, 'each stock was asked for once: ' + asked.length + ' asked, ' + new Set(asked).size + ' different');
   });
   // v1.187: the summary counts a score only after it is saved, so refused saves never inflate it
-  await runScenario('refresh from TradingView: stocks whose save fails are not counted as updated', { cfg: { liveCollections: true, rules: [{ op: 'set', prefix: 'stockUpdates/', error: { message: 'write refused' } }] } }, async page => {
+  await runScenario('refresh from TradingView: stocks whose save fails are not counted as updated', { cfg: { liveCollections: true, rules: [{ op: 'set', prefix: 'liveSnapshot/', error: { message: 'write refused' } }] } }, async page => {
     await page.click('#tvSnapshotBtn');
     await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
     const text = await page.textContent('#tv_fiResult');

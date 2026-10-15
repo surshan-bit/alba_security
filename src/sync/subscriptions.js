@@ -4,7 +4,7 @@ import { refreshAnalysisSoon } from '../analysis/section.js';
 import { setResearchTriggerKinds, setResearchTriggers } from '../research/status.js';
 import { rerenderDetail } from '../detail/render.js';
 import { applyResearchOverlay } from '../overlays/research.js';
-import { applyUpdatesOverlay } from '../overlays/updates.js';
+import { applySnapshotOverlay, applyUpdatesOverlay } from '../overlays/updates.js';
 import { pinsRef, tradeCol } from '../identity/session.js';
 import { pinWritesInFlight } from '../core/pins.js';
 import { renderLoadedPart } from '../core/lazy.js';
@@ -88,6 +88,23 @@ function init_sync_subscriptions(){
     }
   };
   watchUpdates(0);
+
+  // The live snapshot of Refresh all stocks: one record per batch of 50 stocks, laid under each stock's own saved update.
+  const watchSnapshot = (attempt) => {
+    try {
+      db.collection('liveSnapshot').onSnapshot(
+        (snap) => {
+          const docs = [];
+          snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
+          try { applySnapshotOverlay(docs); } catch(e){ console.error('Live snapshot could not be applied', e); }
+        },
+        (err) => { console.error('Live snapshot sync error', err); if(attempt < 5) setTimeout(() => watchSnapshot(attempt + 1), 3000 * (attempt + 1)); }
+      );
+    } catch(e){
+      console.error('Live snapshot overlay unavailable', e);
+    }
+  };
+  watchSnapshot(0);
 
   try {
     db.collection('researchTriggers').onSnapshot(
