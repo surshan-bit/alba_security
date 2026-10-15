@@ -120,7 +120,7 @@
             <li><b>Composite:</b> the sum, rounded to 2 decimals.</li>
           </ul>
         </li>
-        <li><b>Two paths, one rule set:</b> the CSV import scores the MACD and RSI values TradingView supplies; the Live Data refresh calculates them from price bars. Both use the same MACD states, RSI bands, weights and composite (<code>src/engine/technical.js</code>). The refresh uses completed weekly and monthly bars only (a week counts as finished from Saturday, a month from the 1st of the next month) and keeps the in-progress reading as <code>technical.provisional</code>; the CSV values include the bar in progress. Every refresh also writes a row to the <code>scoreLog</code> collection (score, inputs, bar dates).</li>
+        <li><b>Two paths, one rule set:</b> the CSV import scores the MACD and RSI values TradingView supplies; the Live Data refresh calculates them from price bars. Both use the same MACD states, RSI bands, weights and composite (<code>src/engine/technical.js</code>). The refresh uses completed weekly and monthly bars only (a week counts as finished from Saturday, a month from the 1st of the next month) and keeps the in-progress reading as <code>technical.provisional</code>; the CSV values include the bar in progress.</li>
         <li><b>Partial data:</b> a blank component (often monthly MACD/RSI for newer tickers) is left out, and the sum is rescaled to 0&ndash;10 over the weights present.
           <ul>
             <li>Example: weekly MACD + weekly RSI + Valuation = 5.5 weight, so composite = (points &divide; 5.5) &times; 10.</li>
@@ -221,6 +221,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.188 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>Removed the score log:</b> the daily record of each stock&rsquo;s technical score and its RSI and MACD figures, added in v1.181 for later back-testing, is gone. Nothing in the dashboard ever read it, only some refreshes wrote to it, and the scores it held can be recalculated from the saved price bars. Refreshes now save one record less per stock. Nothing you see changes. The 490 records it had already written (one per stock, from 15 Oct) were left in the database, unused.</li>
+            </ul>
             <h3>v1.187 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Refresh all stocks is safer to click:</b> a quick double-click could start two runs at once. The second click is now ignored. The summary also counts a technical score as updated only after it was saved; before, a refused save was still counted.</li>
