@@ -1,6 +1,8 @@
 # Runs on every push and pull request: builds the app and runs all the checks. A red cross on GitHub means "do not release this".
 name: checks
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -9,6 +11,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npm install --no-save playwright && npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium   # the Playwright version is pinned in package.json
       - run: npm run check
       - run: npm run platform

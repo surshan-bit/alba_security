@@ -5,11 +5,10 @@
 //  - Trade Log: shown from the live collection; add (with the duplicate guard), sell and remove; the saved Cards / Table choice;
 //    the signed-out view.
 // The stand-in database is the one in tests/lib/env.js (collections made live with cfg.liveCollections). It does not test the real
-// claude.ai runtime. Playwright is optional (SKIPPED if missing). Usage: node tests/state.js   or   npm run state
+// claude.ai runtime. Playwright is optional locally (SKIPPED if missing) but required in CI. Usage: node tests/state.js   or   npm run state
 const fs = require('fs'), path = require('path');
-const { findPlaywright, startServer, openPage } = require('./lib/env.js');
-const chromium = findPlaywright();
-if(!chromium){ console.log('state tests: SKIPPED (Playwright not installed)'); process.exit(0); }
+const { chromiumOrSkip, startServer, openPage } = require('./lib/env.js');
+const chromium = chromiumOrSkip('state tests');
 const srv = startServer();
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'stocks.json'), 'utf8')).stocks;
 const CHUNKS = [FIXTURE.slice(0, Math.ceil(FIXTURE.length / 2)), FIXTURE.slice(Math.ceil(FIXTURE.length / 2))];

@@ -488,6 +488,14 @@ test('v1.182: the reason text of a bars-based score is unchanged by the shared h
   assert.ok(/^monthly MACD bullish, above zero, weekly MACD bullish, above zero\. monthly RSI [\d.]+ \(\w+\), weekly RSI [\d.]+ \(\w+\)\. Valuation pillar reading of 6\.0\/10 \(reasonably valued\)\.$/.test(t.reason), t.reason);
 });
 
+// v1.187: the browser suites are skipped without Playwright on a developer machine, but a missing Playwright must FAIL in CI
+{
+  const { spawnSync } = require('child_process');
+  const run = (ci) => spawnSync(process.execPath, ['-e', "const M = require('module'), o = M._resolveFilename; M._resolveFilename = function(r, ...a){ if(/^playwright/.test(r)) throw new Error('missing'); return o.call(this, r, ...a); }; require('./tests/lib/env.js').chromiumOrSkip('demo suite');"], { cwd: path.join(__dirname, '..'), encoding: 'utf8', env: Object.assign({}, process.env, ci ? { CI: 'true' } : { CI: '' }) });
+  test('v1.187: without Playwright a suite is skipped on a developer machine', () => { const r = run(false); assert.strictEqual(r.status, 0); assert.match(r.stdout, /demo suite: SKIPPED/); });
+  test('v1.187: without Playwright a suite FAILS in CI, so a green check means the browser tests ran', () => { const r = run(true); assert.strictEqual(r.status, 1); assert.match(r.stderr, /demo suite: FAILED/); });
+}
+
 // =========================================================== Characterisation: today's exact numbers on the made-up universe
 const golden = {};
 for(const r of Fe.scoreCsv(csv, { exactIndustryBySym: exactMap }).records){

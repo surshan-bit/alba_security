@@ -11,6 +11,15 @@ function findPlaywright(){
   return null;
 }
 
+// The browser suites need Playwright. On a developer machine a missing Playwright skips them with a notice; in CI (CI=true, set by
+// GitHub Actions) it is a failure, so a green check always means they really ran.
+function chromiumOrSkip(label){
+  const c = findPlaywright();
+  if(c) return c;
+  if(process.env.CI){ console.error(label + ': FAILED (Playwright is not installed, and CI must run every suite)'); process.exit(1); }
+  console.log(label + ': SKIPPED (Playwright not installed)'); process.exit(0);
+}
+
 // ---- server: "/" is the inner document of index.html (the saved one has an outer skeleton) plus the skeleton's [hidden] rule.
 // seeds: name -> JSON text served at /__seed/<name>.json; state.appBroken makes /app.js a 404.
 function startServer(){
@@ -162,4 +171,4 @@ async function openPage(ctx, base, cfg, label, errsOut){
   return { page, errs };
 }
 
-module.exports = { findPlaywright, startServer, installStub, openPage, root };
+module.exports = { chromiumOrSkip, findPlaywright, startServer, installStub, openPage, root };
