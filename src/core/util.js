@@ -62,12 +62,6 @@ function formatUploadTimestamp(iso){
   return d.toLocaleString('en-IN', {day:'numeric', month:'short', year:'numeric', hour:'numeric', minute:'2-digit', timeZone:'Asia/Kolkata'}) + ' IST';
 }
 
-function formatBytes(n){
-  if(n == null) return '';
-  if(n < 1024) return n + ' B';
-  if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
-  return (n/(1024*1024)).toFixed(1) + ' MB';
-}
 
 function pctChangeSpan(pct){
   if(pct == null) return '–';
@@ -84,4 +78,4 @@ function screenerUrl(s){
   return `https://www.screener.in/company/${encodeURIComponent(sym)}/${suffix}`;
 }
 
-export { daysSinceDate, escapeHtml, formatBytes, formatDate, formatDeepRefreshTimestamp, formatRequestedAt, formatUploadTimestamp, pctChangeSpan, sanitizeDocId, screenerUrl, tickerIndustry, tickerSymbol };
+export { daysSinceDate, escapeHtml, formatDate, formatDeepRefreshTimestamp, formatRequestedAt, formatUploadTimestamp, pctChangeSpan, sanitizeDocId, screenerUrl, tickerIndustry, tickerSymbol };

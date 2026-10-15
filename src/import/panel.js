@@ -3,11 +3,10 @@
 // setFiPfx picks the one the next calls draw into.
 const FI_STEPS = [
   { key: 'read', label: 'Read the uploaded file', w: 3 },
-  { key: 'load', label: 'Load the current stock data', w: 17 },
-  { key: 'backup', label: 'Back up the current data', w: 15 },
+  { key: 'load', label: 'Load the current stock data', w: 25 },
   { key: 'score', label: 'Score every stock', w: 10 },
   { key: 'check', label: 'Run integrity checks', w: 5 },
-  { key: 'write', label: 'Write the updated data', w: 45 },
+  { key: 'write', label: 'Write the updated data', w: 52 },
   { key: 'verify', label: 'Verify and finish', w: 5 }
 ];
 let fiCur = null;   // the step list of the job being shown (set by fiReset)

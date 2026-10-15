@@ -660,6 +660,7 @@ test('trade call: history keeps one point a day and lists when the call changed'
     assert.strictEqual(d.valuation.at, '2026-10-14T10:00:00.000Z');
     assert.strictEqual(d.liquidity.avgVolume, 50000);
     assert.strictEqual(d.technical.src, 'snapshot');
+    assert.strictEqual(d.snapAsof, '2026-10-14', 'the day TradingView confirmed the stock, for the Technical data age');
   });
   test('live snapshot: nothing to merge, or a row without a price, leaves the stock record as it is', () => {
     const real = { ticker: 'ABC', globalFactors: { positive: ['x'] } };

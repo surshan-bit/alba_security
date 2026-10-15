@@ -73,9 +73,15 @@ function renderFreshnessPanel(cfg){
   }).join('');
 }
 
+// The day a stock's technical data was last confirmed: its score's date, or the day TradingView's snapshot last covered it if that is later.
+function techConfirmedOn(s){
+  const a = s.technical && s.technical.asof, b = s.__snapAsof;
+  return typeof a === 'string' && typeof b === 'string' ? (b > a ? b : a) : (a || b);
+}
+
 function paintFreshness(){
 renderFreshnessPanel({summaryElId:'fundFreshnessSummary', barsElId:'fundFreshnessBars', getAsof: s => s.asof, noDataText: 'No fundamental refresh dates recorded yet.'});
-renderFreshnessPanel({summaryElId:'techFreshnessSummary', barsElId:'techFreshnessBars', getAsof: s => s.technical && s.technical.asof, noDataText: 'No technical refresh dates recorded yet.'});
+renderFreshnessPanel({summaryElId:'techFreshnessSummary', barsElId:'techFreshnessBars', getAsof: techConfirmedOn, noDataText: 'No technical refresh dates recorded yet.'});
 }
 
 function init_joblogs_freshness(){ paintFreshness(); }

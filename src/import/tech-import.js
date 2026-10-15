@@ -2,15 +2,18 @@
 import { lockBusy, lockText, startBeat, tabId } from './joblock.js';
 import { technicalCsvUploadLog } from '../core/store.js';
 import { uploadsSettled } from './upload-history.js';
-import { formatBytes, sanitizeDocId, tickerSymbol } from '../core/util.js';
+import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { recordAttempt, saveRecord } from './last-file.js';
-import { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiMakeBackup, albaFiPersist, albaFiPrevInfo, albaFiReadAsset, albaFiRenderBackups, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiLoadRaw, albaFiPersist, albaFiPrevInfo, albaFiReadAsset, albaFiRetry, albaFiSleep, albaFiSym, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 import { AlbaTechEngine } from './tech-engine.js';
 import { techValLabel } from '../engine/technical.js';
 import { albaWlResolveBse } from './wlsync.js';
 import { recordScoreHistory } from '../history/scorehistory.js';
+import { paintLastRuns, saveRunLog } from '../refresh/runlog.js';
 
+// The Technical CSV import is hidden for now (v1.199): the TradingView refresh is the only route. Set to true to show it again.
+const SHOW_TECH_CSV = false;
 const ALBA_TI_COMP = { 'monthly MACD': 'monthMacd', 'weekly MACD': 'weekMacd', 'monthly RSI': 'monthRsi', 'weekly RSI': 'weekRsi' };
 // Scores every stock found in the Growth List (never adds stocks) and refreshes price / margin of safety.
 // Mutates `stocks` in place. A stock whose CSV row lacks a component that its stored technical block still
@@ -114,7 +117,8 @@ async function albaTiRunImport(){
   if(!db || !assets){ fiReset('Import data'); fiShowResult('err', [{ text: 'File storage or the database is not available in this view, so the import cannot run here.' }]); return; }
   setFiRunning(true); fiSetButtons(); fiReset('Importing technical data');
   const job = db.doc('importJobs/fundamental'); let locked = false, current = 'read', stopBeat = () => {};
-  let rec = null, recId = null;
+  let rec = null, recId = null, tiRes = null, runError = '';
+  const t0 = Date.now(), startedAt = new Date().toISOString();
   try {
     const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
     if(lockBusy(ld)) throw new Error('another import is already running (' + lockText(ld) + '). It was started from another tab or device. If that one was closed, it counts as interrupted after 3 minutes without activity; then try again.');
@@ -160,17 +164,13 @@ async function albaTiRunImport(){
     } catch(e){ console.error('BSE symbol lookup failed', e); }
     fiSet('load', 'done', raw.stocks.length.toLocaleString('en-IN') + ' stocks (data v' + raw.meta.version + ')');
 
-    // 3. backup
-    current = 'backup'; fiSet('backup', 'running', 'Saving a copy…', 0.4);
-    const bk = await albaFiMakeBackup(db, assets, JSON.stringify(raw.stocks), raw.stocks.length, raw.meta.version, 'Before importing ' + rec.filename + ' (data v' + raw.meta.version + ')');
-    fiSet('backup', 'done', formatBytes(bk.bytes));
-
-    // 4. score
+    // 3. score
     current = 'score'; fiSet('score', 'running', '', 0.3); await albaFiSleep(30);
     const prev = albaFiPrevInfo(raw.stocks);
     const avg = () => { let n = 0, t = 0; for(const s of raw.stocks) if(s.technical && typeof s.technical.score === 'number'){ n++; t += s.technical.score; } return n ? t / n : 0; };
     const avgBefore = avg();
     const res = albaApplyTechnical(csvText, raw.stocks, bse, albaFiDay(rec.uploadedAt));
+    tiRes = res;
     const avgAfter = avg();
     fiSet('score', 'done', res.rescored.toLocaleString('en-IN') + ' rescored' + (res.kept.length ? ', ' + res.kept.length + ' kept' : ''));
 
@@ -219,11 +219,14 @@ async function albaTiRunImport(){
     recordAttempt('tech', rec, recId, e, db);
     if(getFiState()){ getFiState().error = e; if(current && getFiState().status[current] !== 'done') fiSet(current, 'error', ''); }
     const msg = (e && e.message) ? e.message : String(e);
+    runError = (e && e.cancelled ? 'cancelled: ' : '') + msg.slice(0, 200);
     fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);
     if(locked){ try { await job.set({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500), kind: 'technical' }); } catch(x){} }
   } finally {
-    stopBeat(); setFiRunning(false); fiSetButtons(); albaFiRenderBackups();
+    stopBeat();
+    if(rec && getFiDb()) await saveRunLog(getFiDb(), 'csv', startedAt, t0, { planned: tiRes ? tiRes.matched : 0, saved: tiRes && !runError ? tiRes.rescored : 0, unchanged: 0, scored: tiRes && !runError ? tiRes.rescored : 0, kept: tiRes ? tiRes.kept.length : 0, skipped: tiRes ? tiRes.frozen : 0, stopped: !!runError, error: runError || null, file: rec.filename });
+    setFiRunning(false); fiSetButtons(); paintLastRuns(getFiDb());
   }
 }
 
-export { albaTiRunImport };
+export { SHOW_TECH_CSV, albaTiRunImport };

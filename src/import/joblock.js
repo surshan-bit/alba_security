@@ -1,4 +1,4 @@
-// The job lock (importJobs/*) shared by the Fundamental import, Technical import, restore and watchlist sync.
+// The job lock (importJobs/*) shared by the Fundamental import, Technical import and watchlist sync.
 // A running job refreshes `heartbeatAt` every few seconds. A job counts as interrupted when
 //   - it was started by this same browser tab (the tab id survives a reload) and this page is not running it: the page was reloaded; or
 //   - nothing was heard from it for a few minutes (another tab or device that was closed).
