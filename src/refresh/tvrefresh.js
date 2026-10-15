@@ -92,6 +92,16 @@ function skippedReport(skipped, kind){
   host.appendChild(b);
 }
 
+// One record per run in the database (refreshRunLog/<kind>-<start time>), so how long each run took, and where the time went, can be
+// measured later from the data: when it started and ended, how many stocks were saved, left alone or skipped, the seconds spent waiting on
+// TradingView and saving, and the seconds each batch took. Never stops a run: a failed save only means a missing record.
+async function saveRunLog(db, kind, startedAt, t0, rec){
+  try {
+    const endedAt = new Date().toISOString();
+    await db.doc('refreshRunLog/' + kind + '-' + startedAt.replace(/[-:.]/g, '')).set(Object.assign({ v: 1, kind, startedAt, endedAt, durationMs: Date.now() - t0 }, rec));
+  } catch(e){ console.error('Could not save the refresh run record', e); }
+}
+
 // ---- 1. Refresh all stocks ----
 async function runSnapshot(){
   const db = await begin('Refreshing all stocks from TradingView');
@@ -99,13 +109,14 @@ async function runSnapshot(){
   const today = tvIstDate();
   const lines = [], skipped = [];
   let updated = 0, kept = 0, scored = 0, unchanged = 0, stopped = false;
+  const t0 = Date.now(), startedAt = new Date().toISOString(), batchSecs = [];
+  let tvWaitMs = 0, saveMs = 0, planned = 0, runError = '';
   try {
     fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
     // Which stocks already have a saved update. Without this list a save could not tell "change" from "create", and creating
     // REPLACES the whole record (the Global factors and research notes in it would be lost), so a run never goes on without it.
     const existing = new Set(), existingData = new Map();
     let listed = false;
-    const t0 = Date.now();
     for(let attempt = 0; attempt < 2 && !listed; attempt++){
       try { const snap = await db.collection('stockUpdates').get(); snap.docs.forEach(d => { if(!d.exists) return; existing.add(d.id); try { existingData.set(d.id, d.data()); } catch(e){ /* compared only when readable */ } }); listed = true; }
       catch(e){ console.error('Could not list saved updates', e); if(attempt === 0) await sleep(1500); }
@@ -117,6 +128,7 @@ async function runSnapshot(){
       if(!sym) skipped.push({ sym: tickerSymbol(s), name: s.name, reason: 'BSE-only stock with no TradingView symbol saved yet' }); else todo.push({ s, sym });
     }
     fiSet('prepare', 'done', num(todo.length) + ' stocks' + (skipped.length ? ', ' + skipped.length + ' without a symbol' : ''));
+    planned = todo.length;
     const batches = [];
     for(let i = 0; i < todo.length; i += BATCH) batches.push(todo.slice(i, i + BATCH));
     // The next batch is requested while the current one is being saved. TradingView answers "Too Many Requests" when called back
@@ -133,11 +145,13 @@ async function runSnapshot(){
     let pending = batches.length ? fetchBatch(batches[0]) : null;
     for(let bi = 0; bi < batches.length; bi++){
       if(stopAsked){ stopped = true; break; }
-      const batch = batches[bi];
+      const batch = batches[bi], b0 = Date.now();
       fiSet('run', 'running', 'Batch ' + (bi + 1) + ' of ' + batches.length + ' · ' + num(updated + unchanged) + ' done', bi / batches.length);
+      const w0 = Date.now();
       const res = await pending;
+      tvWaitMs += Date.now() - w0;
       pending = bi + 1 < batches.length && !stopAsked ? fetchBatch(batches[bi + 1]) : null;
-      if(res.error){ batch.forEach(x => skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: tvErrorText(res.error) })); backoff = 1500; continue; }
+      if(res.error){ batch.forEach(x => skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: tvErrorText(res.error) })); backoff = 1500; batchSecs.push(Math.round((Date.now() - b0) / 100) / 10); continue; }
       const payload = res.payload;
       const data = (payload && payload.data) || {};
       const writes = [];
@@ -148,6 +162,7 @@ async function runSnapshot(){
         writes.push({ id: sanitizeDocId(tickerSymbol(s)), body, s, kept: !!u.kept, scored: !!u.technical });
       }
       let w = 0;
+      const s0 = Date.now();
       const worker = async () => {
         while(w < writes.length){
           const { id, body, s, kept: wasKept, scored: wasScored } = writes[w++];
@@ -163,6 +178,8 @@ async function runSnapshot(){
         }
       };
       await Promise.all(Array.from({ length: 6 }, worker));
+      saveMs += Date.now() - s0;
+      batchSecs.push(Math.round((Date.now() - b0) / 100) / 10);
     }
     fiSet('run', 'done', num(updated) + ' saved' + (unchanged ? ', ' + num(unchanged) + ' unchanged' : ''));
     fiSet('verify', 'done', '');
@@ -174,8 +191,12 @@ async function runSnapshot(){
     fiShowResult(updated + unchanged === 0 ? 'err' : 'ok', lines, true);
     skippedReport(skipped, 'snapshot');
   } catch(e){
+    runError = tvErrorText(e);
     fiShowResult('err', [{ text: 'Stopped: ' + tvErrorText(e), cls: 'fi-line fi-line-strong' }, { text: num(updated) + ' stocks were saved before this.', cls: 'fi-line fi-line-muted' }], true);
-  } finally { end(); }
+  } finally {
+    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
+    end();
+  }
 }
 
 // ---- 2. Fill missing history ----
@@ -192,7 +213,8 @@ async function runHistory(){
   const db = await begin('Filling missing price history');
   if(!db) return;
   const failed = [];
-  let done = 0, ok = 0, stopped = false;
+  let done = 0, ok = 0, stopped = false, planned = 0, missingBefore = 0, runError = '';
+  const t0 = Date.now(), startedAt = new Date().toISOString();
   try {
     fiSet('prepare', 'running', 'Finding stocks without history…', 0.3);
     let tried = {};
@@ -201,6 +223,7 @@ async function runHistory(){
     const { missing, order, trackedCount } = await missingHistoryOrder();
     const eligible = order.filter(s => !recent(sanitizeDocId(tickerSymbol(s))));
     const list = eligible.slice(0, HISTORY_CAP);
+    planned = list.length; missingBefore = missing.length;
     fiSet('prepare', 'done', num(missing.length) + ' without history' + (trackedCount ? ', ' + trackedCount + ' are tracked picks' : ''));
     if(!list.length){
       fiSet('run', 'done', ''); fiSet('verify', 'done', '');
@@ -232,8 +255,12 @@ async function runHistory(){
     ], true);
     skippedReport(failed, 'history');
   } catch(e){
+    runError = tvErrorText(e);
     fiShowResult('err', [{ text: 'Stopped: ' + tvErrorText(e), cls: 'fi-line fi-line-strong' }, { text: ok + ' stocks were completed before this.', cls: 'fi-line fi-line-muted' }], true);
-  } finally { end(); }
+  } finally {
+    if(planned > 0 || runError) await saveRunLog(db, 'history', startedAt, t0, { planned, missingBefore, tried: done, saved: ok, failed: failed.length, stopped, error: runError || null });
+    end();
+  }
 }
 
 async function paintHint(){
