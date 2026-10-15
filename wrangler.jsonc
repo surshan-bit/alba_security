@@ -2,5 +2,6 @@
   "name": "alba-test",
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
-  "assets": { "directory": "./dist" }
+  "assets": { "directory": "./dist" },
+  "previews": {}
 }
