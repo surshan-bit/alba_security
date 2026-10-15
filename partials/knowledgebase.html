@@ -221,6 +221,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.191 &middot; 2026-10-15</h3>
+            <ul>
+              <li><b>Behind the scenes only, nothing changes on screen:</b> the automatic code check had 229 known warnings, almost all of one kind (the code treats a clicked element as a button or text box, which the checker could not see). They are all fixed now, so the list of known warnings is empty and any new mistake is flagged straight away. A before-and-after comparison of all screens showed no difference.</li>
+            </ul>
             <h3>v1.190 &middot; 2026-10-15</h3>
             <ul>
               <li><b>Buy / Sell ideas load only what they need:</b> picking a strategy used to read the price history of every stock. It now reads only the stocks in that strategy, a few at a time, and shows &ldquo;Loading weekly price history&hellip; (n of m)&rdquo; while it does. This keeps the panel fast once price history has been filled for all stocks.</li>
