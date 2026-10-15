@@ -685,6 +685,26 @@ async function tvRefreshScenarios(){
     ok(r.btn && /skipped/.test(r.text), 'a skipped-stocks file is offered: ' + r.text.slice(0, 300));
     ok(await page.evaluate(() => !document.getElementById('tvStopBtn') || document.getElementById('tvStopBtn').hidden), 'the Stop button is hidden again');
   });
+  // v1.185: if the list of saved updates cannot be read, saving blindly would REPLACE whole records and lose what else they hold
+  const research = { ticker: first, globalFactors: { scope: 'sector', positive: ['kept note'], negative: [] }, technical: { score: 3, asof: '2020-01-01', states: {}, raw: {}, reason: 'old' } };
+  await runScenario('refresh from TradingView: if the saved updates cannot be listed, nothing is written and no research is lost', { docs: { ['stockUpdates/' + first]: research }, cfg: { liveCollections: true, rules: [{ op: 'get', path: 'stockUpdates', error: { message: 'network down' } }] } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 60000 });
+    const text = await page.textContent('#tv_fiResult');
+    ok(await page.evaluate(() => /fi-result-err/.test(document.getElementById('tv_fiResult').className)), 'it says it stopped: ' + text.slice(0, 200));
+    ok(/nothing was changed|Nothing was changed/.test(text), 'it says nothing was changed: ' + text.slice(0, 300));
+    const a = await readDb(page), kept = a.all['stockUpdates/' + first];
+    ok(kept && kept.globalFactors && kept.globalFactors.positive[0] === 'kept note', 'the saved Global factors note is still there: ' + JSON.stringify(kept).slice(0, 200));
+    ok(Object.keys(a.all).filter(k => k.startsWith('stockUpdates/')).length === 1, 'no other record was written');
+    ok(await page.evaluate(() => !(window.__tvBatchCalls || []).length), 'TradingView was not even asked');
+  });
+  await runScenario('refresh from TradingView: a list that fails once is retried and the run goes on', { docs: { ['stockUpdates/' + first]: research }, cfg: { liveCollections: true, rules: [{ op: 'get', path: 'stockUpdates', times: 1, error: { message: 'temporary network error' } }] } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
+    ok(await page.evaluate(() => /fi-result-ok/.test(document.getElementById('tv_fiResult').className)), 'it finishes: ' + (await page.textContent('#tv_fiResult')).slice(0, 200));
+    const a = await readDb(page), rec = a.all['stockUpdates/' + first];
+    ok(rec.globalFactors && rec.globalFactors.positive[0] === 'kept note' && rec.valuation && rec.valuation.currentPrice === 111.1, 'the note is kept and the price is added: ' + JSON.stringify(Object.keys(rec)));
+  });
   // the real database hands out records that cannot be changed in place: the list of stocks that failed before must be copied first
   const old = {}; DS.stocks.filter(s => !/^\d/.test(symOf(s))).forEach(s => { old[symOf(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_')] = '2020-01-01T00:00:00.000Z'; });
   await runScenario('fill missing history: a saved failure list that cannot be changed in place does not stop the run', { docs: { 'stockMeta/histFillTried': Object.assign({ uploadedAt: '2026-10-01' }, old) } }, async page => {

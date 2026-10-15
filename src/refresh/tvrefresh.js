@@ -91,8 +91,15 @@ async function runSnapshot(){
   let updated = 0, kept = 0, scored = 0, stopped = false;
   try {
     fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
+    // Which stocks already have a saved update. Without this list a save could not tell "change" from "create", and creating
+    // REPLACES the whole record (the Global factors and research notes in it would be lost), so a run never goes on without it.
     const existing = new Set();
-    try { const snap = await db.collection('stockUpdates').get(); snap.docs.forEach(d => { if(d.exists) existing.add(d.id); }); } catch(e){ console.error('Could not list saved updates', e); }
+    let listed = false;
+    for(let attempt = 0; attempt < 2 && !listed; attempt++){
+      try { const snap = await db.collection('stockUpdates').get(); snap.docs.forEach(d => { if(d.exists) existing.add(d.id); }); listed = true; }
+      catch(e){ console.error('Could not list saved updates', e); if(attempt === 0) await sleep(1500); }
+    }
+    if(!listed) throw new Error('the saved updates could not be read, so nothing was changed (saving without them could overwrite research notes). Try again in a moment.');
     const todo = [];
     for(const s of stocks){
       const sym = snapshotSymbol(s);
@@ -123,6 +130,8 @@ async function runSnapshot(){
           const { id, body, s } = writes[w++];
           try {
             const ref = db.doc('stockUpdates/' + id);
+            // A stock missing from the list is checked once more just before it is created, in case a record appeared since.
+            if(!existing.has(id)){ const cur = await ref.get(); if(cur && cur.exists) existing.add(id); }
             if(existing.has(id)) await ref.update(body); else { await ref.set(Object.assign({ ticker: tickerSymbol(s) }, body)); existing.add(id); }
             updated++;
           } catch(e){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: 'could not be saved: ' + String((e && e.message) || e).slice(0, 80) }); }

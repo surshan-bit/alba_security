@@ -82,7 +82,7 @@ function installStub(cfg){
   }
   function colSnap(p){ const docs = []; for(const [k, v] of store){ if(k.startsWith(p + '/') && !k.slice(p.length + 1).includes('/')) docs.push(snap(k.slice(p.length + 1), v)); } return { docs, size: docs.length, empty: !docs.length, forEach: f => docs.forEach(f), docChanges: () => [] }; }
   function mkCol(p){
-    const c = { doc: id => mkDoc(p + '/' + id), get: async () => { await seedP; return colSnap(p); },
+    const c = { doc: id => mkDoc(p + '/' + id), get: async () => { await seedP; rule('get', p); return colSnap(p); },
       onSnapshot: cb => {
         if(cfg.liveCollections){ if(!colListeners.has(p)) colListeners.set(p, new Set()); colListeners.get(p).add(cb); }
         seedP.then(() => cb(colSnap(p)));
