@@ -40,7 +40,8 @@ function wireMultiselectFilterGroup(btns, dataAttr, getSet, setSet, onChange){
 
 const techStates = (s) => (s.technical && s.technical.states) || {};
 
-// The stocks the Analysis section works on. A stock with no valuation data at all is never included.
+// The stocks the Analysis section works on: every stock. A stock with no Intrinsic Value (so no margin of safety) is listed with its MoS
+// and price cells blank; it is left out only when a MoS Rating button or the MoS range is used, as those need a margin of safety.
 // Tech Rating W / M: a stock with no rating for that timeframe is excluded once any button there is active.
 const strategyPassSet = () => strategyStockSet(analysisFilters.strategyId);
 function analysisBucket(){
@@ -50,7 +51,6 @@ function analysisBucket(){
     const verdictOk = analysisFilters.verdicts.length === 0 || analysisFilters.verdicts.includes(s.verdict);
     if(!verdictOk) return false;
     const rating = mosRatingAny(s);
-    if(rating == null) return false;
     if(analysisFilters.mosRatings.length !== 0 && !analysisFilters.mosRatings.includes(rating)) return false;
     const st = techStates(s);
     if(analysisFilters.techW.length !== 0 && !analysisFilters.techW.includes(st.weekMacd)) return false;
@@ -64,7 +64,6 @@ function analysisBucket(){
 function analysisPasses(s, skip, inStrategy){
   if(inStrategy && !inStrategy.has(s)) return false;
   const rating = mosRatingAny(s);
-  if(rating == null) return false;
   if(stocksInRange([s]).length === 0) return false;   // the same MoS and RSI ranges the list applies, so a count equals what the list shows
   const st = techStates(s);
   if(skip !== 'averdict' && analysisFilters.verdicts.length && !analysisFilters.verdicts.includes(s.verdict)) return false;
@@ -150,16 +149,16 @@ function strategyGroup(){
       </div>`;
 }
 
-// Why the numbers above can be lower than the Explorer's: Analysis never lists a stock with no valuation data, and a stock with no RSI
-// reading is hidden as soon as that RSI range is narrowed. Shown only when something is hidden.
+// Why the numbers above can be lower than the total: a stock with no Intrinsic Value is hidden as soon as the MoS range is narrowed (or a
+// MoS Rating button is chosen), and a stock with no RSI reading is hidden as soon as that RSI range is narrowed. Shown only when something is hidden.
 function hiddenNote(){
   const inStrategy = strategyPassSet(), f = analysisFilters;
   const base = inStrategy ? stocks.filter(s => inStrategy.has(s)) : stocks;
-  const weekFull = f.weekMin === 0 && f.weekMax === 100, monthFull = f.monthMin === 0 && f.monthMax === 100;
+  const weekFull = f.weekMin === 0 && f.weekMax === 100, monthFull = f.monthMin === 0 && f.monthMax === 100, mosNarrowed = f.mosLo !== null || f.mosHi !== null;
   const n = { noVal: 0, noWeek: 0, noMonth: 0, range: 0, other: 0 };
   let shown = 0;
   base.forEach(s => {
-    if(mosRatingAny(s) == null){ n.noVal++; return; }
+    if(mosNarrowed && mosRatingAny(s) == null){ n.noVal++; return; }
     const raw = (s.technical && s.technical.raw) || {};
     if(raw.weekRsi == null && !weekFull){ n.noWeek++; return; }
     if(raw.monthRsi == null && !monthFull){ n.noMonth++; return; }
@@ -170,7 +169,7 @@ function hiddenNote(){
   if(!hidden) return '';
   const fmt = (v) => v.toLocaleString('en-IN');
   const parts = [];
-  if(n.noVal) parts.push(`${fmt(n.noVal)} with no valuation data (Analysis never lists these)`);
+  if(n.noVal) parts.push(`${fmt(n.noVal)} with no Intrinsic Value (so no margin of safety) while the MoS range is narrowed`);
   if(n.noWeek) parts.push(`${fmt(n.noWeek)} with no weekly RSI while the W RSI range is ${f.weekMin}–${f.weekMax}`);
   if(n.noMonth) parts.push(`${fmt(n.noMonth)} with no monthly RSI while the M RSI range is ${f.monthMin}–${f.monthMax}`);
   if(n.range) parts.push(`${fmt(n.range)} outside the MoS or RSI ranges`);

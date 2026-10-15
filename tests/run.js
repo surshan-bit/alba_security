@@ -200,6 +200,15 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   snap('s6j2_narrow', { rows: Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-ticker')).map(e => e.textContent).join(',') });
   typeInto($('#monthRsiMaxInput'), '100'); typeInto($('#weekRsiMinInput'), '0'); await sleep(700);
   snap('s6j3_fullrange', { rows: Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-ticker')).map(e => e.textContent).join(','), body: html$('#analysisPanelBody') });
+  // v1.185: with nothing filtered, "All" and the list cover every stock, including those with no Intrinsic Value (their MoS and Price cells are blank)
+  for(const id of ['weekRsiMinInput', 'monthRsiMaxInput']) $('#' + id).dispatchEvent(new win.Event('change', { bubbles: true }));   // a slider's release redraws the filter counts
+  await sleep(300);
+  { const rows = Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-row'));
+    const blankMos = rows.filter(r => /mos-none/.test(r.innerHTML)).length;
+    snap('s6j3b_every_stock', { all: $('#analysisStrategyFilter [data-astrat="all"] .filter-n').textContent, fund: $('#analysisVerdictFilters [data-averdict="all"] .filter-n').textContent, mosAll: $('#analysisMosFilters [data-amos="all"] .filter-n').textContent, count: $('#analysisLeaderboardCount').textContent, note: String(!!$('#analysisHiddenNote')), blankMosRows: String(blankMos) }); }
+  for(const dir of ['mos_desc', 'mos_asc']){ const sel = $('#analysisSortSelect'); sel.value = dir; sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100);
+    const rows = Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-row:not(.pinned)')); const flags = rows.map(r => /mos-none/.test(r.innerHTML) ? 1 : 0).join('');   // pinned stocks always come first
+    snap('s6j3c_blank_mos_last_' + dir, { lastBlankRun: String(/^0*1*$/.test(flags)), flags }); }
   { const sel = $('#analysisSortSelect'); sel.value = 'monthRsi_asc'; sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100); }
   snap('s6j4_blank_sorted_last', { rows: Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-ticker')).map(e => e.textContent).join(',') });
   typeInto($('#weekRsiMinInput'), '55'); await sleep(700);

@@ -11,9 +11,16 @@ const rsiCmp = (key, dir) => (a, b) => {
   return dir * (x - y);
 };
 
+// A stock with no margin of safety (no Intrinsic Value) always sorts last, whichever way the list is sorted.
+const mosCmp = (dir) => (a, b) => {
+  const x = mosPct(a), y = mosPct(b);
+  if(x === -Infinity || y === -Infinity) return x === y ? 0 : (x === -Infinity ? 1 : -1);
+  return dir * (x - y);
+};
+
 const ANALYSIS_SORT_OPTIONS = [
-  { value: 'mos_desc', label: 'Margin of Safety (high to low)', cmp: (a, b) => mosPct(b) - mosPct(a) },
-  { value: 'mos_asc', label: 'Margin of Safety (low to high)', cmp: (a, b) => mosPct(a) - mosPct(b) },
+  { value: 'mos_desc', label: 'Margin of Safety (high to low)', cmp: mosCmp(-1) },
+  { value: 'mos_asc', label: 'Margin of Safety (low to high)', cmp: mosCmp(1) },
   { value: 'score_desc', label: 'Fundamental Score (high to low)', cmp: (a, b) => (b.score || 0) - (a.score || 0) },
   { value: 'weekRsi_desc', label: 'W RSI (high to low)', cmp: rsiCmp('weekRsi', -1) },
   { value: 'weekRsi_asc', label: 'W RSI (low to high)', cmp: rsiCmp('weekRsi', 1) },
