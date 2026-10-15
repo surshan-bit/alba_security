@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
-        with: { version: latest }
+        with: { version: 2.121.0 }
       - run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then echo "No SUPABASE_ACCESS_TOKEN secret yet: skipping the deploy."; exit 0; fi
           supabase functions deploy --project-ref djxnoijgwtklszvgunma
