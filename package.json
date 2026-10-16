@@ -15,7 +15,8 @@
     "update-golden": "node tests/check.js --update",
     "check:live": "node tests/check.js --live",
     "refresh": "node tests/refresh.js",
-    "types": "node tools/typecheck.js"
+    "types": "node tools/typecheck.js",
+    "screener": "node --test screener-worker/test/worker.test.js"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

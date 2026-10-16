@@ -1,0 +1,7 @@
+{
+  "name": "alba-screener",
+  "private": true,
+  "type": "module",
+  "description": "Remote MCP server on Cloudflare Workers that returns the Alba fundamental score inputs from Screener.in. Not part of the dashboard build.",
+  "scripts": { "test": "node --test test/" }
+}
