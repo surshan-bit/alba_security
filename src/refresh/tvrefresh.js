@@ -88,16 +88,20 @@ async function runSnapshot(){
   let updated = 0, kept = 0, scored = 0, unchanged = 0, stopped = false;
   const t0 = Date.now(), startedAt = new Date().toISOString(), batchSecs = [];
   let tvWaitMs = 0, saveMs = 0, planned = 0, chunksSaved = 0, runError = '';
+  let retried = 0, answeredAgain = 0, carried = 0, noSymbol = [];
   let filled = 0, barsUpdated = 0, histFailed = 0, noneBefore = 0, staleBefore = 0, noHistoryLeft = 0, histRan = false;
   try {
     fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
     // The chunks saved by the last run, so a batch that came back exactly the same is not written again. A failed read only means every chunk is written.
     const stored = new Map();
     try { const snap = await db.collection('liveSnapshot').get(); snap.docs.forEach(d => { if(d.exists) stored.set(d.id, d.data()); }); } catch(e){ console.error('Could not read the saved snapshot', e); }
+    // The last good row of every stock, with the day it is from, so a stock TradingView does not answer for today keeps its figures instead of losing them.
+    const prevRows = new Map();
+    stored.forEach(c => { if(c && Array.isArray(c.rows)) c.rows.forEach(r => { if(r && typeof r.k === 'string' && Array.isArray(r.c)) prevRows.set(r.k, { y: r.y, c: r.c, d: r.d || c.asof, t: r.t || c.at }); }); });
     const todo = [];
     for(const s of stocks){
       const sym = snapshotSymbol(s);
-      if(!sym) skipped.push({ sym: tickerSymbol(s), name: s.name, reason: 'BSE-only stock with no TradingView symbol saved yet' }); else todo.push({ s, sym });
+      if(!sym){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: 'BSE-only stock with no TradingView symbol saved yet' }); noSymbol.push(tickerSymbol(s) + ' ' + s.name); } else todo.push({ s, sym });
     }
     fiSet('prepare', 'done', num(todo.length) + ' stocks' + (skipped.length ? ', ' + skipped.length + ' without a symbol' : ''));
     planned = todo.length;
@@ -125,13 +129,27 @@ async function runSnapshot(){
       pending = bi + 1 < batches.length && !stopAsked ? fetchBatch(batches[bi + 1]) : null;
       if(res.error){ batch.forEach(x => skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: tvErrorText(res.error) })); backoff = 1500; batchSecs.push(Math.round((Date.now() - b0) / 100) / 10); continue; }
       const payload = res.payload;
-      const data = (payload && payload.data) || {};
+      const data = Object.assign({}, (payload && payload.data) || {});
+      // A stock TradingView leaves out of an answer is usually a one-off miss: ask again for just those symbols before giving up.
+      const priced = x => data[x.sym] && typeof data[x.sym].close === 'number' && data[x.sym].close > 0;
+      const lacking = batch.filter(x => !priced(x));
+      if(lacking.length && !stopAsked){
+        await sleep(1000);
+        try { const again = await tvCall('mcp-tv-get-symbol-data-batch', { symbols: lacking.map(x => x.sym), columns: COLS }); Object.assign(data, (again && again.data) || {}); retried += lacking.length; answeredAgain += lacking.filter(priced).length; } catch(e){ console.error('Retry of the missing stocks failed', e); }
+        lastStart = Date.now();
+      }
       const rows = [];
       let rowScored = 0, rowKept = 0;
       for(const { s, sym } of batch){
+        const k = sanitizeDocId(tickerSymbol(s));
         const u = snapshotUpdate(s, data[sym], today, sym, s.technical);
-        if(u.reason){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: u.reason + ' (' + sym + ')' }); continue; }
-        rows.push({ k: sanitizeDocId(tickerSymbol(s)), y: sym, c: packValues(data[sym]) });
+        if(u.reason){
+          const prev = prevRows.get(k);
+          if(prev){ rows.push({ k, y: prev.y, c: prev.c, d: prev.d, t: prev.t }); carried++; skipped.push({ sym: tickerSymbol(s), name: s.name, reason: u.reason + ' (' + sym + '): kept its figures from ' + prev.d }); }
+          else skipped.push({ sym: tickerSymbol(s), name: s.name, reason: u.reason + ' (' + sym + ')' });
+          continue;
+        }
+        rows.push({ k, y: sym, c: packValues(data[sym]) });
         if(u.technical) rowScored++; if(u.kept) rowKept++;
       }
       const s0 = Date.now();
@@ -202,6 +220,8 @@ async function runSnapshot(){
     if(histRan) lines.push({ text: 'Price bars: ' + num(filled) + ' stocks downloaded in full' + (noHistoryLeft > 0 ? ' (' + num(noHistoryLeft) + ' still have none)' : '') + ', ' + num(barsUpdated) + ' given their new weekly and monthly bars' + (histFailed ? ', ' + num(histFailed) + ' failed' : '') + '.', cls: 'fi-line' });
     lines.push({ text: 'Took ' + duration(Date.now() - t0) + '.', cls: 'fi-line fi-line-muted' });
     lines.push({ text: 'These scores include the week and month still in progress, so they can change before the week ends. Stocks with saved price bars get the stricter completed-weeks score once their bars are up to date.', cls: 'fi-line fi-line-muted' });
+    if(noSymbol.length) lines.push({ text: num(noSymbol.length) + ' stocks have no TradingView symbol yet, so they are not refreshed: ' + noSymbol.slice(0, 10).join(', ') + (noSymbol.length > 10 ? ' … +' + (noSymbol.length - 10) : '') + '. Their symbols are looked up by exact company name; one that cannot be found has to be added by hand.', cls: 'fi-line' });
+    if(retried) lines.push({ text: num(retried) + ' stocks TradingView left out of an answer were asked for again; ' + num(answeredAgain) + ' answered the second time' + (carried ? ', ' + num(carried) + ' still had no price and kept their figures from an earlier day.' : '.'), cls: 'fi-line fi-line-muted' });
     if(skipped.length) lines.push({ text: num(skipped.length) + ' stocks skipped (listed in the file below).', cls: 'fi-line' });
     fiShowResult(updated + unchanged === 0 ? 'err' : 'ok', lines, true);
     skippedReport(skipped, 'snapshot');
@@ -209,7 +229,7 @@ async function runSnapshot(){
     runError = tvErrorText(e);
     fiShowResult('err', [{ text: 'Stopped: ' + tvErrorText(e), cls: 'fi-line fi-line-strong' }, { text: num(updated) + ' stocks were saved before this.', cls: 'fi-line fi-line-muted' }], true);
   } finally {
-    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, chunks: chunksSaved, filled, barsUpdated, historyFailed: histFailed, noHistoryLeft: histRan ? noHistoryLeft : null, v: 3, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
+    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, chunks: chunksSaved, retried, answeredAgain, carried, noSymbol: noSymbol.length, filled, barsUpdated, historyFailed: histFailed, noHistoryLeft: histRan ? noHistoryLeft : null, v: 4, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
     end();
     paintLastRuns(db);
   }
