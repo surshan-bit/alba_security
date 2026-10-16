@@ -221,6 +221,14 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.202 &middot; 2026-10-16</h3>
+            <ul>
+              <li>New <strong>Tech 2</strong> column beside Tech in the Analysis grid, and a &ldquo;Technical score 2&rdquo; field in Strategies, so the two technical scores can be compared and filtered side by side. The existing Tech score is unchanged.</li>
+              <li>Tech 2 is built from each stock&rsquo;s weekly price bars (moving-average stack, RSI zones, volume breakouts, on-balance volume, distance from the 52-week high, 13-week trend, MACD). Its weights were fitted on about four years of history for roughly 1,500 stocks and tested on a different period from the one it was fitted on.</li>
+              <li>It is rated only when the weekly MACD is bullish, the week is up at least 1 % and average volume is at least 20,000. Outside those conditions it was tested and did not work, so the cell shows a dash (hover for the reason). It rests on the last finished week and changes once a week.</li>
+              <li>The edge is modest: in testing, its top fifth reached +5 % within two weeks about 2 points more often than similarly volatile stocks (roughly 27&ndash;31 % against 22&ndash;27 %). Treat it as a tilt, not a promise. The plan is to watch it next to Tech for a few weeks and retire whichever does worse.</li>
+              <li>The scores are calculated and saved by <strong>Refresh all stocks</strong> (after the price bars are up to date) in a few records, and appear after the next run.</li>
+            </ul>
             <h3>v1.201 &middot; 2026-10-16</h3>
             <ul>
               <li><b>A stock TradingView misses once no longer loses its figures:</b> when TradingView leaves a stock out of an answer, Refresh all stocks now asks for those stocks again right away. If a stock still has no price, it keeps its last good figures, marked with their own day, so the Technical data age shows how old they really are instead of the stock silently falling back to older data. The result and the Last 2 runs record how many were asked again, how many answered and how many kept earlier figures.</li>
