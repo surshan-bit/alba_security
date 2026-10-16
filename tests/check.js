@@ -24,6 +24,7 @@ if(!LIVE) step('lint src/', 'node', ['tools/lint.js', '--strict']);
 if(!LIVE) step('type check of src/ (TypeScript checkJs; no new findings vs tests/types.baseline.txt)', 'node', ['tools/typecheck.js']);
 fs.rmSync(out, { recursive: true, force: true });
 step('engine unit tests (CSV import engines)', 'node', process.argv.includes('--update') ? ['tests/engines.js', '--update'] : ['tests/engines.js']);
+step('alba-screener Worker tests (pretend Screener, no network)', 'node', ['--test', 'screener-worker/test/worker.test.js']);
 step('regression harness', 'node', ['tests/run.js', '.', out]);
 step('browser smoke test (Chromium; skipped if Playwright is missing)', 'node', ['tests/browser.js']);
 step('state tests in Chromium (pins, Trade Log; skipped if Playwright is missing)', 'node', ['tests/state.js']);
