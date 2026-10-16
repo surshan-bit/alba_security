@@ -668,7 +668,7 @@ async function tvRefreshScenarios(){
     ok(noLog(after.all) === noLog(before.all), 'the saved stock records are exactly as they were');
     // v1.196: each run leaves one record in the database with its timing and counts
     const runs = Object.entries(after.all).filter(([k]) => k.startsWith('refreshRunLog/')).map(([, v]) => v).sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1));
-    ok(runs.length === 2 && runs.every(r => r.kind === 'snapshot' && r.v === 4 && typeof r.durationMs === 'number' && r.durationMs >= 0 && r.endedAt >= r.startedAt), 'each run saved one record with its start, end and duration: ' + JSON.stringify(runs.map(r => [r.kind, r.durationMs])));
+    ok(runs.length === 2 && runs.every(r => r.kind === 'snapshot' && r.v === 5 && typeof r.durationMs === 'number' && r.durationMs >= 0 && r.endedAt >= r.startedAt), 'each run saved one record with its start, end and duration: ' + JSON.stringify(runs.map(r => [r.kind, r.durationMs])));
     ok(runs[0].saved > 100 && runs[0].unchanged === 0 && runs[1].saved === 0 && runs[1].unchanged === runs[0].saved, 'the records say how many stocks each run saved and left alone: ' + JSON.stringify(runs.map(r => [r.saved, r.unchanged])));
     ok(runs.every(r => Array.isArray(r.batchSecs) && r.batchSecs.length === r.batches && r.batches > 0 && typeof r.tvWaitSecs === 'number' && typeof r.saveSecs === 'number' && typeof r.chunks === 'number' && r.error === null), 'the records hold the seconds each batch took and the time spent waiting on TradingView and saving');
     ok(runs[0].chunks === runs[0].batches && runs[1].chunks === 0, 'one save per batch, none the second time: ' + JSON.stringify(runs.map(r => [r.batches, r.chunks])));

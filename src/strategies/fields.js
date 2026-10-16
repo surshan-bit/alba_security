@@ -49,6 +49,7 @@ const FIELDS = [
   { id: 'weekPct', group: 'Technical', label: 'Weekly % change', type: 'num', unit: '%', dp: 1, priceBased: true, get: (s) => num(rawOf(s).weekPctChange) },
   { id: 'monthPct', group: 'Technical', label: 'Monthly % change', type: 'num', unit: '%', dp: 1, priceBased: true, get: (s) => num(rawOf(s).monthPctChange) },
   { id: 'techScore', group: 'Technical', label: 'Technical score', type: 'num', unit: '/10', dp: 1, get: (s) => num(s.technical && s.technical.score) },
+  { id: 'techScore2', group: 'Technical', label: 'Technical score 2', type: 'num', unit: '/10', dp: 1, get: (s) => num(s.technical2 && s.technical2.score) },
   { id: 'newsPos', group: 'News and events', label: `Positive news items (last ${NEWS_DAYS} days)`, type: 'num', unit: '', dp: 0, get: (s) => { const c = newsCounts(s); return c ? c.pos : null; } },
   { id: 'newsNeg', group: 'News and events', label: `Negative news items (last ${NEWS_DAYS} days)`, type: 'num', unit: '', dp: 0, get: (s) => { const c = newsCounts(s); return c ? c.neg : null; } },
   { id: 'newsAll', group: 'News and events', label: `All news items (last ${NEWS_DAYS} days)`, type: 'num', unit: '', dp: 0, get: (s) => { const c = newsCounts(s); return c ? c.total : null; } },

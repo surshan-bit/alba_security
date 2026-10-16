@@ -16,6 +16,7 @@ import { tvCall, tvErrorText, tvIstDate, tvMcp } from '../tv/connector.js';
 import { loadRuns } from '../strategies/tracking.js';
 import { priorityOrder } from './freshness.js';
 import { planHistory } from './historyplan.js';
+import { buildTech2Chunks } from '../engine/techscore2.js';
 import { debugHandle } from '../boot/handoff.js';
 import { getFiDb, getFiOwner, getFiRunning, setFiRunning } from '../import/fund-import.js';
 import { fiEl, fiReset, fiSet, fiShowResult, setFiPfx } from '../import/panel.js';
@@ -89,6 +90,7 @@ async function runSnapshot(){
   const t0 = Date.now(), startedAt = new Date().toISOString(), batchSecs = [];
   let tvWaitMs = 0, saveMs = 0, planned = 0, chunksSaved = 0, runError = '';
   let retried = 0, answeredAgain = 0, carried = 0, noSymbol = [];
+  let tech2Saved = 0, tech2Rated = 0, tech2Failed = 0;
   let filled = 0, barsUpdated = 0, histFailed = 0, noneBefore = 0, staleBefore = 0, noHistoryLeft = 0, histRan = false;
   try {
     fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
@@ -214,8 +216,29 @@ async function runSnapshot(){
       noHistoryLeft = noneBefore - filled;
       failedBars.forEach(x => skipped.push(x));
     }
+    // ---- Technical Score 2: from the saved weekly bars, a few records ----
+    if(histRan && !stopped){
+      fiSet('verify', 'running', 'Calculating Technical Score 2…', 0.5);
+      try {
+        const chunks = buildTech2Chunks(stocks, s => (priceHistoryByTicker[pcTickerKey(s)] || {})['1W'], today);
+        const oldT2 = new Map();
+        try { const snap = await db.collection('techScore2').get(); snap.docs.forEach(d => { if(d.exists) oldT2.set(d.id, d.data()); }); } catch(e){ console.error('Could not read the saved Tech 2 scores', e); }
+        for(const { id, doc } of chunks){
+          tech2Rated += doc.rows.filter(r => typeof r.s === 'number').length;
+          const old = oldT2.get(id);
+          if(old && old.asof === today && sameValue(old.rows, doc.rows)){ tech2Saved += doc.rows.length; continue; }
+          let saved = false;
+          for(let attempt = 0; attempt < 2 && !saved; attempt++){
+            try { await db.doc('techScore2/' + id).set(doc); saved = true; } catch(e){ if(attempt === 0) await sleep(1500); else console.error('Could not save Tech 2 ' + id, e); }
+          }
+          if(saved) tech2Saved += doc.rows.length; else tech2Failed += doc.rows.length;
+        }
+      } catch(e){ console.error('Technical Score 2 failed', e); tech2Failed = -1; }
+    }
     fiSet('verify', 'done', '');
     lines.push({ text: (stopped ? 'Stopped. ' : '') + num(updated) + ' stocks refreshed: price saved for each, ' + num(scored) + ' technical scores updated, ' + num(kept) + ' kept their completed-week score (updated in the last 3 days).', cls: 'fi-line fi-line-strong' });
+    if(histRan && tech2Failed !== -1 && !stopped) lines.push({ text: 'Technical Score 2: ' + num(tech2Saved) + ' stocks scored from their weekly bars, ' + num(tech2Rated) + ' rated' + (tech2Failed ? ', ' + num(tech2Failed) + ' could not be saved' : '') + '. The rest do not meet its conditions (bullish weekly MACD, week up at least 1 %, volume) or have under 60 weeks of bars.', cls: 'fi-line' });
+    if(histRan && tech2Failed === -1) lines.push({ text: 'Technical Score 2 could not be calculated this time.', cls: 'fi-line' });
     if(unchanged) lines.push({ text: num(unchanged) + ' stocks already held exactly these figures (same price and scores), so they were not rewritten.', cls: 'fi-line' });
     if(histRan) lines.push({ text: 'Price bars: ' + num(filled) + ' stocks downloaded in full' + (noHistoryLeft > 0 ? ' (' + num(noHistoryLeft) + ' still have none)' : '') + ', ' + num(barsUpdated) + ' given their new weekly and monthly bars' + (histFailed ? ', ' + num(histFailed) + ' failed' : '') + '.', cls: 'fi-line' });
     lines.push({ text: 'Took ' + duration(Date.now() - t0) + '.', cls: 'fi-line fi-line-muted' });
@@ -229,7 +252,7 @@ async function runSnapshot(){
     runError = tvErrorText(e);
     fiShowResult('err', [{ text: 'Stopped: ' + tvErrorText(e), cls: 'fi-line fi-line-strong' }, { text: num(updated) + ' stocks were saved before this.', cls: 'fi-line fi-line-muted' }], true);
   } finally {
-    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, chunks: chunksSaved, retried, answeredAgain, carried, noSymbol: noSymbol.length, filled, barsUpdated, historyFailed: histFailed, noHistoryLeft: histRan ? noHistoryLeft : null, v: 4, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
+    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, chunks: chunksSaved, retried, answeredAgain, carried, noSymbol: noSymbol.length, filled, barsUpdated, historyFailed: histFailed, noHistoryLeft: histRan ? noHistoryLeft : null, v: 5, tech2: tech2Saved, tech2Rated, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
     end();
     paintLastRuns(db);
   }

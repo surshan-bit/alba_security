@@ -5,6 +5,7 @@ import { setResearchTriggerKinds, setResearchTriggers } from '../research/status
 import { rerenderDetail } from '../detail/render.js';
 import { applyResearchOverlay } from '../overlays/research.js';
 import { applySnapshotOverlay, applyUpdatesOverlay } from '../overlays/updates.js';
+import { applyTech2Overlay } from '../overlays/techscore2.js';
 import { pinsRef, tradeCol } from '../identity/session.js';
 import { pinWritesInFlight } from '../core/pins.js';
 import { renderLoadedPart } from '../core/lazy.js';
@@ -105,6 +106,23 @@ function init_sync_subscriptions(){
     }
   };
   watchSnapshot(0);
+
+  // Technical Score 2: one record per 250 stocks, saved by Refresh all stocks.
+  const watchTech2 = (attempt) => {
+    try {
+      db.collection('techScore2').onSnapshot(
+        (snap) => {
+          const docs = [];
+          snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
+          try { applyTech2Overlay(docs); } catch(e){ console.error('Technical Score 2 could not be applied', e); }
+        },
+        (err) => { console.error('Technical Score 2 sync error', err); if(attempt < 5) setTimeout(() => watchTech2(attempt + 1), 3000 * (attempt + 1)); }
+      );
+    } catch(e){
+      console.error('Technical Score 2 overlay unavailable', e);
+    }
+  };
+  watchTech2(0);
 
   try {
     db.collection('researchTriggers').onSnapshot(

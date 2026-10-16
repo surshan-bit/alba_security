@@ -744,6 +744,53 @@ test('trade call: history keeps one point a day and lists when the call changed'
   });
 }
 
+// ---- Technical Score 2 (v1.202) ----
+{
+  const T2 = load('src/engine/techscore2.js', 'export { computeTech2 };');
+  const wk0 = Date.parse('2024-01-01T00:00:00Z') / 1000;
+  const mk = (n, f, vol = 1000000) => { const out = []; let px = 100; for(let i = 0; i < n; i++){ px = f(i, px); out.push([wk0 + i * 604800, px, px * 1.02, px * 0.98, px, vol]); } return out; };
+  const rising = n => mk(n, (i, px) => (i === n - 1 ? px * 1.03 : px * 1.004));
+  test('tech score 2: a rising stock whose last week is up 3 % is rated, on a 0-10 scale', () => {
+    const r = T2.computeTech2(rising(120));
+    assert.ok(r && r.rated, 'rated');
+    assert.ok(r.score >= 0 && r.score <= 10, 'score ' + r.score);
+    assert.strictEqual(r.week, '2026-04-13', 'the week it rests on');
+  });
+  test('tech score 2: not rated when the week is up under 1 %, MACD is not bullish or volume is thin', () => {
+    const flatWeek = mk(120, (i, px) => (i === 119 ? px * 1.002 : px * 1.004));
+    assert.strictEqual(T2.computeTech2(flatWeek).rated, false);
+    assert.match(T2.computeTech2(flatWeek).why, /less than 1/);
+    const falling = mk(120, (i, px) => (i < 100 ? px * 1.004 : px * 0.97));
+    assert.match(T2.computeTech2(falling).why, /MACD/);
+    assert.match(T2.computeTech2(mk(120, (i, px) => (i === 119 ? px * 1.03 : px * 1.004), 50000)).why, /volume/);
+    assert.strictEqual(T2.computeTech2(flatWeek).score, null);
+  });
+  test('tech score 2: the saved records hold one row per stock with enough bars, 250 to a record', () => {
+    const list = [];
+    for(let i = 0; i < 300; i++) list.push({ ticker: 'S' + i, name: 'S' + i });
+    const barsOf = s => (s.ticker === 'S5' ? rising(30) : (s.ticker === 'S6' ? undefined : (s.ticker === 'S7' ? mk(120, (i, px) => (i < 100 ? px * 1.004 : px * 0.97)) : rising(120))));
+    const out = T2.buildTech2Chunks(list, barsOf, '2026-10-16');
+    assert.deepStrictEqual(out.map(c => [c.id, c.doc.rows.length]), [['c001', 250], ['c002', 48]], '300 stocks, two with no usable bars');
+    const all = out.flatMap(c => c.doc.rows), s7 = all.find(r => r.k === 'S7'), s1 = all.find(r => r.k === 'S1');
+    assert.ok(!all.some(r => r.k === 'S5' || r.k === 'S6'));
+    assert.strictEqual(s7.s, null); assert.match(s7.x, /MACD/);
+    assert.ok(typeof s1.s === 'number' && s1.x === undefined && s1.w === '2026-04-13');
+    assert.strictEqual(out[0].doc.asof, '2026-10-16');
+  });
+  test('tech score 2: too few bars gives nothing, and a week still in progress is left out', () => {
+    assert.strictEqual(T2.computeTech2(rising(59)), null);
+    const b = rising(120), last = b[119][0];
+    const day = new Date((last + 2 * 86400) * 1000).toISOString().slice(0, 10);   // Wednesday of the last bar's week
+    const r = T2.computeTech2(b, day);
+    assert.strictEqual(r.week, new Date((b[118][0] + 19800) * 1000).toISOString().slice(0, 10), 'built on the previous, finished week');
+  });
+  test('tech score 2: a stronger recent run scores higher than a weaker one', () => {
+    const weak = T2.computeTech2(mk(120, (i, px) => (i === 119 ? px * 1.012 : px * 1.0005)));
+    const strong = T2.computeTech2(mk(120, (i, px) => (i === 119 ? px * 1.08 : px * 1.012)));
+    assert.ok(weak.rated && strong.rated && strong.score > weak.score, weak.score + ' < ' + strong.score);
+  });
+}
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
