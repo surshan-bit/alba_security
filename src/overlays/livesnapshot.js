@@ -2,7 +2,8 @@
 // batch of 50 stocks (collection liveSnapshot, ids c001, c002 ...) instead of one record per stock. The database takes about 1.5 saves a
 // second however many are sent at once, so about 44 saves per run instead of about 2,000 is what makes a full refresh fast.
 //   liveSnapshot/<c001...> = { v: 1, asof: 'YYYY-MM-DD', at: ISO time, rows: [ { k, y, c: [ ...values in COLS order, null when missing ] }, ... ] }
-//   k = the stock's record id (its ticker), y = the TradingView symbol it was read from.
+//   k = the stock's record id (its ticker), y = the TradingView symbol it was read from. A row may also carry d (day) and t (time): it is then a
+//   row kept from an earlier run because TradingView had no price for the stock today, and it counts as that day's, not the chunk's.
 // The page turns each row back into what the refresh used to save per stock ({ valuation, liquidity, technical }) and lays it under that
 // stock's own saved update (stockUpdates), which still carries the research notes, Global factors and completed-weeks scores:
 // mergedDoc() decides which of the two is newer for each part.

@@ -83,12 +83,13 @@ function applySnapshotOverlay(chunkDocs){
   chunkDocs.forEach(d => {
     const c = d.data;
     if(!c || !Array.isArray(c.rows) || typeof c.asof !== 'string') return;
-    const at = typeof c.at === 'string' ? c.at : null;
     c.rows.forEach(row => {
       if(!row || typeof row.k !== 'string' || !Array.isArray(row.c)) return;
+      // a row kept from an earlier run (TradingView had no price for it) carries its own day and time
+      const asof = typeof row.d === 'string' ? row.d : c.asof, at = typeof row.t === 'string' ? row.t : (typeof c.at === 'string' ? c.at : null);
       const old = next.get(row.k);
       if(old && (old.at || '') > (at || '')) return;
-      next.set(row.k, { row, asof: c.asof, at });
+      next.set(row.k, { row, asof, at });
     });
   });
   snapRows = next;

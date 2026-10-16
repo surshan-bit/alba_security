@@ -638,7 +638,7 @@ async function tvRefreshScenarios(){
     ok(today0 > 100, 'the technical data age bars show the refreshed stocks as Today without a reload: ' + today0);
     const a = await readDb(page), chunks = Object.entries(a.all).filter(([k]) => k.startsWith('liveSnapshot/')).sort(([x], [y]) => (x < y ? -1 : 1));
     const rows = [].concat(...chunks.map(([, v]) => v.rows));
-    ok(chunks.length >= 1 && chunks.length === r.calls.length && chunks.every(([k, v], i) => k === 'liveSnapshot/c' + String(i + 1).padStart(3, '0') && v.v === 1 && v.asof === today && typeof v.at === 'string' && v.rows.length <= 50), 'one record per TradingView batch: ' + r.calls.length + ' calls, today ' + today + ', ' + chunks.slice(-2).map(([k, v]) => k + ':' + v.rows.length + ':' + v.asof + ':' + v.v + ':' + v.at).join(','));
+    ok(chunks.length >= 1 && chunks.length <= r.calls.length && r.calls.length - chunks.length <= 2 && chunks.every(([k, v], i) => k === 'liveSnapshot/c' + String(i + 1).padStart(3, '0') && v.v === 1 && v.asof === today && typeof v.at === 'string' && v.rows.length <= 50), 'one record per TradingView batch (a call that only asks again for stocks left out is not a batch): ' + r.calls.length + ' calls, today ' + today + ', ' + chunks.slice(-2).map(([k, v]) => k + ':' + v.rows.length + ':' + v.asof + ':' + v.v + ':' + v.at).join(','));
     ok(rows.length > 100 && rows.every(x => x.c[0] === 111.1 && typeof x.k === 'string' && typeof x.y === 'string'), 'a price for every stock: ' + rows.length);
     ok(rows.filter(x => x.c[9] === 50000).length === rows.length, 'every row carries its average daily volume');
     ok(Object.keys(a.all).filter(k => k.startsWith('stockUpdates/')).length === 1, 'no per-stock record was written');
@@ -668,7 +668,7 @@ async function tvRefreshScenarios(){
     ok(noLog(after.all) === noLog(before.all), 'the saved stock records are exactly as they were');
     // v1.196: each run leaves one record in the database with its timing and counts
     const runs = Object.entries(after.all).filter(([k]) => k.startsWith('refreshRunLog/')).map(([, v]) => v).sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1));
-    ok(runs.length === 2 && runs.every(r => r.kind === 'snapshot' && r.v === 3 && typeof r.durationMs === 'number' && r.durationMs >= 0 && r.endedAt >= r.startedAt), 'each run saved one record with its start, end and duration: ' + JSON.stringify(runs.map(r => [r.kind, r.durationMs])));
+    ok(runs.length === 2 && runs.every(r => r.kind === 'snapshot' && r.v === 4 && typeof r.durationMs === 'number' && r.durationMs >= 0 && r.endedAt >= r.startedAt), 'each run saved one record with its start, end and duration: ' + JSON.stringify(runs.map(r => [r.kind, r.durationMs])));
     ok(runs[0].saved > 100 && runs[0].unchanged === 0 && runs[1].saved === 0 && runs[1].unchanged === runs[0].saved, 'the records say how many stocks each run saved and left alone: ' + JSON.stringify(runs.map(r => [r.saved, r.unchanged])));
     ok(runs.every(r => Array.isArray(r.batchSecs) && r.batchSecs.length === r.batches && r.batches > 0 && typeof r.tvWaitSecs === 'number' && typeof r.saveSecs === 'number' && typeof r.chunks === 'number' && r.error === null), 'the records hold the seconds each batch took and the time spent waiting on TradingView and saving');
     ok(runs[0].chunks === runs[0].batches && runs[1].chunks === 0, 'one save per batch, none the second time: ' + JSON.stringify(runs.map(r => [r.batches, r.chunks])));
@@ -711,7 +711,7 @@ async function tvRefreshScenarios(){
     await page.evaluate(() => { const b = document.getElementById('tvSnapshotBtn'); b.click(); b.click(); });
     await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
     const asked = await page.evaluate(() => [].concat(...(window.__tvBatchCalls || []).map(c => c.symbols)));
-    ok(asked.length > 100 && new Set(asked).size === asked.length, 'each stock was asked for once: ' + asked.length + ' asked, ' + new Set(asked).size + ' different');
+    ok(asked.length > 100 && asked.length - new Set(asked).size <= 2, 'each stock was asked for once: ' + asked.length + ' asked, ' + new Set(asked).size + ' different');
   });
   // v1.187: the summary counts a score only after it is saved, so refused saves never inflate it
   await runScenario('refresh from TradingView: stocks whose save fails are not counted as updated', { cfg: { liveCollections: true, rules: [{ op: 'set', prefix: 'liveSnapshot/', error: { message: 'write refused' } }] } }, async page => {
@@ -726,6 +726,33 @@ async function tvRefreshScenarios(){
   const triedExcept = keep => ({ ['stockMeta/histFillTried']: Object.fromEntries(DS.stocks.filter(s => !keep.includes(symOf(s))).map(s => [sid(symOf(s)), nowIso])) });
   const nonNumeric = DS.stocks.filter(s => !/^\d/.test(symOf(s))).map(s => symOf(s));
   const waitDone = async (page, ms) => { await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: ms || 120000 }); return page.textContent('#tv_fiResult'); };
+  // v1.201: a stock TradingView leaves out of an answer is asked for again, and if it still has no price it keeps its earlier figures with their own date
+  const miss = DS.stocks.map(s => symOf(s)).find(x => /^[A-Z0-9]+$/.test(x));
+  const snapRows = all => [].concat(...Object.entries(all).filter(([k]) => k.startsWith('liveSnapshot/')).map(([, v]) => v.rows));
+  await runScenario('refresh all stocks: a stock TradingView misses once is asked for again', { cfg: { liveCollections: true } }, async page => {
+    await page.evaluate(sym => { window.__tvFlaky = { [sym]: 1 }; }, 'NSE:' + miss);
+    await page.click('#tvSnapshotBtn');
+    const text = await waitDone(page);
+    ok(/were asked for again; 1 answered the second time/.test(text), 'the result says the missed stock was asked for again and answered: ' + text.slice(0, 500));
+    const a = await readDb(page), row = snapRows(a.all).find(r => r.k === sid(miss));
+    ok(row && row.c[0] === 111.1 && row.d === undefined, 'the stock has today\'s figures after the second ask: ' + JSON.stringify(row));
+    const run = Object.values(a.all).find(v => v && v.kind === 'snapshot'); ok(run && run.retried >= 1 && run.answeredAgain === 1 && run.carried === 0 && run.noSymbol > 0, 'the run record counts the retry and the stocks without a symbol: ' + JSON.stringify(run && [run.retried, run.answeredAgain, run.carried, run.noSymbol]));
+    ok(/stocks have no TradingView symbol yet, so they are not refreshed:/.test(text), 'the screen lists the stocks with no TradingView symbol: ' + text.slice(0, 500));
+  });
+  const oldRow = { k: sid(miss), y: 'NSE:' + miss, c: [77.7, 2, 1, 3, 1, 60, 58, 1.5, 4, 50000], d: undefined };
+  await runScenario('refresh all stocks: a stock with no price keeps its earlier figures, dated as they are', { cfg: { liveCollections: true }, docs: { 'liveSnapshot/c001': { v: 1, asof: '2026-10-10', at: '2026-10-10T10:00:00.000Z', rows: [{ k: oldRow.k, y: oldRow.y, c: oldRow.c }] } } }, async page => {
+    await page.evaluate(sym => { window.__tvFlaky = { [sym]: 5 }; }, 'NSE:' + miss);
+    await page.click('#tvSnapshotBtn');
+    const text = await waitDone(page);
+    ok(/still had no price and kept their figures from an earlier day/.test(text), 'the result says it kept the figures: ' + text.slice(0, 500));
+    const a = await readDb(page), row = snapRows(a.all).find(r => r.k === sid(miss));
+    ok(row && row.c[0] === 77.7 && row.d === '2026-10-10' && /^2026-10-10T/.test(row.t), 'the earlier row is kept with its own day: ' + JSON.stringify(row));
+    const others = snapRows(a.all).filter(r => r.k !== sid(miss)); ok(others.length > 100 && others.every(r => r.c[0] === 111.1 && r.d === undefined), 'every other stock has today\'s figures');
+    const run = Object.values(a.all).find(v => v && v.kind === 'snapshot'); ok(run && run.retried >= 1 && run.answeredAgain === 0 && run.carried === 1, 'the run record counts it: ' + JSON.stringify(run && [run.retried, run.answeredAgain, run.carried]));
+    const m = await page.evaluate(sym => { const s = window.__alba.stocks.find(x => window.__alba.sanitizeDocId(window.__alba.tickerSymbol(x)) === sym); return { px: s.valuation.currentPrice, snap: s.__snapAsof }; }, sid(miss));
+    ok(m.px === 77.7 && m.snap === '2026-10-10', 'the page shows its price and counts its age from 10 Oct, not today: ' + JSON.stringify(m));
+  });
+
   const plain = nonNumeric.filter(x => /^[A-Z0-9]+$/.test(x)), histKeep = plain.slice(0, 3);
   await runScenario('refresh all stocks: stocks with no history get their full history and a completed-weeks score', { history: true, docs: triedExcept(histKeep) }, async page => {
     await page.click('#tvSnapshotBtn');

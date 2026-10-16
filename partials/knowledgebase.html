@@ -221,6 +221,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.201 &middot; 2026-10-16</h3>
+            <ul>
+              <li><b>A stock TradingView misses once no longer loses its figures:</b> when TradingView leaves a stock out of an answer, Refresh all stocks now asks for those stocks again right away. If a stock still has no price, it keeps its last good figures, marked with their own day, so the Technical data age shows how old they really are instead of the stock silently falling back to older data. The result and the Last 2 runs record how many were asked again, how many answered and how many kept earlier figures.</li>
+              <li><b>Stocks with no TradingView symbol are listed on the screen:</b> small BSE-only companies whose letter symbol is not known cannot be refreshed. The result now names them (the first ten) instead of only counting them. Four of the five found so far (P. H. Capital, Lords Mark Industries, GSB Finance and M E T S) were added to the symbol list and are refreshed from now on; Jolly Plastic (507968) still has none.</li>
+            </ul>
             <h3>v1.200 &middot; 2026-10-15</h3>
             <ul>
               <li><b>One Refresh all stocks button does the whole Technical Score refresh:</b> Fill missing history is no longer a separate button. A run now goes through three stages with one progress panel: (1) the snapshot of every stock, as before (about 3 minutes); (2) the full price history, about 5 years up to today, for stocks that have none, tracked picks first, then pinned, strategy matches and the rest; (3) for stocks that already have history, only the weekly or monthly bars that have finished since their last saved bar, so on most days this stage has nothing to do and the run stays short.</li>
