@@ -13,7 +13,7 @@ import { COLS, packValues, snapshotUpdate } from '../overlays/livesnapshot.js';
 import { priceHistoryByTicker, pcTickerKey, priceSymbolByTicker, ensureAllPriceBars } from '../prices/store.js';
 import { refreshOneNow, priceJobs } from '../prices/refresh.js';
 import { BSE_ALPHA_MAP } from '../tv/links.js';
-import { tvCall, tvErrorText, tvIstDate, tvMcp } from '../tv/connector.js';
+import { tvCall, tvErrorText, tvIsFatal, tvIstDate, tvMcp } from '../tv/connector.js';
 import { loadRuns } from '../strategies/tracking.js';
 import { priorityOrder } from './freshness.js';
 import { planHistory } from './historyplan.js';
@@ -125,15 +125,21 @@ async function runSnapshot(){
       const recent = id => tried[id] && Date.now() - (Date.parse(tried[id]) || 0) < SKIP_RETRY_DAYS * 86400000;
       const noneList = byImportance(plan.none).filter(s => !recent(sanitizeDocId(tickerSymbol(s))));
       const failedBars = [];
+      let barsAbort = '';   // set when TradingView refuses every call (quota used up, not connected) or fails many in a row: no point trying the rest
+      let barsFailRun = 0;
       const bars = async (list, key, track, workers) => {
         let next = 0, done = 0, ok = 0;
         const worker = async () => {
-          while(next < list.length && !stopAsked){
+          while(next < list.length && !stopAsked && !barsAbort){
             const s = list[next++], pk = pcTickerKey(s), id = sanitizeDocId(tickerSymbol(s));
             await refreshOneNow(s);
             const j = priceJobs.get(pk);
-            if(j && j.state === 'ok'){ ok++; if(track) delete tried[id]; }
-            else { failedBars.push({ sym: tickerSymbol(s), name: s.name, reason: 'price bars: ' + ((j && j.msg) || 'did not finish') }); if(track) tried[id] = new Date().toISOString(); }
+            if(j && j.state === 'ok'){ ok++; barsFailRun = 0; if(track) delete tried[id]; }
+            else {
+              failedBars.push({ sym: tickerSymbol(s), name: s.name, reason: 'price bars: ' + ((j && j.msg) || 'did not finish') });
+              if(track) tried[id] = new Date().toISOString();
+              if(/quota|exhausted|not available in this view|not connected|reconnected|not allowed/i.test((j && j.msg) || '') || ++barsFailRun >= 8) barsAbort = (j && j.msg) || 'price bars failed 8 times in a row';
+            }
             done++;
             fiSet(key, 'running', num(done) + ' of ' + num(list.length) + ' · ' + tickerSymbol(s), done / list.length);
           }
@@ -148,6 +154,7 @@ async function runSnapshot(){
       if(!stopped && plan.stale.length) barsUpdated = await bars(byImportance(plan.stale), 'update', false, BAR_WORKERS);
       if(stopAsked) stopped = true;
       fiSet('update', 'done', staleBefore ? num(barsUpdated) + ' of ' + num(staleBefore) + ' updated' : 'all up to date');
+      if(barsAbort){ stopped = true; runError = barsAbort; }
       histFailed = failedBars.length;
       noHistoryLeft = noneBefore - filled;
       failedBars.forEach(x => skipped.push(x));
@@ -157,7 +164,7 @@ async function runSnapshot(){
     for(let i = 0; i < todo.length; i += BATCH) batches.push(todo.slice(i, i + BATCH));
     // The next batch is requested while the current one is being saved. TradingView answers "Too Many Requests" when called back
     // to back, so a request waits until 300 ms after the previous one started (longer after a failed call).
-    let lastStart = 0, backoff = 0;
+    let lastStart = 0, backoff = 0, failedBatches = 0;
     const fetchBatch = async (batch) => {
       const wait = Math.max(300, backoff) - (Date.now() - lastStart);
       backoff = 0;
@@ -175,6 +182,9 @@ async function runSnapshot(){
       const res = await pending;
       tvWaitMs += Date.now() - w0;
       pending = bi + 1 < batches.length && !stopAsked ? fetchBatch(batches[bi + 1]) : null;
+      if(res.error && tvIsFatal(res.error)) throw res.error;
+      if(res.error && ++failedBatches >= 3){ const e = new Error(tvErrorText(res.error) + ' Three batches in a row failed, so the run stopped.'); throw e; }
+      if(!res.error) failedBatches = 0;
       if(res.error){ batch.forEach(x => skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: tvErrorText(res.error) })); backoff = 1500; batchSecs.push(Math.round((Date.now() - b0) / 100) / 10); continue; }
       const payload = res.payload;
       const data = Object.assign({}, (payload && payload.data) || {});
@@ -247,7 +257,12 @@ async function runSnapshot(){
     lines.push({ text: 'These scores include the week and month still in progress, so they can change before the week ends. Stocks with saved price bars get the stricter completed-weeks score once their bars are up to date.', cls: 'fi-line fi-line-muted' });
     if(noSymbol.length) lines.push({ text: num(noSymbol.length) + ' stocks have no TradingView symbol yet, so they are not refreshed: ' + noSymbol.slice(0, 10).join(', ') + (noSymbol.length > 10 ? ' … +' + (noSymbol.length - 10) : '') + '. Their symbols are looked up by exact company name; one that cannot be found has to be added by hand.', cls: 'fi-line' });
     if(retried) lines.push({ text: num(retried) + ' stocks TradingView left out of an answer were asked for again; ' + num(answeredAgain) + ' answered the second time' + (carried ? ', ' + num(carried) + ' still had no price and kept their figures from an earlier day.' : '.'), cls: 'fi-line fi-line-muted' });
-    if(skipped.length) lines.push({ text: num(skipped.length) + ' stocks skipped (listed in the file below).', cls: 'fi-line' });
+    if(runError) lines.push({ text: 'Stopped because: ' + runError, cls: 'fi-line fi-line-strong' });
+    if(skipped.length){
+      const why = new Map(); skipped.forEach(x => { const r = String(x.reason).replace(/\([A-Z]+:[^)]*\)/g, '').replace(/from \d{4}-\d\d-\d\d/, '').trim(); why.set(r, (why.get(r) || 0) + 1); });
+      const top = [...why.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([r, n]) => num(n) + ' × ' + r.slice(0, 110));
+      lines.push({ text: num(skipped.length) + ' stocks skipped. Most common reasons: ' + top.join('; ') + '. The full list is in the file below.', cls: 'fi-line' });
+    }
     fiShowResult(updated + unchanged === 0 ? 'err' : 'ok', lines, true);
     skippedReport(skipped, 'snapshot');
   } catch(e){
