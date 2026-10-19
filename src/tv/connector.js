@@ -23,17 +23,26 @@ async function tvCall(tool, input){
   for(let attempt = 0; attempt < 4; attempt++){
     try {
       const r = await mcp.callTool(TV_SERVER, tool, input, { cache: false });
-      return r.payload;
+      const p = r.payload;
+      // The batch and screener tools answer a rate limit or backend error as a normal reply with success=false (no exception), so it is turned into one here.
+      if(p && typeof p === 'object' && p.success === false) throw Object.assign(new Error(String(p.error || p.message || (Array.isArray(p.warnings) && p.warnings.join('; ')) || 'TradingView reported a failure')), { code: 'tool_error' });
+      return p;
     } catch(e){
       last = e;
-      const transient = e && (e.retryable || (e.code === 'tool_error' && /tvws|websocket|handshake|timeout|timed out|connection|EOF|reset|unavailable/i.test(String(e.message))) || e.code === 'server_unavailable');
+      const msg = String(e && e.message);
+      const transient = e && !tvIsQuota(e) && (e.retryable || (e.code === 'tool_error' && /tvws|websocket|handshake|timeout|timed out|connection|EOF|reset|unavailable|429|too many|rate.?limit|\b5\d\d\b|backend/i.test(msg)) || e.code === 'server_unavailable');
       if(!transient) throw e;
-      await tvSleep(1500 * (attempt + 1) + Math.random() * 800);
+      await tvSleep((/429|too many|rate.?limit/i.test(msg) ? 4000 : 1500) * (attempt + 1) + Math.random() * 800);
     }
   }
   throw last;
 }
+// The daily tool-call quota is spent: every further call fails until it resets, so a run should stop rather than try the rest.
+function tvIsQuota(e){ return !!e && /quota|exhausted/i.test(String(e.message)); }
+// An error after which no further call in this run can work (quota, connector missing or not signed in).
+function tvIsFatal(e){ const c = e && e.code; return tvIsQuota(e) || ['no_mcp', 'not_granted', 'capability_disabled', 'not_in_manifest', 'consent_required', 'server_not_connected', 'server_not_found', 'needs_reauth'].includes(c); }
 function tvErrorText(e){
+  if(tvIsQuota(e)) return 'TradingView daily tool-call quota is used up; it resets at 00:00 UTC (5:30 am IST). ' + String(e.message).slice(0, 120);
   const c = e && e.code;
   if(c === 'no_mcp' || c === 'not_granted' || c === 'capability_disabled') return 'The TradingView connector is not available in this view.';
   if(c === 'not_in_manifest' || c === 'consent_required') return 'This page is not allowed to use TradingView. Allow it when asked (or in the page permissions) and try again.';
@@ -95,4 +104,4 @@ async function tvResolveSymbol(s){
   return 'BSE:' + BSE_ALPHA_MAP[key];
 }
 
-export { TV_SERVER, tvCall, tvErrorText, tvIstDate, tvMcp, tvMergeDelta, tvResolveSymbol, tvToRows, tvValidate };
+export { TV_SERVER, tvCall, tvErrorText, tvIsFatal, tvIstDate, tvMcp, tvMergeDelta, tvResolveSymbol, tvToRows, tvValidate };
