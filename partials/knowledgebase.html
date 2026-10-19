@@ -221,6 +221,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.204 &middot; 2026-10-19</h3>
+            <ul>
+              <li><strong>Refresh all stocks</strong> now works in a better order: first the full history for stocks that have none (two at a time), then the new weekly and monthly bars for stocks whose bars are out of date (four at a time), and last the snapshot of every stock in batches of 50. The progress list shows the stages in that order.</li>
+              <li><strong>Fixed &ldquo;0 saved&rdquo;:</strong> when TradingView answered a rate limit or error as a normal reply, the whole batch was counted as having no price. It is now treated as an error and retried after a wait.</li>
+              <li>If TradingView&rsquo;s daily call quota is used up, or the connector is not connected, the run stops at once. It also stops after three failed snapshot batches or eight failed bar downloads in a row. The result panel now says why (&ldquo;Stopped because&hellip;&rdquo;) and shows the most common skip reasons.</li>
+            </ul>
             <h3>v1.203 &middot; 2026-10-16</h3>
             <ul>
               <li><strong>Tech 2</strong> now scores every stock that has at least 60 finished weeks of saved price bars, not only those with a bullish weekly MACD and a week up 1&nbsp;% or more. Before this, about nine in ten stocks showed a dash.</li>
