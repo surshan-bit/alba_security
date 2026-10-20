@@ -50,7 +50,7 @@
           <div class="upload-panel">
             <div class="upload-row">
               <div class="upload-text">
-                <div class="upload-hint">1. Downloads the full price history, about 5 years up to today, for stocks that have none (tracked picks first, two at a time); the first run can take a while, and Stop then a later click carries on. 2. Reads price, MACD and RSI for every stock from TradingView (about 45 calls, about 3 minutes) and recalculates every Technical Score. 3. For stocks that already have history, adds the weekly and monthly bars that have finished since their last saved bar: stocks one week or month behind are updated from the same calls as step 2 (no extra calls), the others one by one.</div>
+                <div class="upload-hint">1. Downloads the full price history, about 5 years up to today, for stocks that have none (tracked picks first, two at a time); the first run can take a while, and Stop then a later click carries on. 2. Fetches price, MACD and RSI for every stock from TradingView, 50 stocks per call (about 45 calls, about 3 minutes), together with the new weekly and monthly bars of stocks that are one week or month behind. 3. Saves those bars 50 stocks to a record. 4. Calculates every stock&rsquo;s Technical Score and saves the scores 50 stocks to a record. Stocks the answer cannot place with certainty are fetched one by one.</div>
                 <div class="upload-hint" id="tvRefreshHint">The count of stocks with saved history appears after the first run.</div>
               </div>
               <button type="button" class="select-mode-btn fi-btn-primary" id="tvSnapshotBtn" title="Saves a fresh price and technical reading for every stock, from TradingView">Refresh all stocks</button>

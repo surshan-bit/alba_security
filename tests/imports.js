@@ -74,7 +74,7 @@ async function upload(page, which, name, text){
   await page.waitForTimeout(100);
 }
 async function readDb(page){
-  const json = await page.evaluate(() => JSON.stringify(Object.fromEntries(Array.from(window.__store).filter(([k]) => /^(stockData|stockMeta|backupLog|importJobs|fundamentalCsvUploadLog|technicalCsvUploadLog|watchlistSyncLog|stockUpdates|refreshRunLog|liveSnapshot|priceHistory)\//.test(k)))));
+  const json = await page.evaluate(() => JSON.stringify(Object.fromEntries(Array.from(window.__store).filter(([k]) => /^(stockData|stockMeta|backupLog|importJobs|fundamentalCsvUploadLog|technicalCsvUploadLog|watchlistSyncLog|stockUpdates|refreshRunLog|liveSnapshot|priceHistory|barsRecent|techBlocks)\//.test(k)))));
   const all = JSON.parse(json), meta = all['stockMeta/main'], stocks = new Map(), chunkDocs = {};
   for(const cid of meta.chunks){ const d = all['stockData/' + cid]; chunkDocs[cid] = d; if(d) for(const s of d.stocks) stocks.set(symOf(s), s); }
   const col = c => Object.entries(all).filter(([k]) => k.startsWith(c + '/')).map(([k, v]) => Object.assign({ id: k.slice(c.length + 1) }, v)).sort((a, b) => String(a.createdAt || a.uploadedAt || a.startedAt || a.id).localeCompare(String(b.createdAt || b.uploadedAt || b.startedAt || b.id)));
@@ -769,7 +769,7 @@ async function tvRefreshScenarios(){
     const run = Object.values(a.all).find(v => v && v.kind === 'snapshot');
     ok(run && run.filled === 3 && run.barsUpdated === 0 && run.noHistoryLeft > 1000 && run.historyFailed === 0, 'the run record counts the downloads: ' + JSON.stringify(run && [run.filled, run.barsUpdated, run.noHistoryLeft, run.historyFailed]));
     const steps = await page.evaluate(() => Array.from(document.querySelectorAll('#tv_fiSteps li')).map(li => li.className.replace(/.*fi-/, '') + ':' + li.querySelector('.fi-label').textContent));
-    ok(steps.length === 5 && steps.every(x => /^done:/.test(x)), 'all five steps are done: ' + steps.join(' | '));
+    ok(steps.length === 6 && steps.every(x => /^done:/.test(x)), 'all six steps are done: ' + steps.join(' | '));
     const last = await page.evaluate(() => document.getElementById('lastRuns_snapshot').innerText);
     ok(/bars: 3 full history, 0 updated/.test(last), 'the Last 2 runs list mentions the bars: ' + last.replace(/\s+/g, ' '));
   });
@@ -818,9 +818,42 @@ async function tvRefreshScenarios(){
     const text = await waitDone(page);
     const z = plain[0], a = await readDb(page), calls = await page.evaluate(() => window.__tvOhlcvCalls || []);
     ok(!calls.some(c => c.startsWith('NSE:' + z + ' ')), 'no per-stock bar request for the stock: ' + JSON.stringify(calls));
-    const w = a.all['priceHistory/NSE_' + sid(z) + '_1W'];
-    ok(w && w.bars.length === 81 && w.bars[79][4] === 11.5 && w.bars[80][4] === 12, 'the finished week replaced the saved one and the new week was added: ' + (w && JSON.stringify(w.bars.slice(-2))));
+    // the new bars are saved in a record of 50 stocks (barsRecent), not by rewriting the stock's own priceHistory document
+    const row = Object.entries(a.all).filter(([id]) => id.startsWith('barsRecent/')).flatMap(([, v]) => (v && v.rows) || []).find(r => r.k === z);
+    ok(row && row.w.length === 40 && row.w[38][4] === 11.5 && row.w[39][4] === 12, 'the finished week replaced the saved one and the new week was added, in the record: ' + (row && JSON.stringify(row.w.slice(-2))));
+    ok(a.all['priceHistory/NSE_' + sid(z) + '_1W'].bars.length === 80, 'the stock\'s own document was not rewritten');
+    ok(Object.keys(a.all).some(id => id.startsWith('techBlocks/')), 'the technical scores were saved in a record too: ' + Object.keys(a.all).filter(id => /^(barsRecent|techBlocks)\//.test(id)).join(', '));
     ok(/1 given their new weekly and monthly bars \(1 of them from the batch call\)/.test(text), 'the result says it came from the batch call: ' + text.slice(0, 500));
+  });
+  // recent bars saved in a record are laid on the stock's own bars when the page loads them: the stock counts as up to date and is left alone
+  await runScenario('refresh all stocks: a stock whose recent bars are in a record is up to date', { history: true, docs: (() => {
+      const nowS = Math.floor(Date.now() / 1000), mon = nowS - ((new Date((nowS + 19800) * 1000).getUTCDay() + 6) % 7) * 86400 - ((nowS + 19800) % 86400) + 19800 + 3600;
+      const first = new Date((nowS + 19800) * 1000), mStart = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1) / 1000 - 19800 + 3600;
+      const bars = (last, step, n) => Array.from({ length: n }, (_, i) => [last - (n - 1 - i) * step, 10, 12, 9, 11 + i * 0.01, 100]);
+      const [z] = plain.slice(0, 1), mk = (sym, wLast, mLast) => ({ ['priceHistory/NSE_' + sid(sym) + '_1W']: { ticker: sym, symbol: 'NSE:' + sym, interval: '1W', bars: bars(wLast, 7 * 86400, 80), count: 80, fetchedAt: '2026-01-01T00:00:00Z' }, ['priceHistory/NSE_' + sid(sym) + '_1M']: { ticker: sym, symbol: 'NSE:' + sym, interval: '1M', bars: bars(mLast, 30 * 86400, 40), count: 40, fetchedAt: '2026-01-01T00:00:00Z' } });
+      return Object.assign({}, triedExcept([z]), mk(z, mon - 14 * 86400, mStart), { 'barsRecent/c001': { v: 1, at: '2026-10-01T00:00:00Z', rows: [{ k: z, y: 'NSE:' + z, w: bars(mon, 7 * 86400, 40), m: bars(mStart, 30 * 86400, 12) }] } });
+    })() }, async page => {
+    await page.click('#tvSnapshotBtn');
+    const text = await waitDone(page);
+    const z = plain[0], calls = await page.evaluate(() => window.__tvOhlcvCalls || []);
+    ok(/, 0 given their new weekly and monthly bars/.test(text), 'the stock counted as up to date: ' + text.slice(0, 400));
+    ok(!calls.some(c => c.startsWith('NSE:' + z + ' ')), 'no bar request for it: ' + JSON.stringify(calls));
+  });
+  // a bars record that cannot be saved: the stock is not counted as updated and is fetched one by one instead
+  await runScenario('refresh all stocks: a bars record that cannot be saved leaves the stock to the one-by-one fetch', { history: true, cfg: { rules: [{ op: 'set', prefix: 'barsRecent/', error: { message: 'write refused' } }] }, docs: (() => {
+      const nowS = Math.floor(Date.now() / 1000), mon = nowS - ((new Date((nowS + 19800) * 1000).getUTCDay() + 6) % 7) * 86400 - ((nowS + 19800) % 86400) + 19800 + 3600;
+      const first = new Date((nowS + 19800) * 1000), mStart = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1) / 1000 - 19800 + 3600;
+      const bars = (last, step, n) => Array.from({ length: n }, (_, i) => [last - (n - 1 - i) * step, 10, 12, 9, 11 + i * 0.01, 100]);
+      const [z] = plain.slice(0, 1), mk = (sym, wLast, mLast) => ({ ['priceHistory/NSE_' + sid(sym) + '_1W']: { ticker: sym, symbol: 'NSE:' + sym, interval: '1W', bars: bars(wLast, 7 * 86400, 80), count: 80, fetchedAt: '2026-01-01T00:00:00Z' }, ['priceHistory/NSE_' + sid(sym) + '_1M']: { ticker: sym, symbol: 'NSE:' + sym, interval: '1M', bars: bars(mLast, 30 * 86400, 40), count: 40, fetchedAt: '2026-01-01T00:00:00Z' } });
+      return Object.assign({}, triedExcept([z]), mk(z, mon - 7 * 86400, mStart));
+    })() }, async page => {
+    await page.evaluate(() => { window.__tvBarRow = { 'open|1W': 11, 'high|1W': 13, 'low|1W': 10, 'close|1W': 12, 'volume|1W': 50, 'open[1]|1W': 10, 'high[1]|1W': 12, 'low[1]|1W': 9, 'close[1]|1W': 11.5, 'volume[1]|1W': 100,
+      'open|1M': 10, 'high|1M': 12, 'low|1M': 9, 'close|1M': 11, 'volume|1M': 100, 'open[1]|1M': 10, 'high[1]|1M': 12, 'low[1]|1M': 9, 'close[1]|1M': 11, 'volume[1]|1M': 100 }; });
+    await page.click('#tvSnapshotBtn');
+    await waitDone(page);
+    const z = plain[0], a = await readDb(page);
+    ok(!Object.keys(a.all).some(k => k.startsWith('barsRecent/')), 'no bars record was saved');
+    ok(a.all['priceHistory/NSE_' + sid(z) + '_1W'].fetchedAt !== '2026-01-01T00:00:00Z', 'the stock was then fetched on its own and its own document saved');
   });
   // Stop ends the history stages early and the run is recorded as stopped
   await runScenario('refresh all stocks: Stop during the history download ends the run and says so', { history: true }, async page => {

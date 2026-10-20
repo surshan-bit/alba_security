@@ -73,6 +73,7 @@ function applyUpdatesDoc(s, doc){
 }
 let lastDocs = new Map();   // docId -> the stock's own saved update (stockUpdates)
 let snapRows = new Map();   // docId -> { row, asof, at } from the newest liveSnapshot chunk that carries the stock
+let techRows = new Map();   // docId -> technical block from the techBlocks chunks (completed-weeks scores calculated by Refresh all stocks)
 function applyUpdatesOverlay(docs){
   lastDocs = new Map(docs.map(d => [d.id, d.data]));
   rebuildOverlay();
@@ -95,14 +96,36 @@ function applySnapshotOverlay(chunkDocs){
   snapRows = next;
   rebuildOverlay();
 }
+// Technical blocks (collection techBlocks, ids c001 ...): { v: 1, asof, at, rows: [ { k, t } ] }, k = the stock's record id and t = the same technical block
+// a bars refresh used to save in the stock's own update. Laid under the stock's own update: the newer block (by its asof) wins, this one on a tie.
+function applyTechBlocksOverlay(chunkDocs){
+  const next = new Map();
+  chunkDocs.forEach(d => {
+    const c = d.data, at = c && typeof c.at === 'string' ? c.at : '';
+    if(!c || !Array.isArray(c.rows)) return;
+    c.rows.forEach(r => {
+      if(!r || typeof r.k !== 'string' || !r.t || typeof r.t !== 'object') return;
+      const old = next.get(r.k);
+      if(!old || old.at < at) next.set(r.k, { t: r.t, at });
+    });
+  });
+  techRows = next;
+  rebuildOverlay();
+}
+function withTechBlock(real, tr){
+  if(!tr) return real;
+  const rt = real && real.technical;
+  if(rt && typeof rt.asof === 'string' && typeof tr.t.asof === 'string' && rt.asof > tr.t.asof) return real;
+  return Object.assign({}, real || {}, { technical: tr.t });
+}
 function rebuildOverlay(){
   const index = stockByDocId();
   const next = new Map();
-  const ids = new Set([...lastDocs.keys(), ...snapRows.keys()]);
+  const ids = new Set([...lastDocs.keys(), ...snapRows.keys(), ...techRows.keys()]);
   ids.forEach(id => {
     const s = index.get(id);
     if(!s) return;
-    let data = lastDocs.get(id);
+    let data = withTechBlock(lastDocs.get(id), techRows.get(id));
     try { data = mergedDoc(s, data, snapRows.get(id)); } catch(e){ console.error('Live snapshot row ' + id + ' could not be merged', e); }
     if(data) next.set(id, { s, data });
   });
@@ -126,4 +149,4 @@ function rebuildOverlay(){
   if(analysisSectionEl && analysisSectionEl.classList.contains('active')) refreshAnalysisSoon();
 }
 
-export { applySnapshotOverlay, applyUpdatesOverlay };
+export { applySnapshotOverlay, applyTechBlocksOverlay, applyUpdatesOverlay };

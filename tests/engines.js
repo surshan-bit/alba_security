@@ -788,6 +788,35 @@ test('trade call: history keeps one point a day and lists when the call changed'
     const r = row([197.69, 199.72, 196.05, 196.79, 2266126], [196.6, 198.93, 192.8, 197.74, 9274407], 'W');   // prev bar's high 198.93 is below the saved high 199.9
     assert.strictEqual(H.alignBars([L], H.batchBars(r, 'W'), 'W', now), null);
   });
+  // recent bars in chunks (v1.208)
+  const R = load('src/prices/recent.js', 'export { mergeRecent };');
+  const bk = (t, c) => [at(t), 1, 2, 0.5, c, 10];
+  test('recent bars: the stock\'s own bars before the first recent bar are kept, the recent bars replace the rest', () => {
+    const full = [bk('2026-09-14T03:45:00Z', 1), bk('2026-09-21T03:45:00Z', 2), bk('2026-09-28T03:45:00Z', 3), bk('2026-10-05T03:45:00Z', 4)];
+    const recent = [bk('2026-09-28T03:45:00Z', 33), bk('2026-10-05T03:45:00Z', 44), bk('2026-10-12T03:45:00Z', 55)];
+    const out = R.mergeRecent(full, recent, H.weekBucket);
+    assert.deepStrictEqual(out.map(b => b[4]), [1, 2, 33, 44, 55]);
+    assert.deepStrictEqual(R.mergeRecent(full, [], H.weekBucket), full, 'nothing recent: the stock\'s own bars');
+    assert.deepStrictEqual(R.mergeRecent([], recent, H.weekBucket), [], 'a stock with no bars of its own is not given a partial history');
+  });
+  test('recent bars: a recent row older than the stock\'s own save is ignored, a newer one is laid on top', () => {
+    R.setRecentFromDocs([{ id: 'c001', data: { at: '2026-10-20T04:00:00Z', rows: [{ k: 'ABC', w: [bk('2026-10-12T03:45:00Z', 5), bk('2026-10-19T03:45:00Z', 6)], m: [] }] } }]);
+    const own = { '1W': [bk('2026-10-05T03:45:00Z', 4), bk('2026-10-12T03:45:00Z', 50)], '1M': [bk('2026-10-01T03:45:00Z', 9)] };
+    const older = R.withRecent('ABC', own, '2026-10-20T05:00:00Z');
+    assert.strictEqual(older.bars['1W'].length, 2, 'the stock\'s own save is newer: used as it is');
+    const newer = R.withRecent('ABC', own, '2026-10-15T05:00:00Z');
+    assert.deepStrictEqual(newer.bars['1W'].map(b => b[4]), [4, 5, 6]);
+    assert.strictEqual(newer.fetched, '2026-10-20T04:00:00.000Z');
+    assert.strictEqual(newer.bars['1M'].length, 1, 'no recent monthly bars: the stock\'s own');
+    assert.strictEqual(R.withRecent('ZZZ', own, null).bars, own, 'a stock without a recent row');
+  });
+  test('recent bars: the lag counts the weekly bars beyond the stock\'s own documents', () => {
+    R.setRecentFromDocs([]);
+    R.withRecent('LAG', { '1W': [bk('2026-10-05T03:45:00Z', 1), bk('2026-10-12T03:45:00Z', 2)], '1M': [] }, '2026-10-15T00:00:00Z');
+    assert.strictEqual(R.lagOf('LAG', [bk('2026-10-05T03:45:00Z', 1), bk('2026-10-12T03:45:00Z', 2), bk('2026-10-19T03:45:00Z', 3), bk('2026-10-26T03:45:00Z', 4)]), 2);
+    R.noteFullSaved('LAG', '1W', [bk('2026-10-26T03:45:00Z', 4)]);
+    assert.strictEqual(R.lagOf('LAG', [bk('2026-10-26T03:45:00Z', 4)]), 0);
+  });
   test('batch bars: anything unclear is left to the one-by-one fetch', () => {
     const now = at('2026-10-20T04:00:00Z'), L = [at('2026-10-12T03:45:00Z'), 196.6, 197, 195, 196, 5000000];
     const good = row([197.69, 199.72, 196.05, 196.79, 2266126], [196.6, 198.93, 192.8, 197.74, 9274407], 'W');

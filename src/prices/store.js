@@ -3,6 +3,7 @@ import { stocks } from '../core/stocks.js';
 import { dbCapabilityPromise } from '../core/store.js';
 import { priceFetchedAt } from '../research/status.js';
 import { getShownIndex, renderDetail } from '../detail/render.js';
+import { setRecentFromDocs, withRecent } from './recent.js';
 
 // ---- Price history chart (experimental, OCCL only for now) ----
 // Weekly / Monthly candlesticks + volume from the shared database collection `priceHistory`
@@ -15,6 +16,23 @@ function pcTickerKey(s){ return String((s && s.ticker) || '').split(' · ')[0].t
 // The `priceHistory` collection holds every stock's weekly + monthly bars (about 1.5 MB), so it is NOT read at startup.
 // Bars are fetched one stock at a time, with a filtered query, the first time that stock's detail page opens (or when
 // the Analysis "Triggered" column needs its fetch time). Results are cached for the session.
+// The recent bars saved in chunks (collection barsRecent, see recent.js), read once per session and again after a refresh saves new ones.
+let recentPromise = null;
+function loadRecentBars(force){
+  if(recentPromise && !force) return recentPromise;
+  recentPromise = (async () => {
+    const db = await dbCapabilityPromise;
+    if(!db) return [];
+    try {
+      const snap = await db.collection('barsRecent').get();
+      const docs = [];
+      snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
+      setRecentFromDocs(docs);
+      return docs;
+    } catch(e){ console.error('Recent bars unavailable', e); return []; }
+  })();
+  return recentPromise;
+}
 const priceLoaded = new Set();      // tickers whose bars were fetched (or saved) this session
 var priceLoading = new Map();     // ticker -> in-flight promise
 function priceApply(key, bars, symbol, fetchedAt){
@@ -31,15 +49,17 @@ function ensurePriceBars(s){
     const db = await dbCapabilityPromise;
     if(!db) return false;
     try {
+      await loadRecentBars();
       const snap = await db.collection('priceHistory').where('ticker', '==', key).get();
-      const bars = {}; let sym = null, fetched = null;
+      let bars = {}; let sym = null, fetched = null;
       snap.docs.forEach(d => {
         if(!d.exists) return;
         const x = d.data();
         if(x && x.interval && Array.isArray(x.bars)){ bars[x.interval] = x.bars; if(x.symbol) sym = x.symbol; }
         if(x && x.fetchedAt && (!fetched || new Date(x.fetchedAt) > new Date(fetched))) fetched = x.fetchedAt;
       });
-      priceApply(key, bars, sym, fetched);
+      const w = withRecent(key, bars, fetched);
+      priceApply(key, w.bars, sym, w.fetched);
       return true;
     } catch(e){ console.error('Price history unavailable', e); return false; }
     finally { priceLoading.delete(key); }
@@ -55,6 +75,7 @@ function ensureAllPriceBars(){
     const db = await dbCapabilityPromise;
     if(!db) return false;
     try {
+      await loadRecentBars();
       const snap = await db.collection('priceHistory').get();
       const by = new Map();
       snap.docs.forEach(d => {
@@ -66,7 +87,7 @@ function ensureAllPriceBars(){
         e.bars[x.interval] = x.bars; if(x.symbol) e.sym = x.symbol;
         if(x.fetchedAt && (!e.fetched || new Date(x.fetchedAt) > new Date(e.fetched))) e.fetched = x.fetchedAt;
       });
-      by.forEach((e, key) => { if(!priceLoaded.has(key)) priceApply(key, e.bars, e.sym, e.fetched); });
+      by.forEach((e, key) => { if(!priceLoaded.has(key)){ const w = withRecent(key, e.bars, e.fetched); priceApply(key, w.bars, e.sym, w.fetched); } });
       return true;
     } catch(e){ console.error('Price history unavailable', e); allBarsPromise = null; return false; }
   })();
@@ -81,4 +102,4 @@ function loadPriceBarsFor(s, idx){
   });
 }
 
-export { ensureAllPriceBars, ensurePriceBars, loadPriceBarsFor, pcTickerKey, priceApply, priceHistoryByTicker, priceLoaded, priceSymbolByTicker };
+export { ensureAllPriceBars, ensurePriceBars, loadPriceBarsFor, loadRecentBars, pcTickerKey, priceApply, priceHistoryByTicker, priceLoaded, priceSymbolByTicker };
