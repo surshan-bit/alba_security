@@ -5,6 +5,7 @@ import { lockBusy, lockText, startBeat, tabId } from './joblock.js';
 import { primeStockCache } from '../boot/stockdata.js';
 import { fiAsk, fiEl, fiReset, fiSet, fiShowResult, getFiState, setFiPfx } from './panel.js';
 import { albaApplyFundamental } from './fund-engine.js';
+import { albaFiCheck, albaFiPrevInfo, albaFiSym } from './fund-check.js';
 import { SHOW_TECH_CSV, albaTiRunImport } from './tech-import.js';
 import { albaWlRunSync } from './wlsync.js';
 import { registerBusy } from '../core/busy.js';
@@ -23,7 +24,6 @@ const ALBA_FI = { HARD: 240000, SOFT: 200000 };
 const ALBA_FI_COLUMNS = ['Name','BSE Code','NSE Code','ISIN Code','Industry Group','Industry','Current Price','Intrinsic Value','Book value','Profit growth','Profit growth 3Years','Profit growth 5Years','Sales growth 3Years','Return on invested capital','Return on capital employed','Return on equity','OPM','Price to Earning','Industry PE','PEG Ratio','Pledged percentage','Interest Coverage','Debt to equity','Change in promoter holding','Piotroski score','Quick ratio','Altman Z Score','Current ratio','Contingent liabilities','Average return on equity 7Years','Average return on equity 10Years','Median return on capital employed 10Years','Free cash flow 3years','Free cash flow 5years','Operating cash flow 3years','Operating cash flow 5years','CROIC','Graham','Change in FII holding 3Years','Change in DII holding 3Years','Historical PE 5Years','Average debtor days 3years','NCAVPS','Number of Shareholders'];
 const ALBA_FI_PUBLISHED = 'The new data had already been saved when this failed, so it is live. Check the stock list; if it looks wrong, import a corrected file.';
 const albaFiSleep = ms => new Promise(r => setTimeout(r, ms));
-const albaFiSym = s => s.ticker.split('·')[0].trim();
 const albaFiSid = id => String(id).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_') || 'x';
 const albaFiSize = o => new TextEncoder().encode(JSON.stringify(o)).length;
 const albaFiDay = iso => { try { return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); } catch(e){ return new Date().toISOString().slice(0, 10); } };
@@ -68,53 +68,6 @@ async function albaFiLoadRaw(db, onProgress){
   const stocks = [].concat(...meta.chunks.map(c => docs[c].stocks));
   if(stocks.length !== meta.count) throw new Error('expected ' + meta.count + ' stocks but read ' + stocks.length);
   return { meta, docs, oldCanon, stocks };
-}
-
-// ---- Integrity checks (the saved check_fundamental + precheck_data scripts) ----
-function albaFiPrevInfo(stocks){
-  const m = new Map(), n = g => g && ((g.positive || []).length + (g.negative || []).length);
-  for(const s of stocks) m.set(albaFiSym(s), { score: s.score, verdict: s.verdict, hasGlobal: !!n(s.globalFactors), hasTech: !!(s.technical && s.technical.score != null) });
-  return m;
-}
-function albaFiCheck(stocks, prev){
-  const hard = [], soft = [];
-  const band = x => x >= 8 ? 'buy' : x >= 6 ? 'mbuy' : x >= 5 ? 'hold' : 'avoid';
-  const list = a => a.slice(0, 5).join(', ') + (a.length > 5 ? ' …' : '');
-  const seen = new Set(), dups = [], badShape = [], badNum = [], badSum = [], badVerdict = [], badPillar = [];
-  if(stocks.length < 2000) hard.push('only ' + stocks.length + ' stocks in the result');
-  for(const s of stocks){
-    const t = albaFiSym(s); const u = t.toUpperCase();
-    if(seen.has(u)) dups.push(t); seen.add(u);
-    const f = s.fundamentals && s.fundamentals.factors;
-    if(!Array.isArray(f) || f.length !== 9 || typeof s.score !== 'number'){ badShape.push(t); continue; }
-    if(f.some(x => typeof x.score !== 'number' || !isFinite(x.score))) badNum.push(t);
-    const sum = f.reduce((a, x) => a + (typeof x.score === 'number' ? x.score : 0), 0), w = f.reduce((a, x) => a + x.weight, 0);
-    if(Math.abs(sum - s.score) > 0.05 || Math.abs(w - 10) > 0.02) badSum.push(t);
-    if(s.verdict !== band(s.score)) badVerdict.push(t);
-    if(!s.pillars || typeof s.pillars.val !== 'number') badPillar.push(t);
-  }
-  if(dups.length) hard.push(dups.length + ' duplicate tickers: ' + list(dups));
-  if(badShape.length) hard.push(badShape.length + ' stocks without a complete 9-factor block: ' + list(badShape));
-  if(badNum.length) hard.push(badNum.length + ' stocks with a non-numeric factor score: ' + list(badNum));
-  if(badSum.length) hard.push(badSum.length + ' stocks where the factors do not add up to the score: ' + list(badSum));
-  if(badVerdict.length) hard.push(badVerdict.length + ' verdicts that disagree with the score bands: ' + list(badVerdict));
-  if(badPillar.length) hard.push(badPillar.length + ' stocks with a non-numeric pillars.val: ' + list(badPillar));
-  let moved = 0, maxMove = 0; const lostGlobal = [], lostTech = [];
-  const now = new Set();
-  for(const s of stocks){
-    const t = albaFiSym(s); now.add(t);
-    const p = prev.get(t); if(!p) continue;
-    if(typeof s.score === 'number' && typeof p.score === 'number'){ const d = Math.abs(s.score - p.score); if(d >= 1.0) moved++; if(d > maxMove) maxMove = d; }
-    const n = g => g && ((g.positive || []).length + (g.negative || []).length);
-    if(p.hasGlobal && !n(s.globalFactors)) lostGlobal.push(t);
-    if(p.hasTech && !(s.technical && s.technical.score != null)) lostTech.push(t);
-  }
-  const lost = []; for(const t of prev.keys()) if(!now.has(t)) lost.push(t);
-  if(lost.length) hard.push(lost.length + ' stocks would disappear: ' + list(lost));
-  if(lostGlobal.length) hard.push(lostGlobal.length + ' stocks would lose their Global & Macro content: ' + list(lostGlobal));
-  if(lostTech.length) hard.push(lostTech.length + ' stocks would lose their technical score: ' + list(lostTech));
-  if(moved > 40) soft.push(moved + ' stocks moved by 1.0 point or more (normally under 40). That can be real after a big data change, or a sign of a wrong file.');
-  return { hard, soft, moved, maxMove };
 }
 
 // ---- Packing the list back into chunk documents (the saved stockdb.py split) ----
@@ -309,6 +262,8 @@ async function albaFiRunImport(){
       { text: chk.moved + ' stocks moved by 1.0 point or more (largest move ' + chk.maxMove.toFixed(2) + ').' }
     ];
     if(res.onboarded.length) lines.push({ text: 'New: ' + res.onboarded.slice(0, 15).join(', ') + (res.onboarded.length > 15 ? ' … +' + (res.onboarded.length - 15) : '') + '. They use the default Screener.in link and ' + (res.bseOnly.length ? 'have no TradingView chart mapping yet (BSE-only: ' + res.bseOnly.slice(0, 10).join(', ') + (res.bseOnly.length > 10 ? ' …' : '') + ').' : 'need no chart mapping.'), cls: 'fi-line fi-line-muted' });
+    const noVal = raw.stocks.filter(s => res.onboarded.includes(albaFiSym(s)) && !(s.pillars && typeof s.pillars.val === 'number')).map(albaFiSym);
+    if(noVal.length) lines.push({ text: noVal.length + ' new stock' + (noVal.length === 1 ? ' has' : 's have') + ' no Intrinsic Value in the file, so no valuation or technical score yet: ' + noVal.slice(0, 10).join(', ') + (noVal.length > 10 ? ' … +' + (noVal.length - 10) : '') + '.', cls: 'fi-line fi-line-muted' });
     if(logErr) lines.push({ text: 'The data is saved, but the upload record could not be marked as imported (' + logErr + '), so the Last file loaded card may still say "not imported".' });
     fiShowResult('ok', lines);
   } catch(e){
@@ -353,4 +308,4 @@ function getFiAssets(){ return fiAssets; }
 function getFiOwner(){ return fiOwner; }
 function setFiRunning(v){ fiRunning = v; }
 
-export { ALBA_FI_PUBLISHED, albaFiCheck, albaFiDay, albaFiErr, albaFiLoadRaw, albaFiPersist, albaFiPrevInfo, albaFiRetry, albaFiSleep, albaFiSym, fiSetButtons, getFiAssets, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning, albaFiReadAsset };
+export { ALBA_FI_PUBLISHED, albaFiDay, albaFiErr, albaFiLoadRaw, albaFiPersist, albaFiRetry, albaFiSleep, fiSetButtons, getFiAssets, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning, albaFiReadAsset };

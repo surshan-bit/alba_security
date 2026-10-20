@@ -274,6 +274,29 @@ test('apply: re-scores listed stocks in place, adds new ones with safe defaults,
   assert.strictEqual(added.screenerConsolidated, undefined);
   assert.deepStrictEqual(res.verdictMix, stocks.reduce((m, s) => (m[s.verdict] = (m[s.verdict] || 0) + 1, m), {}));
 });
+const C = load('src/import/fund-check.js');
+const W9 = [1.8, 1.8, 1.125, 1.125, 0.9, 0.9, 0.675, 0.675, 1.0];
+const chkStock = (i, extra) => Object.assign({ ticker: 'C' + i + ' · T', score: 7, verdict: 'mbuy', pillars: { val: 7 }, valuation: { intrinsicValue: 100, currentPrice: 80 },
+  fundamentals: { factors: W9.map(w => ({ weight: w, score: w * 0.7 })) } }, extra || {});
+const chkList = extra => Array.from({ length: 2000 }, (_, i) => (i === 0 ? chkStock(0, extra) : chkStock(i)));
+test('integrity check: a stock with no Intrinsic Value may have no valuation anchor (pillars.val)', () => {
+  const noIv = { pillars: {}, valuation: { intrinsicValue: null, currentPrice: 51.09 } };
+  const r = C.albaFiCheck(chkList(noIv), new Map()); assert.deepStrictEqual(r.hard, []);
+  const r2 = C.albaFiCheck(chkList({ pillars: {}, valuation: { currentPrice: 51.09 } }), new Map()); assert.deepStrictEqual(r2.hard, []);   // no valuation figures at all
+});
+test('integrity check: a stock that HAS a valuation but no pillars.val is still a hard failure', () => {
+  const r = C.albaFiCheck(chkList({ pillars: {} }), new Map());
+  assert.strictEqual(r.hard.length, 1); assert.ok(/1 stocks with a non-numeric pillars\.val: C0/.test(r.hard[0]));
+  const r2 = C.albaFiCheck(chkList({ pillars: { val: 'x' } }), new Map()); assert.ok(/non-numeric pillars\.val/.test(r2.hard[0]));
+});
+test('apply + check: a new ticker with a blank Intrinsic Value is added without a valuation anchor and passes the check', () => {
+  const noIv = fundRow('NOIV', 'Alpha', 'Widgets', { 'Intrinsic Value': '', Graham: '' });
+  const stocks = [];
+  const res = F.albaApplyFundamental(fundCsv([noIv, ...universe.slice(0, 11)]), stocks, '2026-10-10');
+  const s = stocks.find(x => x.ticker.startsWith('NOIV'));
+  assert.ok(s); assert.ok(res.onboarded.includes('NOIV')); assert.deepStrictEqual(s.pillars, {}); assert.ok(!(s.valuation.intrinsicValue > 0));
+  assert.ok(!C.albaFiCheck(stocks.concat(chkList()), new Map()).hard.some(m => /pillars\.val/.test(m)));
+});
 test('apply: BSE-only companies are onboarded under their BSE number and listed as such', () => {
   const stocks = []; const row = fundRow('', 'Alpha', 'Widgets', { 'NSE Code': '', 'BSE Code': '512345' });
   const res = F.albaApplyFundamental(fundCsv([row, ...universe.slice(0, 11)]), stocks, '2026-10-10');
