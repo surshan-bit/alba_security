@@ -71,4 +71,4 @@ function barReaction(bars, i){
   const next = i + 1 < bars.length ? bars[i + 1] : null;
   return { same: prev ? (b[4] / prev - 1) * 100 : null, next: next && b[4] ? (next[4] / b[4] - 1) * 100 : null };
 }
-export { EVENT_GROUPS, barReaction, eventsByBar, stockChartEvents };
+export { EVENT_GROUPS, barReaction, eventTime, eventsByBar, stockChartEvents };

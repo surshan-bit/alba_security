@@ -4,7 +4,7 @@ import { stockIndex, stocks } from '../core/stocks.js';
 import { escapeHtml } from '../core/util.js';
 import { ensureAllPriceBars, pcTickerKey, priceHistoryByTicker } from '../prices/store.js';
 import { appSections } from '../ui/navigation.js';
-import { openStockInline } from '../ui/inlinedetail.js';
+import { openIndustryInline, openStockInline } from '../ui/inlinedetail.js';
 import { analysisLbCell, analysisRowContext, columnHeaderHtml, stockGridColumnIds } from '../analysis/columns.js';
 import { publishedStrategies } from '../strategies/state.js';
 import { strategyStockSet, validStrategyId } from '../strategies/pick.js';
@@ -174,7 +174,7 @@ function draw(el){
   const cols = strategyOn() ? 9 : 6;
   const body = rows.map(r => {
     const isOpen = open.has(r.name);
-    return '<tr class="biz-row' + (isOpen ? ' open' : '') + '" data-biz-name="' + escapeHtml(r.name) + '" tabindex="0" role="button" aria-expanded="' + isOpen + '"><td class="biz-name">' + escapeHtml(r.name) + '</td><td class="num">' + r.count + '</td><td class="num">' + pct(r.mean) + '</td><td class="num">' + pct(r.median) + '</td><td>' + breadth(r) + '</td><td class="num">' + (r.news.length ? r.news.length + (r.pos || r.neg ? ' <span class="news-pos">+' + r.pos + '</span> <span class="news-neg">&minus;' + r.neg + '</span>' : '') : '') + '</td>' + (strategyOn() ? '<td class="num">' + (r.matches ? '<b class="biz-matchcount">' + r.matches + '</b> of ' + r.count : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null ? pct(r.matchMean) : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null && r.mean !== null ? signedPp(r.matchMean - r.mean) : '') + '</td>' : '') + '</tr>' + (isOpen ? detailHtml(r, cols) : '');
+    return '<tr class="biz-row' + (isOpen ? ' open' : '') + '" data-biz-name="' + escapeHtml(r.name) + '" tabindex="0" role="button" aria-expanded="' + isOpen + '"><td class="biz-name">' + escapeHtml(r.name) + ' <button type="button" class="biz-open" data-biz-open="' + escapeHtml(r.name) + '" title="Open the industry page: factors, news and charts">Open &rsaquo;</button></td><td class="num">' + r.count + '</td><td class="num">' + pct(r.mean) + '</td><td class="num">' + pct(r.median) + '</td><td>' + breadth(r) + '</td><td class="num">' + (r.news.length ? r.news.length + (r.pos || r.neg ? ' <span class="news-pos">+' + r.pos + '</span> <span class="news-neg">&minus;' + r.neg + '</span>' : '') : '') + '</td>' + (strategyOn() ? '<td class="num">' + (r.matches ? '<b class="biz-matchcount">' + r.matches + '</b> of ' + r.count : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null ? pct(r.matchMean) : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null && r.mean !== null ? signedPp(r.matchMean - r.mean) : '') + '</td>' : '') + '</tr>' + (isOpen ? detailHtml(r, cols) : '');
   }).join('');
   if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + heatmapHtml(rows, period, Math.max(300, el.clientWidth - 280)) + note); return; }
   kit.defineToolbar('biz', () => {
@@ -203,6 +203,8 @@ function init(){
   const el = bodyEl(); if(!el) return;
   watchFullscreenExit(() => bizFull, () => { bizFull = false; render(); });
   el.addEventListener('click', (e) => {
+    const io = closestEl(e, '[data-biz-open]');
+    if(io){ openIndustryInline(appSections.business, 'Explorer', by, io.dataset.bizOpen); return; }
     const nt = closestEl(e, '[data-biz-newstoggle]');
     if(nt){ const n = nt.dataset.bizNewstoggle; if(newsOpen.has(n)) newsOpen.delete(n); else newsOpen.add(n); render(); return; }
     if(closestEl(e, '[data-biz-filters]')){ bizFiltersOpen = !bizFiltersOpen; render(); return; }
