@@ -221,6 +221,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.212 &middot; 2026-10-20</h3>
+            <ul>
+              <li><strong>W % chg and M % chg now show the current week and month in every grid.</strong> Explorer, Analysis and Strategies show this week&rsquo;s move (the price against the last close before Monday) and this month&rsquo;s move (against the last close before the 1st), worked out from the saved weekly and monthly bars. Before, a stock showed the last finished week or month, or a figure from the last import: a stock that did not trade this week kept last week&rsquo;s move, and about 120 stocks that TradingView gives no MACD or RSI for never updated. The Technical score, RSI, MACD and ratings are unchanged, and no new refresh is needed.</li>
+              <li><strong>Import fixes.</strong> A new stock with no Intrinsic Value in the screener.in file no longer stops the import or shows the red data-check banner.</li>
+            </ul>
+
             <h3>v1.211 &middot; 2026-10-20</h3>
             <ul>
               <li><strong>Import no longer stops for new stocks with no Intrinsic Value.</strong> A new ticker whose screener.in row has a blank Intrinsic Value used to fail the integrity check (&ldquo;non-numeric pillars.val&rdquo;) and block the whole import. It is now added without a valuation or technical score, and the result card names those stocks. A stock that has an Intrinsic Value but no valuation figure still stops the import.</li>

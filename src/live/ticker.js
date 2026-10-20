@@ -9,6 +9,7 @@ import { redrawWhenIdle } from '../ui/scrollkeep.js';
 import { detailEl } from '../core/dom.js';
 import { getShownIndex } from '../detail/render.js';
 import { pcTickerKey, priceSymbolByTicker } from '../prices/store.js';
+import { periodStartSec } from '../prices/periodmove.js';
 import { tvCall, tvMcp } from '../tv/connector.js';
 import { pctChangeSpan } from '../core/util.js';
 import { ldQuote, ldSymOk, ldVerifiedSymbol } from '../livedata/symbols.js';
@@ -60,11 +61,6 @@ function watched(){
 // (the 1st) began, India time. That close comes from the weekly / monthly bars, is read once per stock per period and kept. A stock
 // whose bars cannot be read keeps its shown figure.
 const refs = new Map();   // 'W' or 'M' + ticker key -> { start, ref }
-function periodStartSec(kind, now = Date.now()){
-  const ist = new Date(now + 330 * 60000);
-  const day = kind === 'W' ? ist.getUTCDate() - (ist.getUTCDay() + 6) % 7 : 1;   // the Monday of this week, or the 1st of this month
-  return Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), day) / 1000 - 330 * 60;
-}
 async function periodRefOf(kind, key, sym){
   const start = periodStartSec(kind), id = kind + key, have = refs.get(id);
   if(have && have.start === start) return have.ref;

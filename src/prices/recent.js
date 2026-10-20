@@ -42,6 +42,8 @@ function setRecentFromDocs(docs){
     });
   });
 }
+// One stock's recent weekly and monthly bars (by ticker key), or null when the chunks hold none.
+function recentBarsOf(key){ const r = recentByKey.get(key); return r ? { w: r.w, m: r.m } : null; }
 function noteRecentSaved(key, at, W, M){ recentByKey.set(key, { at, w: W.slice(-KEEP_W), m: M.slice(-KEEP_M) }); }
 // A stock's own document of one kind ('1W' or '1M') now holds these bars.
 function noteFullSaved(key, iv, rows){
@@ -56,4 +58,4 @@ function lagOf(key, W){
 }
 const recentRow = (key, sym, W, M) => ({ k: key, y: sym || null, w: W.slice(-KEEP_W), m: M.slice(-KEEP_M) });
 
-export { COMPACT_LAG, lagOf, noteFullSaved, noteRecentSaved, recentRow, setRecentFromDocs, withRecent };
+export { COMPACT_LAG, lagOf, noteFullSaved, noteRecentSaved, recentBarsOf, recentRow, setRecentFromDocs, withRecent };
