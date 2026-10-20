@@ -29,7 +29,7 @@ function initPriceChart(s){
   if(pcObserver){ pcObserver.disconnect(); pcObserver = null; }
   const root = document.getElementById('priceChartBlock'); if(!root || !pcHasData(s)) return;
   const saved = priceHistoryByTicker[pcTickerKey(s)], px = s.valuation && s.valuation.currentPrice, now = Date.now();
-  const bars = Object.assign({}, saved, { '1W': followPrice(saved['1W'], px, periodStartSec('W', now)), '1M': followPrice(saved['1M'], px, periodStartSec('M', now)) });   // this week's and this month's bar follow the price, as W % chg / M % chg do
+  const bars = Object.assign({}, saved, { '1W': followPrice(saved['1W'], px, periodStartSec('W', now), 8 * 86400), '1M': followPrice(saved['1M'], px, periodStartSec('M', now), 32 * 86400) });   // this week's and this month's bar follow the price, as W % chg / M % chg do
   const IST = 19800;
   const fmtD = (t, o) => new Date((t + IST) * 1000).toLocaleDateString('en-GB', Object.assign({timeZone:'UTC'}, o));
   const rs = n => '₹' + n.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
