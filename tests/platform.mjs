@@ -124,5 +124,12 @@ import { readFileSync } from 'node:fs';
   eq('cors: the answer varies by Origin', corsHeaders(site).Vary, 'Origin');
 }
 
+// Security headers: the Cloudflare site must ship the file that sets them
+{
+  const { readFileSync } = await import('node:fs');
+  const h = readFileSync(new URL('../platform/_headers', import.meta.url), 'utf8');
+  for(const line of ['X-Frame-Options: DENY', 'X-Content-Type-Options: nosniff', 'Referrer-Policy: strict-origin-when-cross-origin']) eq('headers: ' + line, h.includes(line), true);
+}
+
 console.log(fails ? fails + ' FAILED' : 'OK: platform contract tests pass');
 process.exit(fails ? 1 : 0);

@@ -8,6 +8,7 @@ for(const f of ['index.html', 'app.js', 'styles.css', 'js', 'chunks', 'partials'
   const from = path.join(root, f);
   if(fs.existsSync(from)) fs.cpSync(from, path.join(out, f), { recursive: true });
 }
+fs.copyFileSync(path.join(root, 'platform', '_headers'), path.join(out, '_headers'));
 let html = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
 const m = html.match(/data-entry="app\.js\?v=([^"]+)"/);
 if(!m){ console.error('dist: index.html has no data-entry="app.js?v=..." to redirect'); process.exit(1); }
