@@ -1,4 +1,4 @@
-# Publishes the private server functions (supabase/functions) to Supabase whenever they change on main.
+# Publishes the private server functions (supabase/functions) to Supabase whenever they change on main, once the same checks as ci.yml pass.
 # Needs one GitHub secret: SUPABASE_ACCESS_TOKEN (Supabase account settings -> Access Tokens).
 name: deploy-functions
 on:
@@ -9,7 +9,18 @@ on:
 permissions:
   contents: read
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check
+      - run: npm run platform
   deploy:
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
