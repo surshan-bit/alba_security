@@ -4,7 +4,7 @@ import { refreshAnalysisSoon } from '../analysis/section.js';
 import { setResearchTriggerKinds, setResearchTriggers } from '../research/status.js';
 import { rerenderDetail } from '../detail/render.js';
 import { applyResearchOverlay } from '../overlays/research.js';
-import { applySnapshotOverlay, applyUpdatesOverlay } from '../overlays/updates.js';
+import { applySnapshotOverlay, applyTechBlocksOverlay, applyUpdatesOverlay } from '../overlays/updates.js';
 import { applyTech2Overlay } from '../overlays/techscore2.js';
 import { pinsRef, tradeCol } from '../identity/session.js';
 import { pinWritesInFlight } from '../core/pins.js';
@@ -106,6 +106,23 @@ function init_sync_subscriptions(){
     }
   };
   watchSnapshot(0);
+
+  // Completed-weeks technical blocks of Refresh all stocks: one record per 50 stocks, laid under each stock's own saved update.
+  const watchTechBlocks = (attempt) => {
+    try {
+      db.collection('techBlocks').onSnapshot(
+        (snap) => {
+          const docs = [];
+          snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
+          try { applyTechBlocksOverlay(docs); } catch(e){ console.error('Technical blocks could not be applied', e); }
+        },
+        (err) => { console.error('Technical blocks sync error', err); if(attempt < 5) setTimeout(() => watchTechBlocks(attempt + 1), 3000 * (attempt + 1)); }
+      );
+    } catch(e){
+      console.error('Technical blocks overlay unavailable', e);
+    }
+  };
+  watchTechBlocks(0);
 
   // Technical Score 2: one record per 250 stocks, saved by Refresh all stocks.
   const watchTech2 = (attempt) => {
