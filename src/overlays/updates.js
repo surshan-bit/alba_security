@@ -67,6 +67,15 @@ function applyUpdatesDoc(s, doc){
       s.technical = cur;
     }
   }
+  // Week and month move from a snapshot that had no indicators (so no technical block): only the two figures change, never the
+  // technical score or its date, and only when the snapshot is not older than the saved reading.
+  const pc = doc && doc.pctChange;
+  if(pc && typeof pc === 'object' && typeof pc.asof === 'string' && s.technical && typeof s.technical === 'object' && newer(pc.asof, s.technical.asof)){
+    const patch = {};
+    if(typeof pc.week === 'number') patch.weekPctChange = pc.week;
+    if(typeof pc.month === 'number') patch.monthPctChange = pc.month;
+    if(Object.keys(patch).length) s.technical = Object.assign({}, s.technical, { raw: Object.assign({}, s.technical.raw || {}, patch) });
+  }
   if(doc && typeof doc.snapAsof === 'string') s.__snapAsof = doc.snapAsof;
   const ua = doc && typeof doc.asof === 'string' ? doc.asof : null;
   if(ua) s.__updAsof = ua; else delete s.__updAsof;
