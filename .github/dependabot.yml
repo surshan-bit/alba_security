@@ -1,0 +1,11 @@
+# Weekly pull requests for out-of-date packages and GitHub Actions (the Actions are pinned to exact commits, so this keeps them current).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5

@@ -221,6 +221,13 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.215 &middot; 2026-10-20</h3>
+            <ul>
+              <li><strong>Stock names are shown as plain text on the stock page.</strong> A company name or ticker that contained page code (for example from an imported CSV) was treated as code. It now shows exactly as written and never runs.</li>
+              <li><strong>Safer settings for the test site and the server.</strong> The test site now tells browsers not to show it inside another page, not to guess file types, and to share less referrer detail. The owner-only function now answers only the sites on its list instead of every site, and the database set-up script can be run again without errors.</li>
+              <li><strong>Behind the scenes, nothing changes on screen.</strong> The automatic checks run once per pull request instead of twice, the server functions deploy only after the checks pass, the helper tools are fixed to exact versions, and weekly update notices and a package safety check were added.</li>
+            </ul>
+
             <h3>v1.214 &middot; 2026-10-20</h3>
             <ul>
               <li><strong>The chart tooltip&rsquo;s Change now matches W % chg and M % chg.</strong> Hovering a weekly or monthly bar showed the bar&rsquo;s close against its own open, so a stock that gapped up (for example Lagnam Spintex on its upper circuit, +0.0% in the tooltip against +19.99% in the grid) disagreed with the grid and the header. The tooltip now shows the close against the previous bar&rsquo;s close, the same measure as the grid. About 80% of stocks were affected on the current week and month bars.</li>

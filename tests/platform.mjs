@@ -2,6 +2,7 @@
 // Run: node tests/platform.js
 import { createDocStore, createMemoryBackend } from '../platform/docstore.js';
 import { installPlatform } from '../platform/shim.js';
+import { corsHeaders } from '../supabase/functions/_shared/cors.ts';
 let fails = 0;
 const eq = (name, a, b) => { const ok = JSON.stringify(a) === JSON.stringify(b); if(!ok){ fails++; console.log('FAIL', name, JSON.stringify(a), '!=', JSON.stringify(b)); } };
 const tick = () => new Promise(r => setTimeout(r, 5));
@@ -110,6 +111,24 @@ import { readFileSync } from 'node:fs';
   const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
   eq('schema: the file bucket is created private', /values \('assets', 'assets', false\)/.test(schema) && /set public = false/.test(schema) && !/'assets', 'assets', true/.test(schema), true);
   eq('migration for existing projects makes it private', /update storage\.buckets set public = false where id = 'assets'/.test(readFileSync(new URL('../supabase/003_private_assets.sql', import.meta.url), 'utf8')), true);
+}
+
+// CORS for the private functions: only the listed pages are answered, never a wildcard
+{
+  const site = 'https://alba-test.surshan.workers.dev', other = 'https://evil.example';
+  eq('cors: the test site is allowed by default', corsHeaders(site)['Access-Control-Allow-Origin'], site);
+  eq('cors: another page gets no allow-origin header', corsHeaders(other)['Access-Control-Allow-Origin'], undefined);
+  eq('cors: no Origin header (not a browser) gets none', corsHeaders(null)['Access-Control-Allow-Origin'], undefined);
+  eq('cors: never a wildcard', corsHeaders(other, '*')['Access-Control-Allow-Origin'], undefined);
+  eq('cors: a listed origin is echoed back', corsHeaders('https://b.example', ' https://a.example , https://b.example ')['Access-Control-Allow-Origin'], 'https://b.example');
+  eq('cors: the answer varies by Origin', corsHeaders(site).Vary, 'Origin');
+}
+
+// Security headers: the Cloudflare site must ship the file that sets them
+{
+  const { readFileSync } = await import('node:fs');
+  const h = readFileSync(new URL('../platform/_headers', import.meta.url), 'utf8');
+  for(const line of ['X-Frame-Options: DENY', 'X-Content-Type-Options: nosniff', 'Referrer-Policy: strict-origin-when-cross-origin']) eq('headers: ' + line, h.includes(line), true);
 }
 
 console.log(fails ? fails + ' FAILED' : 'OK: platform contract tests pass');

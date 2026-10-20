@@ -1,4 +1,5 @@
--- Alba Securities: database for Supabase (run once in the Supabase SQL editor). UNVERIFIED until run on a real project.
+-- Alba Securities: database for Supabase (run in the Supabase SQL editor; safe to run again). Checked twice in a row on Postgres 16 with
+-- stand-ins for Supabase's auth and storage; still UNVERIFIED on a real Supabase project.
 -- One table holds every document the app keeps, addressed by path ('data/users/<uid>/prefs', 'stockMeta/main', ...).
 
 create table if not exists public.docs (
@@ -50,23 +51,30 @@ alter table public.docs enable row level security;
 alter table public.profiles enable row level security;
 
 -- your own documents: data/users/<your uid>/...
+drop policy if exists own_docs_all on public.docs;
 create policy own_docs_all on public.docs for all to authenticated
   using (path like 'data/users/' || auth.uid()::text || '/%')
   with check (path like 'data/users/' || auth.uid()::text || '/%');
 
 -- shared stock data: everyone signed in may read the free part; Pro / trial users and the owner read all; only the owner writes
+drop policy if exists shared_read_free on public.docs;
 create policy shared_read_free on public.docs for select to authenticated
   using (path like 'stockMeta/%' or path like 'stockUpdates/%');
+drop policy if exists shared_read_pro on public.docs;
 create policy shared_read_pro on public.docs for select to authenticated
   using ((path like 'stockData/%' or path like 'stockResearch/%' or path like 'priceHistory/%') and public.has_pro());
+drop policy if exists shared_write_owner on public.docs;
 create policy shared_write_owner on public.docs for all to authenticated
   using (public.is_owner() and path not like 'data/users/%') with check (public.is_owner() and path not like 'data/users/%');
 
+drop policy if exists own_user_record on public.docs;
 create policy own_user_record on public.docs for all to authenticated
   using (path = 'users/' || auth.uid()::text) with check (path = 'users/' || auth.uid()::text);
+drop policy if exists owner_read_users on public.docs;
 create policy owner_read_users on public.docs for select to authenticated
   using (public.is_owner() and path like 'users/%');
 
+drop policy if exists profile_read_own on public.profiles;
 create policy profile_read_own on public.profiles for select to authenticated using (uid = auth.uid());
 -- no insert / update policy: profiles change only through the trigger above, the payment webhook (service key) or the owner in the dashboard.
 
@@ -74,6 +82,7 @@ create policy profile_read_own on public.profiles for select to authenticated us
 -- folder, using their own sign-in; there are no public links (the app reads files through the storage API, see platform/shim.js).
 insert into storage.buckets (id, name, public) values ('assets', 'assets', false)
   on conflict (id) do update set public = false;
+drop policy if exists assets_own on storage.objects;
 create policy assets_own on storage.objects for all to authenticated
   using (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text);
@@ -86,4 +95,8 @@ grant select on public.profiles to authenticated;
 grant execute on function public.docs_merge(text, jsonb) to authenticated;
 revoke all on public.docs, public.profiles from anon;
 
-alter publication supabase_realtime add table public.docs;
+do $$ begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'docs') then
+    alter publication supabase_realtime add table public.docs;
+  end if;
+end $$;
