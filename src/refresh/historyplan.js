@@ -58,10 +58,14 @@ function alignBars(stored, bars, kind, nowS){
   const gap = bucket(nowS) - bucket(L[0]);
   const row = (t, b) => [t, b.o, b.h, b.l, b.c, b.v];
   const head = stored.slice(0, -1);
+  // The saved newest bar was still forming when it was saved, so the same bar now can only have a higher high, a lower low and more volume, and the same open.
+  const same = b => sameNum(b.o, L[1]) && b.h >= L[2] - 1e-4 && b.l <= L[3] + 1e-4 && b.v >= L[5] * 0.99;
+  // When TradingView's "current" bar is the saved bar itself, its "previous" bar must be the one saved before it.
+  const prevIsBefore = stored.length < 2 || sameNum(bars.prev.o, stored[stored.length - 2][1]);
   let out = null;
-  if(gap === 0){ if(sameNum(bars.cur.o, L[1])) out = head.concat([row(L[0], bars.cur)]); }
+  if(gap === 0){ if(same(bars.cur) && prevIsBefore) out = head.concat([row(L[0], bars.cur)]); }
   else if(gap === 1){
-    const isPrev = sameNum(bars.prev.o, L[1]), isCur = sameNum(bars.cur.o, L[1]);
+    const isPrev = same(bars.prev), isCur = same(bars.cur) && prevIsBefore;
     if(isPrev && !isCur) out = head.concat([row(L[0], bars.prev), row((kind === 'W' ? weekStartS(nowS) : monthStartS(nowS)) + OPEN_S, bars.cur)]);   // the saved bar has finished and a new one has begun
     else if(isCur && !isPrev) out = head.concat([row(L[0], bars.cur)]);   // the new week or month has no bar yet: the newest bar is still the saved one
   }

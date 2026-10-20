@@ -95,7 +95,7 @@ async function runSnapshot(){
   let tvWaitMs = 0, saveMs = 0, planned = 0, chunksSaved = 0, runError = '';
   let retried = 0, answeredAgain = 0, carried = 0, noSymbol = [];
   let tech2Saved = 0, tech2Failed = 0;
-  let batchSaved = 0, filled = 0, barsUpdated = 0, histFailed = 0, noneBefore = 0, staleBefore = 0, noHistoryLeft = 0, histRan = false;
+  let batchSaved = 0, batchCalls = 0, filled = 0, barsUpdated = 0, histFailed = 0, noneBefore = 0, staleBefore = 0, noHistoryLeft = 0, histRan = false;
   try {
     fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
     // The chunks saved by the last run, so a batch that came back exactly the same is not written again. A failed read only means every chunk is written.
@@ -114,6 +114,8 @@ async function runSnapshot(){
     // ---- 1. full history for stocks that have none (a few calls, so it always fits in the daily quota) ----
     /** @type {any} */
     let ctx = null;
+    /** @type {Record<string, number>} */
+    const batchLeft = {};   // why stocks were left for the one-by-one fetch
     if(stopAsked || skipHistory()){ stopped = stopped || stopAsked; fiSet('fill', 'done', 'skipped'); }
     else {
       histRan = true;
@@ -136,8 +138,9 @@ async function runSnapshot(){
         const j = priceJobs.get(pcTickerKey(s)), id = sanitizeDocId(tickerSymbol(s));
         if(j && j.state === 'ok'){ barsFailRun = 0; if(track) delete tried[id]; return true; }
         failedBars.push({ sym: tickerSymbol(s), name: s.name, reason: 'price bars: ' + ((j && j.msg) || 'did not finish') });
-        if(track) tried[id] = new Date().toISOString();
-        if(/quota|exhausted|not available in this view|not connected|reconnected|not allowed/i.test((j && j.msg) || '') || ++barsFailRun >= 8) ctx.abort = (j && j.msg) || 'price bars failed 8 times in a row';
+        const refused = /quota|exhausted|not available in this view|not connected|reconnected|not allowed/i.test((j && j.msg) || '');
+        if(track && !refused) tried[id] = new Date().toISOString();   // a refusal (quota, no connection) says nothing about the stock, so it is tried again next run
+        if(refused || ++barsFailRun >= 8) ctx.abort = (j && j.msg) || 'price bars failed 8 times in a row';
         return false;
       };
       // Runs `task` over the list with `workers` stocks at a time; prog = { done, total } feeds the progress line.
@@ -166,14 +169,15 @@ async function runSnapshot(){
           else left.push(s);
         }
         let saved = 0, failedCalls = 0, lastStart = 0;
+        batchLeft.noSymbol = left.length;   // stocks with no saved bars or no TradingView symbol are not eligible
         for(let i = 0; i < jobs.length && !stopAsked && !ctx.abort; i += BATCH){
           const part = jobs.slice(i, i + BATCH);
           const wait = 300 - (Date.now() - lastStart); if(wait > 0) await sleep(wait);
           lastStart = Date.now();
           let data;
-          try { const p = await tvCall('mcp-tv-get-symbol-data-batch', { symbols: part.map(x => x.sym), columns: BAR_COLUMNS }); data = (p && p.data) || {}; failedCalls = 0; }
+          try { const p = await tvCall('mcp-tv-get-symbol-data-batch', { symbols: part.map(x => x.sym), columns: BAR_COLUMNS }); batchCalls++; data = (p && p.data) || {}; failedCalls = 0; }
           catch(e){
-            part.forEach(x => left.push(x.s));
+            part.forEach(x => left.push(x.s)); batchLeft.callFailed = (batchLeft.callFailed || 0) + part.length;
             if(tvIsFatal(e)){ ctx.abort = tvErrorText(e); break; }
             if(++failedCalls >= 3){ ctx.abort = tvErrorText(e) + ' Three batches in a row failed, so the bar update stopped.'; break; }
             await sleep(1500); continue;
@@ -181,9 +185,11 @@ async function runSnapshot(){
           const ready = [];
           for(const j of part){
             const row = data[j.sym];
-            const W = j.needW ? alignBars(j.h['1W'], batchBars(row, 'W'), 'W', nowS) : j.h['1W'];
-            const M = j.needM ? alignBars(j.h['1M'], batchBars(row, 'M'), 'M', nowS) : j.h['1M'];
-            if(W && M) ready.push({ s: j.s, W, M, w: j.needW, m: j.needM }); else left.push(j.s);
+            const bw = j.needW ? batchBars(row, 'W') : null, bm = j.needM ? batchBars(row, 'M') : null;
+            const W = j.needW ? alignBars(j.h['1W'], bw, 'W', nowS) : j.h['1W'];
+            const M = j.needM ? alignBars(j.h['1M'], bm, 'M', nowS) : j.h['1M'];
+            if(W && M) ready.push({ s: j.s, W, M, w: j.needW, m: j.needM });
+            else { left.push(j.s); const k = !row ? 'noAnswer' : ((j.needW && !bw) || (j.needM && !bm)) ? 'missing' : 'unclear'; batchLeft[k] = (batchLeft[k] || 0) + 1; }
           }
           saved += await pool(ready, key, BAR_WORKERS, prog, async r => { await refreshFromBars(r.s, r.W, r.M, r); return settle(r.s, false); }, r => r.s);
         }
@@ -309,6 +315,11 @@ async function runSnapshot(){
     if(histRan && tech2Failed !== -1 && !stopped) lines.push({ text: 'Technical Score 2: ' + num(tech2Saved) + ' stocks scored from their weekly bars' + (tech2Failed ? ', ' + num(tech2Failed) + ' could not be saved' : '') + '. Stocks with under 60 weeks of bars get no score.', cls: 'fi-line' });
     if(histRan && tech2Failed === -1) lines.push({ text: 'Technical Score 2 could not be calculated this time.', cls: 'fi-line' });
     if(unchanged) lines.push({ text: num(unchanged) + ' stocks already held exactly these figures (same price and scores), so they were not rewritten.', cls: 'fi-line' });
+    if(histRan && (batchSaved || Object.keys(batchLeft).some(k => batchLeft[k]))){
+      const why = { noSymbol: 'no saved bars or symbol', noAnswer: 'TradingView sent nothing', missing: 'figures missing', unclear: 'bars did not line up (gap, split or flat prices)', callFailed: 'the batch call failed' };
+      const rest = Object.keys(why).filter(k => batchLeft[k]).map(k => num(batchLeft[k]) + ' ' + why[k]);
+      lines.push({ text: 'Batch bar update: ' + num(batchSaved) + ' stocks from ' + num(batchCalls) + ' calls' + (rest.length ? '; left for the one-by-one fetch: ' + rest.join(', ') : '') + '.', cls: 'fi-line fi-line-muted' });
+    }
     if(histRan) lines.push({ text: 'Price bars: ' + num(filled) + ' stocks downloaded in full' + (noHistoryLeft > 0 ? ' (' + num(noHistoryLeft) + ' still have none)' : '') + ', ' + num(barsUpdated) + ' given their new weekly and monthly bars' + (batchSaved ? ' (' + num(batchSaved) + ' of them from the batch call)' : '') + (histFailed ? ', ' + num(histFailed) + ' failed' : '') + '.', cls: 'fi-line' });
     lines.push({ text: 'Took ' + duration(Date.now() - t0) + '.', cls: 'fi-line fi-line-muted' });
     lines.push({ text: 'These scores include the week and month still in progress, so they can change before the week ends. Stocks with saved price bars get the stricter completed-weeks score once their bars are up to date.', cls: 'fi-line fi-line-muted' });
