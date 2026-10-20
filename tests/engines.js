@@ -297,6 +297,30 @@ test('apply + check: a new ticker with a blank Intrinsic Value is added without 
   assert.ok(s); assert.ok(res.onboarded.includes('NOIV')); assert.deepStrictEqual(s.pillars, {}); assert.ok(!(s.valuation.intrinsicValue > 0));
   assert.ok(!C.albaFiCheck(stocks.concat(chkList()), new Map()).hard.some(m => /pillars\.val/.test(m)));
 });
+const PM = load('src/prices/periodmove.js');
+const istMs = (y, mo, d, h, mi) => Date.UTC(y, mo - 1, d, h, mi) - 330 * 60000;   // an India-time moment as epoch ms
+test('period move: the week starts on Monday and the month on the 1st, India time', () => {
+  const tue = istMs(2026, 10, 20, 14, 0);                                          // Tuesday 20 Oct, 14:00 IST
+  assert.strictEqual(PM.periodStartSec('W', tue), istMs(2026, 10, 19, 0, 0) / 1000);
+  assert.strictEqual(PM.periodStartSec('M', tue), istMs(2026, 10, 1, 0, 0) / 1000);
+  assert.strictEqual(PM.periodStartSec('W', istMs(2026, 10, 19, 7, 30)), istMs(2026, 10, 19, 0, 0) / 1000);   // Monday before the open
+  assert.strictEqual(PM.periodStartSec('W', istMs(2026, 10, 18, 10, 0)), istMs(2026, 10, 12, 0, 0) / 1000);   // Sunday: still the week that ended
+  assert.strictEqual(PM.periodStartSec('W', istMs(2026, 10, 1, 9, 0)), istMs(2026, 9, 28, 0, 0) / 1000);     // the Monday can fall in the month before
+});
+test('period move: price against the last close before the period, ignoring the bar of the period itself', () => {
+  const ws = istMs(2026, 10, 19, 0, 0) / 1000;
+  const bars = [[ws - 14 * 86400, 0, 0, 0, 48.6, 1], [ws - 7 * 86400, 0, 0, 0, 51.72, 1], [ws + 3600, 0, 0, 0, 60, 1]];   // two finished weeks and this week's bar
+  assert.strictEqual(PM.periodMove(55, bars, ws), 6.34);
+  assert.strictEqual(PM.periodMove(51.72, bars, ws), 0);                           // a stock that did not trade this week: 0.00%, not last week's +6.42%
+  assert.strictEqual(PM.periodMove(46.548, bars, ws), -10);
+});
+test('period move: nothing to report without a price or a bar before the period', () => {
+  const ws = 1000;
+  assert.strictEqual(PM.periodMove(50, [], ws), null); assert.strictEqual(PM.periodMove(50, undefined, ws), null);
+  assert.strictEqual(PM.periodMove(50, [[2000, 0, 0, 0, 40, 1]], ws), null);       // only a bar of the period itself
+  assert.strictEqual(PM.periodMove(0, [[500, 0, 0, 0, 40, 1]], ws), null); assert.strictEqual(PM.periodMove(NaN, [[500, 0, 0, 0, 40, 1]], ws), null);
+  assert.strictEqual(PM.periodMove(50, [[500, 0, 0, 0, 0, 1], [600, 0, 0, 0, NaN, 1]], ws), null);               // closes that are not usable
+});
 test('apply: BSE-only companies are onboarded under their BSE number and listed as such', () => {
   const stocks = []; const row = fundRow('', 'Alpha', 'Widgets', { 'NSE Code': '', 'BSE Code': '512345' });
   const res = F.albaApplyFundamental(fundCsv([row, ...universe.slice(0, 11)]), stocks, '2026-10-10');

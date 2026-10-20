@@ -5,6 +5,9 @@ import { rerenderDetail } from '../detail/render.js';
 import { paintFreshness } from '../joblogs/freshness.js';
 import { mergedDoc } from './livesnapshot.js';
 import { stockByDocId } from './research.js';
+import { stocks } from '../core/stocks.js';
+import { periodMove, periodStartSec } from '../prices/periodmove.js';
+import { recentBarsOf, setRecentFromDocs } from '../prices/recent.js';
 
 // ---- stockUpdates overlay (added 2026-10-07) ----
 // Part B (technical block) and Part C (globalFactors) of a research run are saved as one document per
@@ -121,6 +124,28 @@ function applyTechBlocksOverlay(chunkDocs){
   techRows = next;
   rebuildOverlay();
 }
+// The recent weekly and monthly bars (collection barsRecent, see prices/recent.js), read here so W % chg and M % chg can follow the current week and month.
+function applyRecentBarsOverlay(chunkDocs){
+  setRecentFromDocs(chunkDocs);
+  rebuildOverlay();
+}
+// W % chg and M % chg are this week's and this month's move: the price against the last close before Monday / the 1st (India time), from the recent
+// bars. The saved technical block (completed weeks) and the snapshot carry the last completed period's move, so without this a stock shows the week
+// or month before, and a stock that did not trade this week keeps last week's figure. Only these two figures change, never the score or the date.
+function applyPeriodMoves(){
+  const now = Date.now(), ws = periodStartSec('W', now), ms = periodStartSec('M', now);
+  let moved = false;
+  stocks.forEach(s => {
+    const raw = s.technical && s.technical.raw, px = s.valuation && s.valuation.currentPrice;
+    if(!raw || !(px > 0)) return;
+    const r = recentBarsOf(String(s.ticker || '').split(' · ')[0].trim());
+    if(!r) return;
+    const w = periodMove(px, r.w, ws), m = periodMove(px, r.m, ms);
+    if(w !== null && raw.weekPctChange !== w){ raw.weekPctChange = w; moved = true; }
+    if(m !== null && raw.monthPctChange !== m){ raw.monthPctChange = m; moved = true; }
+  });
+  return moved;
+}
 function withTechBlock(real, tr){
   if(!tr) return real;
   const rt = real && real.technical;
@@ -150,6 +175,7 @@ function rebuildOverlay(){
   }
   updatesOverlayApplied.clear();
   for(const [id, { s }] of next) updatesOverlayApplied.set(id, s);
+  if(applyPeriodMoves()) changed = true;
   if(!changed) return;
   setPeerGroupCache(null);
   rerenderDetail();
@@ -158,4 +184,4 @@ function rebuildOverlay(){
   if(analysisSectionEl && analysisSectionEl.classList.contains('active')) refreshAnalysisSoon();
 }
 
-export { applySnapshotOverlay, applyTechBlocksOverlay, applyUpdatesOverlay };
+export { applyRecentBarsOverlay, applySnapshotOverlay, applyTechBlocksOverlay, applyUpdatesOverlay };

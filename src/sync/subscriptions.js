@@ -4,7 +4,7 @@ import { refreshAnalysisSoon } from '../analysis/section.js';
 import { setResearchTriggerKinds, setResearchTriggers } from '../research/status.js';
 import { rerenderDetail } from '../detail/render.js';
 import { applyResearchOverlay } from '../overlays/research.js';
-import { applySnapshotOverlay, applyTechBlocksOverlay, applyUpdatesOverlay } from '../overlays/updates.js';
+import { applyRecentBarsOverlay, applySnapshotOverlay, applyTechBlocksOverlay, applyUpdatesOverlay } from '../overlays/updates.js';
 import { applyTech2Overlay } from '../overlays/techscore2.js';
 import { pinsRef, tradeCol } from '../identity/session.js';
 import { pinWritesInFlight } from '../core/pins.js';
@@ -123,6 +123,23 @@ function init_sync_subscriptions(){
     }
   };
   watchTechBlocks(0);
+
+  // The recent weekly and monthly bars of Refresh all stocks (about 3 MB in all): W % chg and M % chg are worked out from them.
+  const watchRecentBars = (attempt) => {
+    try {
+      db.collection('barsRecent').onSnapshot(
+        (snap) => {
+          const docs = [];
+          snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
+          try { applyRecentBarsOverlay(docs); } catch(e){ console.error('Recent bars could not be applied', e); }
+        },
+        (err) => { console.error('Recent bars sync error', err); if(attempt < 5) setTimeout(() => watchRecentBars(attempt + 1), 3000 * (attempt + 1)); }
+      );
+    } catch(e){
+      console.error('Recent bars overlay unavailable', e);
+    }
+  };
+  watchRecentBars(0);
 
   // Technical Score 2: one record per 250 stocks, saved by Refresh all stocks.
   const watchTech2 = (attempt) => {
