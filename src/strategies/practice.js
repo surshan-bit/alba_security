@@ -4,6 +4,7 @@
 import { escapeHtml } from '../core/util.js';
 import { stocks } from '../core/stocks.js';
 import { ldAskJson, ldEnsureClaudeAccess, ldErrText } from '../livedata/claude.js';
+import { claudeStepOn } from '../livedata/claudegate.js';
 import { FIELDS, FIELD_BY_ID } from './fields.js';
 import { OPS, describeRule, qualifyingStocks } from './rules.js';
 import { saveStrategies } from './state.js';
@@ -56,6 +57,7 @@ async function runPractice(key, done, refresh){
   if(running.has(key)) return;
   running.add(key); done();
   try {
+    if(!claudeStepOn('practice')){ results.set(key, { error: 'Strategy practice ideas are turned off in Settings > Claude controls.' }); return; }
     await ldEnsureClaudeAccess();
     const sample = (typeof claude !== 'undefined' && claude && typeof claude.use === 'function') ? await claude.use('sample').catch(() => null) : null;
     if(!sample) throw { fromClaude: true, code: 'not_declared', message: 'Claude is not available here.' };

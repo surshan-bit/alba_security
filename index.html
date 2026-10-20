@@ -20,17 +20,17 @@
   } catch(e){ /* storage unavailable — default (dark) theme applies */ }
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=3a5adeaa">
+<link rel="stylesheet" href="styles.css?v=698891d6">
 <!--build:preload-->
-<link rel="modulepreload" href="app.js?v=3a5adeaa">
-<link rel="modulepreload" href="chunks/chunk-5SQKQUIX.js">
-<link rel="modulepreload" href="chunks/chunk-7JQQHAZJ.js">
-<link rel="modulepreload" href="chunks/main-74OKKVNB.js">
-<link rel="modulepreload" href="chunks/chunk-AM6TXT4P.js">
-<link rel="modulepreload" href="chunks/chunk-S36QZUWL.js">
-<link rel="modulepreload" href="chunks/chunk-WTJMNWAV.js">
-<link rel="modulepreload" href="chunks/chunk-NAYJRKBZ.js">
-<link rel="modulepreload" href="chunks/chunk-PJQSPY2R.js">
+<link rel="modulepreload" href="app.js?v=698891d6">
+<link rel="modulepreload" href="chunks/chunk-XNUOLYNC.js">
+<link rel="modulepreload" href="chunks/chunk-BCXG4U5S.js">
+<link rel="modulepreload" href="chunks/main-LWXS7H47.js">
+<link rel="modulepreload" href="chunks/chunk-Z4QUN6RO.js">
+<link rel="modulepreload" href="chunks/chunk-GQ2HRSVZ.js">
+<link rel="modulepreload" href="chunks/chunk-ZLDDANMD.js">
+<link rel="modulepreload" href="chunks/chunk-FQ6EDD7X.js">
+<link rel="modulepreload" href="chunks/chunk-56ZIKMDT.js">
 <!--/build:preload-->
 </head>
 <body>
@@ -75,7 +75,7 @@
       </g>
       <circle cx="100" cy="100" r="50" fill="url(#brandSunGrad)"/>
     </svg>
-    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.209 &mdash; tagged 2026-10-20">v1.209</span></div>
+    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.210 &mdash; tagged 2026-10-20">v1.210</span></div>
   </div>
   <div class="sidebar-nav">
     <div class="nav-section-label">Menu</div>
@@ -220,6 +220,12 @@
         </div>
       </div>
     </div>
+
+    <header class="settings-subhead">
+      <h2>Claude controls</h2>
+      <div class="sub">Choose which steps may send data to Claude. All are on by default. Switching one off skips only that step; the CSV import never uses Claude. Saved the same way as your theme.</div>
+    </header>
+    <div class="settings-panel" id="claudeControls"></div>
   </section>
 
 </div>
@@ -228,7 +234,7 @@
   <div class="boot-msg" style="font-size:.95rem;max-width:480px;line-height:1.5;"></div>
   <button type="button" class="boot-retry" hidden style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer;" onclick="location.reload()">Retry</button>
 </div>
-<script src="js/loader.js" data-entry="app.js?v=3a5adeaa"></script>
+<script src="js/loader.js" data-entry="app.js?v=698891d6"></script>
 </body>
 </html>
 

@@ -7,6 +7,7 @@ import { tvCall, tvErrorText, tvIstDate, tvMcp } from '../tv/connector.js';
 import { priceJobs, refreshOneNow } from '../prices/refresh.js';
 import { ldAbort, ldGet, ldJson, ldSet } from './bar.js';
 import { ldAskJson, ldEnsureClaudeAccess, ldErrText, setLdPhase } from './claude.js';
+import { claudeAnyOn, claudeStepOn } from './claudegate.js';
 import { ldVerifiedSymbol } from './symbols.js';
 import { ldApplyLabels, ldBuildEvents, ldLabelPrompt, ldMergeEvents, ldUnlabeledNews } from './events.js';
 
@@ -46,9 +47,12 @@ async function ldRunFundamental(s){
     set(2, 'Preparing…');
     const db = await dbCapabilityPromise;
     if(!db) throw new Error('The database is not available in this view.');
-    const sample = (typeof claude !== 'undefined' && claude && typeof claude.use === 'function') ? await claude.use('sample').catch(() => null) : null;
-    if(!sample) throw new Error('Asking Claude from this page is not available in this view.');
-    await ldEnsureClaudeAccess();
+    const useClaude = claudeAnyOn();   // every Claude step switched off in Settings: still refresh from TradingView, never contact Claude
+    const sample = useClaude && (typeof claude !== 'undefined' && claude && typeof claude.use === 'function') ? await claude.use('sample').catch(() => null) : null;
+    if(useClaude && !sample) throw new Error('Asking Claude from this page is not available in this view.');
+    if(useClaude) await ldEnsureClaudeAccess();
+    const skippedOff = [];   // steps skipped because Settings > Claude controls turned them off
+    const offNote = (id, label) => { if(!claudeStepOn(id)) skippedOff.push(label); return !claudeStepOn(id); };
     if(!(await tvMcp())) throw Object.assign(new Error('The TradingView connector is not available in this view.'), { code: 'no_mcp' });
 
     // ---- Gather what TradingView can tell us about this company (the only outside data Claude will see) ----
@@ -91,7 +95,7 @@ async function ldRunFundamental(s){
         const merged = ldMergeEvents(ecur && ecur.exists ? (ecur.data() || {}).events : [], fresh);
         // Label the headlines that have no positive / negative label yet (cheapest model tier, only the unlabelled ones).
         const todo = ldUnlabeledNews(merged);
-        if(todo.length){
+        if(todo.length && !offNote('newsLabels', 'news labels')){
           try {
             halt();
             labelled = ldApplyLabels(todo, await ldAskJson(sample, ldLabelPrompt(s.name, todo), { modelTier: 'quick', cache: false, signal }));
@@ -147,7 +151,7 @@ async function ldRunFundamental(s){
     const needCards = !researchFresh || forced;   // factor cards, Global & Macro and the summary only when stale, newer news exists, or forced
     const upd = {};   // factor key -> { score?, note?, metrics?, research? }
     let metricsFilled = 0;
-    if(withGaps.length){
+    if(withGaps.length && !offNote('missingMetrics', 'missing metrics')){
       set(34, 'Looking for missing metrics in the TradingView data…');
       try {
         const r = await ask(headFor(withGaps.map(x => x.key), ['fin', 'fc']) + 'TASK: These metrics are "n/a" in the screener.in CSV import: ' + withGaps.map(x => '[' + x.key + '] ' + x.missing.join(', ')).join('; ') + '.\nFor each, give a value ONLY when the TradingView data above directly provides it or it follows from it by simple arithmetic you can state. Otherwise leave it out; do not estimate. Format a value the way a similar metric on the card is shown, with its unit (for example "12.4%" or "Rs 5,076 Cr"), and add the basis in "note".\nReply with only JSON: {"factors":{"<factor key>":{"metrics":{"<metric label exactly as listed>":"<value>"},"note":"<one sentence on the basis>"}}}', 34, 46, 1200);
@@ -177,12 +181,13 @@ async function ldRunFundamental(s){
     pend.forEach(x => { if(x.proxy) SCORABLE.add(x.key); });
     const TRAD = ['fin', 'prof', 'growth', 'val'];
     const groups = [
-      { label: 'Traditional Analysis', keys: factors.filter(f => TRAD.includes(f.key)).map(f => f.key), from: 48, to: 60, tier: 'quick', tv: ['fin', 'fcLite', 'newsLite'] },
-      { label: 'Buffett-Style Analysis', keys: factors.filter(f => !TRAD.includes(f.key)).map(f => f.key), from: 60, to: 74, tier: 'quick', tv: ['finLite', 'fcLite', 'news', 'stories', 'docs'] }
+      { step: 'tradCards', label: 'Traditional Analysis', keys: factors.filter(f => TRAD.includes(f.key)).map(f => f.key), from: 48, to: 60, tier: 'quick', tv: ['fin', 'fcLite', 'newsLite'] },
+      { step: 'buffettCards', label: 'Buffett-Style Analysis', keys: factors.filter(f => !TRAD.includes(f.key)).map(f => f.key), from: 60, to: 74, tier: 'quick', tv: ['finLite', 'fcLite', 'news', 'stories', 'docs'] }
     ].filter(g => g.keys.length);
+    const cardGroups = needCards ? groups.filter(g => !offNote(g.step, g.label)) : [];
     const scoreNotes = [];
     let cardsRefreshed = 0;
-    for(const g of (needCards ? groups : [])){
+    for(const g of cardGroups){
       set(g.from, 'Refreshing ' + g.label + '…');
       try {
         const listing = g.keys.map(k => '"' + k + '" (' + (SCORABLE.has(k) ? 'you may re-score it' : 'scored mechanically, do not return a score') + ')').join(', ');
@@ -214,7 +219,7 @@ async function ldRunFundamental(s){
       }
     }
     if(cardsRefreshed) notes.push(cardsRefreshed + ' factor card' + (cardsRefreshed === 1 ? '' : 's') + ' refreshed');
-    else if(needCards && !failed.length) failed.push('factor cards (Claude returned nothing usable)');
+    else if(cardGroups.length && !failed.length) failed.push('factor cards (Claude returned nothing usable)');
     const scoreChanges = scoreNotes.filter(Boolean);
     // Save the fundamental findings now, so a later failure in Global & Macro does not lose them.
     if(Object.keys(upd).length){
@@ -241,7 +246,7 @@ async function ldRunFundamental(s){
     // ---- 3. Global & Macro plus recent news ----
     setLdPhase('claude');
     let gfOut = null;
-    const needGlobal = needCards || gfMissing;
+    const needGlobal = (needCards || gfMissing) && !offNote('globalMacro', 'Global & Macro');
     if(needGlobal) set(78, 'Researching Global & Macro and recent news…');
     if(needGlobal) try {
       const g0 = s.globalFactors || {};
@@ -295,8 +300,9 @@ async function ldRunFundamental(s){
 
     // ---- 5. Strengths and Watch-outs box, rewritten from everything above ----
     setLdPhase('claude');
-    if(needCards || metricsFilled) set(90, 'Reviewing the Strengths and Watch-outs…');
-    if(needCards || metricsFilled) try {
+    const doStrengths = (needCards || metricsFilled) && !offNote('strengths', 'Strengths and Watch-outs');
+    if(doStrengths) set(90, 'Reviewing the Strengths and Watch-outs…');
+    if(doStrengths) try {
       const v = s.valuation || {};
       const ivNow = typeof v.intrinsicValue === 'number' && v.intrinsicValue > 0 ? v.intrinsicValue : null;
       const pxNow = typeof v.currentPrice === 'number' ? v.currentPrice : null;
@@ -327,7 +333,8 @@ async function ldRunFundamental(s){
     }
 
     if(!notes.length && failed.length) throw new Error('Nothing was saved. ' + failed.join('; ') + '.');
-    return (notes.join('. ') || 'Finished') + '.' + (failed.length ? ' Not done: ' + failed.join('; ') + '.' : '') + ' Based on TradingView data and Claude, without web search.';
+    const offText = skippedOff.length ? ' Turned off in Settings: ' + skippedOff.join(', ') + '.' : '';
+    return (notes.join('. ') || 'Finished') + '.' + (failed.length ? ' Not done: ' + failed.join('; ') + '.' : '') + offText + (useClaude ? ' Based on TradingView data and Claude, without web search.' : ' Based on TradingView data only.');
   } finally {
     ldAbort.delete(key + '|fund');
   }
