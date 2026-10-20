@@ -223,6 +223,9 @@
       </ul>
             <h3>v1.209 &middot; 2026-10-20</h3>
             <ul>
+              <li><strong>Shorter result and help text.</strong> The result of Refresh all stocks is now a heading with the time taken and a few bullets (prices, bars, technical scores, Technical Score 2), each with its % done; problems are listed only when there are some. The help text above the button is four short steps.</li>
+              <li><strong>Refresh all stocks now checks TradingView first.</strong> One cheap call before anything else: if TradingView is refusing the dashboard&rsquo;s calls it stops within a second instead of after reading the saved data, and a refusal is tried once more after 8 seconds in case it was short.</li>
+              <li>The completed-weeks technical scores have their own bullet: how many were calculated in batches and how many one by one.</li>
               <li>When TradingView refuses the dashboard&rsquo;s calls because of its tool-call quota, the red box on Data Refresh now shows TradingView&rsquo;s whole message (the limit and when it lifts) instead of cutting it off, and says that calls from elsewhere may still work.</li>
             </ul>
             <h3>v1.208 &middot; 2026-10-20</h3>

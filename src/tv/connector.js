@@ -106,4 +106,4 @@ async function tvResolveSymbol(s){
   return 'BSE:' + BSE_ALPHA_MAP[key];
 }
 
-export { TV_SERVER, tvCall, tvErrorText, tvIsFatal, tvIstDate, tvMcp, tvMergeDelta, tvResolveSymbol, tvToRows, tvValidate };
+export { TV_SERVER, tvCall, tvErrorText, tvIsFatal, tvIsQuota, tvIstDate, tvMcp, tvMergeDelta, tvResolveSymbol, tvToRows, tvValidate };
