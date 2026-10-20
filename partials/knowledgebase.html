@@ -221,6 +221,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.213 &middot; 2026-10-20</h3>
+            <ul>
+              <li><strong>W % chg and M % chg after a split or bonus.</strong> A stock whose saved price bars were on another scale than today&rsquo;s price (for example BANSALWIRE after a split, which showed -80% instead of +1.7%) now takes TradingView&rsquo;s weekly or monthly figure when the bar-based figure is 40% or more and TradingView&rsquo;s is less than half of it. A stock that did not trade this week still shows 0.00%.</li>
+              <li><strong>The price chart&rsquo;s current week and month bars follow the price.</strong> The weekly and monthly bars of the period in progress were only as new as the last refresh (the October bar was often weeks old), so they did not match W % chg and M % chg. The chart now draws those two bars from the current price, so each plotted bar&rsquo;s change equals the figure in the grid. The saved bars are not changed.</li>
+            </ul>
+
             <h3>v1.212 &middot; 2026-10-20</h3>
             <ul>
               <li><strong>W % chg and M % chg now show the current week and month in every grid.</strong> Explorer, Analysis and Strategies show this week&rsquo;s move (the price against the last close before Monday) and this month&rsquo;s move (against the last close before the 1st), worked out from the saved weekly and monthly bars. Before, a stock showed the last finished week or month, or a figure from the last import: a stock that did not trade this week kept last week&rsquo;s move, and about 120 stocks that TradingView gives no MACD or RSI for never updated. The Technical score, RSI, MACD and ratings are unchanged, and no new refresh is needed.</li>

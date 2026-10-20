@@ -314,6 +314,34 @@ test('period move: price against the last close before the period, ignoring the 
   assert.strictEqual(PM.periodMove(51.72, bars, ws), 0);                           // a stock that did not trade this week: 0.00%, not last week's +6.42%
   assert.strictEqual(PM.periodMove(46.548, bars, ws), -10);
 });
+test('period move: a split or bonus (bars on another scale) falls back to TradingView\'s figure, nothing else does', () => {
+  assert.strictEqual(PM.checkedMove(-80.13, 1.7), 1.7);                              // BANSALWIRE: saved bars from before the split
+  assert.strictEqual(PM.checkedMove(-80.62, -3.08), -3.08);
+  assert.strictEqual(PM.checkedMove(-45, -42), -45);                                 // a real big move: both agree, kept
+  assert.strictEqual(PM.checkedMove(0, -13.04), 0);                                  // did not trade this period: TradingView shows its last candle, 0.00% is right
+  assert.strictEqual(PM.checkedMove(-12, 3), -12);                                   // below the jump size
+  assert.strictEqual(PM.checkedMove(-60, null), -60); assert.strictEqual(PM.checkedMove(-60, undefined), -60); assert.strictEqual(PM.checkedMove(-60, NaN), -60);
+  assert.strictEqual(PM.checkedMove(null, 5), null);
+  assert.strictEqual(PM.checkedMove(150, 2.4567), 2.46);
+});
+test('period move: the plotted bar of the period in progress follows the price, and never changes the saved bars', () => {
+  const ws = istMs(2026, 10, 19, 0, 0) / 1000, wk = 7 * 86400;
+  const saved = [[ws - 2 * wk + 33300, 48, 50, 47, 48.6, 10], [ws - wk + 33300, 49, 53, 48, 51.72, 20], [ws + 33300, 51.72, 55, 50, 52, 30]];   // the last bar is this week's, saved earlier
+  const before = JSON.stringify(saved);
+  const f = PM.followPrice(saved, 56, ws, 8 * 86400);                                         // price above the bar's high: close follows, high stretches
+  assert.deepStrictEqual(f[2], [ws + 33300, 51.72, 56, 50, 56, 30]); assert.strictEqual(f.length, 3);
+  assert.deepStrictEqual(PM.followPrice(saved, 49, ws, 8 * 86400)[2], [ws + 33300, 51.72, 55, 49, 49, 30]);   // below the low
+  assert.strictEqual(JSON.stringify(saved), before);                               // a copy: the saved bars are untouched
+  assert.strictEqual(PM.periodMove(56, f, ws), 8.28);                              // the plotted bar's move (56 / 51.72) is the same figure as the grid's
+  const old = saved.slice(0, 2);                                                   // no bar for this week yet
+  assert.strictEqual(PM.followPrice(old, 51.72, ws, 8 * 86400), old);                          // price unchanged: no trade, no bar
+  const g = PM.followPrice(old, 53, ws, 8 * 86400); assert.strictEqual(g.length, 3); assert.deepStrictEqual(g[2], [ws + 33300, 51.72, 53, 51.72, 53, 0]);
+  assert.strictEqual(old.length, 2);
+  assert.strictEqual(PM.followPrice([], 50, ws, 8 * 86400).length, 0); assert.strictEqual(PM.followPrice(saved, 0, ws, 8 * 86400), saved); assert.strictEqual(PM.followPrice(undefined, 50, ws, 8 * 86400), undefined);
+  const stale = [[ws - 4 * wk + 33300, 40, 42, 39, 41, 5], [ws - 3 * wk + 33300, 41, 44, 40, 43, 6]];      // last bar three weeks old: bars are stale, nothing is invented
+  assert.strictEqual(PM.followPrice(stale, 60, ws, 8 * 86400), stale);
+  assert.strictEqual(PM.followPrice(old, 53, ws, 8 * 86400).length, 3);                                    // the previous week's bar is within the gap
+});
 test('period move: nothing to report without a price or a bar before the period', () => {
   const ws = 1000;
   assert.strictEqual(PM.periodMove(50, [], ws), null); assert.strictEqual(PM.periodMove(50, undefined, ws), null);
