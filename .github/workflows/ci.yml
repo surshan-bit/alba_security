@@ -14,6 +14,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with: { node-version: 22, cache: npm }
       - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high   # fails on a known high-severity problem in a package the site ships
       - run: npx playwright install --with-deps chromium   # the Playwright version is pinned in package.json
       - run: npm run check
       - run: npm run platform
