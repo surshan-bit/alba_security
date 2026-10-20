@@ -655,13 +655,13 @@ async function tvRefreshScenarios(){
     await page.click('#tvSnapshotBtn');
     await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
     const first = await page.textContent('#tv_fiResult');
-    ok(/Took \d+ (s|min)/.test(first) && !/already held exactly/.test(first), 'the first run reports its time and has nothing unchanged: ' + first.slice(0, 260));
+    ok(/Done in \d+ (s|min)/.test(first) && !/unchanged/.test(first), 'the first run reports its time and has nothing unchanged: ' + first.slice(0, 260));
     await page.waitForFunction(() => !document.getElementById('tvSnapshotBtn').disabled, null, { timeout: 30000 });
     const before = await readDb(page);
     await page.click('#tvSnapshotBtn');
-    await page.waitForFunction(() => /already held exactly/.test((document.getElementById('tv_fiResult') || {}).textContent || ''), null, { timeout: 120000 });
+    await page.waitForFunction(() => /[\d,]+ unchanged/.test((document.getElementById('tv_fiResult') || {}).textContent || ''), null, { timeout: 120000 });
     const second = await page.textContent('#tv_fiResult');
-    ok(/(^|\s)0 stocks refreshed/.test(second) && /already held exactly these figures/.test(second), 'the second run saves nothing and says why: ' + second.slice(0, 300));
+    ok(/Prices and snapshot: [\d,]+ of [\d,]+ stocks \(\d+%\), [\d,]+ unchanged/.test(second) && /Done in/.test(second), 'the second run saves nothing and says why: ' + second.slice(0, 300));
     ok(await page.evaluate(() => /fi-result-ok/.test(document.getElementById('tv_fiResult').className)), 'it still counts as a good run');
     const after = await readDb(page);
     const noLog = all => JSON.stringify(Object.keys(all).filter(k => !k.startsWith('refreshRunLog/')).sort().map(k => [k, all[k]]));
@@ -677,7 +677,7 @@ async function tvRefreshScenarios(){
     ok(/Last 2 runs/.test(lastTxt) && (lastTxt.match(/manual/g) || []).length === 2 && /2,?\d{3} saved/.test(lastTxt) && /unchanged/.test(lastTxt), 'the list shows both runs: ' + lastTxt.replace(/\s+/g, ' ').slice(0, 300));
     await page.waitForFunction(() => !document.getElementById('tvSnapshotBtn').disabled, null, { timeout: 30000 });
     await page.click('#tvSnapshotBtn');
-    await page.waitForFunction(() => document.getElementById('tvSnapshotBtn').disabled === false && /Took/.test(document.getElementById('tv_fiResult').textContent), null, { timeout: 120000 });
+    await page.waitForFunction(() => document.getElementById('tvSnapshotBtn').disabled === false && /Done in|Nothing saved|Stopped after/.test(document.getElementById('tv_fiResult').textContent), null, { timeout: 120000 });
     await page.waitForFunction(() => (document.getElementById('lastRuns_snapshot').innerText.match(/manual/g) || []).length === 2, null, { timeout: 15000 });
     const keptRuns = Object.keys((await readDb(page)).all).filter(k => k.startsWith('refreshRunLog/'));
     eq(keptRuns.length, 2, 'a third run leaves only the newest two records');
@@ -718,7 +718,7 @@ async function tvRefreshScenarios(){
     await page.click('#tvSnapshotBtn');
     await page.waitForSelector('#tv_fiResult.fi-result-ok, #tv_fiResult.fi-result-err', { timeout: 120000 });
     const text = await page.textContent('#tv_fiResult');
-    ok(/(^|\s)0 stocks refreshed.*\b0 technical scores updated/.test(text), 'nothing is counted as updated: ' + text.slice(0, 240));
+    ok(/Nothing saved/.test(text) && /Prices and snapshot: 0 of [\d,]+ stocks \(0%\)/.test(text), 'nothing is counted as updated: ' + text.slice(0, 240));
   });
   // v1.200: the history stages of Refresh all stocks. The made-up database has about 2,000 stocks and none has bars, so each scenario
   // marks all but a few stocks as "failed recently" (the list kept in stockMeta/histFillTried), which leaves only those to download.
@@ -733,18 +733,18 @@ async function tvRefreshScenarios(){
     await page.evaluate(sym => { window.__tvFlaky = { [sym]: 1 }; }, 'NSE:' + miss);
     await page.click('#tvSnapshotBtn');
     const text = await waitDone(page);
-    ok(/were asked for again; 1 answered the second time/.test(text), 'the result says the missed stock was asked for again and answered: ' + text.slice(0, 500));
+    ok(/Done in/.test(text) && !/had no price today/.test(text), 'the result says the missed stock was asked for again and answered: ' + text.slice(0, 500));
     const a = await readDb(page), row = snapRows(a.all).find(r => r.k === sid(miss));
     ok(row && row.c[0] === 111.1 && row.d === undefined, 'the stock has today\'s figures after the second ask: ' + JSON.stringify(row));
     const run = Object.values(a.all).find(v => v && v.kind === 'snapshot'); ok(run && run.retried >= 1 && run.answeredAgain === 1 && run.carried === 0 && run.noSymbol > 0, 'the run record counts the retry and the stocks without a symbol: ' + JSON.stringify(run && [run.retried, run.answeredAgain, run.carried, run.noSymbol]));
-    ok(/stocks have no TradingView symbol yet, so they are not refreshed:/.test(text), 'the screen lists the stocks with no TradingView symbol: ' + text.slice(0, 500));
+    ok(/stocks without a TradingView symbol:/.test(text), 'the screen lists the stocks with no TradingView symbol: ' + text.slice(0, 500));
   });
   const oldRow = { k: sid(miss), y: 'NSE:' + miss, c: [77.7, 2, 1, 3, 1, 60, 58, 1.5, 4, 50000], d: undefined };
   await runScenario('refresh all stocks: a stock with no price keeps its earlier figures, dated as they are', { cfg: { liveCollections: true }, docs: { 'liveSnapshot/c001': { v: 1, asof: '2026-10-10', at: '2026-10-10T10:00:00.000Z', rows: [{ k: oldRow.k, y: oldRow.y, c: oldRow.c }] } } }, async page => {
     await page.evaluate(sym => { window.__tvFlaky = { [sym]: 5 }; }, 'NSE:' + miss);
     await page.click('#tvSnapshotBtn');
     const text = await waitDone(page);
-    ok(/still had no price and kept their figures from an earlier day/.test(text), 'the result says it kept the figures: ' + text.slice(0, 500));
+    ok(/stocks? had no price today and kept an earlier one/.test(text), 'the result says it kept the figures: ' + text.slice(0, 500));
     const a = await readDb(page), row = snapRows(a.all).find(r => r.k === sid(miss));
     ok(row && row.c[0] === 77.7 && row.d === '2026-10-10' && /^2026-10-10T/.test(row.t), 'the earlier row is kept with its own day: ' + JSON.stringify(row));
     const others = snapRows(a.all).filter(r => r.k !== sid(miss)); ok(others.length > 100 && others.every(r => r.c[0] === 111.1 && r.d === undefined), 'every other stock has today\'s figures');
@@ -758,7 +758,7 @@ async function tvRefreshScenarios(){
     await page.click('#tvSnapshotBtn');
     const text = await waitDone(page);
     ok(/fi-result-ok/.test(await page.evaluate(() => document.getElementById('tv_fiResult').className)), 'it finishes: ' + text.slice(0, 200));
-    ok(/Price bars: 3 stocks downloaded in full/.test(text), 'the result says what was downloaded: ' + text.slice(0, 400));
+    ok(/Full history: 3 of/.test(text), 'the result says what was downloaded: ' + text.slice(0, 400));
     const a = await readDb(page);
     for(const sym of histKeep){
       const w = a.all['priceHistory/NSE_' + sid(sym) + '_1W'], m = a.all['priceHistory/NSE_' + sid(sym) + '_1M'];
@@ -783,7 +783,7 @@ async function tvRefreshScenarios(){
     })() }, async page => {
     await page.click('#tvSnapshotBtn');
     const text = await waitDone(page);
-    ok(/Price bars: 0 stocks downloaded in full( \([\d,]+ still have none\))?, 1 given their new weekly and monthly bars/.test(text), 'the result says one stock got new bars: ' + text.slice(0, 400));
+    ok(/Weekly and monthly bars: 1 of 1 stocks/.test(text), 'the result says one stock got new bars: ' + text.slice(0, 400));
     const [x, y] = plain.slice(0, 2), a = await readDb(page);
     const fx = a.all['priceHistory/NSE_' + sid(x) + '_1W'].fetchedAt, fy = a.all['priceHistory/NSE_' + sid(y) + '_1W'].fetchedAt;
     ok(fx === '2026-01-01T00:00:00Z' && fy !== '2026-01-01T00:00:00Z', 'the stock saved this week was left alone and the older one was updated: ' + fx + ' / ' + fy);
@@ -823,7 +823,7 @@ async function tvRefreshScenarios(){
     ok(row && row.w.length === 40 && row.w[38][4] === 11.5 && row.w[39][4] === 12, 'the finished week replaced the saved one and the new week was added, in the record: ' + (row && JSON.stringify(row.w.slice(-2))));
     ok(a.all['priceHistory/NSE_' + sid(z) + '_1W'].bars.length === 80, 'the stock\'s own document was not rewritten');
     ok(Object.keys(a.all).some(id => id.startsWith('techBlocks/')), 'the technical scores were saved in a record too: ' + Object.keys(a.all).filter(id => /^(barsRecent|techBlocks)\//.test(id)).join(', '));
-    ok(/1 given their new weekly and monthly bars \(1 of them from the batch call\)/.test(text), 'the result says it came from the batch call: ' + text.slice(0, 500));
+    ok(/Weekly and monthly bars: 1 of 1 stocks \(100%\)/.test(text) && !/one by one/.test(text), 'the result says it came from the batch call: ' + text.slice(0, 500));
   });
   // recent bars saved in a record are laid on the stock's own bars when the page loads them: the stock counts as up to date and is left alone
   await runScenario('refresh all stocks: a stock whose recent bars are in a record is up to date', { history: true, docs: (() => {
@@ -836,7 +836,7 @@ async function tvRefreshScenarios(){
     await page.click('#tvSnapshotBtn');
     const text = await waitDone(page);
     const z = plain[0], calls = await page.evaluate(() => window.__tvOhlcvCalls || []);
-    ok(/, 0 given their new weekly and monthly bars/.test(text), 'the stock counted as up to date: ' + text.slice(0, 400));
+    ok(/Weekly and monthly bars: 0 of 0/.test(text), 'the stock counted as up to date: ' + text.slice(0, 400));
     ok(!calls.some(c => c.startsWith('NSE:' + z + ' ')), 'no bar request for it: ' + JSON.stringify(calls));
   });
   // a bars record that cannot be saved: the stock is not counted as updated and is fetched one by one instead
@@ -855,13 +855,29 @@ async function tvRefreshScenarios(){
     ok(!Object.keys(a.all).some(k => k.startsWith('barsRecent/')), 'no bars record was saved');
     ok(a.all['priceHistory/NSE_' + sid(z) + '_1W'].fetchedAt !== '2026-01-01T00:00:00Z', 'the stock was then fetched on its own and its own document saved');
   });
+  // TradingView is checked with one call before anything else: a refusal that lasts stops the run at once, a short one is tried again
+  await runScenario('refresh all stocks: a quota refusal at the start stops the run with TradingView\'s message and reads nothing', { history: true }, async page => {
+    await page.evaluate(() => { window.__tvRefuse = 99; window.__tvBatchCalls = []; });
+    await page.click('#tvSnapshotBtn');
+    await page.waitForSelector('#tv_fiResult.fi-result-err', { timeout: 60000 });
+    const text = await page.textContent('#tv_fiResult');
+    ok(/quota is used up/.test(text) && /TOOL_QUOTA_EXCEEDED/.test(text), 'the message names the quota and carries TradingView\'s text: ' + text.slice(0, 300));
+    ok(!Object.keys((await readDb(page)).all).some(k => k.startsWith('liveSnapshot/') || k.startsWith('barsRecent/')), 'nothing was saved');
+    ok((await page.evaluate(() => (window.__tvBatchCalls || []).length)) === 0, 'no batch call was made');
+  });
+  await runScenario('refresh all stocks: a refusal that clears within seconds is tried again and the run goes on', {}, async page => {
+    await page.evaluate(() => { window.__tvRefuse = 1; });
+    await page.click('#tvSnapshotBtn');
+    const text = await waitDone(page, 90000);
+    ok(/Done in/.test(text) && !/Stopped/.test(text), 'the run finished after the retry: ' + text.slice(0, 200));
+  });
   // Stop ends the history stages early and the run is recorded as stopped
   await runScenario('refresh all stocks: Stop during the history download ends the run and says so', { history: true }, async page => {
     await page.click('#tvSnapshotBtn');
     await page.waitForFunction(() => Array.from(document.querySelectorAll('#tv_fiSteps li')).some(li => /Full history/.test(li.textContent) && /^[1-9][\d,]* of [\d,]+ ·/.test(li.querySelector('.fi-detail').textContent)), null, { timeout: 90000 });
     await page.click('#tvStopBtn');
     const text = await waitDone(page, 60000);
-    ok(/Stopped\./.test(text) && /Price bars: [1-9]/.test(text), 'the result says it stopped and what was downloaded: ' + text.slice(0, 300));
+    ok(/Stopped after/.test(text) && /Full history: [1-9]/.test(text), 'the result says it stopped and what was downloaded: ' + text.slice(0, 300));
     const run = Object.values((await readDb(page)).all).find(v => v && v.kind === 'snapshot'); ok(run && run.stopped === true && run.filled > 0 && run.filled < 2000, 'the run record says stopped: ' + JSON.stringify(run && [run.stopped, run.filled]));
   });
   await runScenario('refresh from TradingView: without a connection nothing is attempted', { cfg: { noMcp: true } }, async page => {

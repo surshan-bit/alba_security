@@ -17,7 +17,7 @@ import { refreshOneNow, priceJobs, saveFullBars } from '../prices/refresh.js';
 import { COMPACT_LAG, lagOf } from '../prices/recent.js';
 import { saveRecentBars, saveTechBlocks, sameValue } from './barchunks.js';
 import { BSE_ALPHA_MAP } from '../tv/links.js';
-import { tvCall, tvErrorText, tvIsFatal, tvIstDate, tvMcp } from '../tv/connector.js';
+import { tvCall, tvErrorText, tvIsFatal, tvIsQuota, tvIstDate, tvMcp } from '../tv/connector.js';
 import { loadRuns } from '../strategies/tracking.js';
 import { priorityOrder } from './freshness.js';
 import { planHistory, alignBars, batchBars, weekStartS, monthStartS, BAR_COLUMNS, TOLERANCE } from './historyplan.js';
@@ -98,6 +98,14 @@ async function runSnapshot(){
   let tech2Saved = 0, tech2Failed = 0;
   let batchSaved = 0, chunkWrites = 0, compacted = 0, techBlocksSaved = 0, filled = 0, barsUpdated = 0, histFailed = 0, noneBefore = 0, staleBefore = 0, noHistoryLeft = 0, histRan = false;
   try {
+    // One cheap call first: if TradingView is refusing the dashboard's calls (quota, connection), the run stops here at once, with TradingView's message, before reading anything.
+    // A refusal is tried once more after a few seconds, in case it was short.
+    fiSet('prepare', 'running', 'Checking TradingView…', 0.1);
+    try { await tvCall('mcp-tv-get-symbol-data', { symbol: 'NSE:TCS', columns: ['close'] }); }
+    catch(e){
+      if(tvIsQuota(e) && !stopAsked){ fiSet('prepare', 'running', 'TradingView refused the call; trying once more in 8 seconds…', 0.1); await sleep(8000); await tvCall('mcp-tv-get-symbol-data', { symbol: 'NSE:TCS', columns: ['close'] }); }
+      else throw e;
+    }
     fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
     // The chunks saved by the last run, so a batch that came back exactly the same is not written again. A failed read only means every chunk is written.
     const stored = new Map();
@@ -318,25 +326,25 @@ async function runSnapshot(){
       } catch(e){ console.error('Technical Score 2 failed', e); tech2Failed = -1; }
     }
     fiSet('verify', 'done', '');
-    lines.push({ text: (stopped ? 'Stopped. ' : '') + num(updated) + ' stocks refreshed: price saved for each, ' + num(scored) + ' technical scores updated, ' + num(kept) + ' kept their completed-week score (updated in the last 3 days).', cls: 'fi-line fi-line-strong' });
-    if(histRan && tech2Failed !== -1 && !stopped) lines.push({ text: 'Technical Score 2: ' + num(tech2Saved) + ' stocks scored from their weekly bars' + (tech2Failed ? ', ' + num(tech2Failed) + ' could not be saved' : '') + '. Stocks with under 60 weeks of bars get no score.', cls: 'fi-line' });
-    if(histRan && tech2Failed === -1) lines.push({ text: 'Technical Score 2 could not be calculated this time.', cls: 'fi-line' });
-    if(unchanged) lines.push({ text: num(unchanged) + ' stocks already held exactly these figures (same price and scores), so they were not rewritten.', cls: 'fi-line' });
-    if(histRan && (batchSaved || Object.keys(batchLeft).some(k => batchLeft[k]))){
-      const why = { noSymbol: 'no saved bars or symbol', noAnswer: 'TradingView sent nothing', missing: 'figures missing', unclear: 'bars did not line up (gap, split or flat prices)', callFailed: 'the batch call failed' };
-      const rest = Object.keys(why).filter(k => batchLeft[k]).map(k => num(batchLeft[k]) + ' ' + why[k]);
-      lines.push({ text: 'Bars read together with the snapshot: ' + num(batchSaved) + ' stocks, saved with ' + num(chunkWrites) + ' database saves (bars and technical scores in batches of 50)' + (compacted ? '; ' + num(compacted) + ' stocks rewritten in full' : '') + (rest.length ? '; left for the one-by-one fetch: ' + rest.join(', ') : '') + '.', cls: 'fi-line fi-line-muted' });
+    // The result: a heading and short bullets with the % done where it means something; problems only when there are some.
+    const pct = (a, n) => n > 0 ? ' (' + Math.min(100, Math.round(100 * a / n)) + '%)' : '';
+    const B = (text, strong) => lines.push({ text: '• ' + text, cls: strong ? 'fi-line fi-bullet fi-line-strong' : 'fi-line fi-bullet' });
+    lines.push({ text: (stopped ? 'Stopped after ' : updated + unchanged === 0 ? 'Nothing saved, ' : 'Done in ') + duration(Date.now() - t0), cls: 'fi-line fi-line-strong' });
+    if(runError) B('Stopped because: ' + runError, true);
+    B('Prices and snapshot: ' + num(updated + unchanged) + ' of ' + num(planned) + ' stocks' + pct(updated + unchanged, planned) + (unchanged ? ', ' + num(unchanged) + ' unchanged' : ''));
+    if(histRan){
+      if(noneBefore) B('Full history: ' + num(filled) + ' of ' + num(noneBefore) + ' stocks' + pct(filled, noneBefore));
+      B('Weekly and monthly bars: ' + num(barsUpdated) + ' of ' + num(staleBefore) + ' stocks' + pct(barsUpdated, staleBefore) + (barsUpdated > batchSaved ? ' (' + num(barsUpdated - batchSaved) + ' one by one)' : ''));
+      B('Technical scores (completed weeks): ' + num(techBlocksSaved + Math.max(0, barsUpdated - batchSaved)) + ' calculated');
+      if(tech2Failed !== -1 && !stopped) B('Technical Score 2: ' + num(tech2Saved) + ' of ' + num(stocks.length) + ' stocks' + pct(tech2Saved, stocks.length) + (tech2Failed ? ', ' + num(tech2Failed) + ' not saved' : ''));
+      if(tech2Failed === -1) B('Technical Score 2 could not be calculated', true);
     }
-    if(histRan) lines.push({ text: 'Price bars: ' + num(filled) + ' stocks downloaded in full' + (noHistoryLeft > 0 ? ' (' + num(noHistoryLeft) + ' still have none)' : '') + ', ' + num(barsUpdated) + ' given their new weekly and monthly bars' + (batchSaved ? ' (' + num(batchSaved) + ' of them from the batch call)' : '') + (histFailed ? ', ' + num(histFailed) + ' failed' : '') + '.', cls: 'fi-line' });
-    lines.push({ text: 'Took ' + duration(Date.now() - t0) + '.', cls: 'fi-line fi-line-muted' });
-    lines.push({ text: 'These scores include the week and month still in progress, so they can change before the week ends. Stocks with saved price bars get the stricter completed-weeks score once their bars are up to date.', cls: 'fi-line fi-line-muted' });
-    if(noSymbol.length) lines.push({ text: num(noSymbol.length) + ' stocks have no TradingView symbol yet, so they are not refreshed: ' + noSymbol.slice(0, 10).join(', ') + (noSymbol.length > 10 ? ' … +' + (noSymbol.length - 10) : '') + '. Their symbols are looked up by exact company name; one that cannot be found has to be added by hand.', cls: 'fi-line' });
-    if(retried) lines.push({ text: num(retried) + ' stocks TradingView left out of an answer were asked for again; ' + num(answeredAgain) + ' answered the second time' + (carried ? ', ' + num(carried) + ' still had no price and kept their figures from an earlier day.' : '.'), cls: 'fi-line fi-line-muted' });
-    if(runError) lines.push({ text: 'Stopped because: ' + runError, cls: 'fi-line fi-line-strong' });
+    if(noSymbol.length) B(num(noSymbol.length) + ' stocks without a TradingView symbol: ' + noSymbol.slice(0, 3).join(', ') + (noSymbol.length > 3 ? ' …' : ''));
+    if(carried) B(num(carried) + ' stocks had no price today and kept an earlier one');
     if(skipped.length){
       const why = new Map(); skipped.forEach(x => { const r = String(x.reason).replace(/\([A-Z]+:[^)]*\)/g, '').replace(/from \d{4}-\d\d-\d\d/, '').trim(); why.set(r, (why.get(r) || 0) + 1); });
-      const top = [...why.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([r, n]) => num(n) + ' × ' + r.slice(0, 110));
-      lines.push({ text: num(skipped.length) + ' stocks skipped. Most common reasons: ' + top.join('; ') + '. The full list is in the file below.', cls: 'fi-line' });
+      const top = [...why.entries()].sort((a, b) => b[1] - a[1])[0];
+      B(num(skipped.length) + ' stocks skipped, mostly: ' + top[0].slice(0, 90) + ' (list below)');
     }
     fiShowResult(updated + unchanged === 0 ? 'err' : 'ok', lines, true);
     skippedReport(skipped, 'snapshot');

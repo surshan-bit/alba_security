@@ -221,6 +221,13 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.209 &middot; 2026-10-20</h3>
+            <ul>
+              <li><strong>Shorter result and help text.</strong> The result of Refresh all stocks is now a heading with the time taken and a few bullets (prices, bars, technical scores, Technical Score 2), each with its % done; problems are listed only when there are some. The help text above the button is four short steps.</li>
+              <li><strong>Refresh all stocks now checks TradingView first.</strong> One cheap call before anything else: if TradingView is refusing the dashboard&rsquo;s calls it stops within a second instead of after reading the saved data, and a refusal is tried once more after 8 seconds in case it was short.</li>
+              <li>The completed-weeks technical scores have their own bullet: how many were calculated in batches and how many one by one.</li>
+              <li>When TradingView refuses the dashboard&rsquo;s calls because of its tool-call quota, the red box on Data Refresh now shows TradingView&rsquo;s whole message (the limit and when it lifts) instead of cutting it off, and says that calls from elsewhere may still work.</li>
+            </ul>
             <h3>v1.208 &middot; 2026-10-20</h3>
             <ul>
               <li><strong>Refresh all stocks is now three steps: fetch, save in batches, calculate in batches.</strong> The database takes only a few saves a second, and the weekly bars used to cost about three saves for every stock (about 2,000 stocks, 30 to 35 minutes). Now TradingView&rsquo;s answer (the snapshot and the new bars, about 45 calls) is fetched first, the new weekly and monthly bars are saved 50 stocks to a record, and then the technical scores are calculated and saved 50 stocks to a record. That is about 90 saves instead of about 6,000, so a full catch-up should take about 5 to 10 minutes. These times are an estimate until the first full run.</li>

@@ -126,6 +126,7 @@ function installStub(cfg){
     return null;
   }
   const mcp = { callTool: async (server, tool, input) => { await delay(window.__tvDelay || 0);
+    if(window.__tvRefuse > 0){ window.__tvRefuse--; throw Object.assign(new Error('tool_pre_invoke blocked by plugin ToolQuotaPlugin: TOOL_QUOTA_EXCEEDED - Tool call quota exceeded (test)'), { code: 'tool_error' }); }
     if(cfg.tv){ const r = tvCall(tool, input); if(r !== null) return { payload: r }; }
     if(tool === 'mcp-tv-search-symbols') return { payload: { data: { symbols: [{ symbol: 'NSE:' + String(input.query).replace(/\W/g, '').toUpperCase(), exchange: 'NSE', description: String(input.query) }] } } };
     if(tool === 'mcp-tv-get-symbol-data-batch'){ (window.__tvBatchCalls = window.__tvBatchCalls || []).push(clone(input)); const data = {}, missing = []; for(const sym of input.symbols){ if(window.__tvFlaky && window.__tvFlaky[sym] > 0){ window.__tvFlaky[sym]--; missing.push({ symbol: sym, reason: 'Quote data not found' }); } else if(/NOTV|ALPHATWO/.test(sym)) missing.push({ symbol: sym, reason: 'not found' }); else data[sym] = { close: 111.1, 'MACD.macd|1W': 2, 'MACD.signal|1W': 1, 'MACD.macd|1M': 3, 'MACD.signal|1M': 1, 'RSI|1W': 60, 'RSI|1M': 58, 'change|1W': 1.5, 'change|1M': 4, 'average_volume_30d_calc': 50000 }; if(window.__tvBarRow) Object.assign(data[sym], window.__tvBarRow); } return { payload: { count: Object.keys(data).length, data, missing, missing_count: missing.length, success: true } }; }
