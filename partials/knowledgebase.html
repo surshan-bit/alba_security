@@ -221,6 +221,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.205 &middot; 2026-10-20</h3>
+            <ul>
+              <li><strong>Refresh all stocks no longer runs out of TradingView&rsquo;s daily call quota before saving prices.</strong> The new weekly and monthly bars cost about two calls for every stock, which used up the quota before the snapshot (only about 44 calls) was reached, so nothing was saved. The order is now: full history for stocks that have none, then the snapshot of every stock, then the new bars.</li>
+              <li>New bars ask only for the bar type that is out of date: the weekly bars each week, and the monthly bars once a month. That roughly halves the calls in an ordinary week.</li>
+              <li>If the quota runs out during the bar update, the prices are already saved. The stocks not reached stay out of date, and the next run (after the quota resets at 5:30 am IST) carries on with them.</li>
+            </ul>
             <h3>v1.204 &middot; 2026-10-19</h3>
             <ul>
               <li><strong>Refresh all stocks</strong> now works in a better order: first the full history for stocks that have none (two at a time), then the new weekly and monthly bars for stocks whose bars are out of date (four at a time), and last the snapshot of every stock in batches of 50. The progress list shows the stages in that order.</li>

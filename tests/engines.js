@@ -709,7 +709,7 @@ test('trade call: history keeps one point a day and lists when the call changed'
 
 // ---- history plan (v1.200): which stocks need their full history, which only the new bars, which nothing ----
 {
-  const H = load('src/refresh/historyplan.js', 'export { barsNeeded, monthStartS, weekStartS };');
+  const H = load('src/refresh/historyplan.js', 'export { barsNeeded };');
   const at = iso => Date.parse(iso) / 1000;
   const bars = (w, m) => ({ '1W': w == null ? [] : [[at(w), 1, 1, 1, 1, 1]], '1M': m == null ? [] : [[at(m), 1, 1, 1, 1, 1]] });
   test('history plan: the week starts on Monday and the month on the 1st, in Indian time', () => {

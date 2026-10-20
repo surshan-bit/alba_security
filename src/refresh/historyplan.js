@@ -32,4 +32,4 @@ function planHistory(list, haveOf, nowS){
   return plan;
 }
 
-export { planHistory };
+export { planHistory, weekStartS, monthStartS, TOLERANCE };
