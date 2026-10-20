@@ -221,6 +221,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.211 &middot; 2026-10-20</h3>
+            <ul>
+              <li><strong>Import no longer stops for new stocks with no Intrinsic Value.</strong> A new ticker whose screener.in row has a blank Intrinsic Value used to fail the integrity check (&ldquo;non-numeric pillars.val&rdquo;) and block the whole import. It is now added without a valuation or technical score, and the result card names those stocks. A stock that has an Intrinsic Value but no valuation figure still stops the import.</li>
+            </ul>
+
             <h3>v1.210 &middot; 2026-10-20</h3>
             <ul>
               <li><strong>Claude controls in Settings.</strong> A new panel lists every step that sends data to Claude: filling missing metrics, the Traditional and Buffett factor cards (including the Moat and Governance re-score), Global &amp; Macro, Strengths and Watch-outs, news headline labels and Strategy practice ideas. Each has its own switch, plus an &ldquo;Allow Claude&rdquo; master switch. All are on by default. A step switched off is skipped and named in the result line; with everything off the refresh uses TradingView data only. The CSV import never uses Claude.</li>
