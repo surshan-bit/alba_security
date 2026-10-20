@@ -42,7 +42,7 @@ function tvIsQuota(e){ return !!e && /quota|exhausted/i.test(String(e.message));
 // An error after which no further call in this run can work (quota, connector missing or not signed in).
 function tvIsFatal(e){ const c = e && e.code; return tvIsQuota(e) || ['no_mcp', 'not_granted', 'capability_disabled', 'not_in_manifest', 'consent_required', 'server_not_connected', 'server_not_found', 'needs_reauth'].includes(c); }
 function tvErrorText(e){
-  if(tvIsQuota(e)) return 'TradingView daily tool-call quota is used up; it resets at 00:00 UTC (5:30 am IST). ' + String(e.message).slice(0, 120);
+  if(tvIsQuota(e)) return 'TradingView tool-call quota is used up (the dashboard\'s own calls are blocked; calls from elsewhere may still work). TradingView says: ' + String(e.message).replace(/^tool_pre_invoke blocked by plugin ToolQuotaPlugin:\s*/i, '').slice(0, 600);
   const c = e && e.code;
   if(c === 'no_mcp' || c === 'not_granted' || c === 'capability_disabled') return 'The TradingView connector is not available in this view.';
   if(c === 'not_in_manifest' || c === 'consent_required') return 'This page is not allowed to use TradingView. Allow it when asked (or in the page permissions) and try again.';
