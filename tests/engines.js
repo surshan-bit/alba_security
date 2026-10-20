@@ -736,6 +736,51 @@ test('trade call: history keeps one point a day and lists when the call changed'
     const mon = at('2026-10-19T04:00:00Z');
     assert.strictEqual(H.barsNeeded(bars('2026-10-12T03:45:00Z', '2026-10-01T03:45:00Z'), mon), 'stale', 'Monday: the week has rolled');
   });
+  // bars from the batch call (v1.206): real CASTROL figures, week of 12 Oct finished and week of 19 Oct in progress
+  const WK = c => ({ o: c[0], h: c[1], l: c[2], c: c[3], v: c[4] });
+  const row = (cur, prev, kind) => { const k = kind === 'W' ? '1W' : '1M', r = {}; ['open', 'high', 'low', 'close', 'volume'].forEach((n, i) => { r[n + '|' + k] = cur[i]; r[n + '[1]|' + k] = prev[i]; }); return r; };
+  test('batch bars: a saved bar that has finished is replaced and the new week is added', () => {
+    const t1 = at('2026-10-12T03:45:00Z'), now = at('2026-10-20T04:00:00Z');
+    const stored = [[at('2026-10-05T03:45:00Z'), 199.05, 201.5, 193.59, 194.67, 10286701], [t1, 196.6, 197, 195, 196, 5000000]];
+    const r = row([197.69, 199.72, 196.05, 196.79, 2266126], [196.6, 198.93, 192.8, 197.74, 9274407], 'W');
+    const out = H.alignBars(stored, H.batchBars(r, 'W'), 'W', now);
+    assert.strictEqual(out.length, 3);
+    assert.deepStrictEqual(out[1], [t1, 196.6, 198.93, 192.8, 197.74, 9274407], 'the saved bar takes the finished figures and keeps its own time');
+    assert.deepStrictEqual(out[2], [H.weekStartS(now) + 33300, 197.69, 199.72, 196.05, 196.79, 2266126]);
+  });
+  test('batch bars: the bar in progress is refreshed in place', () => {
+    const t = at('2026-10-19T03:45:00Z'), now = at('2026-10-20T04:00:00Z');
+    const stored = [[at('2026-10-12T03:45:00Z'), 196.6, 198.93, 192.8, 197.74, 9274407], [t, 197.69, 198, 196.5, 197, 1000]];
+    const r = row([197.69, 199.72, 196.05, 196.79, 2266126], [196.6, 198.93, 192.8, 197.74, 9274407], 'W');
+    const out = H.alignBars(stored, H.batchBars(r, 'W'), 'W', now);
+    assert.strictEqual(out.length, 2); assert.deepStrictEqual(out[1], [t, 197.69, 199.72, 196.05, 196.79, 2266126]);
+  });
+  test('batch bars: before the new week has a bar, the newest bar stays the saved one', () => {
+    const t = at('2026-10-12T03:45:00Z'), now = at('2026-10-19T02:00:00Z');   // Monday before the open
+    const stored = [[at('2026-10-05T03:45:00Z'), 199.05, 201.5, 193.59, 194.67, 10286701], [t, 196.6, 197, 195, 196, 5000000]];
+    const r = row([196.6, 198.93, 192.8, 197.74, 9274407], [199.05, 201.5, 193.59, 194.67, 10286701], 'W');
+    const out = H.alignBars(stored, H.batchBars(r, 'W'), 'W', now);
+    assert.strictEqual(out.length, 2); assert.deepStrictEqual(out[1], [t, 196.6, 198.93, 192.8, 197.74, 9274407]);
+  });
+  test('batch bars: monthly bars follow the month', () => {
+    const t = at('2026-09-01T03:45:00Z'), now = at('2026-10-20T04:00:00Z');
+    const stored = [[at('2026-08-03T03:45:00Z'), 185.54, 195, 184.1, 184.49, 68127746], [t, 184.74, 190, 184.2, 189, 3000000]];
+    const r = row([200.31, 201.5, 192.8, 196.79, 24652464], [184.74, 203.4, 184.2, 200.52, 75200472], 'M');
+    const out = H.alignBars(stored, H.batchBars(r, 'M'), 'M', now);
+    assert.strictEqual(out.length, 3); assert.strictEqual(out[1][4], 200.52); assert.strictEqual(out[2][1], 200.31);
+  });
+  test('batch bars: anything unclear is left to the one-by-one fetch', () => {
+    const now = at('2026-10-20T04:00:00Z'), L = [at('2026-10-12T03:45:00Z'), 196.6, 197, 195, 196, 5000000];
+    const good = row([197.69, 199.72, 196.05, 196.79, 2266126], [196.6, 198.93, 192.8, 197.74, 9274407], 'W');
+    assert.ok(H.alignBars([L], H.batchBars(good, 'W'), 'W', now));
+    assert.strictEqual(H.alignBars([[at('2026-09-28T03:45:00Z'), 196.6, 197, 195, 196, 1]], H.batchBars(good, 'W'), 'W', now), null, 'two weeks behind');
+    assert.strictEqual(H.alignBars([[L[0], 98.3, 99, 97, 98, 1]], H.batchBars(good, 'W'), 'W', now), null, 'opens differ (a split): refetch in full');
+    assert.strictEqual(H.alignBars([L], H.batchBars(row([196.6, 199.72, 196.05, 196.79, 1], [196.6, 198.93, 192.8, 197.74, 1], 'W'), 'W'), 'W', now), null, 'both bars open alike: cannot tell which is which');
+    const missing = Object.assign({}, good); delete missing['volume|1W'];
+    assert.strictEqual(H.batchBars(missing, 'W'), null, 'a missing number');
+    assert.strictEqual(H.alignBars([L], null, 'W', now), null, 'no answer for the stock');
+    assert.ok(WK([1, 2, 3, 4, 5]).v === 5);
+  });
   test('history plan: stocks are grouped and keep their order', () => {
     const now = at('2026-10-15T10:00:00Z');
     const data = { a: null, b: bars('2026-10-05T03:45:00Z', '2026-10-01T03:45:00Z'), c: bars('2026-10-12T03:45:00Z', '2026-10-01T03:45:00Z'), d: null, e: bars('2026-09-01T03:45:00Z', '2026-09-01T03:45:00Z') };
