@@ -13,12 +13,12 @@ import { stocks, stockByTickerSymbol } from '../core/stocks.js';
 import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { COLS, packValues, snapshotUpdate } from '../overlays/livesnapshot.js';
 import { priceHistoryByTicker, pcTickerKey, priceSymbolByTicker, ensureAllPriceBars } from '../prices/store.js';
-import { refreshOneNow, priceJobs } from '../prices/refresh.js';
+import { refreshFromBars, refreshOneNow, priceJobs } from '../prices/refresh.js';
 import { BSE_ALPHA_MAP } from '../tv/links.js';
 import { tvCall, tvErrorText, tvIsFatal, tvIstDate, tvMcp } from '../tv/connector.js';
 import { loadRuns } from '../strategies/tracking.js';
 import { priorityOrder } from './freshness.js';
-import { planHistory } from './historyplan.js';
+import { planHistory, alignBars, batchBars, weekStartS, monthStartS, BAR_COLUMNS, TOLERANCE } from './historyplan.js';
 import { buildTech2Chunks } from '../engine/techscore2.js';
 import { debugHandle } from '../boot/handoff.js';
 import { getFiDb, getFiOwner, getFiRunning, setFiRunning } from '../import/fund-import.js';
@@ -95,7 +95,7 @@ async function runSnapshot(){
   let tvWaitMs = 0, saveMs = 0, planned = 0, chunksSaved = 0, runError = '';
   let retried = 0, answeredAgain = 0, carried = 0, noSymbol = [];
   let tech2Saved = 0, tech2Failed = 0;
-  let filled = 0, barsUpdated = 0, histFailed = 0, noneBefore = 0, staleBefore = 0, noHistoryLeft = 0, histRan = false;
+  let batchSaved = 0, filled = 0, barsUpdated = 0, histFailed = 0, noneBefore = 0, staleBefore = 0, noHistoryLeft = 0, histRan = false;
   try {
     fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
     // The chunks saved by the last run, so a batch that came back exactly the same is not written again. A failed read only means every chunk is written.
@@ -131,30 +131,71 @@ async function runSnapshot(){
       const failedBars = [];
       ctx = { plan, byImportance, failedBars, abort: '' };   // abort: set when TradingView refuses every call (quota used up, not connected) or fails many in a row: no point trying the rest
       let barsFailRun = 0;
-      const bars = async (list, key, track, workers, lean) => {
-        let next = 0, done = 0, ok = 0;
+      // Counts the outcome of one stock's bar job; stops the stage when TradingView refuses every call or fails many in a row.
+      const settle = (s, track) => {
+        const j = priceJobs.get(pcTickerKey(s)), id = sanitizeDocId(tickerSymbol(s));
+        if(j && j.state === 'ok'){ barsFailRun = 0; if(track) delete tried[id]; return true; }
+        failedBars.push({ sym: tickerSymbol(s), name: s.name, reason: 'price bars: ' + ((j && j.msg) || 'did not finish') });
+        if(track) tried[id] = new Date().toISOString();
+        if(/quota|exhausted|not available in this view|not connected|reconnected|not allowed/i.test((j && j.msg) || '') || ++barsFailRun >= 8) ctx.abort = (j && j.msg) || 'price bars failed 8 times in a row';
+        return false;
+      };
+      // Runs `task` over the list with `workers` stocks at a time; prog = { done, total } feeds the progress line.
+      const pool = async (list, key, workers, prog, task, stockOf = x => x) => {
+        let next = 0, ok = 0;
         const worker = async () => {
           while(next < list.length && !stopAsked && !ctx.abort){
-            const s = list[next++], pk = pcTickerKey(s), id = sanitizeDocId(tickerSymbol(s));
-            await refreshOneNow(s, lean);
-            const j = priceJobs.get(pk);
-            if(j && j.state === 'ok'){ ok++; barsFailRun = 0; if(track) delete tried[id]; }
-            else {
-              failedBars.push({ sym: tickerSymbol(s), name: s.name, reason: 'price bars: ' + ((j && j.msg) || 'did not finish') });
-              if(track) tried[id] = new Date().toISOString();
-              if(/quota|exhausted|not available in this view|not connected|reconnected|not allowed/i.test((j && j.msg) || '') || ++barsFailRun >= 8) ctx.abort = (j && j.msg) || 'price bars failed 8 times in a row';
-            }
-            done++;
-            fiSet(key, 'running', num(done) + ' of ' + num(list.length) + ' · ' + tickerSymbol(s), done / list.length);
+            const s = list[next++];
+            if(await task(s)) ok++;
+            prog.done++;
+            fiSet(key, 'running', num(prog.done) + ' of ' + num(prog.total) + ' · ' + tickerSymbol(stockOf(s)), prog.done / prog.total);
           }
         };
         await Promise.all(Array.from({ length: workers }, worker));
         return ok;
       };
+      const bars = (list, key, track, workers, lean, prog) => pool(list, key, workers, prog || { done: 0, total: list.length }, async s => { await refreshOneNow(s, lean); return settle(s, track); });
+      // Stocks one bar behind: the batch call returns their current and previous weekly and monthly bar, 50 stocks per call, instead of one call per stock.
+      // A stock the batch cannot place with certainty (longer gap, adjusted prices, no answer) is left for the one-by-one fetch. Returns [saved, left].
+      const batchUpdate = async (list, key) => {
+        const nowS = Date.now() / 1000, left = [], jobs = [], prog = { done: 0, total: list.length };
+        const wNeed = nowS => weekStartS(nowS) - TOLERANCE, mNeed = nowS => monthStartS(nowS) - TOLERANCE;
+        for(const s of list){
+          const h = priceHistoryByTicker[pcTickerKey(s)], sym = snapshotSymbol(s);
+          if(h && h['1W'] && h['1W'].length && h['1M'] && h['1M'].length && sym) jobs.push({ s, sym, h, needW: h['1W'][h['1W'].length - 1][0] < wNeed(nowS), needM: h['1M'][h['1M'].length - 1][0] < mNeed(nowS) });
+          else left.push(s);
+        }
+        let saved = 0, failedCalls = 0, lastStart = 0;
+        for(let i = 0; i < jobs.length && !stopAsked && !ctx.abort; i += BATCH){
+          const part = jobs.slice(i, i + BATCH);
+          const wait = 300 - (Date.now() - lastStart); if(wait > 0) await sleep(wait);
+          lastStart = Date.now();
+          let data;
+          try { const p = await tvCall('mcp-tv-get-symbol-data-batch', { symbols: part.map(x => x.sym), columns: BAR_COLUMNS }); data = (p && p.data) || {}; failedCalls = 0; }
+          catch(e){
+            part.forEach(x => left.push(x.s));
+            if(tvIsFatal(e)){ ctx.abort = tvErrorText(e); break; }
+            if(++failedCalls >= 3){ ctx.abort = tvErrorText(e) + ' Three batches in a row failed, so the bar update stopped.'; break; }
+            await sleep(1500); continue;
+          }
+          const ready = [];
+          for(const j of part){
+            const row = data[j.sym];
+            const W = j.needW ? alignBars(j.h['1W'], batchBars(row, 'W'), 'W', nowS) : j.h['1W'];
+            const M = j.needM ? alignBars(j.h['1M'], batchBars(row, 'M'), 'M', nowS) : j.h['1M'];
+            if(W && M) ready.push({ s: j.s, W, M, w: j.needW, m: j.needM }); else left.push(j.s);
+          }
+          saved += await pool(ready, key, BAR_WORKERS, prog, async r => { await refreshFromBars(r.s, r.W, r.M, r); return settle(r.s, false); }, r => r.s);
+        }
+        // what the batch left over still counts towards the same progress line
+        prog.total = list.length;
+        return { saved, left, prog, skippedStop: stopAsked || !!ctx.abort };
+      };
+      ctx.batchUpdate = batchUpdate;
+      ctx.bars = bars;
       if(noneList.length) filled = await bars(noneList, 'fill', true, FULL_WORKERS);
       if(noneList.length){ try { await db.doc('stockMeta/histFillTried').set(tried); } catch(e){ console.error('Could not save the skipped list', e); } }
       fiSet('fill', 'done', noneBefore ? num(filled) + ' of ' + num(noneBefore) + ' downloaded' : 'none needed');
-      ctx.bars = bars;
       if(stopAsked) stopped = true;
       if(ctx.abort){ stopped = true; runError = ctx.abort; }
     }
@@ -232,7 +273,12 @@ async function runSnapshot(){
     // the daily quota; the stocks not reached stay out of date and the next run carries on with them. ----
     if(ctx){
       if(stopAsked) stopped = true;
-      if(!stopped && ctx.plan.stale.length) barsUpdated = await ctx.bars(ctx.byImportance(ctx.plan.stale), 'update', false, BAR_WORKERS, true);
+      if(!stopped && ctx.plan.stale.length){
+        const ordered = ctx.byImportance(ctx.plan.stale);
+        const b = await ctx.batchUpdate(ordered, 'update');
+        batchSaved = b.saved; barsUpdated = b.saved;
+        if(!b.skippedStop && b.left.length) barsUpdated += await ctx.bars(b.left, 'update', false, BAR_WORKERS, true, { done: ordered.length - b.left.length, total: ordered.length });
+      }
       if(stopAsked) stopped = true;
       fiSet('update', 'done', staleBefore ? num(barsUpdated) + ' of ' + num(staleBefore) + ' updated' : 'all up to date');
       if(ctx.abort){ stopped = true; runError = ctx.abort; }
@@ -263,7 +309,7 @@ async function runSnapshot(){
     if(histRan && tech2Failed !== -1 && !stopped) lines.push({ text: 'Technical Score 2: ' + num(tech2Saved) + ' stocks scored from their weekly bars' + (tech2Failed ? ', ' + num(tech2Failed) + ' could not be saved' : '') + '. Stocks with under 60 weeks of bars get no score.', cls: 'fi-line' });
     if(histRan && tech2Failed === -1) lines.push({ text: 'Technical Score 2 could not be calculated this time.', cls: 'fi-line' });
     if(unchanged) lines.push({ text: num(unchanged) + ' stocks already held exactly these figures (same price and scores), so they were not rewritten.', cls: 'fi-line' });
-    if(histRan) lines.push({ text: 'Price bars: ' + num(filled) + ' stocks downloaded in full' + (noHistoryLeft > 0 ? ' (' + num(noHistoryLeft) + ' still have none)' : '') + ', ' + num(barsUpdated) + ' given their new weekly and monthly bars' + (histFailed ? ', ' + num(histFailed) + ' failed' : '') + '.', cls: 'fi-line' });
+    if(histRan) lines.push({ text: 'Price bars: ' + num(filled) + ' stocks downloaded in full' + (noHistoryLeft > 0 ? ' (' + num(noHistoryLeft) + ' still have none)' : '') + ', ' + num(barsUpdated) + ' given their new weekly and monthly bars' + (batchSaved ? ' (' + num(batchSaved) + ' of them from the batch call)' : '') + (histFailed ? ', ' + num(histFailed) + ' failed' : '') + '.', cls: 'fi-line' });
     lines.push({ text: 'Took ' + duration(Date.now() - t0) + '.', cls: 'fi-line fi-line-muted' });
     lines.push({ text: 'These scores include the week and month still in progress, so they can change before the week ends. Stocks with saved price bars get the stricter completed-weeks score once their bars are up to date.', cls: 'fi-line fi-line-muted' });
     if(noSymbol.length) lines.push({ text: num(noSymbol.length) + ' stocks have no TradingView symbol yet, so they are not refreshed: ' + noSymbol.slice(0, 10).join(', ') + (noSymbol.length > 10 ? ' … +' + (noSymbol.length - 10) : '') + '. Their symbols are looked up by exact company name; one that cannot be found has to be added by hand.', cls: 'fi-line' });
@@ -280,7 +326,7 @@ async function runSnapshot(){
     runError = tvErrorText(e);
     fiShowResult('err', [{ text: 'Stopped: ' + tvErrorText(e), cls: 'fi-line fi-line-strong' }, { text: num(updated) + ' stocks were saved before this.', cls: 'fi-line fi-line-muted' }], true);
   } finally {
-    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, chunks: chunksSaved, retried, answeredAgain, carried, noSymbol: noSymbol.length, filled, barsUpdated, historyFailed: histFailed, noHistoryLeft: histRan ? noHistoryLeft : null, v: 5, tech2: tech2Saved, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
+    await saveRunLog(db, 'snapshot', startedAt, t0, { planned, batches: batchSecs.length, saved: updated, unchanged, scored, kept, skipped: skipped.length, stopped, error: runError || null, chunks: chunksSaved, retried, answeredAgain, carried, noSymbol: noSymbol.length, filled, barsUpdated, batchSaved, historyFailed: histFailed, noHistoryLeft: histRan ? noHistoryLeft : null, v: 5, tech2: tech2Saved, tvWaitSecs: Math.round(tvWaitMs / 100) / 10, saveSecs: Math.round(saveMs / 100) / 10, batchSecs });
     end();
     paintLastRuns(db);
   }

@@ -73,17 +73,19 @@ function tvValidate(rows, label){
 }
 // Delta merge: keep stored bars before the first fetched bar, append the fetched ones; every CLOSED stored bar that overlaps
 // must match within 0.01 % (otherwise a split or adjustment happened and the caller does a full refetch). Returns null on mismatch.
-function tvMergeDelta(stored, fetched){
-  const first = fetched[0][0];
-  const byT = new Map(fetched.map(b => [b[0], b]));
+// `bucket` (optional) maps a bar time to its week or month, so a saved bar whose time was only estimated still lines up with the real bar of that period.
+function tvMergeDelta(stored, fetched, bucket){
+  const key = bucket || (t => t);
+  const first = key(fetched[0][0]);
+  const byT = new Map(fetched.map(b => [key(b[0]), b]));
   let overlap = 0;
   for(let i = 0; i < stored.length - 1; i++){
-    const f = byT.get(stored[i][0]); if(!f) continue;
+    const f = byT.get(key(stored[i][0])); if(!f) continue;
     overlap++;
     for(let j = 1; j <= 4; j++) if(Math.abs(f[j] - stored[i][j]) > 1e-4 * Math.abs(stored[i][j]) + 1e-9) return null;
   }
   if(!overlap) return null;
-  return stored.filter(b => b[0] < first).concat(fetched);
+  return stored.filter(b => key(b[0]) < first).concat(fetched);
 }
 async function tvResolveSymbol(s){
   const key = pcTickerKey(s);

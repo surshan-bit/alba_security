@@ -32,4 +32,46 @@ function planHistory(list, haveOf, nowS){
   return plan;
 }
 
-export { planHistory, weekStartS, monthStartS, TOLERANCE };
+// ---- Bars from the batch call (50 stocks per call) instead of one call per stock ----
+// The batch tool returns the current and the previous weekly and monthly bar (open, high, low, close, volume) but no bar times, so a bar is placed by
+// the week (Monday to Sunday) or month it belongs to. A stock whose newest saved bar is the current or the previous week / month can be brought up to date
+// this way; anything else (a longer gap, prices adjusted by a split, an unclear match) returns null and the stock is fetched on its own.
+const weekBucket = t => Math.floor((t + IST - 4 * DAY) / (7 * DAY));
+const monthBucket = t => { const d = new Date((t + IST) * 1000); return d.getUTCFullYear() * 12 + d.getUTCMonth(); };
+const OPEN_S = 33300;   // 09:15 Indian time: a bar opens with the first session of its week or month (a holiday moves it by a day, fixed at the next full download)
+const BAR_COLS = { W: ['open|1W', 'high|1W', 'low|1W', 'close|1W', 'volume|1W', 'open[1]|1W', 'high[1]|1W', 'low[1]|1W', 'close[1]|1W', 'volume[1]|1W'],
+  M: ['open|1M', 'high|1M', 'low|1M', 'close|1M', 'volume|1M', 'open[1]|1M', 'high[1]|1M', 'low[1]|1M', 'close[1]|1M', 'volume[1]|1M'] };
+const BAR_COLUMNS = BAR_COLS.W.concat(BAR_COLS.M);
+// The two bars of one kind ('W' or 'M') out of a batch row: { cur, prev }, or null when a number is missing.
+function batchBars(row, kind){
+  if(!row) return null;
+  const c = BAR_COLS[kind], pick = i => ({ o: row[c[i]], h: row[c[i + 1]], l: row[c[i + 2]], c: row[c[i + 3]], v: row[c[i + 4]] });
+  const cur = pick(0), prev = pick(5);
+  const ok = b => [b.o, b.h, b.l, b.c, b.v].every(Number.isFinite);
+  return ok(cur) && ok(prev) ? { cur, prev } : null;
+}
+const sameNum = (a, b) => Math.abs(a - b) <= 1e-4 * Math.abs(b) + 1e-9;
+// `stored` = the saved bars of one kind (oldest first); returns the bars brought up to date, or null when this stock must be fetched on its own.
+function alignBars(stored, bars, kind, nowS){
+  if(!Array.isArray(stored) || !stored.length || !bars) return null;
+  const bucket = kind === 'W' ? weekBucket : monthBucket, L = stored[stored.length - 1];
+  const gap = bucket(nowS) - bucket(L[0]);
+  const row = (t, b) => [t, b.o, b.h, b.l, b.c, b.v];
+  const head = stored.slice(0, -1);
+  let out = null;
+  if(gap === 0){ if(sameNum(bars.cur.o, L[1])) out = head.concat([row(L[0], bars.cur)]); }
+  else if(gap === 1){
+    const isPrev = sameNum(bars.prev.o, L[1]), isCur = sameNum(bars.cur.o, L[1]);
+    if(isPrev && !isCur) out = head.concat([row(L[0], bars.prev), row((kind === 'W' ? weekStartS(nowS) : monthStartS(nowS)) + OPEN_S, bars.cur)]);   // the saved bar has finished and a new one has begun
+    else if(isCur && !isPrev) out = head.concat([row(L[0], bars.cur)]);   // the new week or month has no bar yet: the newest bar is still the saved one
+  }
+  if(!out) return null;
+  let prevT = -Infinity;
+  for(const r of out){
+    if(!r.every(Number.isFinite) || r[0] <= prevT || r[2] < Math.max(r[1], r[4]) - 1e-4 || r[3] > Math.min(r[1], r[4]) + 1e-4 || r[5] < 0) return null;
+    prevT = r[0];
+  }
+  return out;
+}
+
+export { planHistory, weekStartS, monthStartS, weekBucket, monthBucket, alignBars, batchBars, BAR_COLUMNS, TOLERANCE };

@@ -2,8 +2,8 @@
 import { dbCapabilityPromise } from '../core/store.js';
 import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { priceHistoryStatus } from '../detail/pending.js';
-import { ensurePriceBars, pcTickerKey, priceApply, priceHistoryByTicker } from './store.js';
-import { weekStartS, monthStartS, TOLERANCE } from '../refresh/historyplan.js';
+import { ensurePriceBars, pcTickerKey, priceApply, priceHistoryByTicker, priceSymbolByTicker } from './store.js';
+import { weekStartS, monthStartS, weekBucket, monthBucket, TOLERANCE } from '../refresh/historyplan.js';
 import { computeTechnical } from '../engine/technical.js';
 import { tvCall, tvErrorText, tvIstDate, tvMcp, tvMergeDelta, tvResolveSymbol, tvToRows, tvValidate } from '../tv/connector.js';
 
@@ -42,7 +42,7 @@ async function refreshOneStock(s, db, lean){
   let [W, M] = rowsOf(wp, mp);
   let note = '';
   if(delta){
-    const mw = W ? tvMergeDelta(have['1W'], W) : have['1W'], mm = M ? tvMergeDelta(have['1M'], M) : have['1M'];
+    const mw = W ? tvMergeDelta(have['1W'], W, weekBucket) : have['1W'], mm = M ? tvMergeDelta(have['1M'], M, monthBucket) : have['1M'];
     if(mw && mm){ W = mw; M = mm; }
     else {
       note = ' (prices were adjusted since the last fetch, so the full history was refetched)';
@@ -54,6 +54,14 @@ async function refreshOneStock(s, db, lean){
   }
   const lw = W[W.length - 1][4], lm = M[M.length - 1][4];
   if(needW && needM && Math.abs(lw - lm) > 0.003 * Math.abs(lm)) note += ' (last weekly and monthly closes differ by more than 0.3 %)';
+  await persistBars(s, db, sym, W, M, { delta: !!delta, needW, needM, note });
+}
+// Saves one stock's bars (only the kinds that changed when `o.delta`), then its technical score. Shared by the one-stock fetch above and the batch update.
+async function persistBars(s, db, sym, W, M, o){
+  const { delta, needW, needM } = o;
+  let note = o.note || '';
+  const key = pcTickerKey(s), have = priceHistoryByTicker[key];
+  const set = (m) => priceJobSet(key, 'running', m);
   set('saving bars…');
   const [exch, tick] = sym.split(':');
   const base = sanitizeDocId(exch + '_' + tick);
@@ -95,6 +103,18 @@ async function refreshOneNow(s, lean){
   catch(e){ priceJobSet(key, 'error', tvErrorText(e)); }
 }
 
+// A stock whose bars were brought up to date from the batch call: only the kinds in `changed` ({ w, m }) are saved.
+async function refreshFromBars(s, W, M, changed){
+  const key = pcTickerKey(s);
+  const db = await dbCapabilityPromise;
+  if(!db){ priceJobSet(key, 'error', 'The database is not available in this view.'); return; }
+  priceJobSet(key, 'queued', 'waiting…');
+  try {
+    const sym = priceSymbolByTicker[key] || await tvResolveSymbol(s);
+    await persistBars(s, db, sym, W, M, { delta: true, needW: !!changed.w, needM: !!changed.m, note: ' (from the batch update)' });
+  } catch(e){ priceJobSet(key, 'error', tvErrorText(e)); }
+}
+
 function setPriceJobHook(key, fn){ if(fn) priceJobHooks.set(key, fn); else priceJobHooks.delete(key); }
 
-export { priceJobs, refreshOneNow, setPriceJobHook };
+export { priceJobs, refreshFromBars, refreshOneNow, setPriceJobHook };
