@@ -29,12 +29,17 @@ function snapshotUpdate(s, row, today, sym, keepAgainst){
   if(px == null) return { reason: 'TradingView returned no price' };
   const out = { valuation: { currentPrice: px, asof: today, source: 'TradingView (' + sym + ')' } };
   if(typeof row['average_volume_30d_calc'] === 'number' && row['average_volume_30d_calc'] >= 0) out.liquidity = { avgVolume: Math.round(row['average_volume_30d_calc']), asof: today };
+  // The week and month move come back even when TradingView has no MACD or RSI for the stock. Without an indicator there is no technical
+  // block to carry them, so they are kept apart (pctChange) and laid onto the stock's saved reading, leaving its score and date alone.
+  const wk = typeof row['change|1W'] === 'number' && isFinite(row['change|1W']) ? row['change|1W'] : null;
+  const mo = typeof row['change|1M'] === 'number' && isFinite(row['change|1M']) ? row['change|1M'] : null;
+  const pctOnly = () => { if(wk != null || mo != null) out.pctChange = { asof: today, week: wk, month: mo }; };
   const pv = s && s.pillars && typeof s.pillars.val === 'number' ? s.pillars.val : null;
-  if(pv == null){ out.note = 'no valuation reading, technical score not updated'; return out; }
+  if(pv == null){ out.note = 'no valuation reading, technical score not updated'; pctOnly(); return out; }
   if(keepAgainst && techKeepsBarsBlock(keepAgainst, today)){ out.kept = true; return out; }
   const t = snapshotTechnical({ monthMacdLevel: row['MACD.macd|1M'], monthMacdSignal: row['MACD.signal|1M'], weekMacdLevel: row['MACD.macd|1W'], weekMacdSignal: row['MACD.signal|1W'],
     monthRsi: row['RSI|1M'], weekRsi: row['RSI|1W'], weekPctChange: row['change|1W'], monthPctChange: row['change|1M'] }, pv, today);
-  if(!t) out.note = 'TradingView returned no MACD or RSI'; else out.technical = t;
+  if(!t){ out.note = 'TradingView returned no MACD or RSI'; pctOnly(); } else out.technical = t;
   return out;
 }
 
@@ -65,6 +70,7 @@ function mergedDoc(s, real, snap){
     const realWins = !!rt && typeof rt === 'object' && (techKeepsBarsBlock(rt, snap.asof) || (typeof rt.asof === 'string' && (rt.asof > snap.asof || (rt.asof === snap.asof && rt.src !== 'snapshot'))));
     out.technical = realWins ? rt : u.technical;
   }
+  if(u.pctChange) out.pctChange = newerByAsof(real && real.pctChange, u.pctChange);
   return out;
 }
 
