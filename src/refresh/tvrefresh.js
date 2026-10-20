@@ -96,7 +96,7 @@ async function runSnapshot(){
   let tvWaitMs = 0, saveMs = 0, planned = 0, chunksSaved = 0, runError = '';
   let retried = 0, answeredAgain = 0, carried = 0, noSymbol = [];
   let tech2Saved = 0, tech2Failed = 0;
-  let batchSaved = 0, batchCalls = 0, filled = 0, barsUpdated = 0, histFailed = 0, noneBefore = 0, staleBefore = 0, noHistoryLeft = 0, histRan = false;
+  let batchSaved = 0, filled = 0, barsUpdated = 0, histFailed = 0, noneBefore = 0, staleBefore = 0, noHistoryLeft = 0, histRan = false;
   try {
     fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
     // The chunks saved by the last run, so a batch that came back exactly the same is not written again. A failed read only means every chunk is written.
@@ -159,46 +159,17 @@ async function runSnapshot(){
         return ok;
       };
       const bars = (list, key, track, workers, lean, prog) => pool(list, key, workers, prog || { done: 0, total: list.length }, async s => { await refreshOneNow(s, lean); return settle(s, track); });
-      // Stocks one bar behind: the batch call returns their current and previous weekly and monthly bar, 50 stocks per call, instead of one call per stock.
-      // A stock the batch cannot place with certainty (longer gap, adjusted prices, no answer) is left for the one-by-one fetch. Returns [saved, left].
-      const batchUpdate = async (list, key) => {
-        const nowS = Date.now() / 1000, left = [], jobs = [], prog = { done: 0, total: list.length };
-        const wNeed = nowS => weekStartS(nowS) - TOLERANCE, mNeed = nowS => monthStartS(nowS) - TOLERANCE;
-        for(const s of list){
-          const h = priceHistoryByTicker[pcTickerKey(s)], sym = snapshotSymbol(s);
-          if(h && h['1W'] && h['1W'].length && h['1M'] && h['1M'].length && sym) jobs.push({ s, sym, h, needW: h['1W'][h['1W'].length - 1][0] < wNeed(nowS), needM: h['1M'][h['1M'].length - 1][0] < mNeed(nowS) });
-          else left.push(s);
-        }
-        let saved = 0, failedCalls = 0, lastStart = 0;
-        batchLeft.noSymbol = left.length;   // stocks with no saved bars or no TradingView symbol are not eligible
-        for(let i = 0; i < jobs.length && !stopAsked && !ctx.abort; i += BATCH){
-          const part = jobs.slice(i, i + BATCH);
-          const wait = 300 - (Date.now() - lastStart); if(wait > 0) await sleep(wait);
-          lastStart = Date.now();
-          let data;
-          try { const p = await tvCall('mcp-tv-get-symbol-data-batch', { symbols: part.map(x => x.sym), columns: BAR_COLUMNS }); batchCalls++; data = (p && p.data) || {}; failedCalls = 0; }
-          catch(e){
-            part.forEach(x => left.push(x.s)); batchLeft.callFailed = (batchLeft.callFailed || 0) + part.length;
-            if(tvIsFatal(e)){ ctx.abort = tvErrorText(e); break; }
-            if(++failedCalls >= 3){ ctx.abort = tvErrorText(e) + ' Three batches in a row failed, so the bar update stopped.'; break; }
-            await sleep(1500); continue;
-          }
-          const ready = [];
-          for(const j of part){
-            const row = data[j.sym];
-            const bw = j.needW ? batchBars(row, 'W') : null, bm = j.needM ? batchBars(row, 'M') : null;
-            const W = j.needW ? alignBars(j.h['1W'], bw, 'W', nowS) : j.h['1W'];
-            const M = j.needM ? alignBars(j.h['1M'], bm, 'M', nowS) : j.h['1M'];
-            if(W && M) ready.push({ s: j.s, W, M, w: j.needW, m: j.needM });
-            else { left.push(j.s); const k = !row ? 'noAnswer' : ((j.needW && !bw) || (j.needM && !bm)) ? 'missing' : 'unclear'; batchLeft[k] = (batchLeft[k] || 0) + 1; }
-          }
-          saved += await pool(ready, key, SAVE_WORKERS, prog, async r => { await refreshFromBars(r.s, r.W, r.M, r); return settle(r.s, false); }, r => r.s);
-        }
-        // what the batch left over still counts towards the same progress line
-        prog.total = list.length;
-        return { saved, left, prog, skippedStop: stopAsked || !!ctx.abort };
-      };
-      ctx.batchUpdate = batchUpdate;
+      // Stocks one bar behind need no call of their own: the snapshot call (stage 2) also asks for their current and previous weekly and monthly bar
+      // (50 stocks per call). `jobs` says which stocks that applies to; stage 2 fills `ready` with the bars it could place with certainty, and the
+      // rest (longer gap, adjusted prices, no answer) are left for the one-by-one fetch.
+      const nowS = Date.now() / 1000;
+      ctx.jobs = new Map(); ctx.ready = new Map(); ctx.nowS = nowS;
+      for(const s of plan.stale){
+        const h = priceHistoryByTicker[pcTickerKey(s)], sym = snapshotSymbol(s);
+        if(h && h['1W'] && h['1W'].length && h['1M'] && h['1M'].length && sym) ctx.jobs.set(s, { h, needW: h['1W'][h['1W'].length - 1][0] < weekStartS(nowS) - TOLERANCE, needM: h['1M'][h['1M'].length - 1][0] < monthStartS(nowS) - TOLERANCE });
+      }
+      batchLeft.noSymbol = plan.stale.length - ctx.jobs.size;   // no saved bars or no TradingView symbol: not eligible
+      ctx.pool = pool; ctx.settle = settle;
       ctx.bars = bars;
       if(noneList.length) filled = await bars(noneList, 'fill', true, FULL_WORKERS);
       if(noneList.length){ try { await db.doc('stockMeta/histFillTried').set(tried); } catch(e){ console.error('Could not save the skipped list', e); } }
@@ -207,6 +178,7 @@ async function runSnapshot(){
       if(ctx.abort){ stopped = true; runError = ctx.abort; }
     }
     // ---- 2. snapshot of every stock, 50 per call (about 44 calls, and it is what the screens show every day, so it goes before the long bar update) ----
+    const snapCols = ctx ? COLS.concat(BAR_COLUMNS) : COLS;   // with the bars of the stocks that need them, in the same call
     const batches = [];
     for(let i = 0; i < todo.length; i += BATCH) batches.push(todo.slice(i, i + BATCH));
     // The next batch is requested while the current one is being saved. TradingView answers "Too Many Requests" when called back
@@ -217,7 +189,7 @@ async function runSnapshot(){
       backoff = 0;
       if(wait > 0) await sleep(wait);
       lastStart = Date.now();
-      try { return { payload: await tvCall('mcp-tv-get-symbol-data-batch', { symbols: batch.map(x => x.sym), columns: COLS }) }; }
+      try { return { payload: await tvCall('mcp-tv-get-symbol-data-batch', { symbols: batch.map(x => x.sym), columns: snapCols }) }; }
       catch(e){ return { error: e }; }
     };
     let pending = batches.length && !stopAsked ? fetchBatch(batches[0]) : null;
@@ -240,7 +212,7 @@ async function runSnapshot(){
       const lacking = batch.filter(x => !priced(x));
       if(lacking.length && !stopAsked){
         await sleep(1000);
-        try { const again = await tvCall('mcp-tv-get-symbol-data-batch', { symbols: lacking.map(x => x.sym), columns: COLS }); Object.assign(data, (again && again.data) || {}); retried += lacking.length; answeredAgain += lacking.filter(priced).length; } catch(e){ console.error('Retry of the missing stocks failed', e); }
+        try { const again = await tvCall('mcp-tv-get-symbol-data-batch', { symbols: lacking.map(x => x.sym), columns: snapCols }); Object.assign(data, (again && again.data) || {}); retried += lacking.length; answeredAgain += lacking.filter(priced).length; } catch(e){ console.error('Retry of the missing stocks failed', e); }
         lastStart = Date.now();
       }
       const rows = [];
@@ -256,6 +228,15 @@ async function runSnapshot(){
         }
         rows.push({ k, y: sym, c: packValues(data[sym]) });
         if(u.technical) rowScored++; if(u.kept) rowKept++;
+      }
+      if(ctx) for(const { s, sym } of batch){
+        const j = ctx.jobs.get(s); if(!j) continue;
+        const row = data[sym];
+        const bw = j.needW ? batchBars(row, 'W') : null, bm = j.needM ? batchBars(row, 'M') : null;
+        const W = j.needW ? alignBars(j.h['1W'], bw, 'W', ctx.nowS) : j.h['1W'];
+        const M = j.needM ? alignBars(j.h['1M'], bm, 'M', ctx.nowS) : j.h['1M'];
+        if(W && M) ctx.ready.set(s, { s, W, M, w: j.needW, m: j.needM });
+        else { const k = !row ? 'noAnswer' : ((j.needW && !bw) || (j.needM && !bm)) ? 'missing' : 'unclear'; batchLeft[k] = (batchLeft[k] || 0) + 1; }
       }
       const s0 = Date.now();
       if(rows.length){
@@ -282,9 +263,14 @@ async function runSnapshot(){
       if(stopAsked) stopped = true;
       if(!stopped && ctx.plan.stale.length){
         const ordered = ctx.byImportance(ctx.plan.stale);
-        const b = await ctx.batchUpdate(ordered, 'update');
-        batchSaved = b.saved; barsUpdated = b.saved;
-        if(!b.skippedStop && b.left.length) barsUpdated += await ctx.bars(b.left, 'update', false, BAR_WORKERS, true, { done: ordered.length - b.left.length, total: ordered.length });
+        const readyList = ordered.filter(s => ctx.ready.has(s)).map(s => ctx.ready.get(s));
+        const left = ordered.filter(s => !ctx.ready.has(s));
+        const unseen = left.filter(s => ctx.jobs.has(s)).length - Object.keys(batchLeft).filter(k => k !== 'noSymbol' && k !== 'callFailed').reduce((n, k) => n + batchLeft[k], 0);
+        if(unseen > 0) batchLeft.callFailed = (batchLeft.callFailed || 0) + unseen;   // the snapshot call for them did not happen or failed
+        const prog = { done: 0, total: ordered.length };
+        batchSaved = await ctx.pool(readyList, 'update', SAVE_WORKERS, prog, async r => { await refreshFromBars(r.s, r.W, r.M, r); return ctx.settle(r.s, false); }, r => r.s);
+        barsUpdated = batchSaved;
+        if(!stopAsked && !ctx.abort && left.length){ prog.total = ordered.length; prog.done = ordered.length - left.length; barsUpdated += await ctx.bars(left, 'update', false, BAR_WORKERS, true, prog); }
       }
       if(stopAsked) stopped = true;
       fiSet('update', 'done', staleBefore ? num(barsUpdated) + ' of ' + num(staleBefore) + ' updated' : 'all up to date');
@@ -319,7 +305,7 @@ async function runSnapshot(){
     if(histRan && (batchSaved || Object.keys(batchLeft).some(k => batchLeft[k]))){
       const why = { noSymbol: 'no saved bars or symbol', noAnswer: 'TradingView sent nothing', missing: 'figures missing', unclear: 'bars did not line up (gap, split or flat prices)', callFailed: 'the batch call failed' };
       const rest = Object.keys(why).filter(k => batchLeft[k]).map(k => num(batchLeft[k]) + ' ' + why[k]);
-      lines.push({ text: 'Batch bar update: ' + num(batchSaved) + ' stocks from ' + num(batchCalls) + ' calls' + (rest.length ? '; left for the one-by-one fetch: ' + rest.join(', ') : '') + '.', cls: 'fi-line fi-line-muted' });
+      lines.push({ text: 'Bars read together with the snapshot: ' + num(batchSaved) + ' stocks' + (rest.length ? '; left for the one-by-one fetch: ' + rest.join(', ') : '') + '.', cls: 'fi-line fi-line-muted' });
     }
     if(histRan) lines.push({ text: 'Price bars: ' + num(filled) + ' stocks downloaded in full' + (noHistoryLeft > 0 ? ' (' + num(noHistoryLeft) + ' still have none)' : '') + ', ' + num(barsUpdated) + ' given their new weekly and monthly bars' + (batchSaved ? ' (' + num(batchSaved) + ' of them from the batch call)' : '') + (histFailed ? ', ' + num(histFailed) + ' failed' : '') + '.', cls: 'fi-line' });
     lines.push({ text: 'Took ' + duration(Date.now() - t0) + '.', cls: 'fi-line fi-line-muted' });
