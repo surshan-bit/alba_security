@@ -128,7 +128,7 @@ import { readFileSync } from 'node:fs';
 {
   const { readFileSync } = await import('node:fs');
   const h = readFileSync(new URL('../platform/_headers', import.meta.url), 'utf8');
-  for(const line of ['X-Frame-Options: DENY', 'X-Content-Type-Options: nosniff', 'Referrer-Policy: strict-origin-when-cross-origin']) eq('headers: ' + line, h.includes(line), true);
+  for(const line of ['Strict-Transport-Security: max-age=31536000', 'X-Frame-Options: DENY', 'X-Content-Type-Options: nosniff', 'Referrer-Policy: strict-origin-when-cross-origin']) eq('headers: ' + line, h.includes(line), true);
 }
 
 console.log(fails ? fails + ' FAILED' : 'OK: platform contract tests pass');
