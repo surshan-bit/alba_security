@@ -769,6 +769,25 @@ test('trade call: history keeps one point a day and lists when the call changed'
     const out = H.alignBars(stored, H.batchBars(r, 'M'), 'M', now);
     assert.strictEqual(out.length, 3); assert.strictEqual(out[1][4], 200.52); assert.strictEqual(out[2][1], 200.31);
   });
+  test('batch bars: a stock that did not trade this week keeps its newest bar (real AMALGAM figures)', () => {
+    const now = at('2026-10-20T04:00:00Z');
+    const stored = [[at('2026-09-28T03:45:00Z'), 136.5, 136.5, 134.5, 134.5, 10], [at('2026-10-05T03:45:00Z'), 133.2, 133.2, 133.2, 133.2, 15], [at('2026-10-12T03:45:00Z'), 131.9, 131.9, 131.9, 131.9, 4824]];
+    const r = row([131.9, 131.9, 131.9, 131.9, 4824], [133.2, 133.2, 133.2, 133.2, 30], 'W');   // TradingView's current bar is still the week of 12 Oct: no bar for this week exists
+    const out = H.alignBars(stored, H.batchBars(r, 'W'), 'W', now);
+    assert.strictEqual(out.length, 3); assert.deepStrictEqual(out[2], [stored[2][0], 131.9, 131.9, 131.9, 131.9, 4824]);
+  });
+  test('batch bars: a saved week that only looks like the current one is not overwritten', () => {
+    // the saved newest bar opens at 131.9 and TradingView's current bar also opens at 131.9, but its previous bar (133.2) is not the bar saved before
+    const now = at('2026-10-20T04:00:00Z');
+    const stored = [[at('2026-10-05T03:45:00Z'), 140, 141, 139, 140.5, 20], [at('2026-10-12T03:45:00Z'), 131.9, 133.2, 131.9, 133.2, 30]];
+    const r = row([131.9, 131.9, 131.9, 131.9, 4824], [133.2, 133.2, 133.2, 133.2, 30], 'W');
+    assert.strictEqual(H.alignBars(stored, H.batchBars(r, 'W'), 'W', now), null);
+  });
+  test('batch bars: a finished bar cannot have a smaller range than the same bar saved while forming', () => {
+    const now = at('2026-10-20T04:00:00Z'), L = [at('2026-10-12T03:45:00Z'), 196.6, 199.9, 190, 196, 5000000];
+    const r = row([197.69, 199.72, 196.05, 196.79, 2266126], [196.6, 198.93, 192.8, 197.74, 9274407], 'W');   // prev bar's high 198.93 is below the saved high 199.9
+    assert.strictEqual(H.alignBars([L], H.batchBars(r, 'W'), 'W', now), null);
+  });
   test('batch bars: anything unclear is left to the one-by-one fetch', () => {
     const now = at('2026-10-20T04:00:00Z'), L = [at('2026-10-12T03:45:00Z'), 196.6, 197, 195, 196, 5000000];
     const good = row([197.69, 199.72, 196.05, 196.79, 2266126], [196.6, 198.93, 192.8, 197.74, 9274407], 'W');

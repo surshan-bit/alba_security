@@ -221,6 +221,13 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.207 &middot; 2026-10-20</h3>
+            <ul>
+              <li><strong>Stocks that have no saved price history are no longer skipped because of a refused call.</strong> A run that stopped on TradingView&rsquo;s quota used to mark every stock it could not reach as &ldquo;failed recently&rdquo;, and Refresh all stocks then left it alone for 14 days (this is why a run could say &ldquo;0 of 14 downloaded&rdquo;). Only a failure that is about the stock itself is remembered now. The old list was cleared.</li>
+              <li><strong>The weekly and monthly bars now come in the same calls as the snapshot.</strong> The snapshot call (50 stocks) also returns each stock&rsquo;s current and previous weekly and monthly bar, so a stock that is one week or month behind is brought up to date from that answer, with no extra call. A full run is about 45 TradingView calls plus the full history of any stock that has none.</li>
+              <li>These bars are saved 12 stocks at a time (was 4). They need no TradingView call of their own, so the only limit is how fast the database takes the saves.</li>
+              <li>The batch bar update is stricter about matching a saved bar with TradingView&rsquo;s bar (the high, low and volume must be consistent, not only the open), and the result now says how many stocks were updated this way and why any were left for the one-by-one fetch.</li>
+            </ul>
             <h3>v1.206 &middot; 2026-10-20</h3>
             <ul>
               <li><strong>Refresh all stocks now updates the weekly and monthly bars in batches of 50.</strong> A stock that is one week or one month behind gets its finished bar and its new bar from one batch call, so a full update takes about 45 calls instead of one or two for every stock. That is what kept running into TradingView&rsquo;s daily call quota (the last run stopped after 86 of 2,157 stocks).</li>
