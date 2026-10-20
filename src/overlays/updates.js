@@ -3,11 +3,12 @@ import { refreshAnalysisSoon } from '../analysis/section.js';
 import { setPeerGroupCache } from '../detail/peers.js';
 import { rerenderDetail } from '../detail/render.js';
 import { paintFreshness } from '../joblogs/freshness.js';
-import { mergedDoc } from './livesnapshot.js';
+import { COLS, mergedDoc } from './livesnapshot.js';
 import { stockByDocId } from './research.js';
 import { stocks } from '../core/stocks.js';
-import { periodMove, periodStartSec } from '../prices/periodmove.js';
+import { checkedMove, periodMove, periodStartSec } from '../prices/periodmove.js';
 import { recentBarsOf, setRecentFromDocs } from '../prices/recent.js';
+import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 
 // ---- stockUpdates overlay (added 2026-10-07) ----
 // Part B (technical block) and Part C (globalFactors) of a research run are saved as one document per
@@ -140,7 +141,8 @@ function applyPeriodMoves(){
     if(!raw || !(px > 0)) return;
     const r = recentBarsOf(String(s.ticker || '').split(' · ')[0].trim());
     if(!r) return;
-    const w = periodMove(px, r.w, ws), m = periodMove(px, r.m, ms);
+    const row = snapRows.get(sanitizeDocId(tickerSymbol(s))), tv = row && Array.isArray(row.row.c) ? row.row.c : [];
+    const w = checkedMove(periodMove(px, r.w, ws), tv[COLS.indexOf('change|1W')]), m = checkedMove(periodMove(px, r.m, ms), tv[COLS.indexOf('change|1M')]);
     if(w !== null && raw.weekPctChange !== w){ raw.weekPctChange = w; moved = true; }
     if(m !== null && raw.monthPctChange !== m){ raw.monthPctChange = m; moved = true; }
   });

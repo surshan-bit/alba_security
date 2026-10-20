@@ -18,4 +18,14 @@ function periodMove(price, bars, startSec){
   return ref == null || !(price > 0) ? null : Math.round((price / ref - 1) * 10000) / 100;
 }
 
-export { periodMove, periodStartSec };
+// A move this large, while TradingView's own figure for the same period is less than half of it, means the saved bars are on another scale than today's
+// price (a split or bonus since they were saved): TradingView's figure is used instead. Smaller disagreements stay as worked out, because TradingView
+// reports its last candle for a stock that has not traded in the period, which is not the current period's move.
+const SCALE_JUMP = 40;
+function checkedMove(move, tv){
+  if(move === null) return null;
+  if(typeof tv === 'number' && isFinite(tv) && Math.abs(move) >= SCALE_JUMP && Math.abs(tv) < Math.abs(move) / 2) return Math.round(tv * 100) / 100;
+  return move;
+}
+
+export { checkedMove, periodMove, periodStartSec };

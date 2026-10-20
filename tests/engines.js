@@ -314,6 +314,16 @@ test('period move: price against the last close before the period, ignoring the 
   assert.strictEqual(PM.periodMove(51.72, bars, ws), 0);                           // a stock that did not trade this week: 0.00%, not last week's +6.42%
   assert.strictEqual(PM.periodMove(46.548, bars, ws), -10);
 });
+test('period move: a split or bonus (bars on another scale) falls back to TradingView\'s figure, nothing else does', () => {
+  assert.strictEqual(PM.checkedMove(-80.13, 1.7), 1.7);                              // BANSALWIRE: saved bars from before the split
+  assert.strictEqual(PM.checkedMove(-80.62, -3.08), -3.08);
+  assert.strictEqual(PM.checkedMove(-45, -42), -45);                                 // a real big move: both agree, kept
+  assert.strictEqual(PM.checkedMove(0, -13.04), 0);                                  // did not trade this period: TradingView shows its last candle, 0.00% is right
+  assert.strictEqual(PM.checkedMove(-12, 3), -12);                                   // below the jump size
+  assert.strictEqual(PM.checkedMove(-60, null), -60); assert.strictEqual(PM.checkedMove(-60, undefined), -60); assert.strictEqual(PM.checkedMove(-60, NaN), -60);
+  assert.strictEqual(PM.checkedMove(null, 5), null);
+  assert.strictEqual(PM.checkedMove(150, 2.4567), 2.46);
+});
 test('period move: nothing to report without a price or a bar before the period', () => {
   const ws = 1000;
   assert.strictEqual(PM.periodMove(50, [], ws), null); assert.strictEqual(PM.periodMove(50, undefined, ws), null);
