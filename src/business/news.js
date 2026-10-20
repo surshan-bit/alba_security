@@ -8,6 +8,7 @@ import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { pcTickerKey } from '../prices/store.js';
 import { tvCall, tvErrorText, tvMcp, tvResolveSymbol } from '../tv/connector.js';
 import { ldAskJson, ldEnsureClaudeAccess } from '../livedata/claude.js';
+import { claudeStepOn } from '../livedata/claudegate.js';
 import { ldApplyLabels, ldBuildEvents, ldLabelPrompt, ldMergeEvents, ldUnlabeledNews } from '../livedata/events.js';
 
 const NEWS_MAX = 30;        // stocks per press (each takes a few seconds); pressing again continues with the next ones
@@ -44,7 +45,7 @@ async function collectOne(s, db, sample, signal){
   const merged = ldMergeEvents(stored, fresh);
   let labelled = 0;
   const todo = ldUnlabeledNews(merged);
-  if(todo.length && sample){
+  if(todo.length && sample && claudeStepOn('newsLabels')){
     try { labelled = ldApplyLabels(todo, await ldAskJson(sample, ldLabelPrompt(s.name, todo), { modelTier: 'quick', cache: false, signal })); }
     catch(e){ if(e && e.code === 'cancelled') throw e; /* the headlines are still saved, just without labels */ }
   }
@@ -68,7 +69,7 @@ async function startNewsCollect(list, label, onChange){
     const db = await dbCapabilityPromise;
     if(!db) throw new Error('The database is not available in this view.');
     const sample = (typeof claude !== 'undefined' && claude && typeof claude.use === 'function') ? await claude.use('sample').catch(() => null) : null;
-    if(sample) await ldEnsureClaudeAccess();
+    if(sample && claudeStepOn('newsLabels')) await ldEnsureClaudeAccess();
     let next = 0;
     const worker = async () => {
       while(next < plan.stocks.length && !ctl.signal.aborted){

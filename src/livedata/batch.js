@@ -6,6 +6,7 @@ import { renderLoadedPart } from '../core/lazy.js';
 import { pcTickerKey } from '../prices/store.js';
 import { LD_LABEL, ldAbort, ldGet, ldRunning, ldStart } from './bar.js';
 import { ldEnsureClaudeAccess, setLdParallel } from './claude.js';
+import { claudeAnyOn } from './claudegate.js';
 import { activityEnd, activityNotify, activityRun } from '../ui/activity.js';
 import { getRefreshKit } from '../refresh/hook.js';
 
@@ -122,7 +123,7 @@ async function ldBatchStart(kind, list, source = 'strat'){
   ldBatch = { kind, source, total: list.length, done: 0, active: new Map(), workers, slow: false, running: true, stop: false, failed: [], skipped: 0, note: '', perm: false };
   setLdParallel(workers > 1);
   ldBatchPaint();
-  if(kind === 'fund') await ldEnsureClaudeAccess();   // one permission dialog up front, not one per stock
+  if(kind === 'fund' && claudeAnyOn()) await ldEnsureClaudeAccess();   // one permission dialog up front, not one per stock
   let next = 0, halted = false;
   const worker = async (w) => {
     while(!ldBatch.stop && !halted && next < list.length){
