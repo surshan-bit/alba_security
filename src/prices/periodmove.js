@@ -18,4 +18,4 @@ function periodMove(price, bars, startSec){
   return ref == null || !(price > 0) ? null : Math.round((price / ref - 1) * 10000) / 100;
 }
 
-export { periodMove, periodRef, periodStartSec };
+export { periodMove, periodStartSec };

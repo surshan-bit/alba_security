@@ -310,7 +310,6 @@ test('period move: the week starts on Monday and the month on the 1st, India tim
 test('period move: price against the last close before the period, ignoring the bar of the period itself', () => {
   const ws = istMs(2026, 10, 19, 0, 0) / 1000;
   const bars = [[ws - 14 * 86400, 0, 0, 0, 48.6, 1], [ws - 7 * 86400, 0, 0, 0, 51.72, 1], [ws + 3600, 0, 0, 0, 60, 1]];   // two finished weeks and this week's bar
-  assert.strictEqual(PM.periodRef(bars, ws), 51.72);
   assert.strictEqual(PM.periodMove(55, bars, ws), 6.34);
   assert.strictEqual(PM.periodMove(51.72, bars, ws), 0);                           // a stock that did not trade this week: 0.00%, not last week's +6.42%
   assert.strictEqual(PM.periodMove(46.548, bars, ws), -10);
