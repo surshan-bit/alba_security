@@ -51,4 +51,4 @@ function albaFiCheck(stocks, prev){
   return { hard, soft, moved, maxMove };
 }
 
-export { albaFiCheck, albaFiPrevInfo, albaFiSym };
+export { albaFiCheck, albaFiHasValuation, albaFiPrevInfo, albaFiSym };
