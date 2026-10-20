@@ -789,6 +789,21 @@ async function tvRefreshScenarios(){
     ok(fx === '2026-01-01T00:00:00Z' && fy !== '2026-01-01T00:00:00Z', 'the stock saved this week was left alone and the older one was updated: ' + fx + ' / ' + fy);
     const run = Object.values(a.all).find(v => v && v.kind === 'snapshot'); ok(run && run.filled === 0 && run.barsUpdated === 1, 'the run record counts one update: ' + JSON.stringify(run && [run.filled, run.barsUpdated]));
   });
+  // the bulk bar update asks only for the bar type that is out of date: a stock whose monthly bar is current costs one call (weekly), not two
+  await runScenario('refresh all stocks: a stock with only an old weekly bar is asked for weekly bars only', { history: true, docs: (() => {
+      const nowS = Math.floor(Date.now() / 1000), mon = nowS - ((new Date((nowS + 19800) * 1000).getUTCDay() + 6) % 7) * 86400 - ((nowS + 19800) % 86400) + 19800 + 3600;
+      const first = new Date((nowS + 19800) * 1000), mStart = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1) / 1000 - 19800 + 3600;
+      const bars = (last, step, n) => Array.from({ length: n }, (_, i) => [last - (n - 1 - i) * step, 10, 12, 9, 11 + i * 0.01, 100]);
+      const [z] = plain.slice(0, 1), mk = (sym, wLast, mLast) => ({ ['priceHistory/NSE_' + sid(sym) + '_1W']: { ticker: sym, symbol: 'NSE:' + sym, interval: '1W', bars: bars(wLast, 7 * 86400, 80), count: 80, fetchedAt: '2026-01-01T00:00:00Z' }, ['priceHistory/NSE_' + sid(sym) + '_1M']: { ticker: sym, symbol: 'NSE:' + sym, interval: '1M', bars: bars(mLast, 30 * 86400, 40), count: 40, fetchedAt: '2026-01-01T00:00:00Z' } });
+      return Object.assign({}, triedExcept([z]), mk(z, mon - 21 * 86400, mStart));
+    })() }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await waitDone(page);
+    const calls = await page.evaluate(() => window.__tvOhlcvCalls || []);
+    const z = plain[0];
+    // the stand-in's bars do not line up with the saved ones, so the stock is then refetched in full (weekly and monthly); the first call must be weekly alone
+    ok(calls[0] === 'NSE:' + z + ' 1W' && calls[1] === 'NSE:' + z + ' 1W', 'the first request was for weekly bars only: ' + JSON.stringify(calls));
+  });
   // Stop ends the history stages early and the run is recorded as stopped
   await runScenario('refresh all stocks: Stop during the history download ends the run and says so', { history: true }, async page => {
     await page.click('#tvSnapshotBtn');
