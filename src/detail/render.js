@@ -50,7 +50,7 @@ function renderDetail(idx){
     <div class="detail-top">
       <div class="detail-title">
         <button type="button" class="detail-star${pinned?' pinned':''}" id="detailPinBtn" aria-pressed="${pinned?'true':'false'}" aria-label="${pinned?'Unpin from top':'Pin to top'}" title="${pinned?'Pinned — click to unpin':'Pin to top'}">${pinned?'★':'☆'}</button>
-        <div class="detail-title-text"><div class="detail-name">${s.name}</div><div class="detail-ticker">${s.ticker}</div></div>
+        <div class="detail-title-text"><div class="detail-name">${escapeHtml(s.name)}</div><div class="detail-ticker">${escapeHtml(s.ticker)}</div></div>
       </div>
     <div class="detail-meta">
      ${SHOW_REQUEST_REFRESH ? `<div class="detail-meta-row">

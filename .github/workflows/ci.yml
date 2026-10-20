@@ -1,6 +1,9 @@
-# Runs on every push and pull request: builds the app and runs all the checks. A red cross on GitHub means "do not release this".
+# Runs on every push to main and every pull request: builds the app and runs all the checks. A red cross on GitHub means "do not release this".
 name: checks
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 permissions:
   contents: read
 jobs:

@@ -7,7 +7,10 @@
 const { spawnSync } = require('child_process'), fs = require('fs'), path = require('path');
 const root = path.resolve(__dirname, '..'), base = path.join(root, 'tests', 'types.baseline.txt');
 const tsc = path.join(root, 'node_modules', '.bin', 'tsc');
-if(!fs.existsSync(tsc)){ console.log('typecheck: TypeScript is not installed (npm install); skipped'); process.exit(0); }
+if(!fs.existsSync(tsc)){
+  console.log('typecheck: TypeScript is not installed (npm install); ' + (process.env.CI ? 'failing, because CI must run it' : 'skipped'));
+  process.exit(process.env.CI ? 1 : 0);
+}
 const r = spawnSync(tsc, ['-p', root, '--pretty', 'false'], { encoding: 'utf8', cwd: root, maxBuffer: 64 * 1024 * 1024 });
 const found = (r.stdout + r.stderr).split('\n').filter(l => /error TS\d+/.test(l))
   .map(l => l.replace(/^([^(]+)\(\d+,\d+\): /, '$1: ')).sort();

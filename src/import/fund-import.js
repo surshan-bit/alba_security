@@ -9,6 +9,7 @@ import { albaFiCheck, albaFiPrevInfo, albaFiSym } from './fund-check.js';
 import { SHOW_TECH_CSV, albaTiRunImport } from './tech-import.js';
 import { albaWlRunSync } from './wlsync.js';
 import { registerBusy } from '../core/busy.js';
+import { sanitizeDocId as albaFiSid } from '../core/util.js';
 import { paintLastRuns } from '../refresh/runlog.js';
 import { uploadsSettled } from './upload-history.js';
 import { recordScoreHistory } from '../history/scorehistory.js';
@@ -24,7 +25,6 @@ const ALBA_FI = { HARD: 240000, SOFT: 200000 };
 const ALBA_FI_COLUMNS = ['Name','BSE Code','NSE Code','ISIN Code','Industry Group','Industry','Current Price','Intrinsic Value','Book value','Profit growth','Profit growth 3Years','Profit growth 5Years','Sales growth 3Years','Return on invested capital','Return on capital employed','Return on equity','OPM','Price to Earning','Industry PE','PEG Ratio','Pledged percentage','Interest Coverage','Debt to equity','Change in promoter holding','Piotroski score','Quick ratio','Altman Z Score','Current ratio','Contingent liabilities','Average return on equity 7Years','Average return on equity 10Years','Median return on capital employed 10Years','Free cash flow 3years','Free cash flow 5years','Operating cash flow 3years','Operating cash flow 5years','CROIC','Graham','Change in FII holding 3Years','Change in DII holding 3Years','Historical PE 5Years','Average debtor days 3years','NCAVPS','Number of Shareholders'];
 const ALBA_FI_PUBLISHED = 'The new data had already been saved when this failed, so it is live. Check the stock list; if it looks wrong, import a corrected file.';
 const albaFiSleep = ms => new Promise(r => setTimeout(r, ms));
-const albaFiSid = id => String(id).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_') || 'x';
 const albaFiSize = o => new TextEncoder().encode(JSON.stringify(o)).length;
 const albaFiDay = iso => { try { return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); } catch(e){ return new Date().toISOString().slice(0, 10); } };
 function albaFiCanon(o){

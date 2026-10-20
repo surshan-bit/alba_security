@@ -5,3 +5,5 @@ live_ref
 *.log
 dist
 publish
+tools/alba-data.json.gz
+tools/alba-my-settings.json.gz

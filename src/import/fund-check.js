@@ -1,6 +1,6 @@
 // Fundamental Score import: the integrity checks run before anything is written (the saved check_fundamental + precheck_data scripts).
 // Pure functions with no page code, so the tests can load them directly. Shared by the Fundamental and Technical imports.
-const albaFiSym = s => s.ticker.split('·')[0].trim();
+import { tickerSymbol as albaFiSym } from '../core/util.js';
 // pillars.val (the valuation anchor the Technical Score uses) comes from the Margin of Safety, which needs a positive Intrinsic Value
 // and a price. A stock whose file row has no Intrinsic Value has no anchor: that is allowed, and the technical import leaves it
 // frozen. A stock that DOES have a valuation but no anchor is a real fault.

@@ -120,6 +120,21 @@ const sticksOut = page => page.evaluate(() => {
   }
   return { scrolls: document.documentElement.scrollWidth > W, scrollWidth: document.documentElement.scrollWidth, W, out };
 });
+// ---------------------------------------------------------------- 1b. markup in a stock name
+// A stock name from the CSV is data, not HTML: on the stock page it shows as text and never runs.
+async function markupNameTests(browser){
+  const evil = '<img src=x onerror="window.__xss=1">Evil & Co';
+  const stocks = FIXTURE.map((s, i) => i === 3 ? Object.assign({}, s, { name: evil }) : s);
+  const half = Math.ceil(stocks.length / 2);
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const { page } = await openPage(ctx, { chunks: [stocks.slice(0, half), stocks.slice(half)] }, 'markup name');
+  await appReady(page);
+  await page.evaluate(c => { location.hash = c; }, FIXTURE[3].ticker.split('·')[0].trim()); await page.waitForTimeout(500);
+  ok((await page.locator('#detail .detail-name').innerText()) === evil, 'markup in a stock name: shown as plain text on the stock page');
+  ok(!(await page.evaluate(() => window.__xss)), 'markup in a stock name: the script in it did not run');
+  await ctx.close();
+}
+
 // ---------------------------------------------------------------- 3. Business page
 async function businessTests(browser){
   const ctx = await browser.newContext({ viewport: process.env.SHOT ? { width: 400, height: 800 } : { width: 1280, height: 900 } });
@@ -286,7 +301,7 @@ async function layoutTests(browser){
 (async () => {
   base = await srv.listen();
   const browser = await chromium.launch();
-  try { await bootTests(browser); await businessTests(browser); await layoutTests(browser); }
+  try { await bootTests(browser); await markupNameTests(browser); await businessTests(browser); await layoutTests(browser); }
   finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('browser smoke test FAILED (' + problems.length + ' of ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('browser smoke test: ' + checks + ' checks passed');
