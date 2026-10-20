@@ -29,7 +29,8 @@ import { duration, paintLastRuns, saveRunLog } from './runlog.js';
 const BATCH = 50;                 // symbols per TradingView call (the tool's limit)
 const SKIP_RETRY_DAYS = 14;       // a stock whose history download failed is not tried again for this long
 const FULL_WORKERS = 2;           // stocks whose full history is downloaded at the same time (a big download each)
-const BAR_WORKERS = 4;            // stocks given just their new bars at the same time
+const BAR_WORKERS = 4;            // stocks given just their new bars at the same time, one TradingView call each
+const SAVE_WORKERS = 12;          // stocks whose bars from the batch call are saved at the same time (database writes only, no TradingView call)
 // Test hook: the browser tests switch the history stages off (the made-up database has no history for any stock, so every run would download all of it).
 const skipHistory = () => !!debugHandle().skipHistoryStage;
 const STEPS = [{ key: 'prepare', label: 'Prepare the stock list', w: 5 }, { key: 'fill', label: 'Full history for stocks that have none', w: 30 },
@@ -191,7 +192,7 @@ async function runSnapshot(){
             if(W && M) ready.push({ s: j.s, W, M, w: j.needW, m: j.needM });
             else { left.push(j.s); const k = !row ? 'noAnswer' : ((j.needW && !bw) || (j.needM && !bm)) ? 'missing' : 'unclear'; batchLeft[k] = (batchLeft[k] || 0) + 1; }
           }
-          saved += await pool(ready, key, BAR_WORKERS, prog, async r => { await refreshFromBars(r.s, r.W, r.M, r); return settle(r.s, false); }, r => r.s);
+          saved += await pool(ready, key, SAVE_WORKERS, prog, async r => { await refreshFromBars(r.s, r.W, r.M, r); return settle(r.s, false); }, r => r.s);
         }
         // what the batch left over still counts towards the same progress line
         prog.total = list.length;
