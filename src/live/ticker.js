@@ -16,9 +16,9 @@ import { ldQuote, ldSymOk, ldVerifiedSymbol } from '../livedata/symbols.js';
 import { getLdBatch } from '../livedata/batch.js';
 import { analysisRowContext } from '../analysis/columns.js';
 
-const INTERVAL_MS = 20000, BACKOFF_MS = 120000, MAX_ROWS = 50, PARALLEL = 3, KEY = 'albaDashboard.live.v1';
-let enabled = true, timer = null, busy = false, fails = 0, btn = null, lastAt = 0, lastCount = 0;
-try { enabled = localStorage.getItem(KEY) !== 'off'; } catch(e){ /* storage unavailable: on */ }
+const INTERVAL_MS = 20000, BACKOFF_MS = 120000, MAX_ROWS = 50, PARALLEL = 3;
+// Always starts off, on every load: live prices call TradingView, so they run only after the button is pressed, and only until the page is closed or reloaded.
+let enabled = false, timer = null, busy = false, fails = 0, btn = null, lastAt = 0, lastCount = 0;
 const livePrice = new Map();   // ticker key -> latest price seen live
 
 // NSE cash session: Monday to Friday, 9:15 to 15:30 India time (exchange holidays are not known here).
@@ -173,7 +173,6 @@ function init_live_ticker(){
   search.parentNode.insertBefore(btn, search.nextSibling);
   btn.addEventListener('click', () => {
     enabled = !enabled; fails = 0;
-    try { localStorage.setItem(KEY, enabled ? 'on' : 'off'); } catch(e){ /* kept for this visit only */ }
     paintButton(); if(enabled) tick();
   });
   document.addEventListener('visibilitychange', () => { if(!document.hidden) tick(); paintButton(); });
