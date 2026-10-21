@@ -7,7 +7,7 @@ import '../import/fund-engine.js';
 import { init_import_fund_import } from '../import/fund-import.js';
 import '../import/tech-engine.js';
 import '../import/tech-import.js';
-import '../import/wlsync.js';
+import { renderWlPicker } from '../import/wlsync.js';
 import { refreshLastFiles, renderAllLastFiles } from '../import/last-file.js';
 import { init_joblogs_freshness } from '../joblogs/freshness.js';
 import { init_refresh_tvrefresh } from '../refresh/tvrefresh.js';
@@ -20,6 +20,6 @@ function init(){
   refreshLastFiles();
   init_refresh_tvrefresh();
 }
-function render(){ renderWatchlistSyncLogPanel(); renderAllLastFiles(); }
+function render(){ renderWlPicker(); renderWatchlistSyncLogPanel(); renderAllLastFiles(); }
 
 export { init, render };

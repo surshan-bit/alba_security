@@ -95,7 +95,8 @@
         <h2 class="refreshlog-job-title">TradingView Watchlist Sync</h2>
 
         <div class="refreshlog-manual">
-          <button type="button" class="select-mode-btn fi-btn-primary" id="refreshWatchlistBtn" title="Rebuilds the four Alba watchlists in TradingView from the current verdicts, right here on this page" disabled>Sync now</button>
+          <div id="wlStrategyPicker" class="wl-picker" role="group" aria-label="Strategies to sync"></div>
+          <button type="button" class="select-mode-btn fi-btn-primary" id="refreshWatchlistBtn" title="Writes each ticked strategy to a TradingView watchlist, right here on this page" disabled>Sync selected</button>
         </div>
 
         <div data-import-panel="wl_" data-title="Sync" data-label="Sync progress"></div>

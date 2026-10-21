@@ -27,6 +27,7 @@ async function startScenario(name, o){
   const key = (o.small ? 'small' : 'main') + '-' + name.replace(/\W+/g, '_');
   srv.seeds.set(key, JSON.stringify({ docs: Object.assign({}, o.small ? SMALL.docs : DS.docs, o.docs || {}) }));
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  if(o.strategies) await ctx.addInitScript(j => { try { localStorage.setItem('albaDashboard.strategies.v1', j); } catch(e){} }, o.strategies);
   const errs = [];
   const { page } = await openPage(ctx, base, Object.assign({ seedUrl: base + '/__seed/' + key + '.json', assets: true, tv: true, section: 'refreshlog' }, o.cfg || {}), name, errs);
   await page.waitForFunction(() => window.__alba && window.__alba.stocks && document.querySelector('.app-section.active'), null, { timeout: 90000 });
@@ -508,115 +509,144 @@ async function techScenarios(){
 }
 const BTN_TECH = '#importTechnicalDataBtn';
 // ---------------------------------------------------------------- 4. TradingView watchlist sync
-const WL = ['Alba Securities', 'Alba - Green', 'Alba - Orange', 'Alba - Red'];
+const OLD_WL = ['Alba Securities', 'Alba - Green', 'Alba - Orange', 'Alba - Red'];
+const WL = ['Strong picks', 'Good picks'];
 const WL_CONFIRMED = { 'KLBRENG-B': 'NSE:KLBRENG_B', 'NAM-INDIA': 'NSE:NAM_INDIA', 'J&KBANK': 'NSE:J&KBANK', 'GVT&D': 'NSE:GVT&D' };
-// the four lists the sync should produce from the stock list (written out independently of the page's code)
+// two saved strategies, one rule each (verdict), put in the browser before the page starts
+const WL_STRATEGIES = JSON.stringify([
+  { id: 't-strong', name: WL[0], note: '', rules: [{ field: 'verdict', op: 'in', value: ['buy'] }], published: true },
+  { id: 't-good', name: WL[1], note: '', rules: [{ field: 'verdict', op: 'in', value: ['mbuy'] }], published: true },
+  { id: 't-empty', name: 'No rules yet', note: '', rules: [], published: false }]);
+// the lists the sync should produce from the stock list (written out independently of the page's code)
 function wlExpect(stocks, alpha){
-  const lists = Object.fromEntries(WL.map(n => [n, []])); let strong = 0, good = 0; const left = [];
+  const lists = Object.fromEntries(WL.map(n => [n, []])); const left = [];
   for(const s of stocks){
-    if(s.verdict !== 'buy' && s.verdict !== 'mbuy') continue;
+    if(s.active === false || (s.verdict !== 'buy' && s.verdict !== 'mbuy')) continue;
     const code = symOf(s); let sym;
     if(/^\d+$/.test(code)){ if(!alpha[code]){ left.push(code); continue; } sym = 'BSE:' + alpha[code]; }
     else if(WL_CONFIRMED[code]) sym = WL_CONFIRMED[code]; else if(/[-&]/.test(code)) sym = 'NSE:' + code.replace(/[-&]/g, '_'); else sym = 'NSE:' + code;
-    if(s.verdict === 'buy') strong++; else good++;
-    lists['Alba Securities'].push(sym);
-    const v = s.valuation || {};
-    if(typeof v.intrinsicValue === 'number' && v.intrinsicValue > 0 && typeof v.currentPrice === 'number'){ const mos = (v.intrinsicValue - v.currentPrice) / v.intrinsicValue * 100; lists[mos >= 0 ? 'Alba - Green' : mos >= -25 ? 'Alba - Orange' : 'Alba - Red'].push(sym); }
+    lists[s.verdict === 'buy' ? WL[0] : WL[1]].push(sym);
   }
-  return { lists, strong, good, left };
+  return { lists, left };
 }
-const WLX = wlExpect(DS.stocks, DS.bseAlpha);
+let WLX;   // set from the page's own stock list (the page recomputes scores and verdicts from the data) before the scenarios run
 const tvList = (id, name, symbols, extra) => Object.assign({ id: String(id), name, type: 'custom', symbols }, extra || {});
 const own = () => [tvList(1, 'My Own List', ['NSE:AAA', 'NSE:BBB']), { id: '2', name: null, type: 'colored', color: 'red', symbols: ['NSE:ZZZ'] }];
 const tvState = page => page.evaluate(() => JSON.parse(JSON.stringify({ lists: window.__tv.lists, calls: window.__tv.calls })));
 const callsOf = (st, tool) => st.calls.filter(c => c[0] === tool);
 const setOf = a => [...new Set(a)].sort();
+// tick the named strategies in the picker, then press the button
+async function wlRun(page, names){
+  for(const n of (names === undefined ? WL : names)) await page.check(`#wlStrategyPicker label:has-text("${n}") input`);
+  return run(page, 'wl');
+}
 async function watchlistScenarios(){
-  ok(WLX.strong + WLX.good > 150 && WLX.lists['Alba - Green'].length > 50 && WLX.lists['Alba - Orange'].length > 3 && WLX.lists['Alba - Red'].length > 0, 'test data has stocks for all four lists: ' + WL.map(n => WLX.lists[n].length).join('/'));
-  await runScenario('watchlist sync: first sync creates the four lists and leaves other lists alone', { cfg: { tvLists: own() } }, async page => {
-    const r = await run(page, 'wl');
-    ok(r.cls === 'warn' || r.cls === 'ok', 'finishes: ' + r.cls + ' ' + r.text.slice(0, 200));
-    ok(r.steps.length === 6 && r.steps.every(x => x[0] === 'done') && r.pct === '100%', 'six steps done: ' + JSON.stringify(r.steps.map(x => x[0])));
-    ok(r.lines[0] === 'Sync complete.' && r.cls === 'ok', 'first line: ' + r.lines[0]);
-    const total = WL.reduce((a, n) => a + WLX.lists[n].length, 0);
-    ok(r.text.includes(`${WLX.strong} Strong + ${WLX.good} Good stocks qualify · ${total} added · 0 removed in total.`), 'totals line: ' + r.lines.slice(-3).join(' | '));
-    ok(WL.every((n, i) => r.lines.includes(`${n}: ${WLX.lists[n].length} symbols (+${WLX.lists[n].length} / −0)`)), 'per-list lines: ' + r.lines.join(' | ').slice(0, 300));
-    ok(/Symbols with - or & that were not checked beforehand: BAJAJ-AUTO\./.test(r.text), 'unchecked symbols named');
+  if(only && !'watchlist sync'.includes(only) && !only.includes('watchlist')) return;
+  { const s = await startScenario('watchlist expectation', { strategies: WL_STRATEGIES });
+    try { WLX = wlExpect(await s.page.evaluate(() => window.__alba.stocks.map(x => ({ ticker: x.ticker, verdict: x.verdict, active: x.active }))), DS.bseAlpha); } finally { await s.ctx.close().catch(() => {}); } }
+  ok(WLX.lists[WL[0]].length > 1 && WLX.lists[WL[1]].length > 100, 'test data has stocks for both strategies: ' + WL.map(n => WLX.lists[n].length).join('/'));
+  const S = { strategies: WL_STRATEGIES };
+  await runScenario('watchlist sync: the picker lists the strategies and a strategy with no rules cannot be ticked', Object.assign({ cfg: { tvLists: own() } }, S), async page => {
+    const rows = await page.evaluate(() => [...document.querySelectorAll('#wlStrategyPicker label')].map(l => [l.textContent, l.querySelector('input').disabled, l.querySelector('input').checked]));
+    eq(rows, [[WL[0], false, false], [WL[1], false, false], ['No rules yet (no rules yet)', true, false]], 'one row per strategy, none ticked');
+  });
+  await runScenario('watchlist sync: first sync creates one list per ticked strategy and leaves other lists alone', Object.assign({ cfg: { tvLists: own() } }, S), async page => {
+    const r = await wlRun(page, [WL[0]]);
+    ok(r.cls === 'ok', 'finishes: ' + r.cls + ' ' + r.text.slice(0, 200));
+    ok(r.steps.length === 3 && r.steps.every(x => x[0] === 'done') && r.pct === '100%', 'three steps done: ' + JSON.stringify(r.steps.map(x => x[0])));
+    ok(r.lines[0] === 'Sync complete.', 'first line: ' + r.lines[0]);
+    const n = WLX.lists[WL[0]].length;
+    ok(r.lines.includes(`${WL[0]}: ${n} symbols (+${n} / −0)`) && r.text.includes(`1 strategy · ${n} added · 0 removed in total.`), 'lines: ' + r.lines.join(' | ').slice(0, 300));
     const st = await tvState(page);
-    for(const n of WL){ const l = st.lists.filter(x => x.name === n); ok(l.length === 1 && l[0].type === 'custom' && JSON.stringify(setOf(l[0].symbols)) === JSON.stringify(setOf(WLX.lists[n])), `${n}: exactly one list holding the right ${WLX.lists[n].length} symbols (found ${l.length}/${l[0] && l[0].symbols.length})`); }
-    ok(WLX.lists['Alba Securities'].includes('BSE:ALPHAONE') && WLX.lists['Alba Securities'].includes('NSE:BAJAJ_AUTO') && WLX.lists['Alba Securities'].includes('NSE:J&KBANK') && WLX.lists['Alba Securities'].includes('NSE:KLBRENG_B') && !WLX.lists['Alba Securities'].some(x => /BSE:\d/.test(x)), 'symbol spellings: BSE alpha, underscores, confirmed names, never a raw BSE number');
+    ok(!st.lists.some(x => x.name === WL[1]), 'the strategy that was not ticked is not synced');
+    const l = st.lists.filter(x => x.name === WL[0]); ok(l.length === 1 && l[0].type === 'custom' && JSON.stringify(setOf(l[0].symbols)) === JSON.stringify(setOf(WLX.lists[WL[0]])), `exactly one list holding the right ${n} symbols`);
+    ok(!WLX.lists[WL[0]].some(x => /BSE:\d/.test(x)), 'never a raw BSE number');
     ok(st.lists.some(x => x.name === 'My Own List' && x.symbols.join() === 'NSE:AAA,NSE:BBB') && st.lists.some(x => x.type === 'colored' && x.symbols.join() === 'NSE:ZZZ'), "the person's other lists are untouched");
     ok(!st.lists.some(x => /\(syncing\)/.test(x.name || '')) && callsOf(st, 'mcp-watchlist-delete-watchlist').length === 0, 'no temporary list left and nothing deleted');
     const a = await readDb(page); ok(a.wlJob.status === 'done', 'lock released: ' + JSON.stringify(a.wlJob));
-    eq(a.wlLog.length, 1, 'one log entry'); const lg = a.wlLog[0]; ok(lg.status === 'completed' && lg.qualifiedCount === WLX.strong + WLX.good && lg.strongBuyCount === WLX.strong && lg.moderateBuyCount === WLX.good && lg.added === total && lg.removed === 0 && lg.triggeredBy === 'manual', 'log entry: ' + JSON.stringify(lg).slice(0, 300));
+    eq(a.wlLog.length, 1, 'one log entry'); const lg = a.wlLog[0]; ok(lg.status === 'completed' && lg.qualifiedCount === n && lg.added === n && lg.removed === 0 && lg.triggeredBy === 'manual', 'log entry: ' + JSON.stringify(lg).slice(0, 300));
     ok(a.meta.version === 5 && !(await page.evaluate(() => window.__sets.some(p => /^stockData\//.test(p)))), 'the stock data is not touched by a sync');
     ok(await page.evaluate(() => !document.getElementById('wl_fiResult').querySelector('button')), 'no "reload" button after a sync');
   });
-  await runScenario('watchlist sync: a repeat sync with nothing new changes nothing', { cfg: { tvLists: WL.map((n, i) => tvList(10 + i, n, WLX.lists[n].slice().reverse())) } }, async page => {
-    const r = await run(page, 'wl'); ok(r.cls === 'ok' && r.lines[0] === 'Sync complete.', r.text.slice(0, 160));
+  await runScenario('watchlist sync: two strategies, and nothing is attempted with none ticked', Object.assign({ cfg: { tvLists: own() } }, S), async page => {
+    const none = await wlRun(page, []); ok(none.cls === 'err' && /Tick at least one strategy to sync\./.test(none.text), 'message: ' + none.text.slice(0, 200));
+    eq((await tvState(page)).calls.length, 0, 'TradingView was not contacted');
+    const r = await wlRun(page); ok(r.cls === 'ok', 'finishes: ' + r.text.slice(0, 200));
+    const st = await tvState(page);
+    for(const n of WL){ const l = st.lists.filter(x => x.name === n); ok(l.length === 1 && JSON.stringify(setOf(l[0].symbols)) === JSON.stringify(setOf(WLX.lists[n])), `${n}: one list with the right ${WLX.lists[n].length} symbols`); }
+    ok(WLX.lists[WL[1]].includes('NSE:BAJAJ_AUTO') === /Symbols with - or & that were not checked beforehand: BAJAJ-AUTO\./.test(r.text), 'unchecked symbols named when on a list');
+  });
+  await runScenario('watchlist sync: a repeat sync with nothing new changes nothing', Object.assign({ cfg: { tvLists: WL.map((n, i) => tvList(10 + i, n, WLX.lists[n].slice().reverse())) } }, S), async page => {
+    const r = await wlRun(page); ok(r.cls === 'ok' && r.lines[0] === 'Sync complete.', r.text.slice(0, 160));
     ok(WL.every(n => r.lines.includes(`${n}: ${WLX.lists[n].length} symbols, unchanged`)) && r.text.includes('· 0 added · 0 removed in total.'), 'every list reported unchanged (order does not matter): ' + r.lines.join(' | ').slice(0, 300));
-    const st = await tvState(page); ok(st.calls.every(c => c[0] === 'mcp-watchlist-list-watchlists') && st.lists.map(l => l.id).join() === '10,11,12,13', 'no write of any kind, same list ids');
+    const st = await tvState(page); ok(st.calls.every(c => c[0] === 'mcp-watchlist-list-watchlists') && st.lists.map(l => l.id).join() === '10,11', 'no write of any kind, same list ids');
     eq((await readDb(page)).wlLog[0].status, 'completed', 'logged as completed');
   });
-  await runScenario('watchlist sync: changed lists are built beside the old one, then swapped', { cfg: { tvLists: own().concat([
-      tvList(20, 'Alba Securities', WLX.lists['Alba Securities'].slice(0, 150).concat(['NSE:OLD1', 'NSE:OLD2', 'NSE:OLD3', 'NSE:OLD4', 'NSE:OLD5'])),
-      tvList(21, 'Alba - Green', WLX.lists['Alba - Green']), tvList(22, 'Alba - Red', ['NSE:OLDRED'])]) } }, async page => {
-    const r = await run(page, 'wl'); ok(r.cls === 'ok', 'finishes: ' + r.text.slice(0, 200));
-    const sec = WLX.lists['Alba Securities'].length;
-    ok(r.lines.includes(`Alba Securities: ${sec} symbols (+${sec - 150} / −5)`) && r.lines.includes(`Alba - Green: ${WLX.lists['Alba - Green'].length} symbols, unchanged`) && r.lines.includes(`Alba - Orange: ${WLX.lists['Alba - Orange'].length} symbols (+${WLX.lists['Alba - Orange'].length} / −0)`) && r.lines.includes(`Alba - Red: ${WLX.lists['Alba - Red'].length} symbols (+${WLX.lists['Alba - Red'].length} / −1)`), 'per-list lines: ' + r.lines.join(' | ').slice(0, 400));
+  await runScenario('watchlist sync: a changed list is built beside the old one, then swapped', Object.assign({ cfg: { tvLists: own().concat([
+      tvList(20, WL[0], WLX.lists[WL[0]].slice(0, 1).concat(['NSE:OLD1', 'NSE:OLD2', 'NSE:OLD3', 'NSE:OLD4', 'NSE:OLD5'])), tvList(21, WL[1], WLX.lists[WL[1]])]) } }, S), async page => {
+    const r = await wlRun(page); ok(r.cls === 'ok', 'finishes: ' + r.text.slice(0, 200));
+    const n = WLX.lists[WL[0]].length;
+    ok(r.lines.includes(`${WL[0]}: ${n} symbols (+${n - 1} / −5)`) && r.lines.includes(`${WL[1]}: ${WLX.lists[WL[1]].length} symbols, unchanged`), 'per-list lines: ' + r.lines.join(' | ').slice(0, 400));
     const st = await tvState(page);
-    for(const n of WL){ const l = st.lists.filter(x => x.name === n); ok(l.length === 1 && JSON.stringify(setOf(l[0].symbols)) === JSON.stringify(setOf(WLX.lists[n])), n + ' is right'); }
-    ok(st.lists.find(x => x.name === 'Alba - Green').id === '21', 'an unchanged list keeps its id'); ok(!st.lists.some(x => x.id === '20' || x.id === '22'), 'the old versions are gone');
-    // order of events for "Alba Securities": the new list exists before the old one is deleted, and the rename comes last
+    for(const x of WL){ const l = st.lists.filter(y => y.name === x); ok(l.length === 1 && JSON.stringify(setOf(l[0].symbols)) === JSON.stringify(setOf(WLX.lists[x])), x + ' is right'); }
+    ok(st.lists.find(x => x.name === WL[1]).id === '21', 'an unchanged list keeps its id'); ok(!st.lists.some(x => x.id === '20'), 'the old version is gone');
+    // order of events: the new list exists before the old one is deleted, and the rename comes last
     const seq = st.calls.map(c => c[0] + ':' + (c[1].name || c[1].watchlist_id || ''));
-    const iCreate = seq.indexOf('mcp-watchlist-create-watchlist:Alba Securities (syncing)'), iDelete = seq.indexOf('mcp-watchlist-delete-watchlist:20'), iRename = seq.findIndex(x => /^mcp-watchlist-update-watchlist:Alba Securities$/.test(x));
+    const iCreate = seq.indexOf('mcp-watchlist-create-watchlist:' + WL[0] + ' (syncing)'), iDelete = seq.indexOf('mcp-watchlist-delete-watchlist:20'), iRename = seq.indexOf('mcp-watchlist-update-watchlist:' + WL[0]);
     ok(iCreate >= 0 && iCreate < iDelete && iDelete < iRename, `create (${iCreate}) before delete (${iDelete}) before rename (${iRename})`);
-    ok(callsOf(st, 'mcp-watchlist-delete-watchlist').length === 2, 'only the two replaced lists were deleted');
+    ok(callsOf(st, 'mcp-watchlist-delete-watchlist').length === 1, 'only the replaced list was deleted');
     ok(st.lists.some(x => x.name === 'My Own List') && st.lists.some(x => x.type === 'colored'), "the person's other lists are untouched");
   });
-  await runScenario('watchlist sync: a few symbols TradingView will not take are reported, the rest goes ahead', { cfg: { tvRefuse: WLX.lists['Alba Securities'].slice(0, 3), tvLists: own() } }, async page => {
-    const gone = WLX.lists['Alba Securities'].slice(0, 3);
-    const r = await run(page, 'wl'); ok(r.cls === 'warn' && r.lines[0] === 'Sync finished with gaps.', 'finishes with gaps: ' + r.cls + ' ' + r.lines[0]);
-    ok(new RegExp('TradingView could not resolve: ' + gone.map(g => g.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join(', ')).test(r.text) || gone.every(g => r.text.includes(g)), 'names the dropped symbols: ' + r.lines.slice(-2).join(' | '));
-    const st = await tvState(page); const sec = st.lists.find(x => x.name === 'Alba Securities');
-    ok(sec && JSON.stringify(setOf(sec.symbols)) === JSON.stringify(setOf(WLX.lists['Alba Securities'].filter(x => !gone.includes(x)))), 'the list holds everything except the dropped ones');
+  await runScenario('watchlist sync: the four old fixed lists are removed one at a time, other lists stay', Object.assign({ cfg: { tvLists: own().concat(OLD_WL.map((n, i) => tvList(40 + i, n, ['NSE:OLD' + i]))) } }, S), async page => {
+    const r = await wlRun(page, [WL[0]]); ok(r.cls === 'ok' && r.lines.includes('Removed old lists: ' + OLD_WL.join(', ')), 'finishes: ' + r.text.slice(0, 300));
+    const st = await tvState(page);
+    ok(!st.lists.some(x => OLD_WL.includes(x.name)), 'the four old lists are gone'); ok(st.lists.some(x => x.name === WL[0]), 'the new list is there');
+    ok(st.lists.some(x => x.name === 'My Own List') && st.lists.some(x => x.type === 'colored'), "the person's other lists are untouched");
+    eq(callsOf(st, 'mcp-watchlist-delete-watchlist').length, 4, 'four deletes');
+    const seq = st.calls.map(c => c[0]); let lastDelete = -1, lastRead = 0;
+    seq.forEach((c, i) => { if(c === 'mcp-watchlist-delete-watchlist'){ ok(seq.slice(lastDelete + 1, i).includes('mcp-watchlist-list-watchlists') || lastDelete < 0, 'a re-read before each further delete'); lastDelete = i; } });
+    ok(seq.lastIndexOf('mcp-watchlist-update-watchlist') < seq.indexOf('mcp-watchlist-delete-watchlist'), 'the new list is finished before any old list is deleted'); void lastRead;
+  });
+  await runScenario('watchlist sync: a few symbols TradingView will not take are reported, the rest goes ahead', Object.assign({ cfg: { tvRefuse: WLX.lists[WL[1]].slice(0, 3), tvLists: own() } }, S), async page => {
+    const gone = WLX.lists[WL[1]].slice(0, 3);
+    const r = await wlRun(page, [WL[1]]); ok(r.cls === 'warn' && r.lines[0] === 'Sync finished with gaps.', 'finishes with gaps: ' + r.cls + ' ' + r.lines[0]);
+    ok(gone.every(g => r.text.includes(g)), 'names the dropped symbols: ' + r.lines.slice(-2).join(' | '));
+    const st = await tvState(page); const l = st.lists.find(x => x.name === WL[1]);
+    ok(l && JSON.stringify(setOf(l.symbols)) === JSON.stringify(setOf(WLX.lists[WL[1]].filter(x => !gone.includes(x)))), 'the list holds everything except the dropped ones');
     eq((await readDb(page)).wlLog[0].status, 'partial', 'logged as partial');
   });
-  await runScenario('watchlist sync: too many refused symbols leaves the existing list untouched', { cfg: { tvRefuse: WLX.lists['Alba Securities'].slice(0, 50), tvLists: own().concat([tvList(20, 'Alba Securities', ['NSE:KEEPME1', 'NSE:KEEPME2'])]) } }, async page => {
-    const r = await run(page, 'wl'); ok(r.cls === 'err' && new RegExp('TradingView did not accept 50 of ' + WLX.lists['Alba Securities'].length + ' symbols, so the existing "Alba Securities" list was left untouched').test(r.text), 'message: ' + r.text.slice(0, 300));
+  await runScenario('watchlist sync: too many refused symbols leaves the existing list untouched', Object.assign({ cfg: { tvRefuse: WLX.lists[WL[1]].slice(0, 50), tvLists: own().concat([tvList(20, WL[1], ['NSE:KEEPME1', 'NSE:KEEPME2'])]) } }, S), async page => {
+    const r = await wlRun(page, [WL[1]]); ok(r.cls === 'err' && new RegExp('TradingView did not accept 50 of ' + WLX.lists[WL[1]].length + ' symbols, so the existing "' + WL[1] + '" list was left untouched').test(r.text), 'message: ' + r.text.slice(0, 300));
     const st = await tvState(page); const old = st.lists.find(x => x.id === '20');
-    ok(old && old.name === 'Alba Securities' && old.symbols.join() === 'NSE:KEEPME1,NSE:KEEPME2', 'the existing list is exactly as before');
-    ok(callsOf(st, 'mcp-watchlist-delete-watchlist').length === 0, 'nothing was deleted'); ok(st.lists.some(x => x.name === 'Alba Securities (syncing)'), 'the new list is left for a person, under its temporary name');
+    ok(old && old.name === WL[1] && old.symbols.join() === 'NSE:KEEPME1,NSE:KEEPME2', 'the existing list is exactly as before');
+    ok(callsOf(st, 'mcp-watchlist-delete-watchlist').length === 0, 'nothing was deleted'); ok(st.lists.some(x => x.name === WL[1] + ' (syncing)'), 'the new list is left for a person, under its temporary name');
     const a = await readDb(page); ok(a.wlLog[0].status === 'failed' && a.wlJob.status === 'failed', 'logged and the lock released as failed');
   });
-  await runScenario('watchlist sync: stops at once if deleting a list also removes another', { cfg: { tvAlsoDelete: 'Alba - Green', tvLists: own().concat([tvList(20, 'Alba Securities', ['NSE:OLD1']), tvList(21, 'Alba - Green', ['NSE:OLDGREEN'])]) } }, async page => {
-    const r = await run(page, 'wl'); ok(r.cls === 'err' && /Safety stop: after deleting "Alba Securities" these lists are also gone: Alba - Green\. Nothing more was touched\./.test(r.text), 'message: ' + r.text.slice(0, 300));
+  await runScenario('watchlist sync: stops at once if deleting a list also removes another', Object.assign({ cfg: { tvAlsoDelete: WL[1], tvLists: own().concat([tvList(20, WL[0], ['NSE:OLD1']), tvList(21, WL[1], ['NSE:OLDGOOD'])]) } }, S), async page => {
+    const r = await wlRun(page); ok(r.cls === 'err' && new RegExp('Safety stop: after deleting "' + WL[0] + '" these lists are also gone: ' + WL[1] + '\\. Nothing more was touched\\.').test(r.text), 'message: ' + r.text.slice(0, 300));
     const st = await tvState(page); eq(callsOf(st, 'mcp-watchlist-delete-watchlist').length, 1, 'exactly one delete was attempted');
-    ok(st.lists.some(x => x.name === 'My Own List') && !st.lists.some(x => x.name === 'Alba - Orange' || x.name === 'Alba - Red'), 'no further lists were touched');
+    ok(st.lists.some(x => x.name === 'My Own List'), 'no further lists were touched');
     ok((await readDb(page)).wlLog[0].status === 'failed', 'logged as failed');
   });
-  await runScenario('watchlist sync: a temporary list left by an earlier failed run is cleaned up', { cfg: { tvLists: own().concat([tvList(30, 'Alba Securities (syncing)', ['NSE:JUNK'])]) } }, async page => {
-    const r = await run(page, 'wl'); ok(r.cls === 'ok', 'finishes: ' + r.text.slice(0, 160));
-    const st = await tvState(page); ok(!st.lists.some(x => x.id === '30' || /\(syncing\)/.test(x.name || '')), 'the leftover is gone'); ok(st.lists.filter(x => x.name === 'Alba Securities').length === 1, 'one proper list');
+  await runScenario('watchlist sync: a temporary list left by an earlier failed run is cleaned up', Object.assign({ cfg: { tvLists: own().concat([tvList(30, WL[0] + ' (syncing)', ['NSE:JUNK'])]) } }, S), async page => {
+    const r = await wlRun(page, [WL[0]]); ok(r.cls === 'ok', 'finishes: ' + r.text.slice(0, 160));
+    const st = await tvState(page); ok(!st.lists.some(x => x.id === '30' || /\(syncing\)/.test(x.name || '')), 'the leftover is gone'); ok(st.lists.filter(x => x.name === WL[0]).length === 1, 'one proper list');
   });
-  await runScenario('watchlist sync: without a TradingView connection nothing is attempted', { cfg: { noMcp: true } }, async page => {
-    const r = await run(page, 'wl'); ok(r.cls === 'err' && /Sync stopped: The TradingView connector is not available in this view\./.test(r.text), 'message: ' + r.text.slice(0, 200));
+  await runScenario('watchlist sync: without a TradingView connection nothing is attempted', Object.assign({ cfg: { noMcp: true } }, S), async page => {
+    const r = await wlRun(page, [WL[0]]); ok(r.cls === 'err' && /Sync stopped: The TradingView connector is not available in this view\./.test(r.text), 'message: ' + r.text.slice(0, 200));
     const a = await readDb(page); ok(a.wlLog[0].status === 'failed' && a.wlJob.status === 'failed', 'logged as failed');
   });
-  await runScenario('watchlist sync: another sync is already running', { docs: { 'importJobs/watchlist': { status: 'running', startedAt: new Date().toISOString() } } }, async page => {
-    const r = await run(page, 'wl'); ok(r.cls === 'err' && /another sync is already running \(started/.test(r.text), 'message: ' + r.text.slice(0, 200));
+  await runScenario('watchlist sync: another sync is already running', Object.assign({ docs: { 'importJobs/watchlist': { status: 'running', startedAt: new Date().toISOString() } } }, S), async page => {
+    const r = await wlRun(page, [WL[0]]); ok(r.cls === 'err' && /another sync is already running \(started/.test(r.text), 'message: ' + r.text.slice(0, 200));
     const st = await tvState(page); eq(st.calls.length, 0, 'TradingView was not contacted'); ok((await readDb(page)).wlJob.status === 'running', "the other lock is left alone");
   });
-  await runScenario('watchlist sync: a database with too few qualifying stocks is refused', { small: true }, async page => {
-    const r = await run(page, 'wl'); ok(r.cls === 'err' && /Sync stopped: only \d+ stocks qualify, which looks wrong, so nothing was changed in TradingView/.test(r.text), 'message: ' + r.text.slice(0, 220));
-    eq((await tvState(page)).calls.length, 0, 'TradingView was not contacted');
-  });
-  await runScenario('watchlist sync: BSE-only stocks are looked up by exact company name and the symbol is saved', { docs: { 'stockMeta/bseAlpha': {} }, cfg: { tvSearch: {
+  await runScenario('watchlist sync: BSE-only stocks are looked up by exact company name and the symbol is saved', Object.assign({ docs: { 'stockMeta/bseAlpha': {} }, cfg: { tvSearch: {
       'Bse Only 0': [{ symbol: 'BSE:ALPHAONE', exchange: 'BSE', type: 'stock', description: 'Bse Only 0 Limited' }],
-      'Bse Only 1': [{ symbol: 'BSE:ALPHAX', exchange: 'BSE', type: 'stock', description: 'Bse Only 1 Industries' }] } } }, async page => {
-    const r = await run(page, 'wl'); ok(r.cls === 'warn' && r.lines[0] === 'Sync finished with gaps.' && /No TradingView symbol yet \(left out\): 512341 Bse Only 1/.test(r.text), 'result: ' + r.text.slice(0, 400));
+      'Bse Only 1': [{ symbol: 'BSE:ALPHAX', exchange: 'BSE', type: 'stock', description: 'Bse Only 1 Industries' }] } } }, S), async page => {
+    const r = await wlRun(page); ok(r.cls === 'warn' && r.lines[0] === 'Sync finished with gaps.' && /No TradingView symbol yet \(left out\): 512341 Bse Only 1/.test(r.text), 'result: ' + r.text.slice(0, 400));
     const a = await readDb(page); eq(a.all['stockMeta/bseAlpha'], { '512340': 'ALPHAONE' }, 'the exact match is saved, the near miss is not');
-    const st = await tvState(page); const sec = st.lists.find(x => x.name === 'Alba Securities'); ok(sec.symbols.includes('BSE:ALPHAONE') && !sec.symbols.some(x => /ALPHAX|512341/.test(x)), 'the matched stock is on the list, the unmatched one left out');
+    const st = await tvState(page); const all = [].concat(...WL.map(n => (st.lists.find(x => x.name === n) || { symbols: [] }).symbols));
+    ok(all.includes('BSE:ALPHAONE') && !all.some(x => /ALPHAX|512341/.test(x)), 'the matched stock is on a list, the unmatched one left out');
     eq(a.wlLog[0].status, 'partial', 'logged as partial');
   });
 }
