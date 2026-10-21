@@ -177,6 +177,8 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   snap('s5b_pin', { star: $('#detailPinBtn').className });
 
   nav('analysis'); await sleep(200);
+  // the last research stays on screen when the live read comes back with no documents at all
+  { const alba = win.__alba, n = () => alba.stocks.filter(s => s.__researchAsof).length, before = n(); alba.applyResearchOverlay([]); snap('s5c_research_kept', { before, after: n(), some: before > 0 }); }
   snap('s6_analysis', { body: html$('#analysisPanelBody'), filt: html$('#analysisGlobalFilters') });
   snap('s6_triggered', { cells: Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-researched')).map(td => td.outerHTML).join('\n') });
   click($('#xAxisMonthBtn')); await sleep(150);

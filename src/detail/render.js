@@ -39,10 +39,14 @@ function detailBackToAnalysis(){
 let shownIdx = -1;
 function getShownIndex(){ return shownIdx; }
 // Redraws whatever stock is open, e.g. after saved research or a pin change; does nothing if none is open.
+// Set by the research overlay: called with the stock each time its page is drawn.
+let detailOpenHook = null;
+function setDetailOpenHook(fn){ detailOpenHook = fn; }
 function rerenderDetail(){ if(stocks[shownIdx]) keepScroll(detailEl, () => renderDetail(shownIdx)); }
 function renderDetail(idx){
   shownIdx = idx;
   const s = stocks[idx];
+  if(detailOpenHook) detailOpenHook(s);
   const delta = scoreDelta(s);
   const pinned = isPinned(s);
   detailEl.innerHTML = `
@@ -153,4 +157,4 @@ function renderDetail(idx){
 
 function setDetailBackTo(v){ detailBackTo = v; }
 
-export { detailBackToAnalysis, getShownIndex, renderDetail, rerenderDetail, setDetailBackTo };
+export { detailBackToAnalysis, getShownIndex, renderDetail, rerenderDetail, setDetailBackTo, setDetailOpenHook };
