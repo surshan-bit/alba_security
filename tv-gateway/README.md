@@ -24,3 +24,5 @@ Access tokens are refreshed automatically with the refresh token.
 If registration is refused, the error shows the server's answer; TradingView would have to issue a client id.
 
 Tests (a pretend TradingView, no network): `npm run tvgateway` in the repo root.
+
+Built by Cloudflare from the branch set under Settings, Builds, Production branch.
