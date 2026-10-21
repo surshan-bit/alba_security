@@ -4,13 +4,13 @@
  "s0_boot__analysis": "33489:0b8a7e46ac55",
  "s0_boot__business": "188:ad107a93c457",
  "s0_boot__trackrecord": "1156:5d259a8c8223",
- "s0_boot__knowledgebase": "156134:76082fd66734",
+ "s0_boot__knowledgebase": "156609:8a35f69c57e9",
  "s0_boot__settings": "4676:e9525480e61b",
  "s0_boot__theme": "4:3d09ba44760d",
  "s0_boot__active": "16:7469b67fecde",
  "s0_boot__nav": "46:dcee529be212",
  "s4_search__sugg": "659:421b4cb8387f",
- "s5_select__detail": "21082:b3f52dda011d",
+ "s5_select__detail": "21088:8b401db37153",
  "s5_select__parent": "18:b838b751ffab",
  "s5b_pin__star": "18:2f25f5390134",
  "s6_analysis__body": "26155:bf64645bb31a",
@@ -68,7 +68,7 @@
  "s7_business__sec": "29177:85dc9235472d",
  "s7_trackrecord__sec": "1813:e8930f41e949",
  "s7_help__sec": "23524:70a0e2bfea04",
- "s7_knowledgebase__sec": "156134:76082fd66734",
+ "s7_knowledgebase__sec": "156609:8a35f69c57e9",
  "s7_settings__sec": "4676:e9525480e61b",
  "s7b_strategies_open__list": "1824:47094a85e8f0",
  "s7b_strategies_open__main": "22776:dd5bc9e463ff",
@@ -146,5 +146,5 @@
  "s7k_business_matched_toggle__backToAll": "4:5ffe533b830f",
  "z_final__localStorage": "3297:93de739d7ba1",
  "z_final__db": "16762:6fb94a7f5120",
- "z_console__logs": "1207:7d9327d7803e"
+ "z_console__logs": "900:2b84de01f4ea"
 }

@@ -2,6 +2,7 @@
 import { stocks } from '../core/stocks.js';
 import { escapeHtml, tickerSymbol } from '../core/util.js';
 import { albaFiHasValuation } from '../import/fund-check.js';
+import { expectedScore } from '../core/fundscore.js';
 
 // One-time data-integrity sanity check, run once at load. The offline refresh/merge pipeline
 // (scripts/lib/scoring.js, run outside the browser before publishing) already enforces these
@@ -21,13 +22,12 @@ function runDataIntegrityCheck(){
       problems.push(`${sym}: pillars.val is missing/non-numeric (Technical's valuation blend depends on it)`);
     }
     if(s.fundamentals && Array.isArray(s.fundamentals.factors)){
-      // The score covers only the factors that count (see core/fundscore.js): their scores over their weights, scaled to 10.
-      const counted = s.fundamentals.factors.filter(f => !f.excluded);
-      const w = counted.reduce((a, f) => a + (typeof f.weight === 'number' ? f.weight : 0), 0);
-      const sum = counted.reduce((a, f) => a + (typeof f.score === 'number' ? f.score : NaN), 0);
-      const expected = w > 0 ? sum / w * 10 : sum;
-      if(Number.isNaN(sum) || Math.abs(expected - s.score) > 0.05){
-        problems.push(`${sym}: fundamentals factor scores (${Number.isNaN(sum) ? 'invalid' : expected.toFixed(2)} over the factors that count) don't match stock.score (${s.score})`);
+      // The score covers the factors that count, a factor with no data as neutral (see core/fundscore.js).
+      const factors = s.fundamentals.factors;
+      const invalid = factors.some(f => typeof f.weight !== 'number' || (!f.excluded && typeof f.score !== 'number'));
+      const expected = expectedScore(factors);
+      if(invalid || (expected != null && Math.abs(expected - s.score) > 0.05)){
+        problems.push(`${sym}: fundamentals factor scores (${invalid ? 'invalid' : expected.toFixed(2)} over the factors that count) don't match stock.score (${s.score})`);
       }
     }
   });
