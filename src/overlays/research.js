@@ -6,7 +6,8 @@ import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { refreshAnalysisSoon } from '../analysis/section.js';
 import { redrawWhenIdle } from '../ui/scrollkeep.js';
 import { setPeerGroupCache } from '../detail/peers.js';
-import { rerenderDetail } from '../detail/render.js';
+import { rerenderDetail, setDetailOpenHook } from '../detail/render.js';
+import { dbCapabilityPromise } from '../core/store.js';
 
 // ---- Research overlay (v1.8) ----
 // Research results (Moat, Governance and any other Fundamental factor researched on demand) live in the
@@ -96,9 +97,22 @@ function applyResearchDoc(s, doc){
   }
   if(ra) s.__researchAsof = ra; else delete s.__researchAsof;
 }
+// Redraws what shows research once documents were applied.
+function afterResearchChange(){
+  setPeerGroupCache(null);
+  rerenderDetail();
+  const analysisSectionEl = document.getElementById('section-analysis');
+  if(analysisSectionEl && analysisSectionEl.classList.contains('active')) refreshAnalysisSoon();
+  redrawStrategiesSoon();
+}
 // Re-applies every research document on top of the base data. Idempotent: each stock is first put
 // back to its base values, so a changed or deleted document is always reflected exactly.
 function applyResearchOverlay(docs){
+  // The last research stays on screen until new research replaces it: a snapshot with no documents at all while some are showing is a
+  // failed or cut-off read, not a request to delete every researched stock.
+  if(!docs.length && researchOverlayApplied.size) return;
+  liveSeen = true;
+  saveResearchCache(docs);
   const index = stockByDocId();
   const next = new Map();
   docs.forEach(d => { const s = index.get(d.id); if(s) next.set(d.id, { s, data: d.data }); });
@@ -113,12 +127,77 @@ function applyResearchOverlay(docs){
   }
   researchOverlayApplied.clear();
   for(const [id, { s }] of next) researchOverlayApplied.set(id, s);
-  if(!changed) return;
-  setPeerGroupCache(null);
-  rerenderDetail();
-  const analysisSectionEl = document.getElementById('section-analysis');
-  if(analysisSectionEl && analysisSectionEl.classList.contains('active')) refreshAnalysisSoon();
-  redrawStrategiesSoon();
+  if(changed) afterResearchChange();
+}
+// Applies some documents without touching the stocks that are not named (the saved copy, or one document read on its own).
+function applyResearchDocs(docs){
+  const index = stockByDocId();
+  let changed = false;
+  docs.forEach(d => {
+    const s = index.get(d.id);
+    if(!s) return;
+    revertResearch(s);
+    applyResearchDoc(s, d.data);
+    researchOverlayApplied.set(d.id, s);
+    changed = true;
+  });
+  if(changed) afterResearchChange();
+}
+
+// ---- The last research is kept in this browser (IndexedDB) and shown at once on the next load, until the live read arrives ----
+// The live read of the whole stockResearch collection is one large message; if it fails or is cut short the page still has the last
+// research it saw. A stock opened without research also reads its own document directly.
+const CACHE_DB = 'albaResearchCache', CACHE_STORE = 'kv', CACHE_KEY = 'docs';
+let liveSeen = false, cacheTimer = null;
+const askedAlone = new Set();
+function cacheOpen(){
+  return new Promise((resolve) => {
+    try {
+      const r = indexedDB.open(CACHE_DB, 1);
+      r.onupgradeneeded = () => { try { r.result.createObjectStore(CACHE_STORE); } catch(e){ /* the cache is optional */ } };
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => resolve(null);
+      r.onblocked = () => resolve(null);
+    } catch(e){ resolve(null); }
+  });
+}
+async function readResearchCache(){
+  const idb = await cacheOpen(); if(!idb) return [];
+  return new Promise((resolve) => {
+    try {
+      const q = idb.transaction(CACHE_STORE, 'readonly').objectStore(CACHE_STORE).get(CACHE_KEY);
+      q.onsuccess = () => { try { const o = typeof q.result === 'string' ? JSON.parse(q.result) : null; resolve(o ? Object.keys(o).map(id => ({ id, data: o[id] })) : []); } catch(e){ resolve([]); } };
+      q.onerror = () => resolve([]);
+    } catch(e){ resolve([]); }
+  });
+}
+function saveResearchCache(docs){
+  if(cacheTimer) clearTimeout(cacheTimer);
+  cacheTimer = setTimeout(async () => {
+    cacheTimer = null;
+    let json; try { const o = {}; docs.forEach(d => { o[d.id] = d.data; }); json = JSON.stringify(o); } catch(e){ return; }
+    const idb = await cacheOpen(); if(!idb) return;
+    try {
+      const tx = idb.transaction(CACHE_STORE, 'readwrite');
+      tx.objectStore(CACHE_STORE).put(json, CACHE_KEY);
+      await new Promise((resolve) => { tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve; });
+    } catch(e){ /* the cache is optional */ }
+  }, 3000);
+}
+// A stock opened while it has no research on screen: read its own document (small), once per stock.
+async function ensureResearch(s){
+  const id = sanitizeDocId(tickerSymbol(s));
+  if(researchOverlayApplied.has(id) || askedAlone.has(id)) return;
+  askedAlone.add(id);
+  try {
+    const db = await dbCapabilityPromise; if(!db) return;
+    const snap = await db.doc('stockResearch/' + id).get();
+    if(snap && snap.exists && !researchOverlayApplied.has(id)) applyResearchDocs([{ id, data: snap.data() }]);
+  } catch(e){ askedAlone.delete(id); }
+}
+function init_overlays_research(){
+  setDetailOpenHook(ensureResearch);
+  readResearchCache().then(docs => { if(docs.length && !liveSeen) applyResearchDocs(docs); });
 }
 // The Strategies table shows "Research done" too: redraw it as saved research arrives, so it fills in while a refresh runs.
 let strategiesRedrawTimer = null;
@@ -132,4 +211,4 @@ function redrawStrategiesSoon(){
   }, 1200);
 }
 
-export { applyResearchOverlay, stockByDocId };
+export { applyResearchOverlay, init_overlays_research, stockByDocId };
