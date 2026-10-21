@@ -442,6 +442,7 @@ for (const s of stocks) {
   s.fundamentals = buildFundamentals(r, indOf(s) || r.industry, r.industryGroup);
   s.valuation = { ...(s.valuation || {}), ...valuationBlock(r) };
   { const pv = pillarsFor(r); if (pv) s.pillars = { ...(s.pillars || {}), ...pv }; }
+  if (r.isin) s.isin = r.isin;
   s.asof = asof; rescored++;
 }
 const onboarded = [], needScreenerCheck = [], bseOnly = [];
@@ -450,7 +451,7 @@ for (const r of records) {
   const code = r.nseCode || r.bseCode; if (!code || r.scored.score == null) continue;
   const industry = r.industry || r.industryGroup;
     stocks.push({
-    asof, name: r.name, ticker: `${code} · ${industry}`, industryGroup: r.industryGroup, score: r.scored.score, verdict: r.scored.verdict,
+    asof, name: r.name, isin: r.isin || undefined, ticker: `${code} · ${industry}`, industryGroup: r.industryGroup, score: r.scored.score, verdict: r.scored.verdict,
     pillars: pillarsFor(r) || {},
     technical: { reason: 'Newly imported in the fresh full-universe data load; no Technical Signal history yet. Will be computed from the next Growth List CSV / TradingView refresh.', asof },
     globalFactors: { scope: 'sector', sectorLabel: industry, asof, positive: [], negative: [] },

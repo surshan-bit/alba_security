@@ -32,15 +32,14 @@ const dirFiles = d => fs.existsSync(d) ? fs.readdirSync(d).filter(f => f.endsWit
 
 const stocks = [];
 for(const f of dirFiles(path.join(DATA, 'stockData')).sort()) stocks.push(...(readJson(f).stocks || []));
-const bse = fs.existsSync(path.join(DATA, 'stockMeta', 'bseAlpha.json')) ? readJson(path.join(DATA, 'stockMeta', 'bseAlpha.json')) : {};
+const isinMap = fs.existsSync(path.join(DATA, 'stockMeta', 'isinSymbol.json')) ? readJson(path.join(DATA, 'stockMeta', 'isinSymbol.json')) : {};
 const updates = new Map();
 for(const f of dirFiles(path.join(DATA, 'stockUpdates'))) updates.set(path.basename(f, '.json'), readJson(f));
 
-// same rule as src/refresh/tvrefresh.js (snapshotSymbol)
+// same rule as src/refresh/tvrefresh.js (snapshotSymbol): the symbol saved for the stock's ISIN in stockMeta/isinSymbol
 function symbolOf(s){
-  const key = tickerOf(s);
-  if(!/^\d+$/.test(key)) return 'NSE:' + key.replace(/-/g, '_');
-  return bse[key] ? 'BSE:' + String(bse[key]).replace(/^BSE:/, '') : null;
+  const isin = String(s.isin || '').trim().toUpperCase();
+  return isin && isinMap[isin] ? isinMap[isin] : null;
 }
 
 if(mode === 'plan'){
@@ -49,7 +48,7 @@ if(mode === 'plan'){
   const skipped = [], list = [];
   for(const s of stocks){
     const sym = symbolOf(s);
-    if(!sym) skipped.push({ sym: tickerOf(s), name: s.name, reason: 'BSE-only stock with no TradingView symbol saved yet' }); else list.push({ s, sym });
+    if(!sym) skipped.push({ sym: tickerOf(s), name: s.name, reason: 'No ISIN, or no TradingView symbol saved for it' }); else list.push({ s, sym });
   }
   list.sort((a, b) => (tracked.has(tickerOf(b.s)) ? 1 : 0) - (tracked.has(tickerOf(a.s)) ? 1 : 0));
   const only = args.includes('--tracked-only') ? list.filter(x => tracked.has(tickerOf(x.s))) : list;

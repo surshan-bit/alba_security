@@ -24,7 +24,7 @@ function buildDataset(){
   }
   // four BSE-only companies; the first two are made to look excellent so they qualify for the watchlists
   const GREAT = { 'Return on capital employed': 60, 'Return on equity': 55, 'OPM': 60, 'Median return on capital employed 10Years': 60, 'Average return on equity 7Years': 55, 'Debt to equity': 0, 'Interest Coverage': 90, 'Quick ratio': 4, 'Current ratio': 4, 'Altman Z Score': 12, 'Piotroski score': 9, 'PEG Ratio': 0.1, 'Price to Earning': 7, 'Industry PE': 30, 'Pledged percentage': 0, 'Profit growth': 30, 'Profit growth 3Years': 29, 'Profit growth 5Years': 30, 'Sales growth 3Years': 40, 'Intrinsic Value': 2000, 'Current Price': 100, 'Free cash flow 3years': 100, 'Operating cash flow 3years': 200 };
-  for(let k = 0; k < 4; k++) rows.push(D.fundRow('', 'Group00', 'Ind00a', Object.assign({ 'NSE Code': '', 'BSE Code': String(512340 + k), 'Name': 'Bse Only ' + k }, k < 2 ? GREAT : {})));
+  for(let k = 0; k < 4; k++) rows.push(D.fundRow('', 'Group00', 'Ind00a', Object.assign({ 'NSE Code': '', 'BSE Code': String(512340 + k), 'Name': 'Bse Only ' + k, 'ISIN Code': 'INE00' + (512340 + k) + '1' }, k < 2 ? GREAT : {})));
   const apply = (rs, asof) => { const stocks = []; F.albaApplyFundamental(D.fundCsv(rs), stocks, asof); return stocks; };
   // give three of the Strong/Good companies the awkward symbol shapes the watchlist code has to handle
   let stocks = apply(rows, '2026-09-01');
@@ -46,9 +46,16 @@ function buildDataset(){
   const index = {}; for(const cid of ids) for(const s of chunks[cid].stocks) index[sid(symOf(s))] = cid;
   const meta = { version: 5, updatedAt: '2026-09-01T00:00:00Z', count: stocks.length, chunks: ids, index };
   const bseAlpha = { '512340': 'ALPHAONE', '512341': 'ALPHATWO' };
-  const docs = { 'stockMeta/main': meta, 'stockMeta/bseAlpha': bseAlpha };
+  const docs = { 'stockMeta/main': meta, 'stockMeta/bseAlpha': bseAlpha, 'stockMeta/isinSymbol': isinSymbols(stocks, bseAlpha) };
   for(const cid of ids) docs['stockData/' + cid] = chunks[cid];
   return { D, rows, stocks, meta, chunks, docs, bseAlpha, fundCsv: rs => D.fundCsv(rs || rows), tvCsv: D.tvCsv, symOf };
+}
+
+// The TradingView symbol saved for each stock's ISIN (what the page resolves once by search): NSE:<ticker>, or BSE:<alpha> for a BSE-only stock that has one.
+function isinSymbols(stocks, alpha){
+  const m = {};
+  for(const s of stocks){ const k = symOf(s); if(!s.isin) continue; if(!/^\d+$/.test(k)) m[s.isin] = 'NSE:' + k.replace(/-/g, '_'); else if(alpha[k]) m[s.isin] = 'BSE:' + alpha[k]; }
+  return m;
 }
 
 // A tiny database (the anonymised sample used by the other tests): below the 2,000-stock minimum on purpose.

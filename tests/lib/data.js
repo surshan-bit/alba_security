@@ -19,7 +19,7 @@ const rv = (lo, hi, d = 2) => (lo + rnd() * (hi - lo)).toFixed(d);
 // one made-up company row; `over` replaces named columns
 function fundRow(sym, group, industry, over){
   const price = +rv(50, 900, 1), row = {
-    'Name': 'Company ' + sym, 'BSE Code': String(500000 + Math.floor(rnd() * 90000)), 'NSE Code': sym, 'ISIN Code': 'INE' + sym, 'Industry': industry, 'Industry Group': group,
+    'Name': 'Company ' + sym, 'BSE Code': String(500000 + Math.floor(rnd() * 90000)), 'NSE Code': sym, 'ISIN Code': 'INE' + sym.replace(/[^A-Z0-9]/gi, 'X').toUpperCase().padEnd(8, '0').slice(0, 8) + '1', 'Industry': industry, 'Industry Group': group,
     'Current Price': price, 'Intrinsic Value': (price * (0.6 + rnd())).toFixed(1), 'Book Value': rv(10, 300, 1), 'Profit growth': rv(-20, 80, 1), 'Profit growth 3Years': rv(-5, 40, 1),
     'Profit growth 5Years': rv(-5, 35, 1), 'Sales growth 3Years': rv(-5, 30, 1), 'Return on invested capital': rv(2, 35, 1), 'Return on capital employed': rv(3, 40, 1),
     'Return on equity': rv(2, 35, 1), 'OPM': rv(3, 40, 1), 'Price to Earning': rv(6, 60, 1), 'Industry PE': rv(12, 30, 1), 'PEG Ratio': rv(0.2, 3, 2),
