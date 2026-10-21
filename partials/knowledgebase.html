@@ -221,6 +221,13 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.218 &middot; 2026-10-21</h3>
+            <ul>
+              <li><strong>Technical data is now looked up by ISIN.</strong> Each stock is found on TradingView once, by its ISIN (NSE first, then BSE), and the match is saved so later refreshes do not search again. The old guess from the NSE or BSE code is no longer used for prices, bars, news or live prices.</li>
+              <li><strong>Import the Fundamental CSV once.</strong> The import now keeps each stock&rsquo;s ISIN. Until it has run, stocks have no ISIN and are skipped by the TradingView refresh and listed with the reason. A stock with no ISIN in the CSV, or no match on TradingView, is also skipped and listed.</li>
+              <li>The first refresh after that searches every stock once, so it may reach TradingView&rsquo;s daily call quota; the next run carries on.</li>
+            </ul>
+
             <h3>v1.217 &middot; 2026-10-20</h3>
             <ul>
               <li><strong>New Industry page.</strong> On the Explorer, each industry name is a link that opens its page. The page shows the average Fundamental and Technical score, margin of safety and each factor for the whole group, the Global &amp; Macro notes of its stocks, weekly and monthly average % change charts with news, results and company-event tags, a combined news timeline of all its stocks, and the stocks themselves. Back or Esc returns to the Explorer.</li>

@@ -78,6 +78,9 @@ const e2eStubs = {
   mcp: { callTool: async (server, tool, input) => {
     if(globalThis.__tvDelay) await new Promise(r => setTimeout(r, globalThis.__tvDelay));   // set only by checks that need a refresh to stay "running" for a while
     const d = {};
+    const symOfStock = s => 'NSE:' + String(s.ticker).split('·')[0].trim().replace(/-/g, '_');
+    if(tool === 'mcp-tv-search-symbols' && /^[A-Z]{2}[A-Z0-9]{9}\d$/.test(input.query)){ const s = stocks.find(x => x.isin === input.query); return { payload: { data: { symbols: s ? [{ symbol: symOfStock(s), exchange: 'NSE', type: 'stock', description: s.name }] : [] } } }; }
+    if(tool === 'mcp-tv-get-symbol-data' && input.columns && input.columns.length === 1 && input.columns[0] === 'isin'){ const s = stocks.find(x => symOfStock(x) === input.symbol); return { payload: { data: { isin: s ? s.isin : null } } }; }
     if(tool === 'mcp-tv-search-symbols') return { payload: { data: { symbols: [{ symbol: 'NSE:' + String(input.query).replace(/\W/g, '').toUpperCase(), exchange: 'NSE', description: String(input.query) }] } } };
     if(tool === 'mcp-tv-get-symbol-data') return { payload: { data: { close: 123.4 } } };
     if(tool === 'mcp-tv-get-news') return { payload: { data: { headlines: [{ id: 'n1', title: 'News ' + 'x'.repeat(60), provider: { name: 'P' }, published: Date.now() / 1000 - 86400, link: 'https://e.com/1', paywall: false }] } } };
