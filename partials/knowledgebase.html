@@ -221,6 +221,14 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.221 &middot; 2026-10-21</h3>
+            <ul>
+              <li><strong>Fairer Fundamental Score for stocks with a one-off profit jump.</strong> A very large latest-twelve-month profit growth is now discounted once, in Growth. It no longer also cuts Profitability or Earnings Predictability, which now judge the 3-year and 5-year figures.</li>
+              <li><strong>Capital Reinvestment Efficiency looks past heavy capex.</strong> When free cash flow is negative but operating cash flow is positive, the factor uses ROIC instead of cash-based CROIC, and the factor note says so.</li>
+              <li><strong>Missing data is neutral.</strong> A factor with no data now counts as an average score instead of being dropped, so a gap neither lifts nor sinks a stock.</li>
+              <li>Scores move only after the next Fundamental data import.</li>
+            </ul>
+
             <h3>v1.220 &middot; 2026-10-21</h3>
             <ul>
               <li><strong>Watchlist Sync now syncs your strategies.</strong> In the TradingView Watchlist Sync section, tick the strategies you want and press <b>Sync selected</b>. Each ticked strategy is run over the active stocks and its matches go to a TradingView watchlist with the same name as the strategy. A strategy with no rules cannot be ticked, and one that matches no stock leaves its list as it is.</li>

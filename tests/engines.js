@@ -224,6 +224,20 @@ test('fund scoring: a profit spike far above its multi-year trend is discounted 
   assert.ok(/0\.8x/.test(mk(25).note));      // 2.5x the trend
   assert.ok(/0\.55x/.test(mk(40).note));     // 4x the trend
 });
+test('fund scoring: a TTM spike does not touch Profit or Predict (it is discounted once, in Growth)', () => {
+  const rows = []; for(let i = 0; i < 12; i++) rows.push(fundRow('S' + i, 'Alpha', 'Widgets', { 'Profit growth 3Years': 10, 'Profit growth 5Years': 10, 'Profit growth': 12 }));
+  const get = ttm => { const rs = rows.map((r, i) => i ? r : Object.assign({}, r, { 'Profit growth': ttm })); const f = Fe.scoreCsv(fundCsv(rs), {}).records[0].scored.factors; return k => f.find(x => x.key === k).score; };
+  const calm = get(12), spike = get(40);
+  assert.strictEqual(spike('prof'), calm('prof'));
+  assert.strictEqual(spike('predict'), 0.68 * 0.9);   // 3yr and 5yr alone, with the two-window haircut
+});
+test('fund scoring: capex-heavy company (negative FCF, positive operating cash flow) is judged on ROIC, not CROIC', () => {
+  const rows = []; for(let i = 0; i < 12; i++) rows.push(fundRow('S' + i, 'Alpha', 'Widgets'));
+  const get = over => { const rs = rows.map((r, i) => i ? r : Object.assign({}, r, over)); return Fe.scoreCsv(fundCsv(rs), {}).records[0].scored.factors.find(x => x.key === 'reinvest').score; };
+  const cash = { 'Free cash flow 3years': -50, 'Operating cash flow 3years': 100, 'Return on invested capital': 30 };
+  assert.strictEqual(get(Object.assign({ 'CROIC': -5 }, cash)), get(Object.assign({ 'CROIC': 30 }, cash)));
+  assert.ok(get({ 'CROIC': -5, 'Free cash flow 3years': 50, 'Operating cash flow 3years': 100, 'Return on invested capital': 30 }) < get(Object.assign({ 'CROIC': -5 }, cash)));   // healthy FCF keeps the negative CROIC
+});
 test('fund scoring: sparse data is rescaled over what is present', () => {
   const sparse = fundRow('SPR', 'Alpha', 'Widgets', Object.fromEntries(FUND_HEADER.filter(h => !/^(Name|BSE Code|NSE Code|ISIN Code|Industry|Industry Group|Return on equity)$/.test(h)).map(h => [h, ''])));
   const rec = {}; for(const r of Fe.scoreCsv(fundCsv([...universe.slice(0, 12), sparse]), {}).records) rec[r.sym] = r;
