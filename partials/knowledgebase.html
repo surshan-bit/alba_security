@@ -221,6 +221,13 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.220 &middot; 2026-10-21</h3>
+            <ul>
+              <li><strong>Watchlist Sync now syncs your strategies.</strong> In the TradingView Watchlist Sync section, tick the strategies you want and press <b>Sync selected</b>. Each ticked strategy is run over the active stocks and its matches go to a TradingView watchlist with the same name as the strategy. A strategy with no rules cannot be ticked, and one that matches no stock leaves its list as it is.</li>
+              <li><strong>The four fixed lists are gone.</strong> Alba Securities, Alba - Green, Alba - Orange and Alba - Red are no longer built. The first sync removes them from TradingView, one at a time, after your new lists are in place. Other lists are never touched.</li>
+              <li>The safety steps are unchanged: a new list is built and checked before the old one is replaced, one delete at a time, and BSE-only stocks use their TradingView symbol.</li>
+            </ul>
+
             <h3>v1.219 &middot; 2026-10-21</h3>
             <ul>
               <li><strong>Active and inactive stocks.</strong> Every Fundamental CSV import now marks a stock <em>active</em> when it is in the file and <em>inactive</em> when it is not. A stock that comes back in a later file is active again. Nothing is deleted: an inactive stock keeps all its saved data.</li>

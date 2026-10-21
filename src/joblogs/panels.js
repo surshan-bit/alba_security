@@ -93,7 +93,7 @@ function renderJobLogPanel(cfg){
 
 // Renders the "TradingView Watchlist Sync" panel: recent-runs history only (populated from the
 // watchlistSyncLog subscription, if the database is reachable in this view) — no next-run countdown, since this
-// sync is manual-only (started by the "Sync now" button on this page).
+// sync is manual-only (started by the "Sync selected" button on this page).
 function renderWatchlistSyncLogPanel(){
   renderJobLogPanel({
     runsElId: 'watchlistSyncLogRuns',

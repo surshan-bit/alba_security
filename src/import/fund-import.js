@@ -123,7 +123,7 @@ function fiSetButtons(){
   const defs = [
     ['importFundamentalDataBtn', 'Scores the uploaded CSV and updates the stock data, right here on this page'],
     ['importTechnicalDataBtn', 'Scores the uploaded Growth List and updates the technical data, right here on this page'],
-    ['refreshWatchlistBtn', 'Rebuilds the four Alba watchlists in TradingView from the current verdicts, right here on this page', 'Sync now', 'Syncing…']
+    ['refreshWatchlistBtn', 'Writes each ticked strategy to a TradingView watchlist, right here on this page', 'Sync selected', 'Syncing…']
   ];
   for(const [bid, tip, idle, busy] of defs){
     const b = /** @type {HTMLButtonElement} */ (document.getElementById(bid));

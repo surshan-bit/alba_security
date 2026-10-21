@@ -1,18 +1,21 @@
 // TradingView watchlist sync.
 import { lockBusy, lockText, startBeat, tabId } from './joblock.js';
 import { getDb, watchlistSyncLog } from '../core/store.js';
+import { stocks } from '../core/stocks.js';
 import { sanitizeDocId } from '../core/util.js';
 import { renderWatchlistSyncLogPanel } from '../joblogs/panels.js';
 import { TV_SERVER, tvCall, tvErrorText, tvMcp } from '../tv/connector.js';
-import { albaFiErr, albaFiLoadRaw, albaFiRetry, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { strategies } from '../strategies/state.js';
+import { qualifyingStocks, ruleReady } from '../strategies/rules.js';
+import { albaFiErr, albaFiRetry, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 
 // ====================================================================================================
-// TRADINGVIEW WATCHLIST SYNC, IN THE PAGE (added 2026-10-10). "Sync now" no longer opens a Claude chat: the page
-// builds the four Alba lists from the stored stock data and rewrites them in TradingView through the viewer's own
-// TradingView connector (the page's `mcp` capability).
-//   Alba Securities = verdict Strong or Good; Alba - Green / Orange / Red = the same stocks split by margin of
-//   safety (>= 0 / -25..0 / < -25). A Strong/Good stock with no valuation is left out of the three MoS lists.
+// TRADINGVIEW WATCHLIST SYNC, IN THE PAGE. The owner ticks the strategies to sync and presses "Sync selected": each
+// ticked strategy is run over the active stocks (the same rules as the Strategies screen) and its matches are written
+// to a TradingView watchlist named exactly like the strategy, through the viewer's own TradingView connector (the
+// page's `mcp` capability). The four fixed lists of the earlier version (WL_OLD) are deleted once, after the new
+// lists are in place.
 // Safety (from the incidents in the tradingview-watchlist-symbol-mapping skill):
 //   * the new list is created FIRST under a temporary name and checked; the old list is deleted only after the new
 //     one holds (almost) every symbol, so a failed run never leaves a list empty;
@@ -21,48 +24,35 @@ import { setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 //   * BSE-only stocks use the TradingView alpha symbol from stockMeta/bseAlpha, never BSE:<digits>.
 // Owner only. Uses the shared progress panel (ids prefixed wl_) and its own lock document importJobs/watchlist.
 // ====================================================================================================
-const WL_NAMES = ['Alba Securities', 'Alba - Green', 'Alba - Orange', 'Alba - Red'];
+const WL_OLD = ['Alba Securities', 'Alba - Green', 'Alba - Orange', 'Alba - Red'];
 const WL_CHUNK = 300;
 const WL_CONFIRMED = { 'KLBRENG-B': 'NSE:KLBRENG_B', 'NAM-INDIA': 'NSE:NAM_INDIA', 'J&KBANK': 'NSE:J&KBANK', 'GVT&D': 'NSE:GVT&D' };
-const WL_STEPS = [
-  { key: 'load', label: 'Load the stock data', w: 12 },
-  { key: 'build', label: 'Build the four lists', w: 3 },
-  { key: 'l0', label: WL_NAMES[0], w: 25 },
-  { key: 'l1', label: WL_NAMES[1], w: 20 },
-  { key: 'l2', label: WL_NAMES[2], w: 20 },
-  { key: 'l3', label: WL_NAMES[3], w: 20 }
-];
+const picked = new Set();   // ids of the strategies ticked in the picker
 
-// ---- Which stocks go where (port of the saved watchlist_sets.js) ----
-function albaWlBuild(stocks, bseMap){
+// ---- Which stocks go where ----
+// picks = [{ name, rules }] -> { lists: { name: [symbols] }, needsLookup, unverified, notes }
+function albaWlBuild(universe, bseMap, picks){
   const alpha = Object.assign({}, bseMap || {});
   for(const k of ['version', 'updatedAt', '__version', '_version']) delete alpha[k];
-  const lists = {}; WL_NAMES.forEach(n => { lists[n] = []; });
-  const needsLookup = [], unverified = [], notes = [], seen = new Set();
-  let strong = 0, good = 0;
-  for(const s of stocks){
-    if(s.active === false || (s.verdict !== 'buy' && s.verdict !== 'mbuy')) continue;
-    const code = String(s.ticker).split('·')[0].trim();
-    let sym;
-    if(/^\d+$/.test(code)){
-      const a = alpha[code];
-      if(!a){ needsLookup.push({ code, name: s.name }); continue; }
-      sym = 'BSE:' + String(a).replace(/^BSE:/, '');
-    } else if(WL_CONFIRMED[code]) sym = WL_CONFIRMED[code];
-    else if(/[-&]/.test(code)){ sym = 'NSE:' + code.replace(/[-&]/g, '_'); unverified.push(code); }
-    else sym = 'NSE:' + code;
-    if(seen.has(sym)){ notes.push('duplicate symbol skipped: ' + sym); continue; }
-    seen.add(sym);
-    if(s.verdict === 'buy') strong++; else good++;
-    lists['Alba Securities'].push(sym);
-    const v = s.valuation || {};
-    if(typeof v.intrinsicValue === 'number' && v.intrinsicValue > 0 && typeof v.currentPrice === 'number'){
-      const mos = (v.intrinsicValue - v.currentPrice) / v.intrinsicValue * 100;
-      lists[mos >= 0 ? 'Alba - Green' : mos >= -25 ? 'Alba - Orange' : 'Alba - Red'].push(sym);
+  const lists = {}, needsLookup = [], unverified = [], notes = [], lookedUp = new Set();
+  for(const pick of picks){
+    const seen = new Set(); lists[pick.name] = [];
+    for(const s of qualifyingStocks(universe, pick.rules)){
+      const code = String(s.ticker).split('·')[0].trim();
+      let sym;
+      if(/^\d+$/.test(code)){
+        const a = alpha[code];
+        if(!a){ if(!lookedUp.has(code)){ lookedUp.add(code); needsLookup.push({ code, name: s.name }); } continue; }
+        sym = 'BSE:' + String(a).replace(/^BSE:/, '');
+      } else if(WL_CONFIRMED[code]) sym = WL_CONFIRMED[code];
+      else if(/[-&]/.test(code)){ sym = 'NSE:' + code.replace(/[-&]/g, '_'); if(!unverified.includes(code)) unverified.push(code); }
+      else sym = 'NSE:' + code;
+      if(seen.has(sym)){ notes.push('duplicate symbol skipped: ' + sym); continue; }
+      seen.add(sym); lists[pick.name].push(sym);
     }
   }
-  for(const k of WL_NAMES) for(const x of lists[k]) if(/^BSE:\d+$/.test(x)) throw new Error('refusing to send a raw BSE code (' + x + ')');
-  return { lists, needsLookup, unverified, notes, strong, good };
+  for(const k in lists) for(const x of lists[k]) if(/^BSE:\d+$/.test(x)) throw new Error('refusing to send a raw BSE code (' + x + ')');
+  return { lists, needsLookup, unverified, notes };
 }
 
 // A BSE-only stock with no saved TradingView symbol: search by company name and accept ONLY a BSE stock whose
@@ -183,13 +173,36 @@ async function albaWlSyncOne(name, symbols, onDetail){
   return { action: old.length ? 'replaced' : 'created', count: (fin.symbols || []).length, added: symbols.filter(x => !nowSyms.has(x)).length, removed: oldSyms.filter(x => !newSyms.has(x)).length, dropped };
 }
 
+// ---- The strategy picker (checkboxes above the button) ----
+function renderWlPicker(){
+  const host = document.getElementById('wlStrategyPicker'); if(!host) return;
+  host.textContent = '';
+  for(const st of strategies){
+    const ready = st.rules.some(ruleReady);
+    if(!ready) picked.delete(st.id);
+    const label = document.createElement('label'); label.className = 'wl-pick';
+    const box = document.createElement('input'); box.type = 'checkbox'; box.checked = picked.has(st.id); box.disabled = !ready;
+    box.addEventListener('change', () => { if(box.checked) picked.add(st.id); else picked.delete(st.id); });
+    const txt = document.createElement('span'); txt.textContent = st.name + (ready ? '' : ' (no rules yet)');
+    label.append(box, txt); host.appendChild(label);
+  }
+  if(!strategies.length){ const p = document.createElement('p'); p.className = 'upload-hint'; p.textContent = 'No strategies yet. Create one in Strategies first.'; host.appendChild(p); }
+}
+window.addEventListener('alba-strategies-reloaded', renderWlPicker);
+
 async function albaWlRunSync(){
   if(getFiRunning() || !getFiOwner()) return;
   const db = getFiDb();
   setFiPfx('wl_');
-  if(!db){ fiReset('Watchlist sync', WL_STEPS); fiShowResult('err', [{ text: 'The database is not available in this view, so the sync cannot run here.' }], true); return; }
-  setFiRunning(true); fiSetButtons(); fiReset('Syncing TradingView watchlists', WL_STEPS);
-  const job = db.doc('importJobs/watchlist'); let locked = false, current = 'load', stopBeat = () => {};
+  const picks = strategies.filter(x => picked.has(x.id)).map(x => ({ name: x.name.trim(), rules: x.rules }));
+  const steps = [{ key: 'build', label: 'Match the stocks', w: 10 }]
+    .concat(picks.map((p, i) => ({ key: 'l' + i, label: p.name, w: Math.max(1, 80 / picks.length) })), [{ key: 'old', label: 'Remove the old fixed lists', w: 10 }]);
+  if(!db){ fiReset('Watchlist sync', steps); fiShowResult('err', [{ text: 'The database is not available in this view, so the sync cannot run here.' }], true); return; }
+  if(!picks.length){ fiReset('Watchlist sync', steps); fiShowResult('err', [{ text: 'Tick at least one strategy to sync.' }], true); return; }
+  const names = picks.map(p => p.name);
+  if(names.some(n => !n) || new Set(names).size !== names.length){ fiReset('Watchlist sync', steps); fiShowResult('err', [{ text: 'Each ticked strategy needs its own name, because the TradingView list takes the strategy name.' }], true); return; }
+  setFiRunning(true); fiSetButtons(); fiReset('Syncing TradingView watchlists', steps);
+  const job = db.doc('importJobs/watchlist'); let locked = false, current = 'build', stopBeat = () => {};
   const startedAt = new Date().toISOString(), logId = sanitizeDocId(startedAt);
   const logDb = getDb();
   const saveLog = async rec => {
@@ -202,40 +215,47 @@ async function albaWlRunSync(){
     await albaFiRetry(() => job.set({ status: 'running', startedAt, owner: tabId })); locked = true; stopBeat = startBeat(job);
     await saveLog({ startedAt, status: 'running', triggeredBy: 'manual', note: 'Running from the page.' });
 
-    current = 'load'; fiSet('load', 'running', '', 0);
-    const raw = await albaFiLoadRaw(db, (d, n) => fiSet('load', 'running', d + ' / ' + n + ' parts', d / n));
+    current = 'build'; fiSet('build', 'running', '', 0.5);
     let bse = {};
     try { const bs = await albaFiRetry(() => db.doc('stockMeta/bseAlpha').get()); if(bs && bs.exists) bse = bs.data() || {}; } catch(e){ console.error('Could not read the BSE symbol map', e); }
-    fiSet('load', 'done', raw.stocks.length.toLocaleString('en-IN') + ' stocks');
-
-    current = 'build'; fiSet('build', 'running', '', 0.5);
-    let plan = albaWlBuild(raw.stocks, bse);
+    let plan = albaWlBuild(stocks, bse, picks);
     if(plan.needsLookup.length){
       fiSet('build', 'running', 'Looking up ' + plan.needsLookup.length + ' BSE symbol(s)…', 0.5);
       const found = await albaWlResolveBse(plan.needsLookup);
       if(Object.keys(found).length){
         try { await albaFiRetry(() => db.doc('stockMeta/bseAlpha').update(found)); } catch(e){ console.error('Could not save the new BSE symbols', e); }
-        Object.assign(bse, found); plan = albaWlBuild(raw.stocks, bse);
+        Object.assign(bse, found); plan = albaWlBuild(stocks, bse, picks);
       }
     }
-    if(plan.lists['Alba Securities'].length < 50) throw new Error('only ' + plan.lists['Alba Securities'].length + ' stocks qualify, which looks wrong, so nothing was changed in TradingView');
-    fiSet('build', 'done', WL_NAMES.map(n => plan.lists[n].length).join(' / ') + ' symbols');
+    fiSet('build', 'done', names.map(n => plan.lists[n].length).join(' / ') + ' symbols');
 
-    let added = 0, removed = 0; const dropped = [];
-    for(let i = 0; i < WL_NAMES.length; i++){
-      const name = WL_NAMES[i], key = 'l' + i; current = key;
+    let added = 0, removed = 0, total = 0; const dropped = [], empty = [];
+    for(let i = 0; i < picks.length; i++){
+      const name = names[i], key = 'l' + i; current = key;
+      if(!plan.lists[name].length){ empty.push(name); done.push(name + ': no stock matches, list left as it is'); fiSet(key, 'done', 'no match'); continue; }
       fiSet(key, 'running', plan.lists[name].length + ' symbols', 0.1);
       const r = await albaWlSyncOne(name, plan.lists[name], d => fiSet(key, 'running', d, 0.5));
-      added += r.added; removed += r.removed; r.dropped.forEach(x => dropped.push(x));
+      added += r.added; removed += r.removed; total += r.count; r.dropped.forEach(x => dropped.push(x));
       done.push(name + ': ' + (r.action === 'unchanged' ? r.count + ' symbols, unchanged' : r.count + ' symbols (+' + r.added + ' / −' + r.removed + ')'));
       fiSet(key, 'done', r.action === 'unchanged' ? 'unchanged' : '+' + r.added + ' / −' + r.removed);
     }
-    const partial = dropped.length > 0 || plan.needsLookup.length > 0;
-    const note = WL_NAMES.map(n => n + ' ' + plan.lists[n].length).join(', ') + '.' + (plan.needsLookup.length ? ' No TradingView symbol yet for ' + plan.needsLookup.length + ' BSE-only stocks.' : '');
-    await saveLog({ startedAt, finishedAt: new Date().toISOString(), status: partial ? 'partial' : 'completed', triggeredBy: 'manual', qualifiedCount: plan.strong + plan.good, strongBuyCount: plan.strong, moderateBuyCount: plan.good, added, removed, droppedTickers: dropped.concat(plan.needsLookup.map(x => x.code)), note });
+
+    current = 'old'; fiSet('old', 'running', '', 0.5);
+    const gone = [];
+    for(const old of WL_OLD){
+      if(names.includes(old)) continue;
+      const before = await wlRead(), hit = wlCustom(before).filter(l => l.name === old);
+      if(hit.length === 1){ await wlDeleteChecked(hit[0], before); gone.push(old); }
+    }
+    if(gone.length) done.push('Removed old lists: ' + gone.join(', '));
+    fiSet('old', 'done', gone.length ? gone.length + ' removed' : 'none found');
+
+    const partial = dropped.length > 0 || plan.needsLookup.length > 0 || empty.length > 0;
+    const note = names.map(n => n + ' ' + plan.lists[n].length).join(', ') + '.' + (plan.needsLookup.length ? ' No TradingView symbol yet for ' + plan.needsLookup.length + ' BSE-only stocks.' : '');
+    await saveLog({ startedAt, finishedAt: new Date().toISOString(), status: partial ? 'partial' : 'completed', triggeredBy: 'manual', qualifiedCount: total, added, removed, droppedTickers: dropped.concat(plan.needsLookup.map(x => x.code)), note });
     await albaFiRetry(() => job.set({ status: 'done', finishedAt: new Date().toISOString(), note })); locked = false;
     const lines = [{ text: partial ? 'Sync finished with gaps.' : 'Sync complete.', cls: 'fi-line fi-line-strong' }, ...done.map(t => ({ text: t })),
-      { text: plan.strong + ' Strong + ' + plan.good + ' Good stocks qualify · ' + added + ' added · ' + removed + ' removed in total.' }];
+      { text: picks.length + ' strateg' + (picks.length === 1 ? 'y' : 'ies') + ' · ' + added + ' added · ' + removed + ' removed in total.' }];
     if(dropped.length) lines.push({ text: 'TradingView could not resolve: ' + dropped.slice(0, 15).join(', ') + (dropped.length > 15 ? ' … +' + (dropped.length - 15) : '') + '.', cls: 'fi-line fi-line-muted' });
     if(plan.needsLookup.length) lines.push({ text: 'No TradingView symbol yet (left out): ' + plan.needsLookup.slice(0, 8).map(x => x.code + ' ' + x.name).join('; ') + (plan.needsLookup.length > 8 ? ' … +' + (plan.needsLookup.length - 8) : '') + '.', cls: 'fi-line fi-line-muted' });
     if(plan.unverified.length) lines.push({ text: 'Symbols with - or & that were not checked beforehand: ' + plan.unverified.join(', ') + '.', cls: 'fi-line fi-line-muted' });
@@ -252,4 +272,4 @@ async function albaWlRunSync(){
   }
 }
 
-export { albaWlResolveBse, albaWlRunSync };
+export { albaWlResolveBse, albaWlRunSync, renderWlPicker };
