@@ -1,7 +1,5 @@
 // TradingView connector calls: retries, symbol resolution, bar parsing and validation.
-import { dbCapabilityPromise } from '../core/store.js';
-import { BSE_ALPHA_MAP } from './links.js';
-import { pcTickerKey, priceSymbolByTicker } from '../prices/store.js';
+import { isinOf, isinSymbolCached, resolveIsinSymbols } from './isin.js';
 
 // ---- Price and technical refresh from the page (added 2026-10-07) ----
 // Pulls weekly and monthly bars straight from the viewer's TradingView connector (the page declares the `mcp`
@@ -87,23 +85,11 @@ function tvMergeDelta(stored, fetched, bucket){
   if(!overlap) return null;
   return stored.filter(b => key(b[0]) < first).concat(fetched);
 }
+// The TradingView symbol for a stock, found by its ISIN (see tv/isin.js). A stock with no ISIN or no match is an error, not a guess from its code.
 async function tvResolveSymbol(s){
-  const key = pcTickerKey(s);
-  if(priceSymbolByTicker[key]) return priceSymbolByTicker[key];
-  if(!/^\d+$/.test(key)) return 'NSE:' + key.replace(/-/g, '_');
-  if(BSE_ALPHA_MAP[key]) return 'BSE:' + String(BSE_ALPHA_MAP[key]).replace(/^BSE:/, '');
-  // BSE-only stock (ticker is the numeric code): TradingView uses the alpha symbol, found by company name.
-  const p = await tvCall('mcp-tv-search-symbols', { query: s.name, type_filter: 'stock' });
-  const list = (p && p.data && p.data.symbols) || (p && p.symbols) || [];
-  const norm = x => String(x || '').toLowerCase().replace(/\b(limited|ltd|pvt|private)\b\.?/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
-  const want = norm(s.name);
-  const hits = list.filter(r => r && r.exchange === 'BSE' && r.symbol && (norm(r.description).startsWith(want) || want.startsWith(norm(r.description))));
-  if(hits.length === 1){
-    BSE_ALPHA_MAP[key] = hits[0].symbol.replace(/^BSE:/, '');   // remember the bare name for next time (and for the TradingView link)
-    try { const db = await dbCapabilityPromise; if(db){ const ref = db.doc('stockMeta/bseAlpha'); const cur = await ref.get(); const o = {}; o[key] = BSE_ALPHA_MAP[key]; if(cur && cur.exists) await ref.update(o); else await ref.set(o); } } catch(_){}
-  }
-  if(hits.length !== 1) throw new Error('Could not match ' + s.name + ' to a single BSE symbol on TradingView (' + hits.length + ' matches). Use "Research this stock" with price history for this one.');
-  return 'BSE:' + BSE_ALPHA_MAP[key];
+  const missing = await resolveIsinSymbols([s]);
+  if(missing.length) throw new Error(s.name + ' has ' + (isinOf(s) ? 'no TradingView match for ISIN ' + isinOf(s) : 'no ISIN (import the Fundamental CSV to add it)') + '.');
+  return isinSymbolCached(s);
 }
 
 export { TV_SERVER, tvCall, tvErrorText, tvIsFatal, tvIsQuota, tvIstDate, tvMcp, tvMergeDelta, tvResolveSymbol, tvToRows, tvValidate };

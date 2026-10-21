@@ -270,7 +270,7 @@ async function fundScenarios(){
   await half('fund import: the index cannot be published', [{ op: 'set', path: 'stockMeta/main', error: { code: 'not_granted', message: 'index refused' } }], /Could not publish the new data \(not_granted: index refused\)\. Your previous data was put back\./, 5);
   await half('fund import: someone else changes the data meanwhile', [{ op: 'set', prefix: 'stockData/', nth: 1, bumpMeta: true }], /changed by someone else while this import was running \(version 5 → 105\)/, 105);
 
-  await runScenario('fund import: checking the saved data fails after publishing', { cfg: { rules: [{ op: 'get', prefix: 'stockData/', after: 106, error: { code: 'not_granted', message: 'read-back refused' } }] } }, async page => {
+  await runScenario('fund import: checking the saved data fails after publishing', { cfg: { rules: [{ op: 'get', prefix: 'stockData/', after: DS.meta.chunks.length * 2, error: { code: 'not_granted', message: 'read-back refused' } }] } }, async page => {
     await upload(page, 'fund', 'may.csv', fundFileChanged().csv);
     const r = await run(page, 'fund'); const a = await readDb(page);
     ok(r.cls === 'err' && /read-back refused/.test(r.text), 'verify failure is reported: ' + r.text.slice(0, 200));

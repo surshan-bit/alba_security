@@ -35,4 +35,4 @@ dbCapabilityPromise.then(db => db ? db.doc('stockMeta/bseAlpha').get() : null).t
 }).catch(() => {});
 }
 
-export { BSE_ALPHA_MAP, init_tv_links, renderTvChart, tvUrlFor };
+export { init_tv_links, renderTvChart, tvUrlFor };

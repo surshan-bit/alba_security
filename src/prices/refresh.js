@@ -3,7 +3,7 @@ import { dbCapabilityPromise } from '../core/store.js';
 import { sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { priceHistoryStatus } from '../detail/pending.js';
 import { noteFullSaved } from './recent.js';
-import { ensurePriceBars, pcTickerKey, priceApply, priceHistoryByTicker, priceSymbolByTicker } from './store.js';
+import { ensurePriceBars, pcTickerKey, priceApply, priceHistoryByTicker } from './store.js';
 import { weekStartS, monthStartS, weekBucket, monthBucket, TOLERANCE } from '../refresh/historyplan.js';
 import { computeTechnical } from '../engine/technical.js';
 import { tvCall, tvErrorText, tvIstDate, tvMcp, tvMergeDelta, tvResolveSymbol, tvToRows, tvValidate } from '../tv/connector.js';
@@ -77,7 +77,7 @@ async function writeBarDocs(s, db, sym, W, M, o){
 async function saveFullBars(s, W, M){
   const key = pcTickerKey(s), db = await dbCapabilityPromise;
   if(!db) return false;
-  try { await writeBarDocs(s, db, priceSymbolByTicker[key] || await tvResolveSymbol(s), W, M, { delta: false }); return true; }
+  try { await writeBarDocs(s, db, await tvResolveSymbol(s), W, M, { delta: false }); return true; }
   catch(e){ console.error('Could not compact the bars of ' + key, e); return false; }
 }
 // Saves one stock's bars (only the kinds that changed when `o.delta`), then its technical score. Shared by the one-stock fetch above and the batch update.
