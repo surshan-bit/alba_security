@@ -23,20 +23,23 @@ function bandOf(score){ return score >= 8 ? 'buy' : score >= 6 ? 'mbuy' : score 
 function applyFundamentalConfidence(s){
   const m = s && s.fundamentals;
   if(!m || !Array.isArray(m.factors) || !m.factors.length) return;
+  // [factor, score] pairs that count. A factor with no data counts as neutral (half its weight) so missing data neither
+  // flatters nor sinks a stock; the Moat / Governance proxies stay out for every stock alike.
   const ok = [];
   m.factors.forEach(f => {
     const why = exclusionReason(f);
-    if(why) f.excluded = why; else { delete f.excluded; ok.push(f); }
+    if(why) f.excluded = why; else delete f.excluded;
+    if(!why) ok.push([f, typeof f.score === 'number' ? f.score : 0]);
+    else if(!(PROXY_KEYS.has(f.key) && !hasSource(f))) ok.push([f, f.weight / 2]);
   });
-  const num = f => (typeof f.score === 'number' ? f.score : 0);
   const sub = {};
   Object.keys(CATEGORY_KEYS).forEach(cat => {
-    const fs = ok.filter(f => f.category === cat), w = fs.reduce((a, f) => a + f.weight, 0);
-    sub[CATEGORY_KEYS[cat]] = w > 0 ? r2(fs.reduce((a, f) => a + num(f), 0) / w * 10) : null;
+    const fs = ok.filter(([f]) => f.category === cat), w = fs.reduce((a, [f]) => a + f.weight, 0);
+    sub[CATEGORY_KEYS[cat]] = w > 0 ? r2(fs.reduce((a, [, v]) => a + v, 0) / w * 10) : null;
   });
-  const w = ok.reduce((a, f) => a + f.weight, 0);
+  const w = ok.reduce((a, [f]) => a + f.weight, 0);
   if(w <= 0) return;   // nothing can be relied on: leave the stored score as it was
-  const score = r2(ok.reduce((a, f) => a + num(f), 0) / w * 10);
+  const score = r2(ok.reduce((a, [, v]) => a + v, 0) / w * 10);
   s.score = score; s.verdict = bandOf(score);
   m.scoringBreakdown = Object.assign({}, m.scoringBreakdown, sub, { overallComposite: score });
 }

@@ -265,8 +265,7 @@ function scoreOne(r, pct, moatPct) {
   let profScore = weightedPartial(1.8, [
     { coef: 0.654, pct: pct.roceEff.get(r) }, { coef: 0.514, pct: pct.roeEff.get(r) }, { coef: 0.631, pct: pct.opm.get(r) },
   ]);
-  if (profScore != null) profScore *= eqDiscount;
-  factors.push({ key: 'prof', label: 'Profitability & Capital Efficiency', weight: 1.8, score: profScore, note: eqNote || undefined });
+  factors.push({ key: 'prof', label: 'Profitability & Capital Efficiency', weight: 1.8, score: profScore });
 
   let growthScore = weightedPartial(1.125, [
     { coef: 0.3977, pct: pct.sales3.get(r) }, { coef: 0.3200, pct: pct.profit3.get(r) }, { coef: 0.6896, pct: pct.profitTTM.get(r) },
@@ -305,7 +304,8 @@ function scoreOne(r, pct, moatPct) {
   }
   factors.push({ key: 'gov', label: 'Management & Governance', weight: 0.9, score: govScore });
 
-  const growthPts = [r.profitGrowthTTM, r.profitGrowth3, r.profitGrowth5].filter(v => v != null);
+  // A TTM spike is already discounted in Growth; it is left out here so it is not punished a second time.
+  const growthPts = [eqDiscount < 1 ? null : r.profitGrowthTTM, r.profitGrowth3, r.profitGrowth5].filter(v => v != null);
   let predictScore = null, predictNote;
   if (growthPts.length >= 2) {
     const dispersion = Math.max(...growthPts) - Math.min(...growthPts);
