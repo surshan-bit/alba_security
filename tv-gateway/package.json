@@ -1,0 +1,7 @@
+{
+  "name": "alba-tv-gateway",
+  "private": true,
+  "type": "module",
+  "description": "Spike: a Cloudflare Worker that signs in to the TradingView MCP server (OAuth 2.1) and calls one tool. Not part of the dashboard build.",
+  "scripts": { "test": "node --test test/gateway.test.js" }
+}

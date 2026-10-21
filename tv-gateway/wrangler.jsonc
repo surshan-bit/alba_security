@@ -1,0 +1,9 @@
+{
+  "name": "alba-tv-gateway",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "vars": { "TV_MCP_URL": "https://mcp.tradingview.com/mcp" },
+  // Create the namespace once:  npx wrangler kv namespace create TV_KV   then paste its id below.
+  "kv_namespaces": [{ "binding": "TV_KV", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }]
+}
