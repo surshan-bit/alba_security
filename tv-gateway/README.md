@@ -10,10 +10,11 @@ and call a tool for the owner. It is deployed on its own and is not part of the 
 - `/tv/search?q=titan`  calls `mcp-tv-search-symbols`.
 Access tokens are refreshed automatically with the refresh token.
 
-## Run the spike (about 10 minutes)
-1. `cd tv-gateway && npx wrangler kv namespace create TV_KV`, paste the id into `wrangler.jsonc`.
-2. `npx wrangler secret put SPIKE_KEY` (a long random text, 16+ characters). `npx wrangler deploy`.
-3. Open `https://alba-tv-gateway.<subdomain>.workers.dev/tv/connect?key=<SPIKE_KEY>`, sign in to TradingView, allow.
+## Run the spike (no coding, about 15 minutes, all in the Cloudflare dashboard)
+1. Cloudflare dashboard, Workers & Pages, **Create**, **Import a repository**, pick `alba_security`. Name it `alba-tv-gateway`, set the
+   **root directory** to `tv-gateway`, keep the default deploy command (`npx wrangler deploy`). Deploy. The storage (`TV_KV`) is created on the first deploy.
+2. Open the new Worker, **Settings, Variables and Secrets**, add a **Secret** named `SPIKE_KEY` (a long random text, 16+ characters). Save and deploy.
+3. Open `https://alba-tv-gateway.<your-subdomain>.workers.dev/tv/connect?key=<SPIKE_KEY>`, sign in to TradingView, allow.
 4. Open `/tv/tools?key=...` then `/tv/search?q=titan&key=...`.
 
 ## What the spike answers
