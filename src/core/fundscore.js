@@ -19,19 +19,28 @@ function exclusionReason(f){
 }
 const r2 = x => Math.round(x * 100) / 100;
 function bandOf(score){ return score >= 8 ? 'buy' : score >= 6 ? 'mbuy' : score >= 5 ? 'hold' : 'avoid'; }
+// [factor, score] pairs that count. A factor with no data counts as neutral (half its weight) so missing data neither
+// flatters nor sinks a stock; the Moat / Governance proxies stay out for every stock alike.
+function countedPairs(factors){
+  const ok = [];
+  factors.forEach(f => {
+    const why = exclusionReason(f);
+    if(!why) ok.push([f, typeof f.score === 'number' ? f.score : 0]);
+    else if(!(PROXY_KEYS.has(f.key) && !hasSource(f))) ok.push([f, f.weight / 2]);
+  });
+  return ok;
+}
+// The score the factors add up to (what applyFundamentalConfidence stores); the data integrity check compares with it.
+function expectedScore(factors){
+  const ok = countedPairs(factors), w = ok.reduce((a, [f]) => a + f.weight, 0);
+  return w > 0 ? r2(ok.reduce((a, [, v]) => a + v, 0) / w * 10) : null;
+}
 // Marks every factor (f.excluded = reason, or removed) and rewrites the stock's score, verdict and block scores.
 function applyFundamentalConfidence(s){
   const m = s && s.fundamentals;
   if(!m || !Array.isArray(m.factors) || !m.factors.length) return;
-  // [factor, score] pairs that count. A factor with no data counts as neutral (half its weight) so missing data neither
-  // flatters nor sinks a stock; the Moat / Governance proxies stay out for every stock alike.
-  const ok = [];
-  m.factors.forEach(f => {
-    const why = exclusionReason(f);
-    if(why) f.excluded = why; else delete f.excluded;
-    if(!why) ok.push([f, typeof f.score === 'number' ? f.score : 0]);
-    else if(!(PROXY_KEYS.has(f.key) && !hasSource(f))) ok.push([f, f.weight / 2]);
-  });
+  m.factors.forEach(f => { const why = exclusionReason(f); if(why) f.excluded = why; else delete f.excluded; });
+  const ok = countedPairs(m.factors);
   const sub = {};
   Object.keys(CATEGORY_KEYS).forEach(cat => {
     const fs = ok.filter(([f]) => f.category === cat), w = fs.reduce((a, [f]) => a + f.weight, 0);
@@ -43,4 +52,4 @@ function applyFundamentalConfidence(s){
   s.score = score; s.verdict = bandOf(score);
   m.scoringBreakdown = Object.assign({}, m.scoringBreakdown, sub, { overallComposite: score });
 }
-export { applyFundamentalConfidence, hasSource };
+export { applyFundamentalConfidence, expectedScore, hasSource };

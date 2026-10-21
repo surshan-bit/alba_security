@@ -502,6 +502,10 @@ test('fix: the technical valuation anchor is refreshed on every fundamental impo
     const t = mk(0.2); FS.applyFundamentalConfidence(t);   // a genuinely low score still counts
     assert.strictEqual(t.fundamentals.factors[1].excluded, undefined); assert.strictEqual(t.score, 5);
   });
+  test('fix: the data integrity check recomputes the same score, neutral factors included', () => {
+    const s = { fundamentals: { factors: [fac('fin', 'Traditional', 1, 0.8), fac('dcf', 'Valuation', 1, 0)], total: 10 }, score: 0 }; FS.applyFundamentalConfidence(s);
+    assert.strictEqual(s.score, 6.5); assert.strictEqual(FS.expectedScore(s.fundamentals.factors), s.score);
+  });
 }
 test('fix: a flat price series has no RSI (not 100)', () => {
   const TECH = load('src/engine/technical.js');

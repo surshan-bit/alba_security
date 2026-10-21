@@ -52,7 +52,7 @@ function renderFundFactorCell(f){
         ${f.excluded ? '<div class="fund-cell-score fs-pending">Not scored</div>' : `<div class="fund-cell-score ${band}">${f.score.toFixed(2)}<span class="fund-cell-max">/${f.weight}</span></div>`}
       </div>
       ${f.excluded ? '' : `<div class="fund-cell-bar"><i class="${band}" style="width:${pct}%"></i></div>`}
-      ${f.excluded ? `<div class="fund-cell-note fund-cell-excluded">Left out of the score: ${f.excluded}.${PROXY_NOTE_KEYS.has(f.key) ? ' Run Refresh Fundamental Info to add a sourced assessment.' : ''}</div>` : (() => { const biz = fundBusinessSummary(f); return biz ? `<div class="fund-cell-business ${biz.band}">${biz.text}</div>` : ''; })()}
+      ${f.excluded ? `<div class="fund-cell-note fund-cell-excluded">${PROXY_NOTE_KEYS.has(f.key) ? `Left out of the score: ${f.excluded}. Run Refresh Fundamental Info to add a sourced assessment.` : `Counted as an average score: ${f.excluded}.`}</div>` : (() => { const biz = fundBusinessSummary(f); return biz ? `<div class="fund-cell-business ${biz.band}">${biz.text}</div>` : ''; })()}
       ${(() => { const flags = govRedFlags(f); return flags.length ? `<div class="fund-cell-flags">${flags.map(fl => `<div class="fund-flag ${fl.sev}">⚠ ${fl.text}</div>`).join('')}</div>` : ''; })()}
       ${f.excluded ? '' : (() => { const extra = fundNoteExtra(f.note); return extra ? `<div class="fund-cell-note">${extra}</div>` : ''; })()}
       ${isResearched && hasSource(f) ? renderFactorResearchBlock(f) : ''}
