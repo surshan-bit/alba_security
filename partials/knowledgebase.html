@@ -221,6 +221,14 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.219 &middot; 2026-10-21</h3>
+            <ul>
+              <li><strong>Active and inactive stocks.</strong> Every Fundamental CSV import now marks a stock <em>active</em> when it is in the file and <em>inactive</em> when it is not. A stock that comes back in a later file is active again. Nothing is deleted: an inactive stock keeps all its saved data.</li>
+              <li><strong>Inactive stocks are hidden</strong> in Explorer, Analysis, Strategies, the search box, pins and the industry pages, and they are left out of counts, industry averages and rankings.</li>
+              <li><strong>Inactive stocks are no longer refreshed:</strong> the TradingView technical, price, news and live-price updates, the Technical CSV import and the watchlist sync all skip them.</li>
+              <li><strong>Trade Log:</strong> a position you hold in an inactive stock still shows, tagged <em>Inactive</em>, without a link to a stock page.</li>
+            </ul>
+
             <h3>v1.218 &middot; 2026-10-21</h3>
             <ul>
               <li><strong>Technical data is now looked up by ISIN.</strong> Each stock is found on TradingView once, by its ISIN (NSE first, then BSE), and the match is saved so later refreshes do not search again. The old guess from the NSE or BSE code is no longer used for prices, bars, news or live prices.</li>

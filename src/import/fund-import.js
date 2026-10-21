@@ -249,7 +249,7 @@ async function albaFiRunImport(){
     const dataVer = out.nothing ? raw.meta.version : out.plan.newMeta.version;
     if(out.nothing){ fiSet('write', 'done', 'nothing changed'); }
     const mixAfter = res.verdictMix;
-    const note = 'Imported in the page: ' + res.rescored + ' rescored, ' + res.onboarded.length + ' new, ' + res.dropped.length + ' left unchanged (not in the file). Strong ' + (mixBefore.buy || 0) + '→' + (mixAfter.buy || 0) + ', Good ' + (mixBefore.mbuy || 0) + '→' + (mixAfter.mbuy || 0) + ', Hold ' + (mixBefore.hold || 0) + '→' + (mixAfter.hold || 0) + ', Avoid ' + (mixBefore.avoid || 0) + '→' + (mixAfter.avoid || 0) + '.';
+    const note = 'Imported in the page: ' + res.rescored + ' rescored, ' + res.onboarded.length + ' new, ' + res.dropped.length + ' left unchanged, ' + res.inactive.length + ' marked inactive (not in the file). Strong ' + (mixBefore.buy || 0) + '→' + (mixAfter.buy || 0) + ', Good ' + (mixBefore.mbuy || 0) + '→' + (mixAfter.mbuy || 0) + ', Hold ' + (mixBefore.hold || 0) + '→' + (mixAfter.hold || 0) + ', Avoid ' + (mixBefore.avoid || 0) + '→' + (mixAfter.avoid || 0) + '.';
     fiSet('verify', 'running', 'Updating the upload history…', 0.7);
     const upd = { status: 'processed', processedAt: new Date().toISOString(), processedNote: note };
     const logErr = await saveRecord('fund', recId, Object.assign({}, rec, upd), db);
@@ -257,7 +257,7 @@ async function albaFiRunImport(){
     fiSet('verify', 'done', 'data v' + dataVer);
     const lines = [
       { text: out.nothing ? 'Import complete: the file produced no changes to the stored data.' : 'Import complete.', cls: 'fi-line fi-line-strong' },
-      { text: res.rescored.toLocaleString('en-IN') + ' stocks rescored · ' + res.onboarded.length + ' new · ' + res.dropped.length + ' not in the file (left unchanged).' },
+      { text: res.rescored.toLocaleString('en-IN') + ' stocks rescored · ' + res.onboarded.length + ' new · ' + res.inactive.length + ' not in the file (marked inactive: hidden and no longer refreshed).' },
       { text: 'Strong ' + (mixBefore.buy || 0) + ' → ' + (mixAfter.buy || 0) + ' · Good ' + (mixBefore.mbuy || 0) + ' → ' + (mixAfter.mbuy || 0) + ' · Hold ' + (mixBefore.hold || 0) + ' → ' + (mixAfter.hold || 0) + ' · Avoid ' + (mixBefore.avoid || 0) + ' → ' + (mixAfter.avoid || 0) + '.' },
       { text: chk.moved + ' stocks moved by 1.0 point or more (largest move ' + chk.maxMove.toFixed(2) + ').' }
     ];

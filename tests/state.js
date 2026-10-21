@@ -226,9 +226,26 @@ async function tradeScenarios(){
   }, /Trade log persistence unavailable/);
 }
 
+// An inactive stock (not in the latest Fundamental CSV) is hidden from the lists and the search, but a position held in it stays on the Trade Log, tagged.
+async function inactiveScenario(){
+  const off = Object.assign({}, FIXTURE[5], { active: false }), chunks = CHUNKS.map(c => c.map(s => s === FIXTURE[5] ? off : s));
+  const id = sid(symOf(off) + '-2026-10-01');
+  await scenario('inactive stock: hidden everywhere except a held position on the Trade Log', { section: 'trackrecord', chunks }, { [TRADES + '/' + id]: openTrade(off, '2026-10-01', 100, 5) }, async page => {
+    await goto(page, 'trackrecord');
+    await until(page, () => document.querySelectorAll('#tradeLogPanelBody .tl-card').length === 1, null, 'the held position is shown');
+    ok(await page.evaluate(() => /Inactive/.test(document.querySelector('#tradeLogPanelBody .tl-card-name').textContent) && !document.querySelector('#tradeLogPanelBody .tl-name-link')), 'the card is tagged Inactive and has no link to a stock page');
+    ok(await page.evaluate(t => window.__alba.stocks.length === window.__alba.loadInfo.count - 1 && !window.__alba.stocks.some(s => s.ticker === t), off.ticker), 'the stock list the screens use leaves the inactive stock out');
+    await goto(page, 'analysis');
+    await page.fill('#globalSearch', off.name); await page.waitForTimeout(300);
+    ok(await page.evaluate(() => document.querySelectorAll('#globalSuggest .suggest-item, #globalSuggest [role="option"]').length === 0), 'search does not offer the inactive stock');
+    await page.fill('#globalSearch', FIXTURE[4].name); await page.waitForTimeout(300);
+    ok(await page.evaluate(() => document.querySelectorAll('#globalSuggest .suggest-item, #globalSuggest [role="option"]').length > 0), 'search still offers an active stock (so the check above can fail)');
+  });
+}
+
 async function main(){
   base = await srv.listen(); browser = await chromium.launch();
-  try { await pinScenarios(); await tradeScenarios(); } finally { await browser.close(); srv.close(); }
+  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); } finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('state tests FAILED (' + problems.length + ' problems, ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('state tests: ' + checks + ' checks passed');
 }

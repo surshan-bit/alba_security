@@ -41,7 +41,7 @@ function albaWlBuild(stocks, bseMap){
   const needsLookup = [], unverified = [], notes = [], seen = new Set();
   let strong = 0, good = 0;
   for(const s of stocks){
-    if(s.verdict !== 'buy' && s.verdict !== 'mbuy') continue;
+    if(s.active === false || (s.verdict !== 'buy' && s.verdict !== 'mbuy')) continue;
     const code = String(s.ticker).split('·')[0].trim();
     let sym;
     if(/^\d+$/.test(code)){

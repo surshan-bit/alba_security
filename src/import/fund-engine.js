@@ -433,9 +433,11 @@ const exact = new Map(stocks.map(s => [symOf(s), indOf(s)]));
 const { records } = E.scoreCsv(csvText, { exactIndustryBySym: exact });
 const byNse = new Map(), byBse = new Map();
 for (const r of records) { if (r.nseCode) byNse.set(E.normSym(r.nseCode), r); if (r.bseCode) byBse.set(E.normSym(r.bseCode), r); }
-const used = new Set(); let rescored = 0; const dropped = [];
+const used = new Set(); let rescored = 0; const dropped = [], inactive = [];
 for (const s of stocks) {
   const sym = symOf(s); const r = byNse.get(sym) || byBse.get(sym);
+  // In the file = active. A stock missing from the file is marked inactive (kept in the data, hidden and not refreshed); one in the file but unscored stays as it was.
+  if (r) delete s.active; else { s.active = false; inactive.push(s.ticker); }
   if (!r || r.scored.score == null) { dropped.push(s.ticker); continue; }
   used.add(r);
   s.score = r.scored.score; s.verdict = r.scored.verdict; if (r.industryGroup !== '(unclassified)') s.industryGroup = r.industryGroup;
@@ -460,7 +462,7 @@ for (const r of records) {
   onboarded.push(code); needScreenerCheck.push(code); if (/^\d+$/.test(code)) bseOnly.push(code);
 }
   const verdictMix = {}; for(const s of stocks) verdictMix[s.verdict] = (verdictMix[s.verdict] || 0) + 1;
-  return { csvRows: records.length, rescored, onboarded, bseOnly, dropped, verdictMix };
+  return { csvRows: records.length, rescored, onboarded, bseOnly, dropped, inactive, verdictMix };
 }
 
 export { albaApplyFundamental };

@@ -77,6 +77,12 @@ test('tech columns: every field found by header text, in any order, with Trading
   assert.strictEqual(short.monthRsi, 1); assert.strictEqual(short.weekRsi, 2); assert.strictEqual(short.monthMacdLevel, -1);
 });
 
+test('tech score: an inactive stock is not matched or rescored', () => {
+  const csv = tvCsv([['AAA1', 'x', '100', '2.5', '-1', '3', '2', '1', '2', '60', '50']]);
+  const off = Object.assign(ist('AAA1 · Test', 6), { active: false });
+  const r = Te.matchAndScore(csv, [off]);
+  assert.strictEqual(r.matched.length, 0); assert.strictEqual(off.technical, undefined);
+});
 test('tech score: hand-computed composite (all five components present)', () => {
   // month MACD bullish above zero = 1 -> 2.5; week MACD bearish above zero = 0.5 -> 0.75; month RSI 60 -> 2.0; week RSI 50 -> 1.2; valuation 6/10*2 = 1.2
   const csv = tvCsv([['AAA1', 'x', '100', '2.5', '-1', '3', '2', '1', '2', '60', '50']]);
@@ -263,8 +269,8 @@ test('apply: re-scores listed stocks in place, adds new ones with safe defaults,
   for(const k of ['name', 'ticker', 'technical', 'globalFactors']) assert.deepStrictEqual(w0[k], before[0][k], k);
   // the valuation anchor that the technical score uses follows the new valuation factor score
   assert.strictEqual(w0.pillars.val, Math.round(w0.fundamentals.factors.find(f => f.key === 'dcf').score * 10 * 10) / 10); assert.notStrictEqual(w0.pillars.val, 3);
-  // a stock that is not in the file is left exactly alone
-  assert.deepStrictEqual(stocks[2], before[2]);
+  // a stock that is not in the file keeps all its data and is only marked inactive
+  assert.deepStrictEqual(stocks[2], Object.assign({}, before[2], { active: false })); assert.deepStrictEqual(res.inactive, ['GONE · Widgets']);
   // a stock listed by its BSE number matches the file's BSE column
   assert.strictEqual(stocks[3].asof, '2026-10-10');
   // a newly added stock
@@ -348,6 +354,15 @@ test('period move: nothing to report without a price or a bar before the period'
   assert.strictEqual(PM.periodMove(50, [[2000, 0, 0, 0, 40, 1]], ws), null);       // only a bar of the period itself
   assert.strictEqual(PM.periodMove(0, [[500, 0, 0, 0, 40, 1]], ws), null); assert.strictEqual(PM.periodMove(NaN, [[500, 0, 0, 0, 40, 1]], ws), null);
   assert.strictEqual(PM.periodMove(50, [[500, 0, 0, 0, 0, 1], [600, 0, 0, 0, NaN, 1]], ws), null);               // closes that are not usable
+});
+test('apply: a stock in the file is active, one missing from it is marked inactive, and it comes back when it returns', () => {
+  const stocks = [mkStock('KEEP', 'Widgets'), mkStock('GONE', 'Widgets', { active: undefined })];
+  const keep = fundRow('KEEP', 'Alpha', 'Widgets');
+  const res = F.albaApplyFundamental(fundCsv([keep, ...universe.slice(0, 11)]), stocks, '2026-10-10');
+  assert.strictEqual(stocks[0].active, undefined); assert.strictEqual(stocks[1].active, false);
+  assert.deepStrictEqual(res.inactive, [stocks[1].ticker]);
+  const again = F.albaApplyFundamental(fundCsv([keep, fundRow('GONE', 'Alpha', 'Widgets'), ...universe.slice(0, 11)]), stocks, '2026-10-11');
+  assert.strictEqual(stocks[1].active, undefined); assert.deepStrictEqual(again.inactive, []);
 });
 test('apply: BSE-only companies are onboarded under their BSE number and listed as such', () => {
   const stocks = []; const row = fundRow('', 'Alpha', 'Widgets', { 'NSE Code': '', 'BSE Code': '512345' });

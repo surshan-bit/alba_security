@@ -1,6 +1,6 @@
 // Buy / Sell ideas panel (Trade Log): pick a strategy, see the stocks that qualify today ranked by Buy / Hold / Sell call (rules in ideacall.js).
 import { keepScroll } from '../ui/scrollkeep.js';
-import { stockByTickerSymbol, stocks } from '../core/stocks.js';
+import { stockByTickerSymbolAny, stocks } from '../core/stocks.js';
 import { allTrades } from '../core/store.js';
 import { escapeHtml, tickerSymbol } from '../core/util.js';
 import { publishedStrategies } from '../strategies/state.js';
@@ -17,7 +17,7 @@ function openTradeByStock(){
   const m = new Map();
   for(const t of allTrades()){
     if(t.status === 'closed' && t.sell) continue;
-    const s = stockByTickerSymbol.get(t.ticker);
+    const s = stockByTickerSymbolAny.get(t.ticker);
     if(s && !m.has(s)) m.set(s, t);
   }
   return m;

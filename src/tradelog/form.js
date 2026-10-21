@@ -1,5 +1,5 @@
 // Trade Log: add, sell and remove forms.
-import { stockByTickerSymbol, stocks } from '../core/stocks.js';
+import { stockByTickerSymbolAny, stocks } from '../core/stocks.js';
 import { getTrade, getTradeDb } from '../core/store.js';
 import { escapeHtml, formatDate, sanitizeDocId, tickerSymbol } from '../core/util.js';
 import { fundamentalCompleteness, technicalCompleteness } from '../detail/completeness.js';
@@ -143,7 +143,7 @@ async function tlSaveBuy(){
 function tlOpenSellForm(id){
   const t = getTrade(id); const host = document.getElementById('tradeFormHost');
   if(!t || !host) return;
-  const s = stockByTickerSymbol.get(t.ticker);
+  const s = stockByTickerSymbolAny.get(t.ticker);
   const curPrice = s && s.valuation && s.valuation.currentPrice != null ? s.valuation.currentPrice : '';
   host.innerHTML = `
     <div class="tl-form" data-tl-form="sell" data-tl-id="${escapeHtml(id)}">
@@ -167,7 +167,7 @@ async function tlSaveSell(id){
   const price = parseFloat(/** @type {HTMLInputElement} */ (document.getElementById('tlSellPrice')).value);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < t.buy.date){ tlSetMsg('Enter a sell date on or after the buy date.', true); return; }
   if(!(price > 0)){ tlSetMsg('Enter a sell price above 0.', true); return; }
-  const s = stockByTickerSymbol.get(t.ticker);
+  const s = stockByTickerSymbolAny.get(t.ticker);
   const rec = Object.assign({}, t); delete rec._id;
   rec.status = 'closed';
   rec.sell = {
@@ -234,7 +234,7 @@ function init_tradelog_form(){
       const a = /** @type {Element} */ (e.target).closest('a[data-tl-open]');
       if(a){
         e.preventDefault();
-        const s = stockByTickerSymbol.get(a.getAttribute('data-tl-open')), idx = s ? stocks.indexOf(s) : -1;
+        const s = stockByTickerSymbolAny.get(a.getAttribute('data-tl-open')), idx = s ? stocks.indexOf(s) : -1;
         if(idx >= 0) openStockInline(appSections.trackrecord, 'Trade Log', idx);
         return;
       }

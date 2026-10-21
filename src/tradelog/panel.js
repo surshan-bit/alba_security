@@ -1,6 +1,6 @@
 // Trade Log panel: model, cards and table.
 import { keepScroll } from '../ui/scrollkeep.js';
-import { stockByTickerSymbol, verdictLabel } from '../core/stocks.js';
+import { stockByTickerSymbolAny, verdictLabel } from '../core/stocks.js';
 import { allTrades, getTradeDb } from '../core/store.js';
 import { escapeHtml, formatDate, pctChangeSpan } from '../core/util.js';
 import { completenessBadge } from '../detail/completeness.js';
@@ -33,7 +33,7 @@ function tradeReturnPct(t){
   // Realized return for a closed trade, else unrealized return against the stock's current live
   // price (null if the stock can't be matched or has no current price on file).
   if(t.status === 'closed' && t.sell && t.sell.realizedReturnPct != null) return t.sell.realizedReturnPct;
-  const stock = stockByTickerSymbol.get(t.ticker);
+  const stock = stockByTickerSymbolAny.get(t.ticker);
   const livePrice = stock && stock.valuation && stock.valuation.currentPrice;
   if(livePrice == null || !t.buy || !t.buy.price) return null;
   return ((livePrice - t.buy.price) / t.buy.price) * 100;
@@ -96,7 +96,7 @@ function tlTradeModel(t){
   const bs = buy.snapshot || {};
   const isClosed = t.status === 'closed' && !!t.sell;
   const sell = isClosed ? t.sell : null;
-  const live = stockByTickerSymbol.get(t.ticker);
+  const live = stockByTickerSymbolAny.get(t.ticker);
   const livePx = live && live.valuation && live.valuation.currentPrice != null ? live.valuation.currentPrice : null;
   const curPx = isClosed ? sell.price : livePx;
   const isLive = !isClosed && !!live && typeof live.liveAt === 'number' && Date.now() - live.liveAt < 90000;
@@ -128,6 +128,7 @@ function tlTradeModel(t){
 // The company name opens its stock page when the stock is in the dashboard; otherwise it is plain text.
 function nameLink(t, stock){
   const text = escapeHtml(t.name || t.ticker || '');
+  if(stock && stock.active === false) return text + ' <span class="completeness-badge incomplete" title="Not in the latest Fundamental CSV, so it is hidden elsewhere and no longer refreshed">Inactive</span>';
   return stock ? `<a href="#" class="tl-name-link" data-tl-open="${escapeHtml(t.ticker || '')}" title="Open stock details">${text}</a>` : text;
 }
 function tlCardHtml(m){

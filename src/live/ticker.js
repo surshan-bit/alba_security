@@ -2,7 +2,7 @@
 // price from TradingView every 20 seconds, and their price, Margin of Safety, W% CHG and M% CHG cells change in place (the weekly
 // figures are this week's and this month's move against the last close before the week / month began, from the weekly and monthly bars). This is polling, not a
 // WebSocket (the page cannot open one); it saves nothing, so a Live Data Refresh is still what stores prices and bars.
-import { stocks, stockByTickerSymbol } from '../core/stocks.js';
+import { stocks, stockByTickerSymbolAny } from '../core/stocks.js';
 import { allTrades } from '../core/store.js';
 import { renderTradeLogPanel } from '../tradelog/panel.js';
 import { redrawWhenIdle } from '../ui/scrollkeep.js';
@@ -33,7 +33,7 @@ function openTradeIdx(){
   const out = [];
   for(const tr of allTrades()){
     if(tr.status === 'closed' && tr.sell) continue;
-    const s = stockByTickerSymbol.get(tr.ticker), idx = s ? stocks.indexOf(s) : -1;
+    const s = stockByTickerSymbolAny.get(tr.ticker), idx = s ? stocks.indexOf(s) : -1;
     if(idx >= 0 && !out.includes(idx)) out.push(idx);
   }
   return out;
