@@ -179,7 +179,10 @@ function roeEffective(r) { const avg = roeAvg(r); return r.roe != null && avg !=
 function relPe(r) { return (r.pe != null && r.pe > 0 && r.industryPe != null) ? r.industryPe / r.pe : null; }
 // A negative P/E (loss-making) is not a cheap multiple, so it gives no own-history gap.
 function ownHistGap(r) { if (r.histPe5 == null || r.histPe5 <= 0 || r.pe == null || r.pe <= 0) return null; return ((r.histPe5 - r.pe) / r.histPe5) * 100; }
-function reinvestMetric(r) { return r.croic != null ? r.croic : r.roic; }
+// CROIC is cash-based, so heavy capex makes it negative even when operating cash flow is healthy: then ROIC is the fairer read.
+function capexDragsCroic(r) { const fcf = r.fcf3 != null ? r.fcf3 : r.fcf5, ocf = r.ocf3 != null ? r.ocf3 : r.ocf5; return fcf != null && ocf != null && fcf < 0 && ocf > 0 && r.roic != null; }
+function useCroic(r) { return r.croic != null && !capexDragsCroic(r); }
+function reinvestMetric(r) { return useCroic(r) ? r.croic : r.roic != null ? r.roic : r.croic; }
 function marginOfSafetyPct(r) { if (r.intrinsicValue == null || r.intrinsicValue <= 0 || r.currentPrice == null) return null; return ((r.intrinsicValue - r.currentPrice) / r.intrinsicValue) * 100; }
 const groupKey = r => r.industryGroup;
 
@@ -241,6 +244,7 @@ function scoreCsv(csvText, opts) {
     r.scored.moatBasis = moatBasis.get(r) || null;
     r.scored.piotroskiPct = pct.piotroski.get(r) != null ? pct.piotroski.get(r) : null;
     r.scored.govBasis = piotBasis.get(r) || null;
+    r.scored.reinvestCroic = useCroic(r);
   }
   return { records, columnMap: colMap };
 }
@@ -265,8 +269,7 @@ function scoreOne(r, pct, moatPct) {
   let profScore = weightedPartial(1.8, [
     { coef: 0.654, pct: pct.roceEff.get(r) }, { coef: 0.514, pct: pct.roeEff.get(r) }, { coef: 0.631, pct: pct.opm.get(r) },
   ]);
-  if (profScore != null) profScore *= eqDiscount;
-  factors.push({ key: 'prof', label: 'Profitability & Capital Efficiency', weight: 1.8, score: profScore, note: eqNote || undefined });
+  factors.push({ key: 'prof', label: 'Profitability & Capital Efficiency', weight: 1.8, score: profScore });
 
   let growthScore = weightedPartial(1.125, [
     { coef: 0.3977, pct: pct.sales3.get(r) }, { coef: 0.3200, pct: pct.profit3.get(r) }, { coef: 0.6896, pct: pct.profitTTM.get(r) },
@@ -305,7 +308,8 @@ function scoreOne(r, pct, moatPct) {
   }
   factors.push({ key: 'gov', label: 'Management & Governance', weight: 0.9, score: govScore });
 
-  const growthPts = [r.profitGrowthTTM, r.profitGrowth3, r.profitGrowth5].filter(v => v != null);
+  // A TTM spike is already discounted in Growth; it is left out here so it is not punished a second time.
+  const growthPts = [eqDiscount < 1 ? null : r.profitGrowthTTM, r.profitGrowth3, r.profitGrowth5].filter(v => v != null);
   let predictScore = null, predictNote;
   if (growthPts.length >= 2) {
     const dispersion = Math.max(...growthPts) - Math.min(...growthPts);
@@ -397,10 +401,10 @@ function buildFactor(key, r, sc, industry, group, scored) {
     metrics = [['Profit growth TTM', pc(r.profitGrowthTTM)], ['3yr avg', pc(r.profitGrowth3)], ['5yr avg', pc(r.profitGrowth5)]];
     note = 'Mechanically scored on consistency of profit growth across TTM/3yr/5yr windows.';
   } else if (key === 'reinvest') {
-    const useCroic = n(r.croic);
-    metrics = [[useCroic ? 'CROIC' : 'ROIC', pc(useCroic ? r.croic : r.roic)]];
-    note = useCroic ? `Mechanically scored from CROIC (Cash Return on Invested Capital) as a proxy for reinvestment efficiency — ${pc(r.croic)}.`
-      : `Mechanically scored from Return on Invested Capital (ROIC, CROIC unavailable) as a proxy for reinvestment efficiency — ${pc(r.roic)}.`;
+    const croic = scored.reinvestCroic;
+    metrics = [[croic ? 'CROIC' : 'ROIC', pc(croic ? r.croic : r.roic)]];
+    note = croic ? `Mechanically scored from CROIC (Cash Return on Invested Capital) as a proxy for reinvestment efficiency — ${pc(r.croic)}.`
+      : `Mechanically scored from Return on Invested Capital (ROIC) as a proxy for reinvestment efficiency — ${pc(r.roic)}; CROIC is unavailable or held down by capex while operating cash flow is positive.`;
   } else if (key === 'dcf') {
     const mos = scored.mosPct;
     metrics = [['Intrinsic Value (Screener.in)', px0(r.intrinsicValue)], ['Current price', px(r.currentPrice)], ['Margin of safety', n(mos) ? mos.toFixed(1) + '%' : 'n/a'], ['Graham Number', px0(r.graham)], ['NCAVPS', px(r.ncavps)]];

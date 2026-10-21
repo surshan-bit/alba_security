@@ -208,7 +208,7 @@ async function fundScenarios(){
     ok(allDone(r) && r.pct === '100%', 'all six steps done at 100%: ' + JSON.stringify(r.steps.map(x => x[0])) + ' ' + r.pct);
     ok(r.lines[0] === 'Import complete.', 'first line: ' + r.lines[0]);
     ok(r.text.includes(`${fmtIn(exp.res.rescored)} stocks rescored · 3 new · 5 not in the file`), 'summary line: ' + r.lines[1]);
-    ok(/Strong 2 → \d+ · Good 184 → \d+/.test(r.text), 'verdict mix line: ' + r.lines[2]);
+    ok(/Strong 2 → \d+ · Good 256 → \d+/.test(r.text), 'verdict mix line: ' + r.lines[2]);
     ok(/New: NEWA, NEWB, NEWC/.test(r.text), 'new tickers are listed');
     const a = await readDb(page);
     eq(a.meta.version, 6, 'version bumped once'); eq(a.meta.count, 2007, 'count = old + new'); eq(a.stocks.size, 2007, 'stocks stored');

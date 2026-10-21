@@ -217,12 +217,26 @@ test('fund peers: a better stock never ranks below a worse one on the same metri
   assert.strictEqual(rec.TIE.scored.moatPct, rec.R0.scored.moatPct);
   near(rec.R11.scored.moatPct, 100);
 });
-test('fund scoring: a profit spike far above its multi-year trend is discounted, and the factor says so', () => {
+test('fund scoring: a profit spike far above its multi-year trend is discounted once (in Growth), and the factor says so', () => {
   const base = { 'Profit growth 3Years': 10, 'Profit growth 5Years': 10 };
-  const mk = ttm => { const rows = []; for(let i = 0; i < 12; i++) rows.push(fundRow('S' + i, 'Alpha', 'Widgets', Object.assign({}, base, { 'Profit growth': i === 0 ? ttm : 12 }))); return Fe.scoreCsv(fundCsv(rows), {}).records[0].scored.factors.find(f => f.key === 'prof'); };
+  const mk = ttm => { const rows = []; for(let i = 0; i < 12; i++) rows.push(fundRow('S' + i, 'Alpha', 'Widgets', Object.assign({}, base, { 'Profit growth': i === 0 ? ttm : 12 }))); return Fe.scoreCsv(fundCsv(rows), {}).records[0].scored.factors.find(f => f.key === 'growth'); };
   assert.strictEqual(mk(12).note, undefined);
   assert.ok(/0\.8x/.test(mk(25).note));      // 2.5x the trend
   assert.ok(/0\.55x/.test(mk(40).note));     // 4x the trend
+});
+test('fund scoring: a TTM spike does not touch Profit or Predict (it is discounted once, in Growth)', () => {
+  const rows = []; for(let i = 0; i < 12; i++) rows.push(fundRow('S' + i, 'Alpha', 'Widgets', { 'Profit growth 3Years': 10, 'Profit growth 5Years': 10, 'Profit growth': 12 }));
+  const get = ttm => { const rs = rows.map((r, i) => i ? r : Object.assign({}, r, { 'Profit growth': ttm })); const f = Fe.scoreCsv(fundCsv(rs), {}).records[0].scored.factors; return k => f.find(x => x.key === k).score; };
+  const calm = get(12), spike = get(40);
+  assert.strictEqual(spike('prof'), calm('prof'));
+  assert.strictEqual(spike('predict'), 0.68 * 0.9);   // 3yr and 5yr alone, with the two-window haircut
+});
+test('fund scoring: capex-heavy company (negative FCF, positive operating cash flow) is judged on ROIC, not CROIC', () => {
+  const rows = []; for(let i = 0; i < 12; i++) rows.push(fundRow('S' + i, 'Alpha', 'Widgets'));
+  const get = over => { const rs = rows.map((r, i) => i ? r : Object.assign({}, r, over)); return Fe.scoreCsv(fundCsv(rs), {}).records[0].scored.factors.find(x => x.key === 'reinvest').score; };
+  const cash = { 'Free cash flow 3years': -50, 'Operating cash flow 3years': 100, 'Return on invested capital': 30 };
+  assert.strictEqual(get(Object.assign({ 'CROIC': -5 }, cash)), get(Object.assign({ 'CROIC': 30 }, cash)));
+  assert.ok(get({ 'CROIC': -5, 'Free cash flow 3years': 50, 'Operating cash flow 3years': 100, 'Return on invested capital': 30 }) < get(Object.assign({ 'CROIC': -5 }, cash)));   // healthy FCF keeps the negative CROIC
 });
 test('fund scoring: sparse data is rescaled over what is present', () => {
   const sparse = fundRow('SPR', 'Alpha', 'Widgets', Object.fromEntries(FUND_HEADER.filter(h => !/^(Name|BSE Code|NSE Code|ISIN Code|Industry|Industry Group|Return on equity)$/.test(h)).map(h => [h, ''])));
@@ -481,10 +495,10 @@ test('fix: the technical valuation anchor is refreshed on every fundamental impo
 {
   const FS = load('src/core/fundscore.js');
   const fac = (key, category, weight, score, extra) => Object.assign({ key, category, weight, score, name: key, metrics: [['x', '1']], note: '' }, extra || {});
-  test('fix: a factor with no data (stored as 0) is left out and the score is rescaled over the rest', () => {
+  test('fix: a factor with no data (stored as 0) counts as neutral, not left out and not worst', () => {
     const mk = z => ({ fundamentals: { factors: [fac('fin', 'Traditional', 1, 0.8), fac('dcf', 'Valuation', 1, z)], total: 10 }, score: 0 });
     const s = mk(0); FS.applyFundamentalConfidence(s);
-    assert.strictEqual(s.fundamentals.factors[1].excluded, 'not enough data to score this factor'); assert.strictEqual(s.score, 8);
+    assert.strictEqual(s.fundamentals.factors[1].excluded, 'not enough data to score this factor'); assert.strictEqual(s.score, 6.5);
     const t = mk(0.2); FS.applyFundamentalConfidence(t);   // a genuinely low score still counts
     assert.strictEqual(t.fundamentals.factors[1].excluded, undefined); assert.strictEqual(t.score, 5);
   });
