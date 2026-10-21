@@ -213,7 +213,7 @@ async function fundScenarios(){
     eq(a.meta.version, 6, 'version bumped once'); eq(a.meta.count, 2007, 'count = old + new'); eq(a.stocks.size, 2007, 'stocks stored');
     sameStocks(a.stocks, exp.list, 'imported list equals what the engine produces');
     // untouched stocks are byte-for-byte what they were; the five missing from the file are left alone
-    for(const code of f.dropped) ok(canon(a.stocks.get(code)) === canon(DS.stocks.find(s => symOf(s) === code)), 'a stock not in the file is left unchanged: ' + code);
+    for(const code of f.dropped) ok(canon(a.stocks.get(code)) === canon(Object.assign({}, DS.stocks.find(s => symOf(s) === code), { active: false })), 'a stock not in the file keeps its data and is marked inactive: ' + code);
     ok(JSON.stringify(Object.keys(a.meta.index).sort()) === JSON.stringify([...a.stocks.keys()].map(sid).sort()), 'the index lists every stock exactly once');
     ok(a.meta.chunks.every(c => a.chunkDocs[c] && a.chunkDocs[c].count === a.chunkDocs[c].stocks.length && JSON.stringify(a.chunkDocs[c]).length < 240000), 'every chunk is consistent and under the size limit');
     const writes = await page.evaluate(() => window.__sets.filter(p => p.startsWith('stockData/')));

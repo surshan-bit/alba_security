@@ -1,6 +1,7 @@
 // All stocks' stored weekly and monthly bars, read in one go (about 1.5 MB) the first time a feature needs them
 // (learning rules, judging tracked picks) and kept for the session. -> Map(symbol -> { w, m, fetchedAt }).
 import { dbCapabilityPromise } from '../core/store.js';
+import { stockByTickerSymbolAny } from '../core/stocks.js';
 import { loadRecentBars } from '../prices/store.js';
 import { withRecent } from '../prices/recent.js';
 
@@ -22,6 +23,7 @@ async function loadPriceSet(force){
       out.set(x.ticker, e);
     });
   }
+  out.forEach((e, key) => { const s = stockByTickerSymbolAny.get(key); if(s && s.active === false) out.delete(key); });   // inactive stocks are left out of strategies
   out.forEach((e, key) => {   // the recent bars saved in chunks go on top of each stock's own documents
     const w = withRecent(key, { '1W': e.w, '1M': e.m }, e.fetchedAt);
     e.w = w.bars['1W']; e.m = w.bars['1M']; e.fetchedAt = w.fetched;

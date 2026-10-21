@@ -99,6 +99,7 @@ function matchAndScore(csvText, stocks, bseAlphaMap) {
   const frozen = [];
 
   for (const s of stocks) {
+    if (s.active === false) continue;   // an inactive stock is not in the technical update
     const rawSym = tickerSymbol(s.ticker);
     const isBseNumeric = /^\d+$/.test(rawSym);
     let csvRow = symbolIndex.get(rawSym);

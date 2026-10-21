@@ -31,7 +31,7 @@ const docIdOf = s => (tickerOf(s).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_') || 'x');
 const dirFiles = d => fs.existsSync(d) ? fs.readdirSync(d).filter(f => f.endsWith('.json')).map(f => path.join(d, f)) : [];
 
 const stocks = [];
-for(const f of dirFiles(path.join(DATA, 'stockData')).sort()) stocks.push(...(readJson(f).stocks || []));
+for(const f of dirFiles(path.join(DATA, 'stockData')).sort()) stocks.push(...(readJson(f).stocks || []).filter(s => s.active !== false));   // inactive stocks are not refreshed
 const isinMap = fs.existsSync(path.join(DATA, 'stockMeta', 'isinSymbol.json')) ? readJson(path.join(DATA, 'stockMeta', 'isinSymbol.json')) : {};
 const updates = new Map();
 for(const f of dirFiles(path.join(DATA, 'stockUpdates'))) updates.set(path.basename(f, '.json'), readJson(f));
