@@ -163,6 +163,17 @@ async function businessTests(browser){
   ok(await page.evaluate(() => document.getElementById('section-business').classList.contains('active') && !document.getElementById('section-business').contains(document.getElementById('detail'))) && (await page.locator('.biz-detail').count()) === 1, 'business: Back returns to the page with the industry still open');
   await page.locator('.biz-row').first().click();
   ok((await page.locator('.biz-detail').count()) === 0, 'business: clicking again closes it');
+  { // the industry page: factors, global & macro, charts, news timeline and stocks, with a way back
+    const name = await page.locator('.biz-row .biz-name').first().evaluate(td => td.firstChild.textContent.trim());
+    await page.locator('.biz-open').first().click(); await page.waitForTimeout(300);
+    const got = await page.evaluate(() => ['jump-ind-factors', 'jump-ind-global', 'jump-ind-charts', 'jump-ind-news', 'jump-ind-stocks'].map(id => !!document.querySelector('#detail #' + id)));
+    ok(got.every(Boolean) && (await page.locator('#detail .detail-name').innerText()) === name && (await page.locator('#detail .biz-row, .biz-detail').count()) === 0, 'industry page: opens with factors, global & macro, charts, news and stocks (' + name + ')');
+    ok((await page.locator('#detail #jump-ind-stocks .strat-row').count()) >= 1 && /Back to Explorer/.test(await page.locator('#detailBackBtn').innerText()), 'industry page: lists its stocks and has a way back');
+    await page.locator('#jump-ind-stocks .strat-row').first().click(); await page.waitForTimeout(300);
+    ok((await page.locator('#detail .detail-jump-ticker').count()) >= 1, 'industry page: clicking a stock opens its page');
+    await page.locator('#detailBackBtn').click(); await page.waitForTimeout(300);
+    ok(await page.evaluate(() => document.getElementById('section-business').classList.contains('active') && !document.getElementById('section-business').contains(document.getElementById('detail'))), 'industry page: Back returns to the Explorer');
+  }
   { // Strategy: none by default; choosing one counts its stocks per industry, highlights them and lists them first when open, nothing removed
     ok(!/Matching/i.test(await page.locator('.biz-table > thead').innerText()) && !/Matched \d+ of/.test(await page.locator('#businessBody').innerText()), 'business: no strategy chosen, so no matching columns');
     const before = await page.locator('.biz-row').count();

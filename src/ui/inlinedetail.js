@@ -4,6 +4,7 @@
 import { detailEl } from '../core/dom.js';
 import { stocks } from '../core/stocks.js';
 import { renderDetail, setDetailBackTo } from '../detail/render.js';
+import { renderIndustryDetail } from '../industry/render.js';
 import { syncStockHash } from './deeplink.js';
 import { tickerSymbol } from '../core/util.js';
 import { recordView } from './viewstack.js';
@@ -60,4 +61,21 @@ function openStockInline(section, label, idx){
   takeKeyboardFocus();
 }
 
-export { closeInlineDetail, inlineOpenIn, openStockInline };
+// Opens an industry's (or industry group's) detail page the same way: in place of the page's content, with Back / Esc to return.
+function openIndustryInline(section, label, by, name){
+  const scroll = current ? current.scroll : window.scrollY;
+  if(!current){
+    const host = document.createElement('div');
+    host.className = 'inline-detail-host';
+    section.appendChild(host);
+    section.classList.add('inline-detail-open');
+    host.appendChild(detailEl);
+    current = { section, host, scroll };
+  }
+  setDetailBackTo({ label, onBack: () => { const key = section.id.replace(/^section-/, ''); closeInlineDetail(true); recordView({ s: key }); } });
+  renderIndustryDetail(by, name, label, (idx) => openStockInline(section, label, idx));
+  window.scrollTo(0, 0);
+  takeKeyboardFocus();
+}
+
+export { closeInlineDetail, inlineOpenIn, openIndustryInline, openStockInline };
