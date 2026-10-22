@@ -73,7 +73,7 @@ async function syncPrefs(){
     const dbAt = d ? (Date.parse(d.updatedAt) || 0) : 0;
     if(d && localAt > dbAt){
       const o = prefsObject(); o.updatedAt = new Date().toISOString();
-      const t = o.theme; if(t === 'light' || t === 'indigo' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      const t = o.theme; if(t === 'light' || t === 'indigo' || t === 'white' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
       await ref.set(o);
       return;
     }
@@ -83,7 +83,7 @@ async function syncPrefs(){
         if(d[field] === undefined) continue;
         try { localStorage.setItem(k, kind === 'json' ? JSON.stringify(d[field]) : String(d[field])); } catch(e){}
       }
-      if(d.theme === 'light' || d.theme === 'indigo' || d.theme === 'dark') document.documentElement.setAttribute('data-theme', d.theme);
+      if(d.theme === 'light' || d.theme === 'indigo' || d.theme === 'white' || d.theme === 'dark') document.documentElement.setAttribute('data-theme', d.theme);
     } else {
       const o = prefsObject();
       if(Object.keys(o).length > 1){ o.updatedAt = new Date().toISOString(); await ref.set(o); }

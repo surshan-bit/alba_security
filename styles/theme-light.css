@@ -4,95 +4,106 @@
    readable text and clear surfaces, buttons with white text on the purple accent, clearer input borders, banded grid rows, the same font as Dark.
    Reference: the Screener site (warm sand page, cream cards, purple accent). Kept last in the cascade so it wins ties.
    Every selector starts with the same prefix, so nothing here can touch the Dark theme. */
-:root:is([data-theme="indigo"],[data-theme="light"]){color-scheme:light;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]){color-scheme:light;}
 /* Type: the Light theme uses the same font as Dark (set in 01-theme-and-base.css); no override here. */
 /* Top bar: cream like the cards, with a clear line under it; the brand reads as text, not as a faded label. */
-:root:is([data-theme="indigo"],[data-theme="light"]) .sidebar{box-shadow:0 0 40px rgba(25,55,100,.18);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .sidebar-overlay{background:rgba(15,35,70,.35);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .nav-item:hover,:root:is([data-theme="indigo"],[data-theme="light"]) .nav-item.active{background:color-mix(in srgb,var(--accent) 9%,var(--panel));}
-:root:is([data-theme="indigo"],[data-theme="light"]) .nav-item.active{color:var(--accent);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .sidebar{box-shadow:0 0 40px rgba(25,55,100,.18);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .sidebar-overlay{background:rgba(15,35,70,.35);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .nav-item:hover,:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .nav-item.active{background:color-mix(in srgb,var(--accent) 9%,var(--panel));}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .nav-item.active{color:var(--accent);}
 /* Cards: only the real cards get the soft shadow. The wrapper panels of the flat layout (filters, Analysis / Explorer / Strategies panels,
    the Settings and Data Refresh wrappers) are deliberately outline-free with no padding, so they must stay flat. */
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.help-panel,.settings-row,.upload-panel,.refreshlog-run,.activity-panel,.alba-confirm-card,#section-trackrecord .analysis-panel){box-shadow:0 1px 2px rgba(25,55,100,.06),0 6px 20px rgba(25,55,100,.07);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.help-panel,.settings-row,.upload-panel,.refreshlog-run,.activity-panel,.alba-confirm-card,#section-trackrecord .analysis-panel){box-shadow:0 1px 2px rgba(25,55,100,.06),0 6px 20px rgba(25,55,100,.07);}
 /* Text that was too faint: muted is now a darker grey, and small labels, hints and headers use it at full strength. */
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.upload-hint,.analysis-panel-sub,.settings-row-sub,.sub){color:#3d444e;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.upload-hint,.analysis-panel-sub,.settings-row-sub,.sub){color:#3d444e;}
 /* Links and company names in the accent colour, as on the Screener. */
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.help-panel a,.help-toc a,.analysis-lb-link,.detail-meta a,.tv-chart-link,.fund-research-sources a,.global-item-source a){color:var(--accent);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .analysis-lb-name{color:var(--accent);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.help-panel a,.help-toc a,.analysis-lb-link,.detail-meta a,.tv-chart-link,.fund-research-sources a,.global-item-source a){color:var(--accent);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .analysis-lb-name{color:var(--accent);}
 /* Buttons. Filled (primary) buttons: white text on purple. Outlined buttons: dark text, a visible edge, purple on hover. */
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.browse-btn,.tl-btn-primary,.lm-tab.on,.alba-confirm-ok,.section-load-error button){background:var(--accent);color:#fff;border-color:var(--accent);}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.sort-select,.detail-back,.lm-tab):not(.tl-btn-primary):not(.on){background:#fbfdff;color:var(--text);border-color:#9db2c9;}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.lm-tab):not(.tl-btn-primary):not(.on):hover{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,#fbfdff);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .select-mode-btn.active{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,#fbfdff);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .refresh-pending{background:rgba(201,162,39,.16);border-color:rgba(138,109,12,.45);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.browse-btn,.tl-btn-primary,.lm-tab.on,.alba-confirm-ok,.section-load-error button){background:var(--accent);color:#fff;border-color:var(--accent);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.sort-select,.detail-back,.lm-tab):not(.tl-btn-primary):not(.on){background:#fbfdff;color:var(--text);border-color:#9db2c9;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.lm-tab):not(.tl-btn-primary):not(.on):hover{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,#fbfdff);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .select-mode-btn.active{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,#fbfdff);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .refresh-pending{background:rgba(201,162,39,.16);border-color:rgba(138,109,12,.45);}
 /* Inputs: near-white fill, a border you can see on cream, and a purple ring when focused. */
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){background:#fbfdff;color:var(--text);border-color:#9db2c9;}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea):focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent);}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(input,select,textarea)::placeholder{color:#4a515b;opacity:1;}
-:root:is([data-theme="indigo"],[data-theme="light"]) .search-suggest{box-shadow:0 10px 28px rgba(25,55,100,.18);}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.sg-item.active,.sg-item:hover,.filter-btn:hover,.filter-btn.active,.strat-card:hover,.strat-card.active){background:color-mix(in srgb,var(--accent) 8%,var(--panel));}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){background:#fbfdff;color:var(--text);border-color:#9db2c9;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea):focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(input,select,textarea)::placeholder{color:#4a515b;opacity:1;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .search-suggest{box-shadow:0 10px 28px rgba(25,55,100,.18);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.sg-item.active,.sg-item:hover,.filter-btn:hover,.filter-btn.active,.strat-card:hover,.strat-card.active){background:color-mix(in srgb,var(--accent) 8%,var(--panel));}
 /* Segmented switches (theme, Cards / Table, Weekly / Monthly): the selected side is the purple pill with white text. */
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.theme-toggle,.tl-view-toggle,.analysis-color-toggle-btns){background:#e3edf8;border-color:#c3d3e6;}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.theme-toggle-btn,.tl-view-btn,.analysis-color-btn){color:#4b515a;}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.theme-toggle-btn.active,.tl-view-btn.active,.analysis-color-btn.active){background:var(--accent);color:#fff;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.theme-toggle,.tl-view-toggle,.analysis-color-toggle-btns){background:#e3edf8;border-color:#c3d3e6;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.theme-toggle-btn,.tl-view-btn,.analysis-color-btn){color:#4b515a;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.theme-toggle-btn.active,.tl-view-btn.active,.analysis-color-btn.active){background:var(--accent);color:#fff;}
 /* Grids: every other row is a faint warm band (as on the Screener); hover and pinned rows stay visible over the band. */
-:root:is([data-theme="indigo"],[data-theme="light"]) .strat-table tbody tr:hover > td,:root:is([data-theme="indigo"],[data-theme="light"]) .strat-row:focus > td{background:color-mix(in srgb,var(--accent) 10%,#fafcff);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .strat-table tbody tr.pinned > td{background:rgba(201,162,39,.2);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .strat-table tbody tr.pinned:hover > td{background:rgba(201,162,39,.3);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .strat-table tbody tr:hover > td,:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .strat-row:focus > td{background:color-mix(in srgb,var(--accent) 10%,#fafcff);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .strat-table tbody tr.pinned > td{background:rgba(201,162,39,.2);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .strat-table tbody tr.pinned:hover > td{background:rgba(201,162,39,.3);}
 /* Chips, tags and badges: the tinted fills are a touch stronger so the label stays readable on cream. */
-:root:is([data-theme="indigo"],[data-theme="light"]) .b-buy{background:rgba(31,122,84,.16);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .b-mbuy{background:rgba(86,111,41,.17);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .b-hold{background:rgba(138,109,12,.17);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .b-avoid{background:rgba(168,63,56,.15);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .brand-version{background:#e3edf8;color:#4b515a;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .b-buy{background:rgba(31,122,84,.16);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .b-mbuy{background:rgba(86,111,41,.17);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .b-hold{background:rgba(138,109,12,.17);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .b-avoid{background:rgba(168,63,56,.15);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .brand-version{background:#e3edf8;color:#4b515a;}
 /* Scroll bars: a visible thumb on the sand page. */
-:root:is([data-theme="indigo"],[data-theme="light"]),:root:is([data-theme="indigo"],[data-theme="light"]) .peers-scroll{scrollbar-color:#a9bdd3 transparent;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]),:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .peers-scroll{scrollbar-color:#a9bdd3 transparent;}
 /* Light theme: blue top bar and white grid panels (v1.113). Light only (every selector starts with the same prefix).
    The top bar is the accent colour with white text; the panels that hold the grids (Analysis, Explorer, Strategies, Trade Log) are white
    cards on the pale-blue page, so the numbers sit on the cleanest background. Inside a white panel the page colour (--bg) and card colour (--panel)
    are set to white, so the sticky first columns, sticky headings, full-screen view and heat-map edges all match the white without further rules. */
 /* ---- Top bar ---- */
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar{background:var(--accent-soft);border-bottom-color:transparent;box-shadow:0 2px 10px rgba(30,45,120,.28);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar :is(.menu-toggle,.topbar-brand,.topbar-section,.topbar-title){color:#fff;}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .menu-toggle:hover{background:rgba(255,255,255,.18);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .topbar-sep{background:#fff;}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .topbar-search-input:focus{border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.35);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .live-toggle{background:rgba(255,255,255,.14);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .live-toggle:hover{border-color:#fff;background:rgba(255,255,255,.24);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .live-toggle.live{color:#fff;border-color:#fff;}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .live-px{color:#fff;border-color:rgba(255,255,255,.6);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .activity-bell{color:#fff;}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .activity-bell:hover,:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .activity-bell[aria-expanded="true"]{color:#fff;background:rgba(255,255,255,.18);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .activity-bell:focus-visible{outline-color:#fff;}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar :is(.activity-badge,.activity-run){box-shadow:0 0 0 2px var(--accent-soft);}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .activity-run{background:#fff;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar{background:var(--accent-soft);border-bottom-color:transparent;box-shadow:0 2px 10px rgba(30,45,120,.28);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar :is(.menu-toggle,.topbar-brand,.topbar-section,.topbar-title){color:#fff;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .menu-toggle:hover{background:rgba(255,255,255,.18);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .topbar-sep{background:#fff;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .topbar-search-input:focus{border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.35);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .live-toggle{background:rgba(255,255,255,.14);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .live-toggle:hover{border-color:#fff;background:rgba(255,255,255,.24);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .live-toggle.live{color:#fff;border-color:#fff;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .live-px{color:#fff;border-color:rgba(255,255,255,.6);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .activity-bell{color:#fff;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .activity-bell:hover,:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .activity-bell[aria-expanded="true"]{color:#fff;background:rgba(255,255,255,.18);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .activity-bell:focus-visible{outline-color:#fff;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar :is(.activity-badge,.activity-run){box-shadow:0 0 0 2px var(--accent-soft);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .activity-run{background:#fff;}
 /* ---- White cards, one look on every screen (as Explorer: the filters and the grid sit together in one white card) ----
    Explorer and Trade Log already put everything in one white panel. Analysis and Strategies lay their filter / strategy column and their
    content side by side, so their whole layout becomes the one white card and the panels inside it are flat (Strategies' panels are told
    apart by a thin line). Inside a white card the page colour (--bg) and card colour (--panel) are white, so the sticky first columns, sticky
    headings, full-screen view and heat-map edges match the white without further rules. */
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(#section-business .analysis-panel,#section-trackrecord .analysis-panel,#section-analysis .analysis-layout,#section-strategies .strat-layout){--bg:#fff;--panel:#fff;background:#fff;border-radius:12px;box-shadow:0 1px 2px rgba(25,55,100,.06),0 6px 20px rgba(25,55,100,.07);}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(#section-analysis .analysis-layout,#section-strategies .strat-layout){padding:16px 18px;}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(#section-analysis .analysis-main > .analysis-panel,#section-strategies .strat-main .strat-panel){background:transparent;box-shadow:none;border-radius:0;padding:0;margin-top:0;}
-:root:is([data-theme="indigo"],[data-theme="light"]) #section-strategies .strat-main .strat-panel + .strat-panel{border-top:0;padding-top:0;margin-top:20px;}
-:root:is([data-theme="indigo"],[data-theme="light"]) #section-strategies .strat-main .strat-panel:first-child + .strat-panel{border-top:1px solid #dde8f4;padding-top:14px;margin-top:10px;}
-:root:is([data-theme="indigo"],[data-theme="light"]) .analysis-panel :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea),:root:is([data-theme="indigo"],[data-theme="light"]) .strat-layout :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){background:#fff;}
-:root:is([data-theme="indigo"],[data-theme="light"]) .strat-table tbody tr:nth-child(odd) > td{background:#f4f8fd;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(#section-business .analysis-panel,#section-trackrecord .analysis-panel,#section-analysis .analysis-layout,#section-strategies .strat-layout){--bg:#fff;--panel:#fff;background:#fff;border-radius:12px;box-shadow:0 1px 2px rgba(25,55,100,.06),0 6px 20px rgba(25,55,100,.07);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(#section-analysis .analysis-layout,#section-strategies .strat-layout){padding:16px 18px;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(#section-analysis .analysis-main > .analysis-panel,#section-strategies .strat-main .strat-panel){background:transparent;box-shadow:none;border-radius:0;padding:0;margin-top:0;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) #section-strategies .strat-main .strat-panel + .strat-panel{border-top:0;padding-top:0;margin-top:20px;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) #section-strategies .strat-main .strat-panel:first-child + .strat-panel{border-top:1px solid #dde8f4;padding-top:14px;margin-top:10px;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .analysis-panel :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea),:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .strat-layout :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){background:#fff;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .strat-table tbody tr:nth-child(odd) > td{background:#f4f8fd;}
 @media (max-width:600px){
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(#section-business .analysis-panel,#section-trackrecord .analysis-panel,#section-analysis .analysis-layout,#section-strategies .strat-layout){padding:10px;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(#section-business .analysis-panel,#section-trackrecord .analysis-panel,#section-analysis .analysis-layout,#section-strategies .strat-layout){padding:10px;}
 /* The Analysis filter column starts at the card's own padding, in line with the Strategies list and the Explorer controls. */
 }
-:root:is([data-theme="indigo"],[data-theme="light"]) #section-analysis .analysis-layout .filters.analysis-filters-panel{padding:0;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) #section-analysis .analysis-layout .filters.analysis-filters-panel{padding:0;}
 /* Heavier grid text on every theme (v1.115). Thin strokes read poorly, so grid cells use a medium weight and column headings a bold one.
    Applies at every screen width (the phone layout uses the same grids). Weights are for all themes; the darker text colours are Light only. */
 :is(.biz-table,.strat-table) > tbody > tr > td,.biz-table > tbody > .biz-row > .biz-name{font-weight:500;}
 :is(.biz-table,.strat-table) > thead > tr > th{font-weight:700;}
 .biz-table > tbody > .biz-row > .biz-name::before,.biz-table > thead > tr > th:first-child::before{font-weight:600;}
 :is(.biz-table,.strat-table) .sub{font-weight:500;}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.biz-table,.strat-table) > thead > tr > th{color:#2c333c;}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.biz-table > tbody > .biz-row > .biz-name,.biz-table > thead > tr > th:first-child)::before{color:#3d4550;}
-:root:not([data-theme="indigo"]):not([data-theme="light"]) :is(.topbar-search-input,.search-input){border-color:#5c574f;}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar .live-toggle{border-color:rgba(255,255,255,.6);color:#fff;}
-:root:is([data-theme="indigo"],[data-theme="light"]) .topbar-brand{color:var(--text);}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.strat-table th,.biz-table>thead>tr>th){color:#454b54;}
-:root:is([data-theme="indigo"],[data-theme="light"]) :is(.help-table td,.help-table th){border-bottom-color:var(--line);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.biz-table,.strat-table) > thead > tr > th{color:#2c333c;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.biz-table > tbody > .biz-row > .biz-name,.biz-table > thead > tr > th:first-child)::before{color:#3d4550;}
+:root:not([data-theme="indigo"]):not([data-theme="light"]):not([data-theme="white"]) :is(.topbar-search-input,.search-input){border-color:#5c574f;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar .live-toggle{border-color:rgba(255,255,255,.6);color:#fff;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .topbar-brand{color:var(--text);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.strat-table th,.biz-table>thead>tr>th){color:#454b54;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.help-table td,.help-table th){border-bottom-color:var(--line);}
+/* White theme: the shared Light rules above also apply; swap the blue-grey edges and shadows for neutral ones. */
+:root[data-theme="white"] .sidebar{box-shadow:0 0 40px rgba(27,31,42,.14);}
+:root[data-theme="white"] .sidebar-overlay{background:rgba(27,31,42,.35);}
+:root[data-theme="white"] :is(.help-panel,.settings-row,.upload-panel,.refreshlog-run,.activity-panel,.alba-confirm-card,#section-trackrecord .analysis-panel){box-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);}
+:root[data-theme="white"] :is(.upload-hint,.analysis-panel-sub,.settings-row-sub,.sub){color:#4a5163;}
+:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.sort-select,.detail-back,.lm-tab):not(.tl-btn-primary):not(.on){background:#fff;border-color:#c9cfdf;}
+:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.lm-tab):not(.tl-btn-primary):not(.on):hover{background:color-mix(in srgb,var(--accent) 6%,#fff);}
+:root[data-theme="white"] .select-mode-btn.active{background:color-mix(in srgb,var(--accent) 10%,#fff);}
+:root[data-theme="white"] :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){background:#fff;border-color:#c9cfdf;}
+:root[data-theme="white"] :is(input,select,textarea)::placeholder{color:#5b6274;}
+:root[data-theme="white"] .search-suggest{box-shadow:0 10px 28px rgba(27,31,42,.16);}

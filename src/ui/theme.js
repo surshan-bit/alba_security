@@ -6,7 +6,7 @@ import { prefSet } from '../identity/prefs.js';
 // section above. A tiny inline script in <head> applies the saved choice before this main
 // script runs, so a Light-theme viewer doesn't see a flash of the dark theme on load.
 const THEME_PREF_KEY = 'albaDashboard.theme.v1';
-const THEME_CHOICES = new Set(['dark', 'light', 'indigo']);
+const THEME_CHOICES = new Set(['dark', 'light', 'indigo', 'white']);
 const themeToggleBtns = Array.from(document.querySelectorAll('.theme-toggle-btn'));
 function saveThemePref(theme){
   prefSet(THEME_PREF_KEY, theme);

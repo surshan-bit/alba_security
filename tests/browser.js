@@ -297,7 +297,7 @@ async function layoutTests(browser){
     await ctx.close();
   }
   // the three themes: nothing sticks out and text is readable (text colour differs from its background)
-  for(const theme of ['dark', 'light', 'indigo']){
+  for(const theme of ['dark', 'light', 'indigo', 'white']){
     const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
     const { page, errs } = await openPage(ctx, { theme }, 'theme ' + theme); await appReady(page); await page.waitForTimeout(500);
     ok((await page.evaluate(() => document.documentElement.getAttribute('data-theme') || 'dark')) === theme, `theme ${theme}: applied`);
