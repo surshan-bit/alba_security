@@ -33,6 +33,28 @@ function renderDetailJumpNav(s){
     links.map(l => '<a href="#" data-jump="' + l[0] + '">' + escapeHtml(l[1]) + jumpPreviewFor(l[0], s) + '</a>').join('') + '</nav>';
 }
 var whoObserver = null;
+var spyHandler = null;
+// Scroll spy: the link of the section being read is marked (the White theme shows it with an underline); at the very top the name tab is the current one.
+function bindJumpSpy(root){
+  const tb = document.querySelector('.topbar');
+  const h = tb ? Math.round(tb.getBoundingClientRect().height) : 0;
+  const nav = root.querySelector('.detail-jump');
+  if(spyHandler) window.removeEventListener('scroll', spyHandler);
+  const links = Array.from(root.querySelectorAll('.detail-jump a[data-jump]'));
+  const who = root.querySelector('.detail-jump-who');
+  if(nav && links.length){
+    spyHandler = () => {
+      if(!nav.isConnected) return;
+      const line = h + nav.getBoundingClientRect().height + 24;
+      let cur = null;
+      links.forEach(a => { const el = document.getElementById(a.dataset.jump); if(el && el.getBoundingClientRect().top <= line) cur = a; });
+      links.forEach(a => a.classList.toggle('is-current', a === cur));
+      if(who) who.classList.toggle('is-current', !cur);
+    };
+    window.addEventListener('scroll', spyHandler, { passive: true });
+    spyHandler();
+  }
+}
 function bindDetailJumpNav(root){
   // Pin the row exactly under the top bar, whatever its real height is, so no gap shows above it while scrolling.
   const tb = document.querySelector('.topbar');
@@ -49,6 +71,7 @@ function bindDetailJumpNav(root){
     }, { rootMargin: '-' + h + 'px 0px 0px 0px', threshold: 0 });
     whoObserver.observe(top);
   }
+  bindJumpSpy(root);
   root.querySelectorAll('.detail-jump a[data-jump]').forEach(a => {
     a.addEventListener('click', (e) => {
       e.preventDefault();
@@ -58,4 +81,4 @@ function bindDetailJumpNav(root){
   });
 }
 
-export { SHOW_CHANGE_NOTE, SHOW_REQUEST_REFRESH, bindDetailJumpNav, renderDetailJumpNav };
+export { SHOW_CHANGE_NOTE, SHOW_REQUEST_REFRESH, bindDetailJumpNav, bindJumpSpy, renderDetailJumpNav };
