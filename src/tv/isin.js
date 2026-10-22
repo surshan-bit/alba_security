@@ -51,4 +51,19 @@ async function resolveIsinSymbols(list, workers = 4){
   return list.filter(s => !isinSymbols[isinOf(s)]);
 }
 
-export { isinOf, isinSymbolCached, resolveIsinSymbols };
+// A bulk run does not search TradingView: it pairs each stock's saved ISIN with the TradingView symbol its last run stored (`savedOf(stock)`),
+// and keeps the pairs in the same map. Stocks with no saved symbol are returned; they are found by their own Refresh. One save for the whole list.
+async function useSavedSymbols(list, savedOf){
+  await loadIsinSymbols();
+  const added = {};
+  for(const s of list){
+    const isin = isinOf(s);
+    if(!ISIN_RE.test(isin) || isinSymbols[isin]) continue;
+    const sym = savedOf(s);
+    if(typeof sym === 'string' && /^[A-Z0-9_&-]+:.+/.test(sym)){ isinSymbols[isin] = sym; added[isin] = sym; }
+  }
+  if(Object.keys(added).length) await saveIsinSymbols(added);
+  return list.filter(s => !isinSymbols[isinOf(s)]);
+}
+
+export { isinOf, isinSymbolCached, resolveIsinSymbols, useSavedSymbols };
