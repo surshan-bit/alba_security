@@ -209,3 +209,16 @@
   :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-hold{background:rgba(201,162,39,.26);}
   :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-avoid{background:rgba(168,63,56,.18);}
 }
+/* Tools screens (Data Refresh, Help, Knowledge Base, Settings): body text raised to about 16px, like the detail pages. */
+@media (min-width:901px){
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) :is(p,li,b,strong,i,em,a,td,code,.glossary-term,.help-disclaimer,.help-formula){font-size:1rem;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) :is(li,p,td){line-height:1.6;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) .glossary-def{font-size:.95rem;line-height:1.55;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) th{font-size:.9rem;letter-spacing:.04em;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) h3{font-size:1.2rem;font-weight:700;color:#1b1f2a;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) .badge{font-size:.85rem;}
+  :root[data-theme="white"] #section-refreshlog :is(.refreshlog-freshness-label,.refreshlog-freshness-count,.refreshlog-freshness-summary,.select-mode-btn,.browse-btn,li,.fi-pct,.upload-hint){font-size:1rem;}
+  :root[data-theme="white"] #section-refreshlog .select-mode-btn,:root[data-theme="white"] #section-refreshlog .browse-btn{font-size:.82rem;}
+  :root[data-theme="white"] #section-refreshlog .refreshlog-sub-note{font-size:.92rem;}
+  :root[data-theme="white"] #section-settings .theme-toggle-btn{font-size:.92rem;padding:8px 16px;}
+}
