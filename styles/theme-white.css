@@ -125,7 +125,7 @@
   :root[data-theme="white"] #detail .detail-jump-label{display:none;}
   :root[data-theme="white"] #detail .detail-jump a{background:transparent;border-radius:0;padding:16px 18px;font-size:1.02rem;font-weight:500;color:#3b4156;border-bottom:3px solid transparent;}
   :root[data-theme="white"] #detail .detail-jump a:hover{color:var(--accent);border-bottom-color:var(--accent);background:transparent;}
-  :root[data-theme="white"] #detail .detail-jump a .jump-preview{font-size:.8rem;}
+  :root[data-theme="white"] #detail .detail-jump a .jump-preview{font-size:.95rem;}
   /* Section cards */
   :root[data-theme="white"] #detail :is(.val-panel,.global-panel,.fund-panel,.tech-panel){background:#fff;border:0;border-radius:16px;box-shadow:var(--card-shadow);padding:26px 32px 30px;margin-top:14px;}
   :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title){font-size:1.55rem;font-weight:500;letter-spacing:-.01em;color:#1b1f2a;}
@@ -200,3 +200,12 @@
   :root[data-theme="white"] #detail :is(.fund-pros li,.fund-cons li){margin-bottom:8px;}
 }
 @media (min-width:901px){:root[data-theme="white"] #detail .detail-back-bar .detail-back{position:relative;top:1px;}}
+/* Tab strip: the score and verdict beside Fundamental / Technical Score become a clear tinted pill with black text. */
+@media (min-width:901px){
+  :root[data-theme="white"] #detail .detail-jump .jump-preview{display:inline-flex;align-items:baseline;gap:6px;margin-left:10px;padding:3px 12px;border-radius:999px;font-size:.95rem;font-weight:600;color:#000;background:#eef0f6;}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview b{font-size:1.15rem;font-weight:800;}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-buy{background:rgba(31,122,84,.18);}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-mbuy{background:rgba(86,111,41,.2);}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-hold{background:rgba(201,162,39,.26);}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-avoid{background:rgba(168,63,56,.18);}
+}
