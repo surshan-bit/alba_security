@@ -264,3 +264,10 @@
 /* Trade Log, Help and Knowledge Base: no intro line under the top bar. */
 :root[data-theme="white"] :is(#section-trackrecord,#section-help,#section-knowledgebase) > header .sub{display:none;}
 :root[data-theme="white"] :is(#section-trackrecord,#section-help,#section-knowledgebase) > header{margin:0;}
+/* Segmented switches (Table / Heat map, period, grouping, All / Matched, size, Cards / Table, themes): one taller, readable size everywhere. */
+@media (min-width:901px){
+  :root[data-theme="white"] :is(.tl-view-toggle,.theme-toggle){box-sizing:border-box;height:42px;padding:3px;align-items:stretch;border-radius:999px;}
+  :root[data-theme="white"] :is(.tl-view-toggle .tl-view-btn,.theme-toggle .theme-toggle-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;height:auto;padding:0 18px;font-size:.92rem;font-weight:600;border-radius:999px;white-space:nowrap;}
+  :root[data-theme="white"] .biz-side .tl-view-toggle .tl-view-btn{padding:0 8px;}
+  :root[data-theme="white"] :is(#tradeAddBtn,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main){height:42px;display:inline-flex;align-items:center;font-size:.85rem;}
+}
