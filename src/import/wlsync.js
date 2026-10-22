@@ -183,7 +183,12 @@ function renderWlPicker(){
     const label = document.createElement('label'); label.className = 'wl-pick';
     const box = document.createElement('input'); box.type = 'checkbox'; box.checked = picked.has(st.id); box.disabled = !ready;
     box.addEventListener('change', () => { if(box.checked) picked.add(st.id); else picked.delete(st.id); });
-    const txt = document.createElement('span'); txt.textContent = st.name + (ready ? '' : ' (no rules yet)');
+    const txt = document.createElement('span'); txt.className = 'wl-pick-text';
+    const nm = document.createElement('span'); nm.className = 'wl-pick-name'; nm.textContent = st.name;
+    const sub = document.createElement('span'); sub.className = 'wl-pick-sub';
+    const nRules = st.rules.filter(ruleReady).length;
+    sub.textContent = ready ? 'Writes the stocks that pass ' + (nRules === 1 ? 'its rule' : 'all ' + nRules + ' rules') + ' to a TradingView watchlist.' : 'No rules yet, so there is nothing to sync.';
+    txt.append(nm, sub);
     label.append(box, txt); host.appendChild(label);
   }
   if(!strategies.length){ const p = document.createElement('p'); p.className = 'upload-hint'; p.textContent = 'No strategies yet. Create one in Strategies first.'; host.appendChild(p); }

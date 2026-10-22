@@ -326,13 +326,25 @@
 /* Buttons: one primary and one secondary style everywhere (wide screens).
    Primary = filled indigo; secondary = white with a thin edge. Both: 40px tall, small spaced capitals, 6px corners. */
 @media (min-width:901px){
-  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel),
-  :root[data-theme="white"] :is(.browse-btn,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 20px;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
-  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
-  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):hover:not(:disabled){color:var(--accent);border-color:var(--accent);}
-  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main):disabled{color:#8a90a0;background:#f6f7fb;border-color:#e0e4ee;}
-  :root[data-theme="white"] :is(.browse-btn,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn){color:#fff;background:var(--accent);border:1px solid var(--accent);}
-  :root[data-theme="white"] :is(.browse-btn,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn):hover:not(:disabled){background:color-mix(in srgb,var(--accent) 88%,#000);}
+  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel),
+  :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 20px;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
+  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
+  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary):hover:not(:disabled){color:var(--accent);border-color:var(--accent);}
+  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn:not(.fi-btn-primary),.rk-main):disabled{color:#8a90a0;background:#f6f7fb;border-color:#e0e4ee;}
+  :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary):disabled{color:#fff;background:color-mix(in srgb,var(--accent) 45%,#fff);border-color:transparent;cursor:not-allowed;}
+  :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn){color:#fff;background:var(--accent);border:1px solid var(--accent);}
+  :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn):hover:not(:disabled){background:color-mix(in srgb,var(--accent) 88%,#000);}
   /* Strategies keeps its free-flow Duplicate / Delete / Suggested Rules as plain text buttons */
   :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;}
+}
+/* Watchlist sync picker: rows like Settings > Claude controls (bold name, short description, tick box at the right, hairline between rows). */
+@media (min-width:901px){
+  :root[data-theme="white"] #section-refreshlog .refreshlog-manual:has(#wlStrategyPicker){display:block;}
+  :root[data-theme="white"] .wl-picker{gap:0;margin-bottom:18px;width:100%;}
+  :root[data-theme="white"] .wl-pick{justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid #eef0f6;}
+  :root[data-theme="white"] .wl-pick input[type=checkbox]{order:2;flex:none;width:20px;height:20px;margin:0;accent-color:var(--accent);cursor:pointer;}
+  :root[data-theme="white"] .wl-pick input[type=checkbox]:disabled{cursor:not-allowed;opacity:.5;}
+  :root[data-theme="white"] .wl-pick-text{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  :root[data-theme="white"] .wl-pick-name{font-size:1rem;font-weight:700;color:#1b1f2a;}
+  :root[data-theme="white"] .wl-pick-sub{font-size:.95rem;color:#4a5163;line-height:1.5;}
 }
