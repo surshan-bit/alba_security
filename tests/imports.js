@@ -759,6 +759,15 @@ async function tvRefreshScenarios(){
   // v1.201: a stock TradingView leaves out of an answer is asked for again, and if it still has no price it keeps its earlier figures with their own date
   const miss = DS.stocks.map(s => symOf(s)).find(x => /^[A-Z0-9]+$/.test(x));
   const snapRows = all => [].concat(...Object.entries(all).filter(([k]) => k.startsWith('liveSnapshot/')).map(([, v]) => v.rows));
+  // v1.225: Refresh all stocks makes no TradingView symbol search; it pairs each stock's saved ISIN with the symbol its last run saved
+  await runScenario('refresh all stocks: no symbol search is made, the saved symbols are used and kept', { cfg: { liveCollections: true } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    await waitDone(page);
+    const st = await tvState(page), searches = st.calls.filter(c => c[0] === 'mcp-tv-search-symbols').length;
+    ok(searches === 0, 'no symbol search was made, got ' + searches);
+    const a = await readDb(page), map = a.all['stockMeta/isinSymbol'];
+    ok(map && Object.keys(map).length > 100, 'the saved symbol list was filled in one go: ' + (map ? Object.keys(map).length : 'missing'));
+  });
   await runScenario('refresh all stocks: a stock TradingView misses once is asked for again', { cfg: { liveCollections: true } }, async page => {
     await page.evaluate(sym => { window.__tvFlaky = { [sym]: 1 }; }, 'NSE:' + miss);
     await page.click('#tvSnapshotBtn');

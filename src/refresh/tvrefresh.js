@@ -16,7 +16,7 @@ import { priceHistoryByTicker, pcTickerKey, ensureAllPriceBars } from '../prices
 import { refreshOneNow, priceJobs, saveFullBars } from '../prices/refresh.js';
 import { COMPACT_LAG, lagOf } from '../prices/recent.js';
 import { saveRecentBars, saveTechBlocks, sameValue } from './barchunks.js';
-import { isinOf, isinSymbolCached, resolveIsinSymbols } from '../tv/isin.js';
+import { isinOf, isinSymbolCached, useSavedSymbols } from '../tv/isin.js';
 import { tvCall, tvErrorText, tvIsFatal, tvIsQuota, tvIstDate, tvMcp } from '../tv/connector.js';
 import { loadRuns } from '../strategies/tracking.js';
 import { priorityOrder } from './freshness.js';
@@ -39,7 +39,7 @@ const STEPS = [{ key: 'prepare', label: 'Prepare the stock list', w: 5 }, { key:
   { key: 'run', label: 'Fetch from TradingView: snapshot and new bars', w: 25 }, { key: 'update', label: 'Save the weekly and monthly bars in batches', w: 20 },
   { key: 'tech', label: 'Technical scores in batches', w: 15 }, { key: 'verify', label: 'Finish', w: 5 }];
 
-// The TradingView symbol for a stock, from its ISIN (resolved for every stock at the start of the run, see tv/isin.js). null when it has none.
+// The TradingView symbol for a stock: its ISIN is in the database, and the symbol is the one the last run saved for it (see tv/isin.js). No TradingView search is made. null when it has none.
 const snapshotSymbol = isinSymbolCached;
 let stopAsked = false;
 let busy = false;
@@ -106,12 +106,12 @@ async function runSnapshot(){
     // The last good row of every stock, with the day it is from, so a stock TradingView does not answer for today keeps its figures instead of losing them.
     const prevRows = new Map();
     stored.forEach(c => { if(c && Array.isArray(c.rows)) c.rows.forEach(r => { if(r && typeof r.k === 'string' && Array.isArray(r.c)) prevRows.set(r.k, { y: r.y, c: r.c, d: r.d || c.asof, t: r.t || c.at }); }); });
-    fiSet('prepare', 'running', 'Finding each stock on TradingView by ISIN…', 0.5);
-    await resolveIsinSymbols(stocks);
+    fiSet('prepare', 'running', 'Using the saved TradingView symbols…', 0.5);
+    await useSavedSymbols(stocks, s => { const p = prevRows.get(sanitizeDocId(tickerSymbol(s))); return p ? p.y : null; });
     const todo = [];
     for(const s of stocks){
       const sym = snapshotSymbol(s);
-      if(!sym){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: isinOf(s) ? 'No TradingView match for ISIN ' + isinOf(s) : 'No ISIN saved (import the Fundamental CSV)' }); noSymbol.push(tickerSymbol(s) + ' ' + s.name); } else todo.push({ s, sym });
+      if(!sym){ skipped.push({ sym: tickerSymbol(s), name: s.name, reason: isinOf(s) ? 'No saved TradingView symbol (open the stock and press Refresh once)' : 'No ISIN saved (import the Fundamental CSV)' }); noSymbol.push(tickerSymbol(s) + ' ' + s.name); } else todo.push({ s, sym });
     }
     fiSet('prepare', 'done', num(todo.length) + ' stocks' + (skipped.length ? ', ' + skipped.length + ' without a symbol' : ''));
     planned = todo.length;
