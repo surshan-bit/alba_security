@@ -302,3 +302,14 @@
   :root[data-theme="white"] #detail .fund-pc-title{margin-bottom:12px;}
   :root[data-theme="white"] #detail .fund-subsection-head{margin-bottom:16px;}
 }
+/* Grids: the Analysis table look (plain dark header with a hairline, roomy rows, every other row tinted) for the remaining tables:
+   Help, Knowledge Base, Trade Log positions (table view) and Buy / Sell ideas. Explorer's own industry table keeps its own look. */
+@media (min-width:901px){
+  :root[data-theme="white"] .help-table{font-size:1rem;border-collapse:separate;border-spacing:0;}
+  :root[data-theme="white"] .help-table th{color:#1b1f2a;font-size:.92rem;font-weight:500;text-transform:none;letter-spacing:0;padding:12px 14px;border-bottom:1px solid #e6e9f2;background:transparent;}
+  :root[data-theme="white"] .help-table td{font-size:1rem;line-height:1.45;padding:14px;border-bottom:0;}
+  :root[data-theme="white"] .help-table tbody tr:nth-child(odd) td{background:#f4f6fc;}
+  :root[data-theme="white"] .help-table tbody tr:nth-child(odd) td:first-child{border-radius:8px 0 0 8px;}
+  :root[data-theme="white"] .help-table tbody tr:nth-child(odd) td:last-child{border-radius:0 8px 8px 0;}
+  :root[data-theme="white"] #section-trackrecord .help-table{width:100%;}
+}
