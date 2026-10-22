@@ -354,20 +354,14 @@
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold:not([open]) > summary{border-bottom:0;}
   :root[data-theme="white"] #section-strategies #stratMain .sr-add{width:260px;max-width:100%;}
 }
-/* Explorer industry table: cell text centred vertically in every row (a two-line name no longer pushes the # or the numbers to the bottom),
-   and the number columns centred under their headings. # and Industry stay left. */
+/* Explorer industry table: cell text centred vertically in every row (a two-line name no longer pushes the # or the numbers to the bottom). */
 @media (min-width:901px){
   :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > td{vertical-align:middle;}
-  :root[data-theme="white"] #section-business .biz-table :is(th,td):not(:first-child):not(.biz-name){text-align:center !important;}
 }
-/* All data grids: text centred in the cells and under the headings, vertically centred; the stock name column (and the first text columns of the
-   Trade Log tables) stay left. Help and Knowledge Base text tables stay left. */
+/* All data grids: cell text vertically centred in every row; the column headings and the data stay left-aligned. */
 @media (min-width:901px){
-  :root[data-theme="white"] .strat-table :is(th,td){text-align:center !important;vertical-align:middle;}
-  :root[data-theme="white"] .strat-table :is(th,td).col-stock{text-align:left !important;}
-  :root[data-theme="white"] #section-trackrecord .help-table :is(th,td){text-align:center !important;vertical-align:middle;}
-  :root[data-theme="white"] #tradeLogPanelBody .help-table :is(th,td):first-child{text-align:left !important;}
-  :root[data-theme="white"] .tl-ideas .help-table :is(th,td):is(:nth-child(2),:last-child){text-align:left !important;}
+  :root[data-theme="white"] .strat-table :is(th,td){vertical-align:middle;}
+  :root[data-theme="white"] #section-trackrecord .help-table :is(th,td){vertical-align:middle;}
 }
 /* Explorer industry table: the row number lives inside the name cell, so when a name wraps to two or more lines the number must sit in the
    middle of the name block, not on its last line. */
