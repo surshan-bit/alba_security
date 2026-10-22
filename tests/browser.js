@@ -145,6 +145,15 @@ async function businessTests(browser){
   const means = await page.$$eval('.biz-row', trs => trs.map(tr => tr.children[2].textContent.trim()));
   const nums = means.map(t => parseFloat(t)).filter(n => !isNaN(n));
   ok(nums.every((n, i) => i === 0 || n <= nums[i - 1] + 1e-9), 'business: ranked by average change, highest first');
+  // heat map: tiles are sized by % change by default; the toggle switches to number of stocks and the choice is saved
+  await page.locator('[data-biz-view="heat"]').click(); await page.waitForSelector('.hm-tile', { timeout: 5000 });
+  ok((await page.locator('[data-biz-size].active').getAttribute('data-biz-size')) === 'chg', 'heat map: sized by % change by default');
+  const tilesChg = await page.$$eval('.hm-tile', t => t.slice(0, 5).map(x => x.title).join('|'));
+  await page.locator('[data-biz-size="count"]').click(); await page.waitForTimeout(200);
+  const tilesCount = await page.$$eval('.hm-tile', t => t.slice(0, 5).map(x => x.title).join('|'));
+  ok((await page.locator('[data-biz-size].active').getAttribute('data-biz-size')) === 'count' && tilesChg !== tilesCount, 'heat map: the toggle re-sizes the tiles by number of stocks');
+  ok(/"heatSize":"count"/.test(await page.evaluate(() => localStorage.getItem('albaDashboard.business.v1') || '')), 'heat map: the size choice is remembered in the browser');
+  await page.locator('[data-biz-size="chg"]').click(); await page.locator('[data-biz-view="table"]').click(); await page.waitForSelector('.biz-row', { timeout: 5000 });
   await page.locator('.biz-row').first().click();
   if(process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   ok((await page.locator('.biz-detail').count()) === 1 && (await page.locator('.biz-detail .strat-row').count()) >= 1, 'business: clicking an industry opens its stocks and news');

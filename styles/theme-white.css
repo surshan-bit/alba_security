@@ -250,3 +250,14 @@
 }
 /* Top bar: equal visual spacing between the search box, the Live pill and the bell (24px each; the bell's icon is inset 11px inside its box). */
 :root[data-theme="white"] .topbar .activity-wrap{margin-left:-5px;}
+/* Notifications panel: the same larger, readable text as the rest of White (wide screens). */
+@media (min-width:901px){
+  :root[data-theme="white"] .activity-panel{width:min(440px,92vw);}
+  :root[data-theme="white"] .activity-head{padding:14px 18px;}
+  :root[data-theme="white"] .activity-head-title{font-size:.95rem;letter-spacing:.1em;font-weight:700;}
+  :root[data-theme="white"] .activity-empty{font-size:1rem;line-height:1.55;padding:18px;}
+  :root[data-theme="white"] .activity-title{font-size:1rem;font-weight:600;}
+  :root[data-theme="white"] .activity-text{font-size:.95rem;line-height:1.5;}
+  :root[data-theme="white"] .activity-time{font-size:.85rem;}
+  :root[data-theme="white"] .activity-btn{font-size:.85rem;}
+}

@@ -21,11 +21,11 @@ const KEY = 'albaDashboard.business.v1';
 let bizFull = false;   // the table fills the whole window
 const newsOpen = new Set();   // industries whose News section is open (closed at first)
 let bizFiltersOpen = false;   // phones: the view, period, grouping and strategy controls fold into one "Filters" line, closed at first
-let period = '1M', by = 'industry', view = 'table', strategyId = '', showMatched = false, rebound = false, loadState = 'idle';   // loadState: 'idle' | 'loading' | 'failed' (price bars for long periods)
+let period = '1M', by = 'industry', view = 'table', heatSize = 'chg', strategyId = '', showMatched = false, rebound = false, loadState = 'idle';   // loadState: 'idle' | 'loading' | 'failed' (price bars for long periods)
 const open = new Set();                                    // industries whose detail is open
-try { const v = JSON.parse(localStorage.getItem(KEY) || '{}'); if(PERIODS.some(p => p.key === v.period)) period = v.period; if(v.by === 'group') by = 'group'; if(v.view === 'heat') view = 'heat'; if(typeof v.strategy === 'string') strategyId = v.strategy; if(v.matched === true) showMatched = true; if(v.rebound === true) rebound = true; } catch(e){ /* storage unavailable: defaults */ }
+try { const v = JSON.parse(localStorage.getItem(KEY) || '{}'); if(PERIODS.some(p => p.key === v.period)) period = v.period; if(v.by === 'group') by = 'group'; if(v.view === 'heat') view = 'heat'; if(v.heatSize === 'count') heatSize = 'count'; if(typeof v.strategy === 'string') strategyId = v.strategy; if(v.matched === true) showMatched = true; if(v.rebound === true) rebound = true; } catch(e){ /* storage unavailable: defaults */ }
 // Saved to this person's preferences (and mirrored in the browser).
-const save = () => { prefSet(KEY, JSON.stringify({ period, by, view, strategy: strategyId, matched: showMatched, rebound })); };
+const save = () => { prefSet(KEY, JSON.stringify({ period, by, view, heatSize, strategy: strategyId, matched: showMatched, rebound })); };
 
 const barsFor = (s) => { const d = priceHistoryByTicker[pcTickerKey(s)]; return d ? d['1W'] : undefined; };
 const pct = (v) => v === null ? '<span class="biz-na">n/a</span>' : '<span class="' + (v > 0 ? 'chg-up' : v < 0 ? 'chg-down' : '') + '">' + (v > 0 ? '+' : '') + v.toFixed(2) + '%</span>';
@@ -161,6 +161,7 @@ function draw(el){
   const allOpen = rows.length > 0 && rows.every(r => open.has(r.name));
   const controls = '<div class="biz-controls"><div class="tl-view-toggle" role="group" aria-label="View"><button type="button" class="tl-view-btn' + (view === 'table' ? ' active' : '') + '" data-biz-view="table">Table</button><button type="button" class="tl-view-btn' + (view === 'heat' ? ' active' : '') + '" data-biz-view="heat">Heat map</button></div><div class="tl-view-toggle" role="group" aria-label="Period">' + PERIODS.map(x => '<button type="button" class="tl-view-btn' + (x.key === period ? ' active' : '') + '" data-biz-period="' + x.key + '">' + x.key + '</button>').join('') + '</div>'
     + '<div class="tl-view-toggle" role="group" aria-label="Grouping"><button type="button" class="tl-view-btn' + (by === 'industry' ? ' active' : '') + '" data-biz-by="industry">Industry</button><button type="button" class="tl-view-btn' + (by === 'group' ? ' active' : '') + '" data-biz-by="group">Industry group</button></div>'
+    + (view === 'heat' ? '<div class="tl-view-toggle" role="group" aria-label="Size the tiles by"><button type="button" class="tl-view-btn' + (heatSize === 'chg' ? ' active' : '') + '" data-biz-size="chg" title="Bigger tiles = bigger average change">% Change</button><button type="button" class="tl-view-btn' + (heatSize === 'count' ? ' active' : '') + '" data-biz-size="count" title="Bigger tiles = more stocks">No. of stocks</button></div>' : '')
     + strategyGroupHtml()
     + '</div>';
   const viewToggle = '<div class="tl-view-toggle biz-match-toggle" role="group" aria-label="Show">'
@@ -182,7 +183,7 @@ function draw(el){
     const isOpen = open.has(r.name);
     return '<tr class="biz-row' + (isOpen ? ' open' : '') + '" data-biz-name="' + escapeHtml(r.name) + '" tabindex="0" role="button" aria-expanded="' + isOpen + '"><td class="biz-name">' + '<button type="button" class="biz-open" data-biz-open="' + escapeHtml(r.name) + '" title="Open the industry page: factors, news and charts">' + escapeHtml(r.name) + '</button></td><td class="num">' + r.count + '</td><td class="num">' + pct(r.mean) + '</td><td class="num">' + pct(r.median) + '</td><td>' + breadth(r) + '</td><td class="num">' + (r.news.length ? r.news.length + (r.pos || r.neg ? ' <span class="news-pos">+' + r.pos + '</span> <span class="news-neg">&minus;' + r.neg + '</span>' : '') : '') + '</td>' + (strategyOn() ? '<td class="num">' + (r.matches ? '<b class="biz-matchcount">' + r.matches + '</b> of ' + r.count : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null ? pct(r.matchMean) : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null && r.mean !== null ? signedPp(r.matchMean - r.mean) : '') + '</td>' : '') + '</tr>' + (isOpen ? detailHtml(r, cols) : '');
   }).join('');
-  if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + heatmapHtml(rows, period, Math.max(300, el.clientWidth - 280)) + note); return; }
+  if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + heatmapHtml(rows, period, Math.max(300, el.clientWidth - 280), heatSize) + note); return; }
   kit.defineToolbar('biz', () => {
     const st = r => r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock), out = [];
     if(strategyOn()) out.push({ id: 'matched', label: 'Matched stocks', stocks: () => rows.flatMap(r => r.items.filter(x => x.match).map(x => x.stock)) });
@@ -220,6 +221,8 @@ function init(){
     if(closestEl(e, '[data-biz-rebound]')){ rebound = !rebound; save(); render(); ensureData(); return; }
     const shw = closestEl(e, '[data-biz-show]');
     if(shw){ if(/** @type {HTMLButtonElement} */ (shw).disabled) return; showMatched = shw.dataset.bizShow === 'matched'; save(); render(); return; }
+    const sz = closestEl(e, '[data-biz-size]');
+    if(sz){ heatSize = sz.dataset.bizSize === 'count' ? 'count' : 'chg'; save(); render(); return; }
     const vb = closestEl(e, '[data-biz-view]'), ht = closestEl(e, '[data-biz-heat]');
     if(vb){ view = vb.dataset.bizView; save(); render(); return; }
     if(ht){   // a heat-map tile: back to the table with that industry opened
