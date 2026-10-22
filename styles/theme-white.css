@@ -36,9 +36,9 @@
 :root[data-theme="white"] .analysis-leaderboard.lb-full .strat-table thead th{background:#fff;}
 :root[data-theme="white"] table tbody td{border-color:#eef0f6;}
 /* Buttons: outlined, uppercase, letter-spaced, as on the Screener. */
-:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main){text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;font-weight:600;border-radius:6px;color:#3b4156;}
+@media (min-width:901px){:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main){text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;font-weight:600;border-radius:6px;color:#3b4156;}}
 :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main):hover{color:var(--accent);border-color:var(--accent);}
-:root[data-theme="white"] :is(.browse-btn,.tl-btn-primary,.alba-confirm-ok){text-transform:uppercase;letter-spacing:.1em;font-size:.76rem;font-weight:600;border-radius:6px;}
+@media (min-width:901px){:root[data-theme="white"] :is(.browse-btn,.tl-btn-primary,.alba-confirm-ok){text-transform:uppercase;letter-spacing:.1em;font-size:.76rem;font-weight:600;border-radius:6px;}}
 :root[data-theme="white"] .filters{border-radius:16px;}
 /* No side borders on the content panels and tables: only the top and bottom hairlines stay. */
 :root[data-theme="white"] :is(.analysis-panel,.strat-panel,.strat-fold,.filters,.strat-table-wrap,.upload-panel,.help-panel,.refreshlog-run){border-left-width:0;border-right-width:0;border-top-width:0;border-radius:0;box-shadow:none;}
@@ -59,7 +59,7 @@
 }
 /* Larger type, closer to the Screener sample. */
 :root[data-theme="white"] .topbar .topbar-search-input{font-size:1.05rem;height:46px;}
-:root[data-theme="white"] .topbar .live-toggle{font-size:.9rem;}
+@media (min-width:901px){:root[data-theme="white"] .topbar .live-toggle{font-size:.9rem;}}
 @media (min-width:901px){
 :root[data-theme="white"] .strat-table,:root[data-theme="white"] .biz-table{font-size:1rem;}
 :root[data-theme="white"] .strat-table:not(.peers-table) td{font-size:.98rem;padding:13px 6px;}
@@ -270,4 +270,14 @@
   :root[data-theme="white"] :is(.tl-view-toggle .tl-view-btn,.theme-toggle .theme-toggle-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;height:auto;padding:0 18px;font-size:.92rem;font-weight:600;border-radius:999px;white-space:nowrap;}
   :root[data-theme="white"] .biz-side .tl-view-toggle .tl-view-btn{padding:0 8px;}
   :root[data-theme="white"] :is(#tradeAddBtn,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main){height:42px;display:inline-flex;align-items:center;font-size:.85rem;}
+}
+/* Phones: a visible menu button, a compact logo mark, tighter top bar. */
+@media (max-width:900px){
+  :root[data-theme="white"] .topbar{height:auto;min-height:56px;padding:6px 10px;gap:8px;margin-bottom:10px;}
+  :root[data-theme="white"] .topbar .menu-toggle{color:#1b1f2a;margin:0;}
+  :root[data-theme="white"] .topbar .menu-toggle:hover{background:#eef0f6;}
+  :root[data-theme="white"] .topbar .topbar-title{display:flex;flex:none;}
+  :root[data-theme="white"] .topbar .topbar-brand{font-size:0;gap:0;}
+  :root[data-theme="white"] .topbar .topbar-brand::before{width:30px;height:30px;}
+  :root[data-theme="white"] .topbar .topbar-search{margin:0;flex:1 1 auto;min-width:0;}
 }
