@@ -1,16 +1,16 @@
 /* White theme: the Screener look. Every selector starts with :root[data-theme="white"], so Dark and Light are untouched.
    Loaded after theme-light.css so it wins ties. Sans-serif throughout, white top bar with the menu as text links,
    indigo table headers, outlined uppercase buttons, big rounded white cards on a pale lavender page. */
-:root[data-theme="white"]{--ff-white:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--tb-h:64px;}
+:root[data-theme="white"]{--ff-white:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--tb-h:72px;}
 /* Type: one sans-serif font everywhere (code and formulas keep their monospace). */
 :root[data-theme="white"] body,:root[data-theme="white"] :is(h1,h2,h3,h4,h5,h6,button,input,select,textarea,table,th,td,.topbar *,.sidebar *,.analysis-panel,.help-panel,.settings-panel,.upload-panel,.filters,.sub,footer){font-family:var(--ff-white);}
 /* Top bar: white, no shadow. Brand on the left, menu links, search and bell on the right. */
 :root[data-theme="white"] .topbar{background:#fff;border-bottom:1px solid #e6e9f2;box-shadow:none;height:var(--tb-h);padding:0 24px;margin-bottom:20px;gap:18px;}
 :root[data-theme="white"] .topbar :is(.topbar-brand,.topbar-title){color:#1b1f2a;}
-:root[data-theme="white"] .topbar-brand{font-size:1.7rem;font-weight:500;letter-spacing:-.5px;}
+:root[data-theme="white"] .topbar-brand{font-size:2.1rem;font-weight:500;letter-spacing:-.5px;}
 :root[data-theme="white"] .topbar :is(.topbar-sep,.topbar-section){display:none;}
 :root[data-theme="white"] .topbar .topbar-search{position:relative;left:auto;top:auto;transform:none;margin:0 0 0 auto;width:260px;max-width:none;flex:0 1 260px;}
-@media (min-width:1400px){:root[data-theme="white"] .topbar .topbar-search{position:absolute;right:170px;top:50%;transform:translateY(-50%);margin:0;width:180px;}}
+@media (min-width:1400px){:root[data-theme="white"] .topbar .topbar-search{position:absolute;right:185px;top:50%;transform:translateY(-50%);margin:0;width:240px;}}
 :root[data-theme="white"] .topbar .topbar-search-input{border-radius:8px;border:1px solid #c9cfdf;background:#fff;height:42px;}
 :root[data-theme="white"] .topbar .topbar-search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent);}
 :root[data-theme="white"] .topbar .activity-bell{color:#4a5163;}
@@ -22,10 +22,10 @@
 /* Menu as text links in the top bar (wide screens). The sidebar element is reused: it is laid over the top bar as a row. */
 @media (min-width:1400px){
   :root[data-theme="white"] .topbar .menu-toggle{display:none;}
-  :root[data-theme="white"] .sidebar{transform:none;position:fixed;top:0;left:268px;right:auto;bottom:auto;width:auto;max-width:none;height:var(--tb-h);padding:0;gap:0;background:transparent;border:0;box-shadow:none;flex-direction:row;align-items:center;overflow:visible;z-index:21;pointer-events:none;}
+  :root[data-theme="white"] .sidebar{transform:none;position:fixed;top:0;left:330px;right:auto;bottom:auto;width:auto;max-width:none;height:var(--tb-h);padding:0;gap:0;background:transparent;border:0;box-shadow:none;flex-direction:row;align-items:center;overflow:visible;z-index:21;pointer-events:none;}
   :root[data-theme="white"] .sidebar-brand,:root[data-theme="white"] .nav-section-label,:root[data-theme="white"] .sidebar-overlay,:root[data-theme="white"] .nav-icon,:root[data-theme="white"] .pro-pill,:root[data-theme="white"] .sidebar :is(.brand-version,.sidebar-foot){display:none;}
   :root[data-theme="white"] .sidebar-nav{display:flex;flex-direction:row;align-items:center;gap:2px;padding:0;pointer-events:auto;}
-  :root[data-theme="white"] .nav-item{background:transparent;border:0;border-radius:6px;padding:8px 9px;font-size:.7rem;font-weight:500;letter-spacing:.11em;text-transform:uppercase;color:#3b4156;white-space:nowrap;box-shadow:none;width:auto;}
+  :root[data-theme="white"] .nav-item{background:transparent;border:0;border-radius:6px;padding:10px 16px;font-size:1rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#3b4156;white-space:nowrap;box-shadow:none;width:auto;}
   :root[data-theme="white"] .nav-item:hover{background:transparent;color:var(--accent);}
   :root[data-theme="white"] .nav-item.active{background:transparent;color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent);border-radius:0;}
 }
@@ -44,4 +44,27 @@
 :root[data-theme="white"] :is(.analysis-panel,.strat-panel,.strat-fold,.filters,.strat-table-wrap,.upload-panel,.help-panel,.refreshlog-run){border-left-width:0;border-right-width:0;border-radius:0;box-shadow:none;}
 /* Logo (the sun mark) before the brand name in the top bar. */
 :root[data-theme="white"] .topbar-brand{display:inline-flex;align-items:center;gap:10px;}
-:root[data-theme="white"] .topbar-brand::before{content:"";width:34px;height:34px;flex:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g' cx='50%25' cy='42%25' r='65%25'%3E%3Cstop offset='0%25' stop-color='%23FFD37A'/%3E%3Cstop offset='100%25' stop-color='%23E9713D'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cg stroke='%23E9713D' stroke-width='10' stroke-linecap='round'%3E%3Cline x1='164' y1='100' x2='186' y2='100'/%3E%3Cline x1='145.25' y1='145.25' x2='160.8' y2='160.8'/%3E%3Cline x1='100' y1='164' x2='100' y2='186'/%3E%3Cline x1='54.75' y1='145.25' x2='39.2' y2='160.8'/%3E%3Cline x1='36' y1='100' x2='14' y2='100'/%3E%3Cline x1='54.75' y1='54.75' x2='39.2' y2='39.2'/%3E%3Cline x1='100' y1='36' x2='100' y2='14'/%3E%3Cline x1='145.25' y1='54.75' x2='160.8' y2='39.2'/%3E%3C/g%3E%3Ccircle cx='100' cy='100' r='50' fill='url(%23g)'/%3E%3C/svg%3E") center/contain no-repeat;}
+:root[data-theme="white"] .topbar-brand::before{content:"";width:42px;height:42px;flex:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cdefs%3E%3CradialGradient id='g' cx='50%25' cy='42%25' r='65%25'%3E%3Cstop offset='0%25' stop-color='%23FFD37A'/%3E%3Cstop offset='100%25' stop-color='%23E9713D'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cg stroke='%23E9713D' stroke-width='10' stroke-linecap='round'%3E%3Cline x1='164' y1='100' x2='186' y2='100'/%3E%3Cline x1='145.25' y1='145.25' x2='160.8' y2='160.8'/%3E%3Cline x1='100' y1='164' x2='100' y2='186'/%3E%3Cline x1='54.75' y1='145.25' x2='39.2' y2='160.8'/%3E%3Cline x1='36' y1='100' x2='14' y2='100'/%3E%3Cline x1='54.75' y1='54.75' x2='39.2' y2='39.2'/%3E%3Cline x1='100' y1='36' x2='100' y2='14'/%3E%3Cline x1='145.25' y1='54.75' x2='160.8' y2='39.2'/%3E%3C/g%3E%3Ccircle cx='100' cy='100' r='50' fill='url(%23g)'/%3E%3C/svg%3E") center/contain no-repeat;}
+/* Tools drop-down (wide screens): Data Refresh, Help, Knowledge Base and Settings. */
+@media (min-width:1400px){
+  :root[data-theme="white"] .nav-tools-group{display:block;position:relative;}
+  :root[data-theme="white"] .nav-tools-toggle{display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;border-radius:0;padding:10px 16px;font:inherit;font-size:1rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#3b4156;cursor:pointer;white-space:nowrap;}
+  :root[data-theme="white"] .nav-tools-toggle:hover,:root[data-theme="white"] .nav-tools-group.open .nav-tools-toggle,:root[data-theme="white"] .nav-tools-group:has(.nav-item.active) .nav-tools-toggle{color:var(--accent);}
+  :root[data-theme="white"] .nav-tools-group:has(.nav-item.active) .nav-tools-toggle{box-shadow:inset 0 -2px 0 var(--accent);}
+  :root[data-theme="white"] .nav-tools-menu{display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:300px;background:#fff;border:1px solid #e6e9f2;border-radius:12px;box-shadow:0 12px 32px rgba(27,31,42,.16);padding:8px;flex-direction:column;z-index:40;}
+  :root[data-theme="white"] .nav-tools-group.open .nav-tools-menu{display:flex;}
+  :root[data-theme="white"] .nav-tools-menu .nav-item{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:12px 14px;border-radius:8px;font-size:1.05rem;letter-spacing:0;text-transform:none;font-weight:500;color:#1b1f2a;box-shadow:none;}
+  :root[data-theme="white"] .nav-tools-menu .nav-item .nav-icon{display:inline-flex;width:40px;height:40px;align-items:center;justify-content:center;border-radius:10px;background:#f3f5fb;color:var(--accent);}
+  :root[data-theme="white"] .nav-tools-menu .nav-item:hover,:root[data-theme="white"] .nav-tools-menu .nav-item.active{background:#f3f5fb;color:var(--accent);}
+}
+/* Larger type, closer to the Screener sample. */
+:root[data-theme="white"] .topbar .topbar-search-input{font-size:1.05rem;height:46px;}
+:root[data-theme="white"] .topbar .live-toggle{font-size:.9rem;}
+:root[data-theme="white"] .strat-table,:root[data-theme="white"] .biz-table{font-size:1rem;}
+:root[data-theme="white"] .strat-table:not(.peers-table) td{font-size:.98rem;padding:13px 6px;}
+:root[data-theme="white"] .strat-table th,:root[data-theme="white"] .biz-table > thead > tr > th,:root[data-theme="white"] .strat-table:not(.peers-table) th{font-size:.92rem;}
+:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,.browse-btn,.tl-btn-primary,.alba-confirm-ok){font-size:.82rem;}
+:root[data-theme="white"] :is(.sub,.settings-row-sub,.upload-hint,.analysis-panel-sub){font-size:1rem;}
+:root[data-theme="white"] :is(.settings-row-title,.analysis-panel-title){font-size:1.1rem;}
+:root[data-theme="white"] .analysis-filters-panel :is(.filter-btn,.filter-group-title,.filter-group label){font-size:.95rem;}
+:root[data-theme="white"] .topbar-brand{font-size:2.1rem;}

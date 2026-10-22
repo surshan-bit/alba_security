@@ -124,6 +124,13 @@ navItems.forEach(btn=>{
     closeSidebar();
   });
 });
+// White theme: the Tools drop-down in the top bar (hidden in the other themes, where its items stay in the sidebar).
+const toolsGroup = document.getElementById('navToolsGroup'), toolsToggle = document.getElementById('navToolsToggle');
+const setToolsOpen = (open) => { toolsGroup.classList.toggle('open', open); toolsToggle.setAttribute('aria-expanded', String(open)); };
+toolsToggle.addEventListener('click', (e)=>{ e.stopPropagation(); setToolsOpen(!toolsGroup.classList.contains('open')); });
+document.addEventListener('click', (e)=>{ if(!closestEl(e, '#navToolsGroup')) setToolsOpen(false); });
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') setToolsOpen(false); });
+toolsGroup.querySelectorAll('.nav-item').forEach(btn=> btn.addEventListener('click', ()=> setToolsOpen(false)));
 if(kbSection){
   kbSection.addEventListener('click', (e)=>{
     const a = closestEl(e, 'a[href^="#help"]');
