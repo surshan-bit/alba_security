@@ -82,7 +82,7 @@ function analysisLbCellRaw(colId, ctx){
     }
     case 'pin': return `<td><button type="button" class="pin-btn${pinned ? ' pinned' : ''}" data-ticker="${escapeHtml(s.ticker)}" title="${pinned ? 'Unpin' : 'Pin to top'}">${pinned ? '★' : '☆'}</button></td>`;
     case 'rank': return `<td class="analysis-lb-rank">${i + 1}</td>`;
-    case 'stock': return `<td><a class="stock-link" href="${escapeHtml(stockShareLink(s))}"><span class="analysis-lb-name">${escapeHtml(s.name)}</span></a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}</span>${getRefreshKit() ? getRefreshKit().dots(s) : ''}</td>`;
+    case 'stock': return `<td class="col-stock"><a class="stock-link" href="${escapeHtml(stockShareLink(s))}"><span class="analysis-lb-name">${escapeHtml(s.name)}</span></a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}</span>${getRefreshKit() ? getRefreshKit().dots(s) : ''}</td>`;
     case 'industry': {
       const m = industryMedianW(s);
       const chg = m === null ? '' : `<span class="ind-w ${m > 0 ? 'chg-up' : m < 0 ? 'chg-down' : ''}" title="Median weekly change of this industry">${m > 0 ? '+' : ''}${m.toFixed(1)}% W</span> `;
@@ -150,7 +150,7 @@ function analysisRowContext(s, i, idx){
 const stockGridColumnIds = () => analysisColumnOrder().filter(id => id !== 'pin');
 function columnHeaderHtml(id){
   const c = ANALYSIS_LB_COLUMN_MAP.get(id);
-  return `<th${c.num ? ' class="num"' : ''}${c.title ? ` title="${escapeHtml(c.title)}"` : ''}>${escapeHtml(c.label)}</th>`;
+  return `<th${c.num || id === 'stock' ? ' class="' + [c.num ? 'num' : '', id === 'stock' ? 'col-stock' : ''].filter(Boolean).join(' ') + '"' : ''}${c.title ? ` title="${escapeHtml(c.title)}"` : ''}>${escapeHtml(c.label)}</th>`;
 }
 
 function renderAnalysisColumnsPanel(colOrder){
