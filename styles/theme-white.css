@@ -261,3 +261,6 @@
   :root[data-theme="white"] .activity-time{font-size:.85rem;}
   :root[data-theme="white"] .activity-btn{font-size:.85rem;}
 }
+/* Trade Log, Help and Knowledge Base: no intro line under the top bar. */
+:root[data-theme="white"] :is(#section-trackrecord,#section-help,#section-knowledgebase) > header .sub{display:none;}
+:root[data-theme="white"] :is(#section-trackrecord,#section-help,#section-knowledgebase) > header{margin:0;}
