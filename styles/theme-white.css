@@ -369,3 +369,9 @@
   :root[data-theme="white"] #tradeLogPanelBody .help-table :is(th,td):first-child{text-align:left !important;}
   :root[data-theme="white"] .tl-ideas .help-table :is(th,td):is(:nth-child(2),:last-child){text-align:left !important;}
 }
+/* Explorer industry table: the row number lives inside the name cell, so when a name wraps to two or more lines the number must sit in the
+   middle of the name block, not on its last line. */
+@media (min-width:901px){
+  :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > .biz-name::before{vertical-align:middle;}
+  :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > .biz-name .biz-open{display:inline-block;vertical-align:middle;text-indent:0;}
+}
