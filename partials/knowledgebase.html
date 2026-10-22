@@ -16,7 +16,7 @@
         <a href="#kb-versions">9. Version history</a>
       </div>
 
-      <h2 id="kb-arch">1. Architecture at a glance</h2>
+      <h2 id="kb-arch" data-icon="layers">1. Architecture at a glance</h2>
       <p>A single-page dashboard published as a claude.ai Artifact. The source is plain ES modules; a small build step turns them into a few static files that the Artifact serves. There is no server of our own: the page talks to the shared database, to Claude and to TradingView through the Artifact's built-in connectors.</p>
       <ul>
         <li><b>Source:</b> <code>src/</code> (JavaScript modules, one responsibility per file), <code>styles/</code> (CSS in cascade order, imported from <code>styles/main.css</code>), <code>partials/</code> (Help, Data Refresh and Knowledge Base text) and <code>index.html</code> (the page shell).</li>
@@ -56,7 +56,7 @@
         <li>Tests: engine unit tests (CSV engines and refresh batches), a jsdom regression harness compared with stored snapshots, and four Chromium suites (smoke and layout including phone sizes, state, live ticker, imports).</li>
       </ul>
 
-      <h2 id="kb-maintenance">2. How this screener stays up to date</h2>
+      <h2 id="kb-maintenance" data-icon="tool">2. How this screener stays up to date</h2>
       <p>The page is static and can't call outside services, so the Claude conversation that maintains it acts as the backend.</p>
       <ul>
         <li><b>Fundamental Score:</b> upload a screener.in CSV in the Fundamental job's panel on the Data Refresh page.
@@ -89,7 +89,7 @@
         </li>
       </ul>
 
-      <h2 id="kb-fundamental">3. Fundamental Score &mdash; stack &amp; sources</h2>
+      <h2 id="kb-fundamental" data-icon="bar">3. Fundamental Score &mdash; stack &amp; sources</h2>
       <p>Combines financial health, profitability, growth, valuation and governance into one score.</p>
       <ul>
         <li><b>Model:</b> 9 factors, weights summing to 10. Full breakdown and worked example in <a href="#help-f1">Help §1</a>.</li>
@@ -107,7 +107,7 @@
         <li><b>Upload panel:</b> shows new and dropped tickers before you commit. If the file browser doesn't open on your phone, open the page in your phone's own browser instead of inside the Claude app.</li>
       </ul>
 
-      <h2 id="kb-technical">4. Technical Score &mdash; stack &amp; sources</h2>
+      <h2 id="kb-technical" data-icon="trend">4. Technical Score &mdash; stack &amp; sources</h2>
       <ul>
         <li><b>Refresh:</b> manual only. Upload a Growth List CSV in the Technical job's panel; there's no schedule or live fetch (removed 2026-09-29).</li>
         <li><b>Source:</b> a TradingView Growth List export with 1-week/1-month price change, RSI(14) and MACD(12,26,9) level and signal.</li>
@@ -143,7 +143,7 @@
       </ul>
       <p class="help-disclaimer">History: from 2026-09-22 to 2026-09-29 the score came mainly from a live daily TradingView fetch. That scheduled task was deleted to save resources, and CSV upload is again the only mechanism.</p>
 
-      <h2 id="kb-valuation">5. Valuation &mdash; stack &amp; sources</h2>
+      <h2 id="kb-valuation" data-icon="tag">5. Valuation &mdash; stack &amp; sources</h2>
       <ul>
         <li><b>Source:</b> one "Intrinsic Value" column from the uploaded screener.in CSV, carried through as is, not recomputed. Analyst price targets were removed 2026-09-29.</li>
         <li><b>Margin of Safety</b> = (Intrinsic Value &minus; Current Price) &divide; Intrinsic Value.</li>
@@ -161,7 +161,7 @@
         <li><b>Removed 2026-09-30:</b> the 12-Month Price Target and FII Ownership Trend cells, including their fields and render code.</li>
       </ul>
 
-      <h2 id="kb-global">6. Global &amp; Macro Information &mdash; stack &amp; sources</h2>
+      <h2 id="kb-global" data-icon="globe">6. Global &amp; Macro Information &mdash; stack &amp; sources</h2>
       <ul>
         <li><b>What it is:</b> a curated, sourced list of macro, commodity, currency and trade-policy linkages that can move the stock. No scoring.</li>
         <li><b>Sources:</b> sector-level web research for most stocks, individual research for large or newsworthy names.</li>
@@ -181,7 +181,7 @@
         </li>
       </ul>
 
-      <h2 id="kb-db">7. Shared database (brief)</h2>
+      <h2 id="kb-db" data-icon="db">7. Shared database (brief)</h2>
       <p>A few collections cover what must sync across devices or survive a republish. Nothing scoring-related lives here.</p>
       <div class="help-table-wrap"><table class="help-table">
         <thead><tr><th>Collection / doc</th><th>Holds</th></tr></thead>
@@ -208,7 +208,7 @@
         <li>The two upload logs hold only the metadata and a pointer to the stored file.</li>
       </ul>
 
-      <h2 id="kb-pipeline">8. Build, test and release</h2>
+      <h2 id="kb-pipeline" data-icon="package">8. Build, test and release</h2>
       <ol>
         <li>Edit only <code>src/</code>, <code>styles/</code>, <code>partials/</code> and <code>index.html</code>. The built files are generated.</li>
         <li><code>npm run check</code> does everything before a release: build, "built files are up to date", syntax check, strict lint (undefined names, start-up order, unused code), the engine unit tests, the jsdom regression harness against <code>tests/golden.json</code>, and the Chromium suites. After a reviewed, intended change, <code>npm run update-golden</code> accepts the new snapshots.</li>
@@ -216,7 +216,7 @@
         <li>Publish with the Artifact tool: the page shell plus only the files that changed (the hashed chunk files change on every build, so the old names are removed). Stock data, research and logs live in the database and never need republishing.</li>
       </ol>
 
-      <h2 id="kb-versions">9. Version history</h2>
+      <h2 id="kb-versions" data-icon="clock">9. Version history</h2>
       <ul>
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
