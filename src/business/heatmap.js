@@ -55,7 +55,9 @@ function heatmapHtml(rows, period, width, size){
   const tiles = [];
   blocks.forEach((b, k) => {
     if(!b.length) return;
-    const bw = bySize ? W * sumW[k] / allW : W;
+    // Each block gets its share of the width but never less than 22%, so a few risers (or fallers) are not squeezed into a thin strip.
+    const nonEmpty = blocks.filter(x => x.length).length, share = nonEmpty > 1 ? Math.min(.78, Math.max(.22, sumW[k] / allW)) : 1;
+    const bw = bySize ? W * share : W;
     layout(b.map(r => ({ v: weight(r), r })).sort((a, c) => c.v - a.v), bw, H).forEach(t => tiles.push(Object.assign(t, { x: t.x + x0 })));
     x0 += bw;
   });
@@ -64,7 +66,7 @@ function heatmapHtml(rows, period, width, size){
     // Text is sized to the tile: big tiles get a full label, small ones a smaller one that wraps, tiny ones only the tooltip.
     const fs = Math.max(9, Math.min(13, Math.min(pw / 9, ph / 3.2)));   // px
     const lineH = fs * 1.2, room = ph - 8;
-    const showChg = pw > 62 && room >= lineH * 2, showN = pw > 80 && room >= lineH * 3.4;
+    const showChg = pw > 62 && room >= lineH * 2, showN = pw > 58 && room >= lineH * 3.1;
     const nameLines = Math.floor((room - (showChg ? lineH : 0) - (showN ? lineH * .9 : 0)) / lineH);
     const showName = pw > 30 && nameLines >= 1;
     const chg = r.mean === null ? 'n/a' : (r.mean > 0 ? '+' : '') + r.mean.toFixed(2) + '%';
