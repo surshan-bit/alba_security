@@ -10,7 +10,7 @@
 :root[data-theme="white"] .topbar-brand{font-size:1.4rem;font-weight:500;letter-spacing:-.5px;}
 :root[data-theme="white"] .topbar :is(.topbar-sep,.topbar-section){display:none;}
 :root[data-theme="white"] .topbar .topbar-search{position:relative;left:auto;top:auto;transform:none;margin:0 0 0 auto;width:260px;max-width:none;flex:0 1 260px;}
-@media (min-width:1400px){:root[data-theme="white"] .topbar .topbar-search{position:absolute;right:185px;top:50%;transform:translateY(-50%);margin:0;width:240px;}}
+@media (min-width:1400px){:root[data-theme="white"] .topbar .topbar-search{position:absolute;right:179px;top:50%;transform:translateY(-50%);margin:0;width:240px;}}
 :root[data-theme="white"] .topbar .topbar-search-input{border-radius:8px;border:1px solid #c9cfdf;background:#fff;height:42px;}
 :root[data-theme="white"] .topbar .topbar-search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent);}
 :root[data-theme="white"] .topbar .activity-bell{color:#4a5163;}
@@ -84,7 +84,7 @@
 }
 :root[data-theme="white"] #section-strategies #stratMain .strat-panel{border-top-width:0;}
 /* Wide screens: the search box grows into the free space between the menu and the Live / bell buttons. */
-@media (min-width:1600px){:root[data-theme="white"] .topbar .topbar-search{width:calc(100vw - 1110px - 185px);max-width:600px;}}
+@media (min-width:1600px){:root[data-theme="white"] .topbar .topbar-search{width:calc(100vw - 1110px - 179px);max-width:600px;}}
 /* Score and rating badges: black text for clarity (the tinted background still shows the verdict). */
 :root[data-theme="white"] .badge:is(.b-buy,.b-mbuy,.b-hold,.b-avoid){color:#000;font-weight:600;}
 /* Primary headings (Data Refresh jobs, Settings, Help and Knowledge Base sections): a topic icon before the title, a larger heavier face and a short accent bar. */
@@ -228,3 +228,25 @@
   :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title::before{content:"";width:28px;height:28px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
   :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title::after{content:"";position:absolute;left:0;bottom:0;width:56px;height:3px;border-radius:2px;background:var(--accent);}
 }
+/* Trade Log: text raised to the readable sizes used elsewhere in White (cards, summary rows, signals, ideas, form). */
+@media (min-width:901px){
+  :root[data-theme="white"] #section-trackrecord .data-chip{font-size:1rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-name{font-size:1.2rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-tk{font-size:.9rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-retval{font-size:2.1rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-retlbl{font-size:.95rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-grid dt{font-size:.82rem;letter-spacing:.06em;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-grid dd{font-size:1.02rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-signal{font-size:1rem;line-height:1.55;}
+  :root[data-theme="white"] #section-trackrecord :is(.tl-signal-label,.tl-signal-badge,.tl-signal-foot,.tl-signal-hist,.tl-signal-notes){font-size:.88rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-signal-why{font-size:1rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-idea-why{font-size:.95rem;}
+  :root[data-theme="white"] #section-trackrecord :is(.tl-ideas-select,.tl-view-btn){font-size:.9rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-form-title{font-size:1rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-grid label{font-size:.85rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-grid input{font-size:1rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-msg{font-size:.92rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card{padding:20px 22px;}
+}
+/* Top bar: equal visual spacing between the search box, the Live pill and the bell (24px each; the bell's icon is inset 11px inside its box). */
+:root[data-theme="white"] .topbar .activity-wrap{margin-left:-5px;}
