@@ -281,3 +281,24 @@
   :root[data-theme="white"] .topbar .topbar-brand::before{width:30px;height:30px;}
   :root[data-theme="white"] .topbar .topbar-search{margin:0;flex:1 1 auto;min-width:0;}
 }
+/* Settings: no intro line either (the first header only; "Claude controls" keeps its own description). */
+:root[data-theme="white"] #section-settings > header:first-child{display:none;}
+/* Breathing room above headings: main headings 44px, sub-headings 28px (none when the heading is the first thing in its block). */
+@media (min-width:901px){
+  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon]){margin-top:44px;}
+  :root[data-theme="white"] :is(.refreshlog-job-title,#section-help h2[data-icon],#section-knowledgebase h2[data-icon]):first-child{margin-top:0;}
+  :root[data-theme="white"] #section-settings .settings-subhead{margin-top:0;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) h3{margin-top:28px;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) h3:first-child{margin-top:0;}
+  :root[data-theme="white"] #section-refreshlog .refreshlog-sub-title{margin-top:28px;}
+  :root[data-theme="white"] #detail .fund-subsection{margin-top:30px;}
+  :root[data-theme="white"] #detail .fund-subsection:first-of-type{margin-top:18px;}
+}
+/* Detail and industry pages: space between a card heading and its content. */
+@media (min-width:901px){
+  :root[data-theme="white"] #detail :is(.val-panel-head,.global-panel-head,.fund-panel-head,.tech-panel-head){margin-bottom:22px;}
+  :root[data-theme="white"] #detail :is(.fund-overall-summary,.global-panel-sub,.peers-sub){margin-top:0;margin-bottom:18px;}
+  :root[data-theme="white"] #detail .fund-pros-cons{margin-top:6px;}
+  :root[data-theme="white"] #detail .fund-pc-title{margin-bottom:12px;}
+  :root[data-theme="white"] #detail .fund-subsection-head{margin-bottom:16px;}
+}
