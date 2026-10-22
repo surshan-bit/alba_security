@@ -135,3 +135,11 @@
   :root[data-theme="white"] #detail .pc-pill{border:0;border-radius:0;padding:8px 16px;font-size:.95rem;color:#3b4156;}
   :root[data-theme="white"] #detail .pc-pill:is(.on,.active,[aria-pressed="true"]){background:color-mix(in srgb,var(--accent) 10%,#fff);color:var(--accent);}
 }
+/* Detail screens: the tab bar goes to the very top, a full-width strip under the top bar, above the Back button and the header card (as on the Screener company page). */
+@media (min-width:901px){
+  :root[data-theme="white"] #detail{display:flex;flex-direction:column;}
+  :root[data-theme="white"] #detail .detail-jump{order:-2;width:100vw;margin:-38px 0 18px calc(50% - 50vw);padding:0 max(24px,calc(50vw - 880px));border-radius:0;box-shadow:none;background:#f6f7fb;border-bottom:1px solid #e6e9f2;box-sizing:border-box;}
+  :root[data-theme="white"] #detail .detail-back-bar{order:-1;}
+  :root[data-theme="white"] #detail .detail-jump .detail-jump-who{flex:0 0 auto;padding:0 14px 0 0;}
+  :root[data-theme="white"] #detail .detail-jump a{padding:14px 18px;}
+}
