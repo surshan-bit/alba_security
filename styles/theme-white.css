@@ -85,3 +85,5 @@
 :root[data-theme="white"] #section-strategies #stratMain .strat-panel{border-top-width:0;}
 /* Wide screens: the search box grows into the free space between the menu and the Live / bell buttons. */
 @media (min-width:1600px){:root[data-theme="white"] .topbar .topbar-search{width:calc(100vw - 1110px - 185px);max-width:600px;}}
+/* Score and rating badges: black text for clarity (the tinted background still shows the verdict). */
+:root[data-theme="white"] .badge:is(.b-buy,.b-mbuy,.b-hold,.b-avoid){color:#000;font-weight:600;}
