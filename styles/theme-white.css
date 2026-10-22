@@ -369,3 +369,9 @@
   :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > .biz-name::before{vertical-align:middle;}
   :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > .biz-name .biz-open{display:inline-block;vertical-align:middle;text-indent:0;}
 }
+/* Logo at 80% of its size (wide screens): wordmark 2.2rem -> 1.76rem, mark 34px -> 27px; the menu moves left to follow. */
+@media (min-width:901px){
+  :root[data-theme="white"] .topbar-brand{font-size:1.76rem;gap:8px;}
+  :root[data-theme="white"] .topbar-brand::before{width:27px;height:27px;}
+}
+@media (min-width:1400px){:root[data-theme="white"] .sidebar{left:278px;}}
