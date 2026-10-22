@@ -354,3 +354,9 @@
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold:not([open]) > summary{border-bottom:0;}
   :root[data-theme="white"] #section-strategies #stratMain .sr-add{width:260px;max-width:100%;}
 }
+/* Explorer industry table: cell text centred vertically in every row (a two-line name no longer pushes the # or the numbers to the bottom),
+   and the number columns centred under their headings. # and Industry stay left. */
+@media (min-width:901px){
+  :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > td{vertical-align:middle;}
+  :root[data-theme="white"] #section-business .biz-table :is(th,td):not(:first-child):not(.biz-name){text-align:center !important;}
+}
