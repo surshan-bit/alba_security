@@ -82,3 +82,4 @@
   :root[data-theme="white"] #section-settings .settings-subhead{margin-top:28px;}
   :root[data-theme="white"] :is(#section-refreshlog,#section-settings) .sub{max-width:none;}
 }
+:root[data-theme="white"] #section-strategies #stratMain .strat-panel{border-top-width:0;}
