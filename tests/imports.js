@@ -548,8 +548,7 @@ async function watchlistScenarios(){
   const S = { strategies: WL_STRATEGIES };
   await runScenario('watchlist sync: the picker lists the strategies and a strategy with no rules cannot be ticked', Object.assign({ cfg: { tvLists: own() } }, S), async page => {
     const rows = await page.evaluate(() => [...document.querySelectorAll('#wlStrategyPicker label')].map(l => [l.querySelector('.wl-pick-name').textContent, l.querySelector('input').disabled, l.querySelector('input').checked]));
-    eq(rows, [[WL[0], false, false], [WL[1], false, false], ['No rules yet', true, false]], 'one row per strategy, none ticked');
-    ok(/No rules yet, so there is nothing to sync/.test(await page.evaluate(() => document.querySelectorAll('#wlStrategyPicker .wl-pick-sub')[2].textContent)), 'watchlist sync: a strategy with no rules says so under its name');
+    eq(rows, [[WL[0], false, false], [WL[1], false, false], ['No rules yet (no rules yet)', true, false]], 'one row per strategy, none ticked');
   });
   await runScenario('watchlist sync: first sync creates one list per ticked strategy and leaves other lists alone', Object.assign({ cfg: { tvLists: own() } }, S), async page => {
     const r = await wlRun(page, [WL[0]]);

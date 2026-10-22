@@ -346,5 +346,26 @@
   :root[data-theme="white"] .wl-pick input[type=checkbox]:disabled{cursor:not-allowed;opacity:.5;}
   :root[data-theme="white"] .wl-pick-text{display:flex;flex-direction:column;gap:2px;min-width:0;}
   :root[data-theme="white"] .wl-pick-name{font-size:1rem;font-weight:700;color:#1b1f2a;}
-  :root[data-theme="white"] .wl-pick-sub{font-size:.95rem;color:#4a5163;line-height:1.5;}
+  :root[data-theme="white"] #section-refreshlog .wl-help{margin:0 0 6px;}
+  :root[data-theme="white"] #section-refreshlog #refreshWatchlistBtn{display:flex;width:fit-content;margin-left:auto;}
+}
+/* Strategies: a single line under the closed setup bar, and the "+ Add a rule" box lined up with the rule fields above it. */
+@media (min-width:901px){
+  :root[data-theme="white"] #section-strategies #stratMain .strat-fold:not([open]) > summary{border-bottom:0;}
+  :root[data-theme="white"] #section-strategies #stratMain .sr-add{width:260px;max-width:100%;}
+}
+/* Explorer industry table: cell text centred vertically in every row (a two-line name no longer pushes the # or the numbers to the bottom). */
+@media (min-width:901px){
+  :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > td{vertical-align:middle;}
+}
+/* All data grids: cell text vertically centred in every row; the column headings and the data stay left-aligned. */
+@media (min-width:901px){
+  :root[data-theme="white"] .strat-table :is(th,td){vertical-align:middle;}
+  :root[data-theme="white"] #section-trackrecord .help-table :is(th,td){vertical-align:middle;}
+}
+/* Explorer industry table: the row number lives inside the name cell, so when a name wraps to two or more lines the number must sit in the
+   middle of the name block, not on its last line. */
+@media (min-width:901px){
+  :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > .biz-name::before{vertical-align:middle;}
+  :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > .biz-name .biz-open{display:inline-block;vertical-align:middle;text-indent:0;}
 }
