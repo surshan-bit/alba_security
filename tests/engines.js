@@ -327,6 +327,13 @@ test('period move: the week starts on Monday and the month on the 1st, India tim
   assert.strictEqual(PM.periodStartSec('W', istMs(2026, 10, 18, 10, 0)), istMs(2026, 10, 12, 0, 0) / 1000);   // Sunday: still the week that ended
   assert.strictEqual(PM.periodStartSec('W', istMs(2026, 10, 1, 9, 0)), istMs(2026, 9, 28, 0, 0) / 1000);     // the Monday can fall in the month before
 });
+test('period move: last week move needs the bar of last week bar', () => {
+  const now = istMs(2026, 10, 21, 12, 0), ws = istMs(2026, 10, 19, 0, 0) / 1000, wk = 7 * 86400;
+  const bars = [[ws - 2 * wk, 0, 0, 0, 100, 1], [ws - wk, 0, 0, 0, 90, 1], [ws + 3600, 0, 0, 0, 95, 1]];
+  assert.strictEqual(PM.lastWeekMove(bars, now), -10);
+  assert.strictEqual(PM.lastWeekMove(bars.slice(0, 1), now), null);                // last week's bar missing: stale, not guessed
+  assert.strictEqual(PM.lastWeekMove(undefined, now), null);
+});
 test('period move: price against the last close before the period, ignoring the bar of the period itself', () => {
   const ws = istMs(2026, 10, 19, 0, 0) / 1000;
   const bars = [[ws - 14 * 86400, 0, 0, 0, 48.6, 1], [ws - 7 * 86400, 0, 0, 0, 51.72, 1], [ws + 3600, 0, 0, 0, 60, 1]];   // two finished weeks and this week's bar
