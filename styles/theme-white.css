@@ -155,3 +155,6 @@
   :root[data-theme="white"] #detail .detail-jump .detail-jump-who.is-current .detail-jump-name,:root[data-theme="white"] #detail .detail-jump a.is-current{color:var(--accent);}
   :root[data-theme="white"] #detail .detail-jump a.is-current{border-bottom-color:var(--accent);}
 }
+/* Wordmark: capitals only, so every letter has the same height, with even spacing and one weight, like the Screener logo. */
+:root[data-theme="white"] .topbar-brand{text-transform:uppercase;font-weight:600;letter-spacing:.07em;}
+@media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:1.55rem;line-height:1;}}
