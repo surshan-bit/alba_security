@@ -349,3 +349,8 @@
   :root[data-theme="white"] #section-refreshlog .wl-help{margin:0 0 6px;}
   :root[data-theme="white"] #section-refreshlog #refreshWatchlistBtn{display:flex;width:fit-content;margin-left:auto;}
 }
+/* Strategies: a single line under the closed setup bar, and the "+ Add a rule" box lined up with the rule fields above it. */
+@media (min-width:901px){
+  :root[data-theme="white"] #section-strategies #stratMain .strat-fold:not([open]) > summary{border-bottom:0;}
+  :root[data-theme="white"] #section-strategies #stratMain .sr-add{width:260px;max-width:100%;}
+}
