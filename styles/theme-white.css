@@ -281,3 +281,5 @@
   :root[data-theme="white"] .topbar .topbar-brand::before{width:30px;height:30px;}
   :root[data-theme="white"] .topbar .topbar-search{margin:0;flex:1 1 auto;min-width:0;}
 }
+/* Settings: no intro line either (the first header only; "Claude controls" keeps its own description). */
+:root[data-theme="white"] #section-settings > header:first-child{display:none;}
