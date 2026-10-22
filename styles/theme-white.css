@@ -346,5 +346,6 @@
   :root[data-theme="white"] .wl-pick input[type=checkbox]:disabled{cursor:not-allowed;opacity:.5;}
   :root[data-theme="white"] .wl-pick-text{display:flex;flex-direction:column;gap:2px;min-width:0;}
   :root[data-theme="white"] .wl-pick-name{font-size:1rem;font-weight:700;color:#1b1f2a;}
-  :root[data-theme="white"] .wl-pick-sub{font-size:.95rem;color:#4a5163;line-height:1.5;}
+  :root[data-theme="white"] #section-refreshlog .wl-help{margin:0 0 6px;}
+  :root[data-theme="white"] #section-refreshlog #refreshWatchlistBtn{display:flex;width:fit-content;margin-left:auto;}
 }
