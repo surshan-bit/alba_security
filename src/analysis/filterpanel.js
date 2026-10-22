@@ -11,6 +11,8 @@ import { publishedStrategies } from '../strategies/state.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { strategyStockSet } from '../strategies/pick.js';
 import { escapeHtml } from '../core/util.js';
+import { isRebound } from '../list/rebound.js';
+import { ensureAllPriceBars } from '../prices/store.js';
 
 // Both filter groups are multiselect (changed 2026-10-06): clicking "All" clears the group back
 // to showing everything; clicking any other button toggles just that option in/out of the active
@@ -55,6 +57,7 @@ function analysisBucket(){
     const st = techStates(s);
     if(analysisFilters.techW.length !== 0 && !analysisFilters.techW.includes(st.weekMacd)) return false;
     if(analysisFilters.techM.length !== 0 && !analysisFilters.techM.includes(st.monthMacd)) return false;
+    if(analysisFilters.rebound && !isRebound(s)) return false;
     return true;
   });
 }
@@ -70,6 +73,7 @@ function analysisPasses(s, skip, inStrategy){
   if(skip !== 'amos' && analysisFilters.mosRatings.length && !analysisFilters.mosRatings.includes(rating)) return false;
   if(skip !== 'atechw' && analysisFilters.techW.length && !analysisFilters.techW.includes(st.weekMacd)) return false;
   if(skip !== 'atechm' && analysisFilters.techM.length && !analysisFilters.techM.includes(st.monthMacd)) return false;
+  if(skip !== 'arebound' && analysisFilters.rebound && !isRebound(s)) return false;
   return true;
 }
 
@@ -82,6 +86,7 @@ function facetCounts(){
         if(!analysisPasses(s, group, inStrategy)) return;
         c.all++;
         const st = techStates(s);
+        if(group === 'arebound'){ if(isRebound(s)) c.on = (c.on || 0) + 1; return; }
         const v = group === 'averdict' ? s.verdict : group === 'amos' ? mosRatingAny(s) : group === 'atechw' ? st.weekMacd : st.monthMacd;
         if(v != null) c[v] = (c[v] || 0) + 1;
       });
@@ -122,6 +127,17 @@ function filterGroup(id, heading, attr, chosen, choices, facetCount){
         <h2>${heading}</h2>
         <div class="filter-group-row">
           ${buttons.join('\n          ')}
+        </div>
+      </div>`;
+}
+
+// Down last week, up this week. One on/off button; its number is how many stocks it would give with the other filters applied.
+function reboundGroup(facetCount){
+  return `<div class="filter-group" id="analysisReboundFilter">
+        <h2>Weekly Move</h2>
+        <div class="filter-group-row">
+          ${filterButton('arebound', 'all', !analysisFilters.rebound, 'var(--text)', 'All', facetCount('arebound', 'all'))}
+          ${filterButton('arebound', 'on', analysisFilters.rebound, 'var(--buy)', 'Rebound', facetCount('arebound', 'on'), 'Down last week, up this week')}
         </div>
       </div>`;
 }
@@ -190,6 +206,7 @@ function analysisFiltersHtml(){
       ${filterGroup('analysisVerdictFilters', 'Fundamental Score', 'averdict', analysisFilters.verdicts, VERDICT_BUTTONS, facetCount)}
       ${filterGroup('analysisMosFilters', 'MoS Rating', 'amos', analysisFilters.mosRatings, MOS_BUTTONS, facetCount)}
       ${filterGroup('analysisTechWFilters', 'W Tech Rating', 'atechw', analysisFilters.techW, TECH_BUTTONS, facetCount)}
+      ${reboundGroup(facetCount)}
       ${filterGroup('analysisTechMFilters', 'M Tech Rating', 'atechm', analysisFilters.techM, TECH_BUTTONS, facetCount)}
       </div>
     </div>
@@ -206,12 +223,17 @@ const GROUPS = [
 ];
 
 // Draws the panel and makes its buttons work. `rerender` redraws the whole Analysis section.
+let barsAsked = false;
 function renderAnalysisFilterPanel(rerender){
+  if(analysisFilters.rebound && !barsAsked){   // last week's move needs the weekly bars: load them once, then redraw
+    barsAsked = true;
+    ensureAllPriceBars().then(ok => { if(ok) rerender(); else barsAsked = false; });
+  }
   const host = document.getElementById('analysisGlobalFilters');
   if(host) host.innerHTML = analysisFiltersHtml();
   const panel = document.getElementById('analysisFilterPanel'), toggle = document.getElementById('analysisFiltersToggle'), summary = document.getElementById('analysisFiltersSummary');
   if(panel && toggle && summary){
-    const names = Array.from(panel.querySelectorAll('.filter-btn.active')).filter(b => !['all'].includes(/** @type {HTMLElement} */ (b).dataset.averdict || /** @type {HTMLElement} */ (b).dataset.amos || /** @type {HTMLElement} */ (b).dataset.atechw || /** @type {HTMLElement} */ (b).dataset.atechm || /** @type {HTMLElement} */ (b).dataset.astrat)).map(b => {
+    const names = Array.from(panel.querySelectorAll('.filter-btn.active')).filter(b => !['all'].includes(/** @type {HTMLElement} */ (b).dataset.averdict || /** @type {HTMLElement} */ (b).dataset.amos || /** @type {HTMLElement} */ (b).dataset.atechw || /** @type {HTMLElement} */ (b).dataset.atechm || /** @type {HTMLElement} */ (b).dataset.arebound || /** @type {HTMLElement} */ (b).dataset.astrat)).map(b => {
       const c = b.cloneNode(true); /** @type {Element} */ (c).querySelectorAll('.filter-n').forEach(n => n.remove()); return c.textContent.trim();
     });
     summary.textContent = names.length ? names.join(', ') : 'All stocks';
@@ -223,6 +245,11 @@ function renderAnalysisFilterPanel(rerender){
   document.querySelectorAll('#analysisStrategyFilter .filter-btn').forEach(btn => btn.addEventListener('click', () => {
     const id = /** @type {HTMLElement} */ (btn).dataset.astrat === 'all' ? '' : /** @type {HTMLElement} */ (btn).dataset.astrat;
     analysisFilters.strategyId = (id && id === analysisFilters.strategyId) ? '' : id;   // clicking the chosen one again goes back to All
+    saveAnalysisFilters(analysisFilters);
+    rerender();
+  }));
+  document.querySelectorAll('#analysisReboundFilter .filter-btn').forEach(btn => btn.addEventListener('click', () => {
+    analysisFilters.rebound = /** @type {HTMLElement} */ (btn).dataset.arebound === 'on' && !analysisFilters.rebound;
     saveAnalysisFilters(analysisFilters);
     rerender();
   }));
