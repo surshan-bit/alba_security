@@ -149,6 +149,8 @@ async function businessTests(browser){
   await page.locator('[data-biz-view="heat"]').click(); await page.waitForSelector('.hm-tile', { timeout: 5000 });
   ok((await page.locator('[data-biz-size].active').getAttribute('data-biz-size')) === 'chg', 'heat map: sized by % change by default');
   const tilesChg = await page.$$eval('.hm-tile', t => t.slice(0, 5).map(x => x.title).join('|'));
+  const signs = await page.$$eval('.hm-tile', t => t.map(x => (/: \+?(-?[0-9.]+)% average/.exec(x.title) || [0, '0'])[1]).map(v => parseFloat(v) > 0 ? 1 : 0));
+  ok(signs.includes(1) && signs.includes(0) && signs.indexOf(0) > signs.lastIndexOf(1), 'heat map: sized by % change, the risers come first and then the fallers');
   await page.locator('[data-biz-size="count"]').click(); await page.waitForTimeout(200);
   const tilesCount = await page.$$eval('.hm-tile', t => t.slice(0, 5).map(x => x.title).join('|'));
   ok((await page.locator('[data-biz-size].active').getAttribute('data-biz-size')) === 'count' && tilesChg !== tilesCount, 'heat map: the toggle re-sizes the tiles by number of stocks');
