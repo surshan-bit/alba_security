@@ -18,6 +18,14 @@ function periodMove(price, bars, startSec){
   return ref == null || !(price > 0) ? null : Math.round((price / ref - 1) * 10000) / 100;
 }
 
+// Last week's move: the close of last week's bar against the close before it, or null when last week's bar is missing (stale bars).
+function lastWeekMove(bars, now = Date.now()){
+  const s0 = periodStartSec('W', now), s1 = s0 - 7 * 86400;
+  if(!Array.isArray(bars) || !bars.some(b => Array.isArray(b) && b[0] >= s1 && b[0] < s0)) return null;
+  const end = periodRef(bars, s0), start = periodRef(bars, s1);
+  return end == null || start == null ? null : Math.round((end / start - 1) * 10000) / 100;
+}
+
 // A move this large, while TradingView's own figure for the same period is less than half of it, means the saved bars are on another scale than today's
 // price (a split or bonus since they were saved): TradingView's figure is used instead. Smaller disagreements stay as worked out, because TradingView
 // reports its last candle for a stock that has not traded in the period, which is not the current period's move.
@@ -45,4 +53,4 @@ function followPrice(bars, price, startSec, gapSec){
   return out;
 }
 
-export { checkedMove, followPrice, periodMove, periodStartSec };
+export { checkedMove, followPrice, lastWeekMove, periodMove, periodStartSec };

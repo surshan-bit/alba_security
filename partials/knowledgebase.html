@@ -221,6 +221,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.226 &middot; 2026-10-22</h3>
+            <ul>
+              <li><strong>New Rebound filter.</strong> Analysis has a Weekly Move filter and Explorer has a Rebound button. Both pick stocks that fell last week but are up this week. In Explorer it works like a strategy: it highlights the matching stocks and the Matched view shows only them. Last week's move comes from the saved weekly price bars, so they load the first time the filter is used.</li>
+            </ul>
+
             <h3>v1.225 &middot; 2026-10-22</h3>
             <ul>
               <li><strong>Refresh all stocks no longer searches TradingView for each stock.</strong> The step "Prepare the stock list" used to look up every stock by its ISIN, which took thousands of TradingView calls and sat at 3%. It now uses the ISIN already saved from the Fundamental CSV, together with the TradingView symbol the last run saved, and keeps the pairs for next time. A stock with no saved symbol is skipped and listed; open it and press Refresh once to find its symbol.</li>

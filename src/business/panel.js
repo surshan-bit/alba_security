@@ -15,16 +15,17 @@ import { kit } from '../refresh/kit.js';
 import { heatmapHtml } from './heatmap.js';
 import { PERIODS, industryTable, needsBars, periodOf } from './calc.js';
 import { closestEl } from '../core/evt.js';
+import { isRebound } from '../list/rebound.js';
 
 const KEY = 'albaDashboard.business.v1';
 let bizFull = false;   // the table fills the whole window
 const newsOpen = new Set();   // industries whose News section is open (closed at first)
 let bizFiltersOpen = false;   // phones: the view, period, grouping and strategy controls fold into one "Filters" line, closed at first
-let period = '1M', by = 'industry', view = 'table', strategyId = '', showMatched = false, loadState = 'idle';   // loadState: 'idle' | 'loading' | 'failed' (price bars for long periods)
+let period = '1M', by = 'industry', view = 'table', strategyId = '', showMatched = false, rebound = false, loadState = 'idle';   // loadState: 'idle' | 'loading' | 'failed' (price bars for long periods)
 const open = new Set();                                    // industries whose detail is open
-try { const v = JSON.parse(localStorage.getItem(KEY) || '{}'); if(PERIODS.some(p => p.key === v.period)) period = v.period; if(v.by === 'group') by = 'group'; if(v.view === 'heat') view = 'heat'; if(typeof v.strategy === 'string') strategyId = v.strategy; if(v.matched === true) showMatched = true; } catch(e){ /* storage unavailable: defaults */ }
+try { const v = JSON.parse(localStorage.getItem(KEY) || '{}'); if(PERIODS.some(p => p.key === v.period)) period = v.period; if(v.by === 'group') by = 'group'; if(v.view === 'heat') view = 'heat'; if(typeof v.strategy === 'string') strategyId = v.strategy; if(v.matched === true) showMatched = true; if(v.rebound === true) rebound = true; } catch(e){ /* storage unavailable: defaults */ }
 // Saved to this person's preferences (and mirrored in the browser).
-const save = () => { prefSet(KEY, JSON.stringify({ period, by, view, strategy: strategyId, matched: showMatched })); };
+const save = () => { prefSet(KEY, JSON.stringify({ period, by, view, strategy: strategyId, matched: showMatched, rebound })); };
 
 const barsFor = (s) => { const d = priceHistoryByTicker[pcTickerKey(s)]; return d ? d['1W'] : undefined; };
 const pct = (v) => v === null ? '<span class="biz-na">n/a</span>' : '<span class="' + (v > 0 ? 'chg-up' : v < 0 ? 'chg-down' : '') + '">' + (v > 0 ? '+' : '') + v.toFixed(2) + '%</span>';
@@ -32,8 +33,12 @@ const bodyEl = () => document.getElementById('businessBody');
 
 // The stocks that qualify for the strategy chosen here (none chosen: no highlighting, no extra columns).
 const chosenStrategy = () => validStrategyId(strategyId);
-const strategyOn = () => !!chosenStrategy();
-const matchSet = () => strategyStockSet(chosenStrategy()) || new Set();
+// "Strategy" below also covers the Rebound button (down last week, up this week): the stocks that pass whichever of the two are on.
+const strategyOn = () => !!chosenStrategy() || rebound;
+const matchSet = () => {
+  const set = chosenStrategy() ? strategyStockSet(chosenStrategy()) || new Set() : new Set(stocks);
+  return rebound ? new Set(Array.from(set).filter(isRebound)) : set;
+};
 // "Matched" view: only the industries (and, inside them, only the stocks) that qualify for the chosen strategy. It needs a strategy; without one everything is shown.
 const matchedOnly = () => showMatched && strategyOn();
 // The industry rows as shown on the page, with the same filter the table uses.
@@ -131,13 +136,14 @@ function strategyGroupHtml(){
     const set = strategyStockSet(x.id);
     return btn(x.id, '<span class="filter-label">' + escapeHtml(x.name) + '</span>', set ? set.size : 0, x.id === chosen, 'var(--accent)', 'Highlight the stocks that qualify for this strategy today');
   }));
-  return '<div class="filters analysis-filters-panel biz-strategy-panel"><div class="filter-group"><h2>Strategy</h2><div class="filter-group-row">' + list.join('') + '</div></div></div>';
+  const rb = '<div class="filter-group"><h2>Weekly Move</h2><div class="filter-group-row"><button type="button" class="filter-btn' + (rebound ? ' active' : '') + '" data-biz-rebound="1" aria-pressed="' + rebound + '" title="Down last week, up this week"><span class="filter-dot" style="background:var(--buy)"></span>Rebound<span class="filter-n">' + stocks.filter(isRebound).length + '</span></button></div></div>';
+  return '<div class="filters analysis-filters-panel biz-strategy-panel"><div class="filter-group"><h2>Strategy</h2><div class="filter-group-row">' + list.join('') + '</div></div>' + rb + '</div>';
 }
 // The view, period, grouping and strategy controls sit in a column beside the content, like the Analysis filters.
 // The "Filters" line (phones only; wide screens show the controls beside the table): what is chosen, and a click opens the controls.
 function filtersToggleHtml(){
   const x = publishedStrategies().find(y => y.id === chosenStrategy());
-  const summary = [view === 'heat' ? 'Heat map' : 'Table', periodOf(period).key, by === 'group' ? 'Industry group' : 'Industry', x ? x.name : 'All'].join(' \u00b7 ');
+  const summary = [view === 'heat' ? 'Heat map' : 'Table', periodOf(period).key, by === 'group' ? 'Industry group' : 'Industry', (x ? x.name : 'All') + (rebound ? ' + Rebound' : '')].join(' \u00b7 ');
   return '<button type="button" class="biz-filters-toggle" data-biz-filters="1" aria-expanded="' + bizFiltersOpen + '"><span class="ft-label">Filters</span><span class="ft-summary">' + escapeHtml(summary) + '</span><span class="ft-caret" aria-hidden="true">\u25be</span></button>';
 }
 const layoutHtml = (controls, main) => '<div class="biz-layout"><aside class="biz-side' + (bizFiltersOpen ? '' : ' filters-collapsed') + '">' + filtersToggleHtml() + controls + '</aside><div class="biz-main' + (bizFull ? ' biz-full' : '') + '">' + main + '</div></div>';
@@ -159,7 +165,7 @@ function draw(el){
     + '</div>';
   const viewToggle = '<div class="tl-view-toggle biz-match-toggle" role="group" aria-label="Show">'
     + '<button type="button" class="tl-view-btn' + (!matchedOnly() ? ' active' : '') + '" data-biz-show="all" title="Show every industry and stock">All</button>'
-    + '<button type="button" class="tl-view-btn' + (matchedOnly() ? ' active' : '') + '" data-biz-show="matched"' + (strategyOn() ? ' title="Show only the industries and stocks that match the chosen strategy"' : ' disabled title="Choose a strategy first"') + '>Matched</button></div>';
+    + '<button type="button" class="tl-view-btn' + (matchedOnly() ? ' active' : '') + '" data-biz-show="matched"' + (strategyOn() ? ' title="Show only the industries and stocks that match the chosen strategy"' : ' disabled title="Choose a strategy or Rebound first"') + '>Matched</button></div>';
   const expandBtn = viewToggle + '<button type="button" class="biz-expand" data-biz-all="' + (allOpen ? 'collapse' : 'expand') + '">' + (allOpen ? 'Collapse all' : 'Expand all') + '</button>'
     + '<button type="button" class="biz-expand" data-biz-full="1" aria-pressed="' + bizFull + '" title="Show the table across the whole window (Esc to leave)">' + fullscreenLabel(bizFull) + '</button>';
   let status = '';
@@ -189,7 +195,7 @@ function draw(el){
 }
 
 function ensureData(){
-  if(!needsBars(period) || loadState === 'loading') return;
+  if(!(needsBars(period) || rebound) || loadState === 'loading') return;
   loadState = 'loading'; render();
   ensureAllPriceBars().then(ok => { loadState = ok ? 'idle' : 'failed'; render(); });
 }
@@ -211,6 +217,7 @@ function init(){
     if(closestEl(e, '[data-biz-full]')){ bizFull = !bizFull; browserFullscreen(bizFull); render(); return; }
     const sb = closestEl(e, '[data-biz-strat]');
     if(sb){ strategyId = sb.dataset.bizStrat; save(); render(); return; }
+    if(closestEl(e, '[data-biz-rebound]')){ rebound = !rebound; save(); render(); ensureData(); return; }
     const shw = closestEl(e, '[data-biz-show]');
     if(shw){ if(/** @type {HTMLButtonElement} */ (shw).disabled) return; showMatched = shw.dataset.bizShow === 'matched'; save(); render(); return; }
     const vb = closestEl(e, '[data-biz-view]'), ht = closestEl(e, '[data-biz-heat]');
