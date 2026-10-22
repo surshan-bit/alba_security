@@ -1,5 +1,5 @@
-// Industry heat map: one tile per industry, sized by how many stocks it has (market-cap weights are not available),
-// coloured by the average change over the chosen period. Pure functions that return HTML.
+// Industry heat map: one tile per industry, sized by the size of its average change (the default) or by how many stocks it has
+// (market-cap weights are not available), coloured by the average change over the chosen period. Pure functions that return HTML.
 import { escapeHtml } from '../core/util.js';
 
 // The % move that gives the strongest colour, per period (a month moves more than a week).
@@ -41,9 +41,13 @@ function tileColor(mean, period){
 }
 
 // rows: the industry rows (name, count, mean). width: the pixel width the map will be drawn at (decides which tiles have room for text).
-function heatmapHtml(rows, period, width){
+function heatmapHtml(rows, period, width, size){
   const W = 1000, H = 780, pxScale = (width || 1000) / W;
-  const tiles = layout(rows.filter(r => r.count > 0).map(r => ({ v: Math.sqrt(r.count), r })).sort((a, b) => b.v - a.v), W, H);
+  const live = rows.filter(r => r.count > 0), bySize = size !== 'count';
+  // Size by % change: the area follows how far the average moved (up or down); a floor keeps flat or missing industries visible.
+  const maxMove = Math.max(0.0001, ...live.map(r => r.mean === null ? 0 : Math.abs(r.mean))), floor = maxMove * .08;
+  const weight = r => bySize ? Math.max(r.mean === null ? 0 : Math.abs(r.mean), floor) : Math.sqrt(r.count);
+  const tiles = layout(live.map(r => ({ v: weight(r), r })).sort((a, b) => b.v - a.v), W, H);
   const tile = (t) => {
     const r = t.r, pw = t.w * pxScale, ph = t.h * pxScale;
     // Text is sized to the tile: big tiles get a full label, small ones a smaller one that wraps, tiny ones only the tooltip.
@@ -58,7 +62,7 @@ function heatmapHtml(rows, period, width){
       + (showName ? '<span class="hm-name" style="-webkit-line-clamp:' + Math.min(nameLines, 4) + '">' + escapeHtml(r.name) + '</span>' : '') + (showChg ? '<span class="hm-chg">' + chg + '</span>' : '') + (showN ? '<span class="hm-n">' + r.count + ' stock' + (r.count === 1 ? '' : 's') + '</span>' : '') + '</button>';
   };
   const s = SCALE[period] || 10;
-  const legend = '<div class="hm-legend"><span>−' + s + '%</span><i class="hm-bar"></i><span>+' + s + '%</span><span class="hm-note">Tile size grows with the number of stocks (scaled so small industries stay readable). Colour = average ' + period + ' change. Tap a tile to open the industry.</span></div>';
+  const legend = '<div class="hm-legend"><span>−' + s + '%</span><i class="hm-bar"></i><span>+' + s + '%</span><span class="hm-note">' + (bySize ? 'Tile size grows with the size of the average change (up or down).' : 'Tile size grows with the number of stocks (scaled so small industries stay readable).') + ' Colour = average ' + period + ' change. Tap a tile to open the industry.</span></div>';
   return '<div class="hm-wrap" style="aspect-ratio:' + W + '/' + H + '">' + tiles.map(tile).join('') + '</div>' + legend;
 }
 

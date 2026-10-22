@@ -10,7 +10,7 @@
 :root[data-theme="white"] .topbar-brand{font-size:1.4rem;font-weight:500;letter-spacing:-.5px;}
 :root[data-theme="white"] .topbar :is(.topbar-sep,.topbar-section){display:none;}
 :root[data-theme="white"] .topbar .topbar-search{position:relative;left:auto;top:auto;transform:none;margin:0 0 0 auto;width:260px;max-width:none;flex:0 1 260px;}
-@media (min-width:1400px){:root[data-theme="white"] .topbar .topbar-search{position:absolute;right:185px;top:50%;transform:translateY(-50%);margin:0;width:240px;}}
+@media (min-width:1400px){:root[data-theme="white"] .topbar .topbar-search{position:absolute;right:179px;top:50%;transform:translateY(-50%);margin:0;width:240px;}}
 :root[data-theme="white"] .topbar .topbar-search-input{border-radius:8px;border:1px solid #c9cfdf;background:#fff;height:42px;}
 :root[data-theme="white"] .topbar .topbar-search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent);}
 :root[data-theme="white"] .topbar .activity-bell{color:#4a5163;}
@@ -36,9 +36,9 @@
 :root[data-theme="white"] .analysis-leaderboard.lb-full .strat-table thead th{background:#fff;}
 :root[data-theme="white"] table tbody td{border-color:#eef0f6;}
 /* Buttons: outlined, uppercase, letter-spaced, as on the Screener. */
-:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main){text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;font-weight:600;border-radius:6px;color:#3b4156;}
+@media (min-width:901px){:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main){text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;font-weight:600;border-radius:6px;color:#3b4156;}}
 :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main):hover{color:var(--accent);border-color:var(--accent);}
-:root[data-theme="white"] :is(.browse-btn,.tl-btn-primary,.alba-confirm-ok){text-transform:uppercase;letter-spacing:.1em;font-size:.76rem;font-weight:600;border-radius:6px;}
+@media (min-width:901px){:root[data-theme="white"] :is(.browse-btn,.tl-btn-primary,.alba-confirm-ok){text-transform:uppercase;letter-spacing:.1em;font-size:.76rem;font-weight:600;border-radius:6px;}}
 :root[data-theme="white"] .filters{border-radius:16px;}
 /* No side borders on the content panels and tables: only the top and bottom hairlines stay. */
 :root[data-theme="white"] :is(.analysis-panel,.strat-panel,.strat-fold,.filters,.strat-table-wrap,.upload-panel,.help-panel,.refreshlog-run){border-left-width:0;border-right-width:0;border-top-width:0;border-radius:0;box-shadow:none;}
@@ -59,7 +59,7 @@
 }
 /* Larger type, closer to the Screener sample. */
 :root[data-theme="white"] .topbar .topbar-search-input{font-size:1.05rem;height:46px;}
-:root[data-theme="white"] .topbar .live-toggle{font-size:.9rem;}
+@media (min-width:901px){:root[data-theme="white"] .topbar .live-toggle{font-size:.9rem;}}
 @media (min-width:901px){
 :root[data-theme="white"] .strat-table,:root[data-theme="white"] .biz-table{font-size:1rem;}
 :root[data-theme="white"] .strat-table:not(.peers-table) td{font-size:.98rem;padding:13px 6px;}
@@ -84,7 +84,7 @@
 }
 :root[data-theme="white"] #section-strategies #stratMain .strat-panel{border-top-width:0;}
 /* Wide screens: the search box grows into the free space between the menu and the Live / bell buttons. */
-@media (min-width:1600px){:root[data-theme="white"] .topbar .topbar-search{width:calc(100vw - 1110px - 185px);max-width:600px;}}
+@media (min-width:1600px){:root[data-theme="white"] .topbar .topbar-search{width:calc(100vw - 1110px - 179px);max-width:600px;}}
 /* Score and rating badges: black text for clarity (the tinted background still shows the verdict). */
 :root[data-theme="white"] .badge:is(.b-buy,.b-mbuy,.b-hold,.b-avoid){color:#000;font-weight:600;}
 /* Primary headings (Data Refresh jobs, Settings, Help and Knowledge Base sections): a topic icon before the title, a larger heavier face and a short accent bar. */
@@ -125,7 +125,7 @@
   :root[data-theme="white"] #detail .detail-jump-label{display:none;}
   :root[data-theme="white"] #detail .detail-jump a{background:transparent;border-radius:0;padding:16px 18px;font-size:1.02rem;font-weight:500;color:#3b4156;border-bottom:3px solid transparent;}
   :root[data-theme="white"] #detail .detail-jump a:hover{color:var(--accent);border-bottom-color:var(--accent);background:transparent;}
-  :root[data-theme="white"] #detail .detail-jump a .jump-preview{font-size:.8rem;}
+  :root[data-theme="white"] #detail .detail-jump a .jump-preview{font-size:.95rem;}
   /* Section cards */
   :root[data-theme="white"] #detail :is(.val-panel,.global-panel,.fund-panel,.tech-panel){background:#fff;border:0;border-radius:16px;box-shadow:var(--card-shadow);padding:26px 32px 30px;margin-top:14px;}
   :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title){font-size:1.55rem;font-weight:500;letter-spacing:-.01em;color:#1b1f2a;}
@@ -158,7 +158,7 @@
 }
 /* Detail screens (cont.): the Back button sits at the right end of the tab strip, and the tab of the section being read is marked as you scroll. */
 @media (min-width:901px){
-  :root[data-theme="white"] #detail .detail-back-bar{order:-3;position:sticky;top:var(--tb-h);height:0;margin:-30px 0 30px;padding:0 max(24px,calc(50vw - 880px)) 0 0;width:100vw;margin-left:calc(50% - 50vw);box-sizing:border-box;z-index:8;pointer-events:none;}
+  :root[data-theme="white"] #detail .detail-back-bar{order:-3;position:sticky;top:var(--tb-h);height:0;margin:-38px 0 38px;padding:0 max(24px,calc(50vw - 880px)) 0 0;width:100vw;margin-left:calc(50% - 50vw);box-sizing:border-box;z-index:8;pointer-events:none;}
   :root[data-theme="white"] #detail .detail-back-bar .detail-back{pointer-events:auto;}
   :root[data-theme="white"] #detail .detail-jump .detail-jump-who{display:flex;}
   :root[data-theme="white"] #detail .detail-jump .detail-jump-name{font-size:1.02rem;font-weight:500;color:#3b4156;}
@@ -184,3 +184,100 @@
 :root[data-theme="white"] #section-trackrecord .analysis-panel-head .analysis-panel-title::before{content:"";width:26px;height:26px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
 :root[data-theme="white"] #section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-title{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='7' width='20' height='14' rx='2'/%3E%3Cpath d='M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2'/%3E%3Cline x1='2' y1='13' x2='22' y2='13'/%3E%3C/svg%3E");}
 :root[data-theme="white"] #section-trackrecord .tl-ideas .analysis-panel-title{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6'/%3E%3Cpath d='M10 22h4'/%3E%3Cpath d='M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z'/%3E%3C/svg%3E");}
+/* Stock detail: the Refresh control reads like the links beside it (View on screener.in, Open chart, Share link). */
+@media (min-width:901px){
+  :root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn{background:transparent;border:0;padding:0;border-radius:0;font-size:1.1rem;font-weight:500;line-height:1.5;color:var(--accent);gap:8px;}
+  :root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn:hover{text-decoration:underline;color:var(--accent);}
+  :root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn svg{width:18px;height:18px;}
+}
+/* Stock/Industry detail: the gap under the header card equals the gap between the section cards (each card already has its own top margin). */
+@media (min-width:901px){:root[data-theme="white"] #detail .detail-top{margin-bottom:0;}}
+/* Detail pages: text in the Global & Macro lists, Strengths / Watch-outs and the factor cards is raised to the size of the metric rows (about 16px). */
+@media (min-width:901px){
+  :root[data-theme="white"] #detail :is(.global-item,.fund-pros li,.fund-cons li,.fund-pc-empty,.fund-cell-business,.val-cell-sub){font-size:1rem;line-height:1.55;}
+  :root[data-theme="white"] #detail .global-item .global-item-source{font-size:.86rem;}
+  :root[data-theme="white"] #detail .global-col-title{font-size:.95rem;letter-spacing:.1em;}
+  :root[data-theme="white"] #detail :is(.fund-pros li,.fund-cons li){margin-bottom:8px;}
+}
+@media (min-width:901px){:root[data-theme="white"] #detail .detail-back-bar .detail-back{position:relative;top:1px;}}
+/* Tab strip: the score and verdict beside Fundamental / Technical Score become a clear tinted pill with black text. */
+@media (min-width:901px){
+  :root[data-theme="white"] #detail .detail-jump .jump-preview{display:inline-flex;align-items:baseline;gap:6px;margin-left:10px;padding:3px 12px;border-radius:999px;font-size:.95rem;font-weight:600;color:#000;background:#eef0f6;}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview b{font-size:1.15rem;font-weight:800;}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-buy{background:rgba(31,122,84,.18);}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-mbuy{background:rgba(86,111,41,.2);}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-hold{background:rgba(201,162,39,.26);}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-avoid{background:rgba(168,63,56,.18);}
+}
+/* Tools screens (Data Refresh, Help, Knowledge Base, Settings): body text raised to about 16px, like the detail pages. */
+@media (min-width:901px){
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) :is(p,li,b,strong,i,em,a,td,code,.glossary-term,.help-disclaimer,.help-formula){font-size:1rem;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) :is(li,p,td){line-height:1.6;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) .glossary-def{font-size:.95rem;line-height:1.55;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) th{font-size:.9rem;letter-spacing:.04em;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) h3{font-size:1.2rem;font-weight:700;color:#1b1f2a;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) .badge{font-size:.85rem;}
+  :root[data-theme="white"] #section-refreshlog :is(.refreshlog-freshness-label,.refreshlog-freshness-count,.refreshlog-freshness-summary,.select-mode-btn,.browse-btn,li,.fi-pct,.upload-hint){font-size:1rem;}
+  :root[data-theme="white"] #section-refreshlog .select-mode-btn,:root[data-theme="white"] #section-refreshlog .browse-btn{font-size:.82rem;}
+  :root[data-theme="white"] #section-refreshlog .refreshlog-sub-note{font-size:.92rem;}
+  :root[data-theme="white"] #section-settings .theme-toggle-btn{font-size:.92rem;padding:8px 16px;}
+}
+/* Settings: "Themes" is a primary heading like "Claude controls": palette icon, large bold title, accent bar. */
+@media (min-width:901px){
+  :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title{display:flex;align-items:center;gap:12px;font-size:1.6rem;font-weight:700;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='13.5' cy='6.5' r='.5'/%3E%3Ccircle cx='17.5' cy='10.5' r='.5'/%3E%3Ccircle cx='8.5' cy='7.5' r='.5'/%3E%3Ccircle cx='6.5' cy='12.5' r='.5'/%3E%3Cpath d='M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.8 1.7-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.5-.7-.5-1.1 0-.9.8-1.7 1.7-1.7H16c3.3 0 6-2.7 6-6 0-4.9-4.5-8.4-10-8.4z'/%3E%3C/svg%3E");}
+  :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title::before{content:"";width:28px;height:28px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
+  :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title::after{content:"";position:absolute;left:0;bottom:0;width:56px;height:3px;border-radius:2px;background:var(--accent);}
+}
+/* Trade Log: text raised to the readable sizes used elsewhere in White (cards, summary rows, signals, ideas, form). */
+@media (min-width:901px){
+  :root[data-theme="white"] #section-trackrecord .data-chip{font-size:1rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-name{font-size:1.2rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-tk{font-size:.9rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-retval{font-size:2.1rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-retlbl{font-size:.95rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-grid dt{font-size:.82rem;letter-spacing:.06em;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-grid dd{font-size:1.02rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-signal{font-size:1rem;line-height:1.55;}
+  :root[data-theme="white"] #section-trackrecord :is(.tl-signal-label,.tl-signal-badge,.tl-signal-foot,.tl-signal-hist,.tl-signal-notes){font-size:.88rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-signal-why{font-size:1rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-idea-why{font-size:.95rem;}
+  :root[data-theme="white"] #section-trackrecord :is(.tl-ideas-select,.tl-view-btn){font-size:.9rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-form-title{font-size:1rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-grid label{font-size:.85rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-grid input{font-size:1rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-msg{font-size:.92rem;}
+  :root[data-theme="white"] #section-trackrecord .tl-card{padding:20px 22px;}
+}
+/* Top bar: equal visual spacing between the search box, the Live pill and the bell (24px each; the bell's icon is inset 11px inside its box). */
+:root[data-theme="white"] .topbar .activity-wrap{margin-left:-5px;}
+/* Notifications panel: the same larger, readable text as the rest of White (wide screens). */
+@media (min-width:901px){
+  :root[data-theme="white"] .activity-panel{width:min(440px,92vw);}
+  :root[data-theme="white"] .activity-head{padding:14px 18px;}
+  :root[data-theme="white"] .activity-head-title{font-size:.95rem;letter-spacing:.1em;font-weight:700;}
+  :root[data-theme="white"] .activity-empty{font-size:1rem;line-height:1.55;padding:18px;}
+  :root[data-theme="white"] .activity-title{font-size:1rem;font-weight:600;}
+  :root[data-theme="white"] .activity-text{font-size:.95rem;line-height:1.5;}
+  :root[data-theme="white"] .activity-time{font-size:.85rem;}
+  :root[data-theme="white"] .activity-btn{font-size:.85rem;}
+}
+/* Trade Log, Help and Knowledge Base: no intro line under the top bar. */
+:root[data-theme="white"] :is(#section-trackrecord,#section-help,#section-knowledgebase) > header .sub{display:none;}
+:root[data-theme="white"] :is(#section-trackrecord,#section-help,#section-knowledgebase) > header{margin:0;}
+/* Segmented switches (Table / Heat map, period, grouping, All / Matched, size, Cards / Table, themes): one taller, readable size everywhere. */
+@media (min-width:901px){
+  :root[data-theme="white"] :is(.tl-view-toggle,.theme-toggle){box-sizing:border-box;height:42px;padding:3px;align-items:stretch;border-radius:999px;}
+  :root[data-theme="white"] :is(.tl-view-toggle .tl-view-btn,.theme-toggle .theme-toggle-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;height:auto;padding:0 18px;font-size:.92rem;font-weight:600;border-radius:999px;white-space:nowrap;}
+  :root[data-theme="white"] .biz-side .tl-view-toggle .tl-view-btn{padding:0 8px;}
+  :root[data-theme="white"] :is(#tradeAddBtn,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main){height:42px;display:inline-flex;align-items:center;font-size:.85rem;}
+}
+/* Phones: a visible menu button, a compact logo mark, tighter top bar. */
+@media (max-width:900px){
+  :root[data-theme="white"] .topbar{height:auto;min-height:56px;padding:6px 10px;gap:8px;margin-bottom:10px;}
+  :root[data-theme="white"] .topbar .menu-toggle{color:#1b1f2a;margin:0;}
+  :root[data-theme="white"] .topbar .menu-toggle:hover{background:#eef0f6;}
+  :root[data-theme="white"] .topbar .topbar-title{display:flex;flex:none;}
+  :root[data-theme="white"] .topbar .topbar-brand{font-size:0;gap:0;}
+  :root[data-theme="white"] .topbar .topbar-brand::before{width:30px;height:30px;}
+  :root[data-theme="white"] .topbar .topbar-search{margin:0;flex:1 1 auto;min-width:0;}
+}
