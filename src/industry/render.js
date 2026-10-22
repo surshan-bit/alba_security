@@ -9,6 +9,7 @@ import { ensureAllPriceBars, pcTickerKey, priceHistoryByTicker } from '../prices
 import { EVENT_GROUPS, eventsByBar } from '../prices/events.js';
 import { analysisLbCell, analysisRowContext, columnHeaderHtml, stockGridColumnIds } from '../analysis/columns.js';
 import { industryFactors, industryGlobal, industryNews, industrySeries } from './calc.js';
+import { bindJumpSpy } from '../detail/jumpnav.js';
 
 const IST = 19800;
 const NEWS_SHOWN = 30;
@@ -182,6 +183,7 @@ function renderIndustryDetail(by, name, backLabel, openStock){
     ${chartsHtml()}
     ${newsHtml(news)}
     ${stocksHtml(members)}`;
+  bindJumpSpy(detailEl);
   detailEl.querySelectorAll('.detail-jump a[data-jump]').forEach(a => a.addEventListener('click', (e) => {
     e.preventDefault();
     const el = document.getElementById(/** @type {HTMLElement} */ (a).dataset.jump);
