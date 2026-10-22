@@ -313,3 +313,13 @@
   :root[data-theme="white"] .help-table tbody tr:nth-child(odd) td:last-child{border-radius:0 8px 8px 0;}
   :root[data-theme="white"] #section-trackrecord .help-table{width:100%;}
 }
+/* Strategies: fewer boxes, more free flow. Fields become underlined, the setup bar and secondary buttons lose their frames, and the list actions are plain links. */
+@media (min-width:901px){
+  :root[data-theme="white"] #section-strategies #stratMain :is(input:not([type=checkbox]):not([type=radio]),select,textarea){border:0;border-bottom:1px solid #c9cfdf;border-radius:0;background-color:transparent;box-shadow:none;padding-left:2px;padding-right:6px;}
+  :root[data-theme="white"] #section-strategies #stratMain :is(input,select,textarea):focus{border-bottom:2px solid var(--accent);box-shadow:none;outline:none;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{border:0;border-bottom:1px solid #e6e9f2;border-radius:0;background:transparent;padding:12px 0;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;box-shadow:none;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.on):hover{background:color-mix(in srgb,var(--accent) 8%,#fff);}
+  :root[data-theme="white"] #section-strategies #stratList :is(.strat-new,.strat-restore){border:0;background:transparent;color:var(--accent);padding-left:9px;}
+  :root[data-theme="white"] #section-strategies #stratList :is(.strat-new,.strat-restore):hover{background:color-mix(in srgb,var(--accent) 8%,#fff);}
+}
