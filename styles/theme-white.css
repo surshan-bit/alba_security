@@ -70,3 +70,13 @@
 @media (min-width:901px){:root[data-theme="white"] :is(.settings-row-title,.analysis-panel-title){font-size:1.1rem;}}
 @media (min-width:901px){:root[data-theme="white"] .analysis-filters-panel :is(.filter-btn,.filter-group-title,.filter-group label){font-size:.95rem;}}
 @media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:2.1rem;}}
+/* Data Refresh and Settings: one big white card on the lavender page, like Explorer, with flat rows split by hairlines. */
+@media (min-width:901px){
+  :root[data-theme="white"] :is(#section-refreshlog,#section-settings){background:#fff;border-radius:12px;box-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);padding:22px 28px 28px;}
+  :root[data-theme="white"] :is(#section-refreshlog,#section-settings) :is(.refreshlog-panel,.settings-panel){max-width:none;}
+  :root[data-theme="white"] :is(#section-refreshlog,#section-settings) :is(.refreshlog-freshness,.upload-panel,.refreshlog-run,.settings-row,.refreshlog-job,.live-refresh){background:transparent;border:0;border-radius:0;box-shadow:none;}
+  :root[data-theme="white"] :is(#section-refreshlog,#section-settings) :is(.upload-panel,.settings-row,.refreshlog-freshness,.refreshlog-job){border-bottom:1px solid #eef0f6;padding-left:0;padding-right:0;margin-bottom:0;}
+  :root[data-theme="white"] #section-settings .settings-row{padding-top:18px;padding-bottom:18px;}
+  :root[data-theme="white"] #section-settings .settings-subhead{margin-top:28px;}
+  :root[data-theme="white"] :is(#section-refreshlog,#section-settings) .sub{max-width:none;}
+}
