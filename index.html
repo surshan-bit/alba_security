@@ -22,17 +22,17 @@
   } catch(e){ /* storage unavailable — default (dark) theme applies */ }
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=38f610d7">
+<link rel="stylesheet" href="styles.css?v=67e76ae3">
 <!--build:preload-->
-<link rel="modulepreload" href="app.js?v=38f610d7">
+<link rel="modulepreload" href="app.js?v=67e76ae3">
 <link rel="modulepreload" href="chunks/chunk-SHVOPT5T.js">
 <link rel="modulepreload" href="chunks/chunk-I4SRDW76.js">
-<link rel="modulepreload" href="chunks/main-57ULGYEE.js">
-<link rel="modulepreload" href="chunks/chunk-OMW5OHYI.js">
-<link rel="modulepreload" href="chunks/chunk-LBZ4M5QO.js">
-<link rel="modulepreload" href="chunks/chunk-KQ4GMFWW.js">
-<link rel="modulepreload" href="chunks/chunk-FAPPWN4J.js">
-<link rel="modulepreload" href="chunks/chunk-FEW7WBTA.js">
+<link rel="modulepreload" href="chunks/main-BQ7FEVMZ.js">
+<link rel="modulepreload" href="chunks/chunk-H5IC6UXM.js">
+<link rel="modulepreload" href="chunks/chunk-APD3I3HY.js">
+<link rel="modulepreload" href="chunks/chunk-HVCHASEM.js">
+<link rel="modulepreload" href="chunks/chunk-KDFUBEHV.js">
+<link rel="modulepreload" href="chunks/chunk-JQQFYL24.js">
 <!--/build:preload-->
 </head>
 <body>
@@ -77,7 +77,7 @@
       </g>
       <circle cx="100" cy="100" r="50" fill="url(#brandSunGrad)"/>
     </svg>
-    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.227 &mdash; tagged 2026-10-22">v1.227</span></div>
+    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.228 &mdash; tagged 2026-10-22">v1.228</span></div>
   </div>
   <div class="sidebar-nav">
     <div class="nav-section-label">Menu</div>
@@ -105,6 +105,10 @@
       </span>
       Trade Log
     </button>
+    <!-- Tools: a drop-down in the White theme's top bar; in Dark and Light the group is invisible and the four items sit in the sidebar as before. -->
+    <div class="nav-tools-group" id="navToolsGroup">
+      <button type="button" class="nav-tools-toggle" id="navToolsToggle" aria-haspopup="true" aria-expanded="false" aria-controls="navToolsMenu">Tools <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+      <div class="nav-tools-menu" id="navToolsMenu">
     <button type="button" class="nav-item" data-section="refreshlog">
       <span class="nav-icon">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6"></path><path d="M2.5 22v-6h6"></path><path d="M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8"></path><path d="M22 12.5a10 10 0 0 1-18.8 4.3L2.5 16"></path></svg>
@@ -129,6 +133,8 @@
       </span>
       Settings
     </button>
+      </div>
+    </div>
   </div>
 </nav>
 
@@ -240,7 +246,7 @@
   <div class="boot-msg" style="font-size:.95rem;max-width:480px;line-height:1.5;"></div>
   <button type="button" class="boot-retry" hidden style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer;" onclick="location.reload()">Retry</button>
 </div>
-<script src="js/loader.js" data-entry="app.js?v=38f610d7"></script>
+<script src="js/loader.js" data-entry="app.js?v=67e76ae3"></script>
 </body>
 </html>
 

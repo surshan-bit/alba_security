@@ -53,3 +53,6 @@ h1{margin:0 0 6px;font-size:1.55rem;font-weight:600;letter-spacing:.2px;}
 .menu-toggle span:nth-child(2){top:17px;}
 .menu-toggle span:nth-child(3){top:23px;}
 .topbar-brand,.topbar-section{line-height:1.2;}
+/* Tools group: invisible wrapper everywhere (items stay in the sidebar); the White theme turns it into a drop-down in the top bar. */
+.nav-tools-group,.nav-tools-menu{display:contents;}
+.nav-tools-toggle{display:none;}
