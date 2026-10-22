@@ -294,3 +294,11 @@
   :root[data-theme="white"] #detail .fund-subsection{margin-top:30px;}
   :root[data-theme="white"] #detail .fund-subsection:first-of-type{margin-top:18px;}
 }
+/* Detail and industry pages: space between a card heading and its content. */
+@media (min-width:901px){
+  :root[data-theme="white"] #detail :is(.val-panel-head,.global-panel-head,.fund-panel-head,.tech-panel-head){margin-bottom:22px;}
+  :root[data-theme="white"] #detail :is(.fund-overall-summary,.global-panel-sub,.peers-sub){margin-top:0;margin-bottom:18px;}
+  :root[data-theme="white"] #detail .fund-pros-cons{margin-top:6px;}
+  :root[data-theme="white"] #detail .fund-pc-title{margin-bottom:12px;}
+  :root[data-theme="white"] #detail .fund-subsection-head{margin-bottom:16px;}
+}
