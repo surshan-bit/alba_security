@@ -16,21 +16,23 @@
     const saved = localStorage.getItem('albaDashboard.theme.v1');
     if(saved === 'light' || saved === 'indigo'){
       document.documentElement.setAttribute('data-theme', 'indigo');
+    } else if(saved === 'white'){
+      document.documentElement.setAttribute('data-theme', 'white');
     }
   } catch(e){ /* storage unavailable — default (dark) theme applies */ }
 })();
 </script>
-<link rel="stylesheet" href="styles.css?v=1e67c9f5">
+<link rel="stylesheet" href="styles.css?v=4959e1b0">
 <!--build:preload-->
-<link rel="modulepreload" href="app.js?v=1e67c9f5">
-<link rel="modulepreload" href="chunks/chunk-XNUOLYNC.js">
-<link rel="modulepreload" href="chunks/chunk-BCXG4U5S.js">
-<link rel="modulepreload" href="chunks/main-GXF2DUPA.js">
-<link rel="modulepreload" href="chunks/chunk-G6RRGWWD.js">
-<link rel="modulepreload" href="chunks/chunk-MJ5RBLP7.js">
-<link rel="modulepreload" href="chunks/chunk-CANUUO2E.js">
-<link rel="modulepreload" href="chunks/chunk-DAOLZHGY.js">
-<link rel="modulepreload" href="chunks/chunk-2D4ERSIE.js">
+<link rel="modulepreload" href="app.js?v=4959e1b0">
+<link rel="modulepreload" href="chunks/chunk-SHVOPT5T.js">
+<link rel="modulepreload" href="chunks/chunk-I4SRDW76.js">
+<link rel="modulepreload" href="chunks/main-57ULGYEE.js">
+<link rel="modulepreload" href="chunks/chunk-OMW5OHYI.js">
+<link rel="modulepreload" href="chunks/chunk-LBZ4M5QO.js">
+<link rel="modulepreload" href="chunks/chunk-KQ4GMFWW.js">
+<link rel="modulepreload" href="chunks/chunk-FAPPWN4J.js">
+<link rel="modulepreload" href="chunks/chunk-FEW7WBTA.js">
 <!--/build:preload-->
 </head>
 <body>
@@ -206,7 +208,7 @@
       <div class="settings-row">
         <div class="settings-row-text">
           <div class="settings-row-title">Themes</div>
-          <div class="settings-row-sub">Choose how the screener looks — Dark or Light. Saved to your account when you are signed in (otherwise to this browser only).</div>
+          <div class="settings-row-sub">Choose how the screener looks — Dark, Light or White. Saved to your account when you are signed in (otherwise to this browser only).</div>
         </div>
         <div class="theme-toggle" id="themeToggle" role="group" aria-label="Theme">
           <button type="button" class="theme-toggle-btn" data-theme-choice="dark">
@@ -216,6 +218,10 @@
           <button type="button" class="theme-toggle-btn" data-theme-choice="indigo">
             <span class="theme-swatch" style="background:linear-gradient(135deg,#fafcff 50%,#4658b6 50%);border:1px solid #a9bdd3;"></span>
             Light
+          </button>
+          <button type="button" class="theme-toggle-btn" data-theme-choice="white">
+            <span class="theme-swatch" style="background:linear-gradient(135deg,#ffffff 50%,#5b5fe0 50%);border:1px solid #d5dae6;"></span>
+            White
           </button>
         </div>
       </div>
@@ -234,7 +240,7 @@
   <div class="boot-msg" style="font-size:.95rem;max-width:480px;line-height:1.5;"></div>
   <button type="button" class="boot-retry" hidden style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer;" onclick="location.reload()">Retry</button>
 </div>
-<script src="js/loader.js" data-entry="app.js?v=1e67c9f5"></script>
+<script src="js/loader.js" data-entry="app.js?v=4959e1b0"></script>
 </body>
 </html>
 
