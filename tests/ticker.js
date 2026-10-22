@@ -36,7 +36,13 @@ const rowsNow = page => page.evaluate(() => {
     await page.waitForFunction(() => window.__alba && window.__alba.stocks && document.querySelector('.app-section.active tr[data-idx]'), null, { timeout: 20000 });
     await page.evaluate(() => { window.__tvWeekClose = 100; window.__tvMonthClose = 80; window.__tvQuote = { close: 123.4 }; });
 
-    // 1. the first look (about 4 seconds after start-up) fills every live cell
+    // 0. live prices start off and make no TradingView call until the button is pressed
+    ok(await page.evaluate(() => document.querySelector('.live-toggle').textContent === 'Live off'), 'live prices start off');
+    await page.waitForTimeout(6000);
+    ok(await page.evaluate(() => !Array.from(document.querySelectorAll('[data-live="price"]')).some(c => /123\.4/.test(c.textContent))), 'with live off no row shows the live price after the start-up look');
+    await page.click('.live-toggle');
+
+    // 1. the first look after the button is pressed fills every live cell
     let good = true;
     try { await page.waitForFunction(() => { const c = Array.from(document.querySelectorAll('.app-section.active tr[data-idx]')).filter(tr => tr.offsetParent !== null).slice(0, 50).map(tr => tr.querySelector('[data-live="price"]')); return c.length > 0 && c.every(x => x && x.textContent.trim() === '₹123.4'); }, null, { timeout: 30000 }); } catch(e){ good = false; }
     ok(good, 'the live price reaches the Price cells of every row on screen');
