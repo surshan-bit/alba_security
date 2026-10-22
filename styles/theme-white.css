@@ -83,3 +83,5 @@
   :root[data-theme="white"] :is(#section-refreshlog,#section-settings) .sub{max-width:none;}
 }
 :root[data-theme="white"] #section-strategies #stratMain .strat-panel{border-top-width:0;}
+/* Wide screens: the search box grows into the free space between the menu and the Live / bell buttons. */
+@media (min-width:1600px){:root[data-theme="white"] .topbar .topbar-search{width:calc(100vw - 1110px - 185px);max-width:600px;}}
