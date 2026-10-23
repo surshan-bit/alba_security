@@ -436,6 +436,9 @@
   :root[data-theme="white"] .biz-main{margin-top:-18px;}
   :root[data-theme="white"] .biz-toolbar .biz-showing{margin:0 0 10px;}
   :root[data-theme="white"] :is(.strat-table,.biz-table) :is(th,td){vertical-align:middle;}
+  /* Explorer: the # hangs in front of the industry name (the name cell is indented to make room for it) */
+  :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name,:root[data-theme="white"] .biz-table > thead > tr > th:first-child{padding-left:calc(4px + 2.6em);}
+  :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name .biz-open{text-indent:0;}
   /* Buttons in the toolbars */
   :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,#section-business .biz-expand,#section-business .rk-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;height:auto;padding:0 14px;font-size:.76rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
   :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,#section-business .biz-expand,#section-business .rk-btn):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
