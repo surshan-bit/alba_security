@@ -39,12 +39,9 @@ function getShownIndex(){ return shownIdx; }
 let detailOpenHook = null;
 function setDetailOpenHook(fn){ detailOpenHook = fn; }
 function rerenderDetail(){ if(stocks[shownIdx]) keepScroll(detailEl, () => renderDetail(shownIdx)); }
-function renderDetail(idx){
-  shownIdx = idx;
-  const s = stocks[idx];
-  if(detailOpenHook) detailOpenHook(s);
-  const pinned = isPinned(s);
-  detailEl.innerHTML = `
+// The whole stock page as markup: the Back bar, the header with its links, the jump row and the panels.
+function detailHtml(s, idx, pinned){
+  return `
     ${detailBackTo ? `<div class="detail-back-bar"><button type="button" class="detail-back" id="detailBackBtn" title="Back (Esc)">&larr; Back to ${detailBackTo.label || 'Analysis'}<span class="detail-back-key">Esc</span></button></div>` : ''}
     <div class="detail-top">
       <div class="detail-title">
@@ -68,10 +65,10 @@ function renderDetail(idx){
     ${renderTechPanel(s)}
     ${renderPeersPanel(s, idx)}
   `;
+}
 
-  initPriceChart(s);
-  loadPriceBarsFor(s, idx);
-  bindDetailJumpNav(detailEl);
+// Rows of the Peers table open that stock; the table is scrolled so the open stock sits in the middle.
+function bindPeers(idx){
   const peersPanel = document.getElementById('peersPanel');
   if(peersPanel){
     peersPanel.querySelectorAll('tbody tr[data-idx]').forEach(tr => {
@@ -86,7 +83,10 @@ function renderDetail(idx){
       scroller.scrollTop = Math.max(0, selfRow.offsetTop - scroller.clientHeight / 2 + selfRow.offsetHeight / 2);
     }
   }
+}
 
+// The links and buttons in the page: the help links, Share link and the pin star.
+function bindDetailLinks(s){
   const howCalculatedLink = document.getElementById('howCalculatedLink');
   if(howCalculatedLink){
     howCalculatedLink.addEventListener('click', (e)=>{
@@ -115,9 +115,20 @@ function renderDetail(idx){
   if(detailPinBtn){
     detailPinBtn.onclick = () => togglePin(s.ticker);
   }
+}
 
+function renderDetail(idx){
+  shownIdx = idx;
+  const s = stocks[idx];
+  if(detailOpenHook) detailOpenHook(s);
+  detailEl.innerHTML = detailHtml(s, idx, isPinned(s));
+
+  initPriceChart(s);
+  loadPriceBarsFor(s, idx);
+  bindDetailJumpNav(detailEl);
+  bindPeers(idx);
+  bindDetailLinks(s);
   bindLiveDataBar(s);   // Live Data Refresh buttons (js/livedata.js)
-
 }
 
 function setDetailBackTo(v){ detailBackTo = v; }
