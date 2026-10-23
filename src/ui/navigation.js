@@ -78,7 +78,7 @@ function showSection(key){
     if(m){ m.render(); return Promise.resolve(); }
     return openPart(key).then(mod => { if(appSections[key].classList.contains('active')) mod.render(); }).catch(e => showLoadError(key, e));
   }
-  return Promise.resolve();
+  return ensurePartial(appSections[key]).catch(e => showLoadError(key, e));   // Help and Knowledge Base text is fetched when the page is first opened
 }
 
 // Knowledge Base intentionally cross-references specific Help sections (e.g. "see Help §1")

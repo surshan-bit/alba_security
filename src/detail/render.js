@@ -110,16 +110,14 @@ function renderDetail(idx){
   if(howCalculatedLink){
     howCalculatedLink.addEventListener('click', (e)=>{
       e.preventDefault();
-      showSection('knowledgebase');
-      document.getElementById('kb-fundamental')?.scrollIntoView({block:'start'});
+      showSection('knowledgebase').then(() => document.getElementById('kb-fundamental')?.scrollIntoView({block:'start'}));
     });
   }
 
   detailEl.querySelectorAll('.proxy-tag-link').forEach(tag => {
     tag.addEventListener('click', (e)=>{
       e.preventDefault();
-      showSection('help');
-      document.getElementById('glossary-data-proxy')?.scrollIntoView({block:'start'});
+      showSection('help').then(() => document.getElementById('glossary-data-proxy')?.scrollIntoView({block:'start'}));
     });
   });
 

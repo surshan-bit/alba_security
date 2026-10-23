@@ -26,7 +26,6 @@
 .fund-grid{grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;column-gap:32px;display:grid;}
 .fund-cell-head{margin-bottom:8px;display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
 .fund-cell-label{color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
-.proxy-tag{display:inline-block;margin-left:7px;font-size:.62rem;font-weight:700;text-transform:none;letter-spacing:0;color:var(--hold);background:rgba(201,162,39,.18);border:1px solid var(--hold);border-radius:10px;padding:1px 7px;vertical-align:middle;text-decoration:none;cursor:pointer;}
 .incomplete-tag{display:inline-block;margin-left:7px;font-size:.62rem;font-weight:700;text-transform:none;letter-spacing:0;color:var(--muted);background:rgba(127,127,127,.14);border:1px dashed var(--muted);border-radius:10px;padding:1px 7px;vertical-align:middle;cursor:help;}
 .data-chip.chip-na{opacity:.55;}
 .proxy-tag-link:hover{background:rgba(201,162,39,.15);}
