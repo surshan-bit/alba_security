@@ -7,6 +7,10 @@ import { closestEl } from '../core/evt.js';
 
 function init_ui_globalsearch(){
   const input = document.getElementById('globalSearch'), box = document.getElementById('globalSuggest'), clear = document.getElementById('globalSearchClear');
+  // A shorter prompt on phones, so the whole of it fits in the box.
+  const longHint = input.getAttribute('placeholder') || '', phoneQuery = window.matchMedia('(max-width: 900px)');
+  const setHint = () => input.setAttribute('placeholder', phoneQuery.matches ? 'Search a company' : longHint);
+  setHint(); phoneQuery.addEventListener('change', setHint);
   if(!input || !box) return;
   let items = [], active = -1;
   const hide = () => { box.classList.remove('show'); input.setAttribute('aria-expanded', 'false'); items = []; active = -1; };
