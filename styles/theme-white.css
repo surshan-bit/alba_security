@@ -412,3 +412,14 @@
   :root[data-theme="white"] #section-refreshlog .select-mode-btn.fi-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 88%,#000);}
   :root[data-theme="white"] #section-refreshlog :is(.browse-btn,.select-mode-btn):hover:not(.fi-btn-primary):not(:disabled){color:var(--accent);border-color:var(--accent);}
 }
+/* Phones, Data Refresh: primary buttons sit at the right (Import data next to Browse CSV, Refresh all stocks, Sync selected). */
+@media (max-width:900px){
+  :root[data-theme="white"] #section-refreshlog .upload-row:has(.browse-wrap){display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;}
+  :root[data-theme="white"] #section-refreshlog .upload-row:has(.browse-wrap) .upload-text{flex:1 0 100%;}
+  :root[data-theme="white"] #section-refreshlog .upload-row .browse-wrap{flex:none;width:auto;}
+  :root[data-theme="white"] #section-refreshlog .upload-row:has(.browse-wrap) .select-mode-btn{flex:none;width:auto;}
+  :root[data-theme="white"] #section-refreshlog .upload-row:has(#tvSnapshotBtn){display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;}
+  :root[data-theme="white"] #section-refreshlog .upload-row:has(#tvSnapshotBtn) .upload-text{flex:1 0 100%;}
+  :root[data-theme="white"] #section-refreshlog #tvSnapshotBtn{flex:none;width:auto;}
+  :root[data-theme="white"] #section-refreshlog #refreshWatchlistBtn{display:flex;width:fit-content;margin-left:auto;}
+}
