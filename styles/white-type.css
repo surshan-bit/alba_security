@@ -3,8 +3,8 @@
    Sizes:  --t-xl page titles and the detail-page name   --t-lg card, section and panel headings, big scores
            --t-md body text, grid values, names, menus   --t-sm grid headings, counts, buttons, pills, small labels
            --t-xs the tiniest tags (version, Pro, key hints)
-   Weights: 400 for text and values, 600 for headings, the active choice, buttons and bold words. Nothing else. */
-:root[data-theme="white"]{--t-xl:32px;--t-lg:20px;--t-md:16px;--t-sm:13px;--t-xs:11px;--w-reg:400;--w-strong:600;}
+   Weights: 500 (medium) for text and values, 700 (bold) for headings, the active choice, buttons and bold words. Nothing else. */
+:root[data-theme="white"]{--t-xl:32px;--t-lg:20px;--t-md:16px;--t-sm:13px;--t-xs:11px;--w-reg:500;--w-strong:700;}
 @media (max-width:900px){
   :root[data-theme="white"]{--t-xl:24px;--t-lg:17px;--t-md:13px;--t-sm:12px;--t-xs:10px;}
 }
