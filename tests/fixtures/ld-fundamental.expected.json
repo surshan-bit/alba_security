@@ -1,0 +1,761 @@
+{
+ "firstA": {
+  "title": "Fundamental refresh finished · Company 01",
+  "text": "1 of 1 refreshed.",
+  "tone": "ok"
+ },
+ "afterA": {
+  "research": {
+   "ticker": "TKR01",
+   "events": [
+    {
+     "k": "news",
+     "d": "2026-10-08",
+     "t": "Company wins a big order",
+     "src": "Wire",
+     "url": "https://news.example/n1",
+     "s": "pos"
+    },
+    {
+     "k": "news",
+     "d": "2026-10-07",
+     "t": "Regulator opens a probe",
+     "src": "Wire",
+     "url": "https://news.example/n2",
+     "s": "neg"
+    },
+    {
+     "k": "news",
+     "d": "2026-09-20",
+     "t": "Quarterly note",
+     "src": "Desk",
+     "url": "https://news.example/n3",
+     "s": "neu"
+    },
+    {
+     "k": "corp",
+     "d": "2026-09-01",
+     "t": "Dividend",
+     "src": "Exch",
+     "url": ""
+    },
+    {
+     "k": "earn",
+     "d": "2026-08-01",
+     "t": "Results · Q1 results",
+     "src": "Exch",
+     "url": ""
+    }
+   ],
+   "asof": "2026-10-11",
+   "changeNote": "Moat & Competitive Advantage 0.90 → 0.50; Management & Governance 0.90 → 0.50",
+   "factors": {
+    "fin": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for fin",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "prof": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for prof",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "growth": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for growth",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "val": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for val",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "moat": {
+     "score": 0.5,
+     "note": "rescored: made-up",
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for moat",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "gov": {
+     "score": 0.5,
+     "note": "rescored: made-up",
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for gov",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "predict": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for predict",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "reinvest": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for reinvest",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "dcf": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for dcf",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    }
+   },
+   "summary": {
+    "asof": "2026-10-11",
+    "strengths": [
+     {
+      "text": "Cheap for its quality",
+      "tone": "strong"
+     },
+     {
+      "text": "Steady",
+      "tone": "good"
+     }
+    ],
+    "watchouts": [
+     {
+      "text": "Debt is rising",
+      "tone": "concern"
+     }
+    ]
+   }
+  },
+  "updates": {
+   "ticker": "TKR01",
+   "globalFactors": {
+    "scope": "company",
+    "asof": "2026-10-11",
+    "positive": [
+     {
+      "text": "Demand is firm &lt;i&gt;now&lt;/i&gt;",
+      "source": "Wire, 2026-10-08",
+      "url": "https://news.example/n1"
+     }
+    ],
+    "negative": [
+     {
+      "text": "Input costs rising",
+      "source": "Claude analysis, no live source",
+      "url": ""
+     }
+    ],
+    "events": [
+     {
+      "headline": "Oil shock",
+      "impact": "negative",
+      "why": "Raises freight cost.",
+      "source": "Wire",
+      "url": "https://news.example/n2"
+     },
+     {
+      "headline": "Odd impact",
+      "impact": "mixed",
+      "why": "x",
+      "source": "Claude analysis, no live source",
+      "url": ""
+     }
+    ]
+   }
+  },
+  "prompts": [
+   {
+    "tier": "quick",
+    "len": 686,
+    "task": " Label each news headline about Company 01 by how it is like"
+   },
+   {
+    "tier": "quick",
+    "len": 5076,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
+   },
+   {
+    "tier": "quick",
+    "len": 5428,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
+   },
+   {
+    "tier": "quick",
+    "len": 4119,
+    "task": " Write this company's Global & Macro Information: macro, com"
+   },
+   {
+    "tier": "quick",
+    "len": 4967,
+    "task": " Write the Strengths and Watch-outs box shown at the top of "
+   }
+  ]
+ },
+ "promptsAfterSecondA": 5,
+ "firstB": {
+  "title": "Fundamental refresh finished · Company 02",
+  "text": "1 of 1 refreshed.",
+  "tone": "ok"
+ },
+ "afterB": {
+  "research": {
+   "ticker": "TKR02",
+   "events": [
+    {
+     "k": "news",
+     "d": "2026-10-08",
+     "t": "Company wins a big order",
+     "src": "Wire",
+     "url": "https://news.example/n1",
+     "s": "pos"
+    },
+    {
+     "k": "news",
+     "d": "2026-10-07",
+     "t": "Regulator opens a probe",
+     "src": "Wire",
+     "url": "https://news.example/n2",
+     "s": "neg"
+    },
+    {
+     "k": "news",
+     "d": "2026-09-20",
+     "t": "Quarterly note",
+     "src": "Desk",
+     "url": "https://news.example/n3",
+     "s": "neu"
+    },
+    {
+     "k": "corp",
+     "d": "2026-09-01",
+     "t": "Dividend",
+     "src": "Exch",
+     "url": ""
+    },
+    {
+     "k": "earn",
+     "d": "2026-08-01",
+     "t": "Results · Q1 results",
+     "src": "Exch",
+     "url": ""
+    }
+   ],
+   "asof": "2026-10-11",
+   "changeNote": "Moat & Competitive Advantage 0.90 → 0.50; Management & Governance 0.72 → 0.50; 4 metric(s) filled",
+   "factors": {
+    "prof": {
+     "note": "basis: made-up",
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for prof",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     },
+     "metrics": {
+      "Avg ROE 7yr": "12.5%"
+     }
+    },
+    "gov": {
+     "score": 0.5,
+     "note": "rescored: made-up",
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for gov",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     },
+     "metrics": {
+      "FII change 3yr": "12.5%",
+      "DII change 3yr": "12.5%"
+     }
+    },
+    "predict": {
+     "note": "basis: made-up",
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for predict",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     },
+     "metrics": {
+      "5-year average": "12.5%"
+     }
+    },
+    "fin": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for fin",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "growth": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for growth",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "val": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for val",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "moat": {
+     "score": 0.5,
+     "note": "rescored: made-up",
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for moat",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "reinvest": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for reinvest",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    },
+    "dcf": {
+     "research": {
+      "asof": "2026-10-11",
+      "headline": "Headline for dcf",
+      "points": [
+       "Point one",
+       "Point two <b>x</b>"
+      ],
+      "positives": [
+       "Plus"
+      ],
+      "negatives": [
+       "Minus"
+      ],
+      "sources": [
+       {
+        "title": "Order win",
+        "url": "https://news.example/n1"
+       }
+      ]
+     }
+    }
+   },
+   "summary": {
+    "asof": "2026-10-11",
+    "strengths": [
+     {
+      "text": "Cheap for its quality",
+      "tone": "strong"
+     },
+     {
+      "text": "Steady",
+      "tone": "good"
+     }
+    ],
+    "watchouts": [
+     {
+      "text": "Debt is rising",
+      "tone": "concern"
+     }
+    ]
+   }
+  },
+  "updates": {
+   "ticker": "TKR02",
+   "globalFactors": {
+    "scope": "company",
+    "asof": "2026-10-11",
+    "positive": [
+     {
+      "text": "Demand is firm &lt;i&gt;now&lt;/i&gt;",
+      "source": "Wire, 2026-10-08",
+      "url": "https://news.example/n1"
+     }
+    ],
+    "negative": [
+     {
+      "text": "Input costs rising",
+      "source": "Claude analysis, no live source",
+      "url": ""
+     }
+    ],
+    "events": [
+     {
+      "headline": "Oil shock",
+      "impact": "negative",
+      "why": "Raises freight cost.",
+      "source": "Wire",
+      "url": "https://news.example/n2"
+     },
+     {
+      "headline": "Odd impact",
+      "impact": "mixed",
+      "why": "x",
+      "source": "Claude analysis, no live source",
+      "url": ""
+     }
+    ]
+   },
+   "technical": {
+    "score": 9.15,
+    "reason": "monthly MACD bullish, above zero, weekly MACD bearish, above zero. monthly RSI 65.6 (strong), weekly RSI 58.8 (strong). Valuation pillar reading of 9.5/10 (attractively valued).",
+    "states": {
+     "monthMacd": "bull_above",
+     "weekMacd": "bear_above",
+     "monthRsi": "strong",
+     "weekRsi": "strong",
+     "valuation": "attractively valued"
+    },
+    "raw": {
+     "monthMacdLevel": 3.4717337453135855,
+     "monthMacdSignal": 3.415391974089267,
+     "weekMacdLevel": 3.477643919523217,
+     "weekMacdSignal": 3.515665267986453,
+     "weekPctChange": -1.4925373134328401,
+     "monthPctChange": 1.1278195488721776,
+     "monthRsi": 65.58492306956165,
+     "weekRsi": 58.835190485350104,
+     "valuationScore": 9.5
+    },
+    "asof": "2026-10-11",
+    "basis": {
+     "week": "2026-10-05",
+     "month": "2026-09-05"
+    },
+    "provisional": {
+     "score": 9.15,
+     "states": {
+      "monthMacd": "bull_above",
+      "weekMacd": "bear_above",
+      "monthRsi": "strong",
+      "weekRsi": "strong"
+     },
+     "monthRsi": 67.58785035085575,
+     "weekRsi": 58.835190485350104
+    }
+   }
+  },
+  "prompts": [
+   {
+    "tier": "quick",
+    "len": 686,
+    "task": " Label each news headline about Company 01 by how it is like"
+   },
+   {
+    "tier": "quick",
+    "len": 5076,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
+   },
+   {
+    "tier": "quick",
+    "len": 5428,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
+   },
+   {
+    "tier": "quick",
+    "len": 4119,
+    "task": " Write this company's Global & Macro Information: macro, com"
+   },
+   {
+    "tier": "quick",
+    "len": 4967,
+    "task": " Write the Strengths and Watch-outs box shown at the top of "
+   },
+   {
+    "tier": "quick",
+    "len": 686,
+    "task": " Label each news headline about Company 02 by how it is like"
+   },
+   {
+    "tier": "quick",
+    "len": 3090,
+    "task": " These metrics are \"n/a\" in the screener.in CSV import: [pro"
+   },
+   {
+    "tier": "quick",
+    "len": 5064,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
+   },
+   {
+    "tier": "quick",
+    "len": 5422,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
+   },
+   {
+    "tier": "quick",
+    "len": 4110,
+    "task": " Write this company's Global & Macro Information: macro, com"
+   },
+   {
+    "tier": "quick",
+    "len": 4968,
+    "task": " Write the Strengths and Watch-outs box shown at the top of "
+   }
+  ]
+ }
+}
