@@ -1,8 +1,8 @@
 // "Score trend" panel on the stock page: the Fundamental and Technical score (0-10) over time, with the price as a
 // faint line behind them. The history is recorded by each import (src/history/scorehistory.js); until a stock has
 // two points there is nothing to draw, and the panel says so.
-import { escapeHtml } from '../core/util.js';
-import { loadScoreHistory, tickerKey, ymdToDate } from '../history/scorehistory.js';
+import { escapeHtml, tickerKey } from '../core/util.js';
+import { loadScoreHistory, ymdToDate } from '../history/scorehistory.js';
 import { panelIcon } from './icons.js';
 
 // The panel is hidden for now (v1.194). Set to true to bring it back: the score history keeps being recorded by every import, so

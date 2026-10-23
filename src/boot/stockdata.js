@@ -5,24 +5,14 @@
 // cached list is used, otherwise every chunk is fetched and cached. Research overlays (stockResearch, stockUpdates,
 // priceHistory) are applied on top afterwards. Whoever changes the base data (CSV refresh) writes the changed chunks and
 // then bumps stockMeta/main.version; open pages show a "data updated - reload" banner.
+import { openKvDb } from '../core/idbkv.js';
 import { debugHandle } from './handoff.js';
 import { bootMessage, hideBootMessage, showUpdateBanner } from './status.js';
 
 const DATA_DB = 'albaStockCache', DATA_STORE = 'kv';
 
-function cacheOpen(){
-  return new Promise((resolve) => {
-    try {
-      const r = indexedDB.open(DATA_DB, 1);
-      r.onupgradeneeded = () => { try { r.result.createObjectStore(DATA_STORE); } catch(e){} };
-      r.onsuccess = () => resolve(r.result);
-      r.onerror = () => resolve(null);
-      r.onblocked = () => resolve(null);
-    } catch(e){ resolve(null); }
-  });
-}
 async function cacheGet(version){
-  const idb = await cacheOpen(); if(!idb) return null;
+  const idb = await openKvDb(DATA_DB, DATA_STORE); if(!idb) return null;
   return new Promise((resolve) => {
     try {
       const q = idb.transaction(DATA_STORE, 'readonly').objectStore(DATA_STORE).get('v' + version);
@@ -33,7 +23,7 @@ async function cacheGet(version){
 }
 async function cachePut(version, list){
   let json; try { json = JSON.stringify(list); } catch(e){ return; }   // before any await: later overlays must not leak into the saved copy
-  const idb = await cacheOpen(); if(!idb) return;
+  const idb = await openKvDb(DATA_DB, DATA_STORE); if(!idb) return;
   try {
     const tx = idb.transaction(DATA_STORE, 'readwrite');
     const os = tx.objectStore(DATA_STORE);

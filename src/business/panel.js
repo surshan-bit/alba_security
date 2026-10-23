@@ -13,6 +13,7 @@ import { prefSet } from '../identity/prefs.js';
 import { browserFullscreen, fullscreenLabel, watchFullscreenExit } from '../ui/fullscreen.js';
 import { kit } from '../refresh/kit.js';
 import { heatmapHtml } from './heatmap.js';
+import { newsItemHtml } from './newsitem.js';
 import { sheetFrame, syncSheets } from '../ui/phonesheet.js';
 import { PERIODS, industryTable, needsBars, periodOf } from './calc.js';
 import { closestEl } from '../core/evt.js';
@@ -101,11 +102,7 @@ function paintNewsStatus(){
 
 function newsHtml(r){
   if(!r.news.length) return '<p class="upload-hint">No news saved for these stocks in this period. Headlines come from Refresh Fundamental Info, so stocks that have not been refreshed recently have none.</p>';
-  return '<ul class="biz-news">' + r.news.slice(0, 15).map(n => {
-    const tag = n.s === 'pos' ? '<span class="news-pos">positive</span>' : n.s === 'neg' ? '<span class="news-neg">negative</span>' : '';
-    const title = /^https?:\/\//i.test(n.url) ? '<a href="' + escapeHtml(n.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(n.t) + '</a>' : escapeHtml(n.t);
-    return '<li><span class="biz-news-date">' + escapeHtml(n.d) + '</span> ' + tag + ' ' + title + '<span class="biz-news-meta"> · ' + escapeHtml(n.stock) + (n.src ? ' · ' + escapeHtml(n.src) : '') + '</span></li>';
-  }).join('') + '</ul>' + (r.news.length > 15 ? '<p class="upload-hint">Showing the newest 15 of ' + r.news.length + '.</p>' : '');
+  return '<ul class="biz-news">' + r.news.slice(0, 15).map(n => newsItemHtml(n)).join('') + '</ul>' + (r.news.length > 15 ? '<p class="upload-hint">Showing the newest 15 of ' + r.news.length + '.</p>' : '');
 }
 // The industry's stocks in the same grid as the Analysis leaderboard and the Strategies results (best change first),
 // with the period's own change as the last column.

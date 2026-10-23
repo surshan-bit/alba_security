@@ -457,7 +457,6 @@
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{padding-right:22px;}
   /* Track these picks is a button like Refresh: outlined, same height */
   :root[data-theme="white"] #section-strategies #stratMain .strat-total #stratTrackBtn{border:1px solid #c9cfdf;background:#fff;color:#1b1f2a;min-height:40px;border-radius:6px;}
-  :root[data-theme="white"] #section-strategies #stratMain .strat-total #stratTrackBtn:disabled{opacity:.5;}
   /* the setup caret sits on the same right edge as the Filters caret below it */
   :root[data-theme="white"] #section-strategies #stratMain .strat-group > summary.analysis-panel-title:before{right:0;}
 }

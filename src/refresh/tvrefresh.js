@@ -10,7 +10,7 @@
 //     date (the monthly bar is fetched once a month, not every week). This is the long step and may run into TradingView's daily call quota; the
 //     stocks not reached stay out of date and the next run carries on with them.
 import { stocks, stockByTickerSymbol } from '../core/stocks.js';
-import { sanitizeDocId, tickerSymbol } from '../core/util.js';
+import { sanitizeDocId, sleep, tickerSymbol } from '../core/util.js';
 import { COLS, packValues, snapshotUpdate } from '../overlays/livesnapshot.js';
 import { priceHistoryByTicker, pcTickerKey, ensureAllPriceBars } from '../prices/store.js';
 import { refreshOneNow, priceJobs, saveFullBars } from '../prices/refresh.js';
@@ -44,7 +44,6 @@ const snapshotSymbol = isinSymbolCached;
 let stopAsked = false;
 let busy = false;
 registerBusy(() => busy);
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 const num = x => x.toLocaleString('en-IN');
 
 function setButtons(running){

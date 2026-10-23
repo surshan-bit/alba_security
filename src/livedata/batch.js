@@ -4,6 +4,7 @@ import { refreshAnalysisSoon } from '../analysis/section.js';
 import { redrawWhenIdle } from '../ui/scrollkeep.js';
 import { renderLoadedPart } from '../core/lazy.js';
 import { pcTickerKey } from '../prices/store.js';
+import { sectionOf } from '../refresh/kit-lookup.js';
 import { LD_LABEL, ldAbort, ldGet, ldRunning, ldStart } from './bar.js';
 import { ldEnsureClaudeAccess, setLdParallel } from './claude.js';
 import { claudeAnyOn } from './claudegate.js';
@@ -32,7 +33,6 @@ const activeNames = () => Array.from(ldBatch.active.values()).join(', ');
 const KIND_NAME = { fund: 'Fundamental', tech: 'Technical' };
 const STAY_OPEN_NOTE = 'You can move to other screens. If you close the dashboard it pauses and carries on when it is opened again.';
 // The screen that started a run, for the "View" button on the top strip.
-const sectionOf = (P) => P === 'analysis' ? 'analysis' : P === 'strat' ? 'strategies' : /^biz-/.test(P) ? 'business' : '';
 function batchStoppingText(){
   return 'Stopping: finishing ' + activeNames() + ' (a bar download already under way cannot be cut short), then the remaining stock(s) will not run.';
 }

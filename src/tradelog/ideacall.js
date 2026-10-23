@@ -3,12 +3,12 @@
 // separate readings: QUALITY (is it worth owning: verdict, margin of safety, Fundamental score) and SETUP (does the chart look
 // like one that moves 5% soon: swing.js). Buy needs both; the Buy list is ranked by setup, then quality. Fixed rules on
 // the dashboard's own numbers, so the same data always gives the same answer. A reference for your own decision, not an order.
+import { fixedOrNull } from '../core/util.js';
 import { factsFor, tradeSignal } from './signals.js';
 
 const BUY_SETUP = 2, AVOID_AT = -2, MOS_MIN = 10, SCORE_MIN = 5;
 const VERDICT_PTS = { buy: 2, mbuy: 1, hold: -1, avoid: -2 };
 const VERDICT_NAME = { buy: 'Strong', mbuy: 'Good', hold: 'Hold', avoid: 'Avoid' };
-const fx = (v, d = 1) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : null;
 
 // Quality points and the reasons for them, from the facts factsFor returns.
 function qualityOf(f){
@@ -18,13 +18,13 @@ function qualityOf(f){
   if(f.verdict && VERDICT_PTS[f.verdict] != null) add(VERDICT_PTS[f.verdict], 'Verdict ' + VERDICT_NAME[f.verdict]);
   const mos = (f.price != null && f.intrinsic) ? (f.intrinsic - f.price) / f.intrinsic * 100 : null;
   if(mos != null){
-    if(mos >= 30) add(2, 'margin of safety ' + fx(mos) + '%');
-    else if(mos >= 10) add(1, 'margin of safety ' + fx(mos) + '%');
-    else if(mos < 0) add(-2, 'above fair value (' + fx(mos) + '%)');
+    if(mos >= 30) add(2, 'margin of safety ' + fixedOrNull(mos) + '%');
+    else if(mos >= 10) add(1, 'margin of safety ' + fixedOrNull(mos) + '%');
+    else if(mos < 0) add(-2, 'above fair value (' + fixedOrNull(mos) + '%)');
   }
   if(f.score != null){
-    if(f.score >= 7) add(1, 'Fundamental score ' + fx(f.score, 2));
-    else if(f.score < SCORE_MIN) add(-1, 'Fundamental score only ' + fx(f.score, 2));
+    if(f.score >= 7) add(1, 'Fundamental score ' + fixedOrNull(f.score, 2));
+    else if(f.score < SCORE_MIN) add(-1, 'Fundamental score only ' + fixedOrNull(f.score, 2));
   }
   // Worth owning at all: a Strong or Good verdict, at least a 10% cushion, and a Fundamental score of 5 or more.
   const worth = !!f.verdict && (f.verdict === 'buy' || f.verdict === 'mbuy') && mos != null && mos >= MOS_MIN && f.score != null && f.score >= SCORE_MIN;

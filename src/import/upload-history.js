@@ -17,48 +17,17 @@ async function uploadsSettled(){ while(saving.size) await Promise.allSettled(Arr
 // preview has already rendered successfully, so a storage hiccup here shouldn't look like the
 // upload itself failed — it just means this particular upload won't be
 // fetchable by Claude later.
-function recordTechnicalCsvUpload(file, text, stats){ return track(saveTechnicalCsvUpload(file, text, stats)); }
-async function saveTechnicalCsvUpload(file, text, stats){
-  if(!stats) return; // preview itself failed — nothing meaningful to log
-  try {
-    if(!(typeof claude !== 'undefined' && claude && typeof claude.use === 'function')){
-      return; // not running in a context that grants capabilities (e.g. a plain browser preview)
-    }
-    const assets = await claude.use('assets');
-    if(!assets){
-      return;
-    }
-    const blob = new Blob([text], { type: 'text/csv' });
-    const uploaded = await assets.upload(blob); // {id, url, sizeBytes, contentType}
-    const uploadedAt = new Date().toISOString();
-    const record = {
-      assetId: uploaded.id,
-      url: uploaded.url,
-      filename: file.name,
-      sizeBytes: uploaded.sizeBytes != null ? uploaded.sizeBytes : file.size,
-      uploadedAt,
-      rowCount: stats.rowCount,
-      newCount: stats.newCount,
-      droppedCount: stats.droppedCount,
-      status: 'uploaded' // Claude sets this to 'processed' via ArtifactData once it actually merges this file
-    };
-    // Update in-memory immediately, even before the shared onSnapshot round-trip lands.
-    const docId = sanitizeDocId(uploadedAt);
-    technicalCsvUploadLog.put(docId, record);
-    const logDb = getDb();
-    if(logDb){
-      await logDb.collection('technicalCsvUploadLog').doc(docId).set(record);
-      await pruneLogCollection(logDb, 'technicalCsvUploadLog', technicalCsvUploadLog, 'uploadedAt');
-    }
-  } catch(e){
-    console.error('Failed to save Technical CSV upload record', e);
-  }
-}
+function recordTechnicalCsvUpload(file, text, stats){ return track(saveCsvUpload(TECHNICAL, file, text, stats)); }
 
 // Same as recordTechnicalCsvUpload, but for the Fundamental Score / screener.in upload flow and
 // its own `fundamentalCsvUploadLog` collection.
-function recordFundamentalCsvUpload(file, text, stats){ return track(saveFundamentalCsvUpload(file, text, stats)); }
-async function saveFundamentalCsvUpload(file, text, stats){
+function recordFundamentalCsvUpload(file, text, stats){ return track(saveCsvUpload(FUNDAMENTAL, file, text, stats)); }
+
+// What differs between the two uploads: the log (and its collection) and the label in the error message.
+const TECHNICAL = { collection: 'technicalCsvUploadLog', log: technicalCsvUploadLog, label: 'Technical' };
+const FUNDAMENTAL = { collection: 'fundamentalCsvUploadLog', log: fundamentalCsvUploadLog, label: 'Fundamental' };
+
+async function saveCsvUpload(kind, file, text, stats){
   if(!stats) return; // preview itself failed — nothing meaningful to log
   try {
     if(!(typeof claude !== 'undefined' && claude && typeof claude.use === 'function')){
@@ -80,17 +49,18 @@ async function saveFundamentalCsvUpload(file, text, stats){
       rowCount: stats.rowCount,
       newCount: stats.newCount,
       droppedCount: stats.droppedCount,
-      status: 'uploaded' // Claude sets this to 'processed' via ArtifactData once it actually scores this file
+      status: 'uploaded' // Claude sets this to 'processed' via ArtifactData once it has used this file
     };
+    // Update in-memory immediately, even before the shared onSnapshot round-trip lands.
     const docId = sanitizeDocId(uploadedAt);
-    fundamentalCsvUploadLog.put(docId, record);
+    kind.log.put(docId, record);
     const logDb = getDb();
     if(logDb){
-      await logDb.collection('fundamentalCsvUploadLog').doc(docId).set(record);
-      await pruneLogCollection(logDb, 'fundamentalCsvUploadLog', fundamentalCsvUploadLog, 'uploadedAt');
+      await logDb.collection(kind.collection).doc(docId).set(record);
+      await pruneLogCollection(logDb, kind.collection, kind.log, 'uploadedAt');
     }
   } catch(e){
-    console.error('Failed to save Fundamental CSV upload record', e);
+    console.error('Failed to save ' + kind.label + ' CSV upload record', e);
   }
 }
 

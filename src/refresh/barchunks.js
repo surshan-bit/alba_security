@@ -3,14 +3,13 @@
 //   barsRecent/<c001...>  the newest bars of every stock (see prices/recent.js)
 //   techBlocks/<c001...>  { v: 1, asof, at, rows: [ { k, t } ] }: each stock's completed-weeks technical block (laid on the stock by overlays/updates.js)
 import { stocks } from '../core/stocks.js';
-import { sanitizeDocId, tickerSymbol } from '../core/util.js';
+import { sanitizeDocId, sleep, tickerSymbol } from '../core/util.js';
 import { priceApply, pcTickerKey, priceHistoryByTicker, priceSymbolByTicker } from '../prices/store.js';
 import { noteRecentSaved, recentRow } from '../prices/recent.js';
 import { computeTechnical } from '../engine/technical.js';
 
 const CHUNK = 50;          // stocks per record
 const WORKERS = 6;         // records saved at the same time
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 // Compares two saved values by content, whatever order their keys are in.
 function stable(x){ return x && typeof x === 'object' ? (Array.isArray(x) ? x.map(stable) : Object.keys(x).sort().reduce((o, k) => { o[k] = stable(x[k]); return o; }, {})) : x; }
 const sameValue = (a, b) => JSON.stringify(stable(a)) === JSON.stringify(stable(b));

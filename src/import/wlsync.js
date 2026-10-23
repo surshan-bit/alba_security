@@ -1,5 +1,4 @@
 // TradingView watchlist sync.
-import { lockBusy, lockText, startBeat, tabId } from './joblock.js';
 import { getDb, watchlistSyncLog } from '../core/store.js';
 import { stocks } from '../core/stocks.js';
 import { sanitizeDocId } from '../core/util.js';
@@ -7,7 +6,7 @@ import { renderWatchlistSyncLogPanel } from '../joblogs/panels.js';
 import { TV_SERVER, tvCall, tvErrorText, tvMcp } from '../tv/connector.js';
 import { strategies } from '../strategies/state.js';
 import { qualifyingStocks, ruleReady } from '../strategies/rules.js';
-import { albaFiErr, albaFiRetry, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { albaFiErr, albaFiMarkFailed, albaFiRetry, albaFiTakeLock, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 
 // ====================================================================================================
@@ -212,9 +211,7 @@ async function albaWlRunSync(){
   };
   const done = [];
   try {
-    const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
-    if(lockBusy(ld)) throw new Error('another sync is already running (' + lockText(ld) + '). Try again in a few minutes.');
-    await albaFiRetry(() => job.set({ status: 'running', startedAt, owner: tabId })); locked = true; stopBeat = startBeat(job);
+    stopBeat = await albaFiTakeLock(job, when => 'another sync is already running (' + when + '). Try again in a few minutes.', { startedAt }); locked = true;
     await saveLog({ startedAt, status: 'running', triggeredBy: 'manual', note: 'Running from the page.' });
 
     current = 'build'; fiSet('build', 'running', '', 0.5);
@@ -268,7 +265,7 @@ async function albaWlRunSync(){
     const msg = e && e.code ? tvErrorText(e) : ((e && e.message) ? e.message : String(e));
     fiShowResult('err', [{ text: 'Sync stopped: ' + msg, cls: 'fi-line fi-line-strong' }].concat(done.map(t => ({ text: 'Done before the stop — ' + t, cls: 'fi-line fi-line-muted' }))), true);
     await saveLog({ startedAt, finishedAt: new Date().toISOString(), status: 'failed', triggeredBy: 'manual', error: msg.slice(0, 400), note: done.join(' | ').slice(0, 400) });
-    if(locked){ try { await job.set({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500) }); } catch(x){} }
+    if(locked) await albaFiMarkFailed(job, msg);
   } finally {
     stopBeat(); setFiRunning(false); fiSetButtons();
   }

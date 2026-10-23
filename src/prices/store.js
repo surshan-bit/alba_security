@@ -1,5 +1,6 @@
 // Price history cache: lazy per-stock loading from the database.
 import { stocks } from '../core/stocks.js';
+import { tickerKey } from '../core/util.js';
 import { dbCapabilityPromise } from '../core/store.js';
 import { priceFetchedAt } from '../research/status.js';
 import { getShownIndex, renderDetail } from '../detail/render.js';
@@ -11,7 +12,7 @@ import { setRecentFromDocs, withRecent } from './recent.js';
 // Hovering a bar shades the same period in the other two charts. Rendered inside the Technical Score panel.
 const priceHistoryByTicker = {};
 const priceSymbolByTicker = {};   // dashboard ticker -> TradingView symbol used the last time bars were stored
-function pcTickerKey(s){ return String((s && s.ticker) || '').split(' · ')[0].trim(); }
+const pcTickerKey = tickerKey;
 // ---- Lazy price history ----
 // The `priceHistory` collection holds every stock's weekly + monthly bars (about 1.5 MB), so it is NOT read at startup.
 // Bars are fetched one stock at a time, with a filtered query, the first time that stock's detail page opens (or when

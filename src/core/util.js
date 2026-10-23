@@ -4,6 +4,18 @@ function sanitizeDocId(id){
   return String(id).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_') || 'x';
 }
 
+// Waits `ms` milliseconds.
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// A number as text with `d` decimals, or null when it is not a finite number.
+const fixedOrNull = (v, d = 1) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : null;
+
+// A number rounded to 2 decimals, or null when it is not a finite number.
+const round2OrNull = v => (typeof v === 'number' && isFinite(v)) ? Math.round(v * 100) / 100 : null;
+
+// The stock's code: the part of the ticker line before " \u00b7 " (also the key of its saved price history and score history).
+function tickerKey(s){ return String((s && s.ticker) || '').split(' \u00b7 ')[0].trim(); }
+
 function tickerSymbol(s){
   return s.ticker.split('·')[0].trim();
 }
@@ -78,4 +90,4 @@ function screenerUrl(s){
   return `https://www.screener.in/company/${encodeURIComponent(sym)}/${suffix}`;
 }
 
-export { daysSinceDate, escapeHtml, formatDate, formatDeepRefreshTimestamp, formatRequestedAt, formatUploadTimestamp, pctChangeSpan, sanitizeDocId, screenerUrl, tickerIndustry, tickerSymbol };
+export { daysSinceDate, escapeHtml, fixedOrNull, formatDate, formatDeepRefreshTimestamp, formatRequestedAt, formatUploadTimestamp, pctChangeSpan, round2OrNull, sanitizeDocId, screenerUrl, sleep, tickerIndustry, tickerKey, tickerSymbol };

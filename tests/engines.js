@@ -616,7 +616,7 @@ test('golden: the scores for the made-up universe have not moved', () => {
 });
 
 // =========================================================== score history (the trend on the stock page)
-const H = load('src/history/scorehistory.js', 'export { BUCKETS, SCORE_ENGINE, addPoint, bucketId, bucketOf, pointFor };');
+const H = load('src/history/scorehistory.js', 'export { BUCKETS, SCORE_ENGINE, addPoint, bucketId, bucketOf, pointFor, tickerKey };');
 const R = load('src/detail/scoretrend.js', 'export { scoreTrendHtml };');
 test('history: a stock always lands in the same one of 64 buckets', () => {
   assert.strictEqual(H.bucketOf('AAA1'), H.bucketOf('AAA1'));

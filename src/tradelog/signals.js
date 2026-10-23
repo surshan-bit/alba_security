@@ -2,6 +2,7 @@
 // Fixed rules on the dashboard's own numbers (verdict, score, margin of safety, RSI, gain against the buy price), so
 // the same data always gives the same call. It is a reference for the person's own decision, never an order.
 // The thresholds below are the defaults; they are plain numbers so they can become settings later.
+import { fixedOrNull, round2OrNull } from '../core/util.js';
 
 const LIMITS = {
   lossReview: -15,       // % below the buy price: look at the position again
@@ -16,7 +17,6 @@ const LIMITS = {
 };
 const GOOD = new Set(['buy', 'mbuy']), WEAK = new Set(['hold', 'avoid']);
 const CALLS = { hold: 'Hold', trim: 'Consider trimming', add: 'Consider adding', review: 'Review' };
-const fx = (v, d = 1) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : null;
 
 // facts: { buyPrice, price, entryScore, score, verdict, intrinsic, techScore, rsiWeek, rsiMonth }; any of them may be null.
 function tradeSignal(facts, limits = LIMITS){
@@ -30,34 +30,34 @@ function tradeSignal(facts, limits = LIMITS){
   // Review: the case for the position itself looks weaker.
   const review = [];
   if(f.verdict && WEAK.has(f.verdict)) review.push('The verdict is now ' + (f.verdict === 'avoid' ? 'Avoid' : 'Hold') + ', below the level you bought at.');
-  if(drop != null && drop >= limits.scoreDropReview) review.push('The Fundamental score fell ' + fx(drop, 2) + ' since you bought (' + fx(f.entryScore, 2) + ' to ' + fx(f.score, 2) + ').');
-  if(gain != null && gain <= limits.lossReview) review.push('The price is ' + fx(-gain) + '% below your buy price.');
-  if(mos != null && mos < 0) review.push('The price is above the fair value estimate (margin of safety ' + fx(mos) + '%).');
+  if(drop != null && drop >= limits.scoreDropReview) review.push('The Fundamental score fell ' + fixedOrNull(drop, 2) + ' since you bought (' + fixedOrNull(f.entryScore, 2) + ' to ' + fixedOrNull(f.score, 2) + ').');
+  if(gain != null && gain <= limits.lossReview) review.push('The price is ' + fixedOrNull(-gain) + '% below your buy price.');
+  if(mos != null && mos < 0) review.push('The price is above the fair value estimate (margin of safety ' + fixedOrNull(mos) + '%).');
   if(review.length){ reasons.push(...review); return out('review'); }
 
   // Trim: a good gain with a stretched price or a thin cushion.
   const trim = [];
   const stretched = f.rsiWeek != null && f.rsiWeek >= limits.rsiStretchedWeek;
   const warm = f.rsiWeek != null && f.rsiMonth != null && f.rsiWeek >= limits.rsiWarmWeek && f.rsiMonth >= limits.rsiWarmMonth;
-  if(gain != null && gain >= limits.gainTrim && (stretched || warm)) trim.push('Weekly RSI is ' + fx(f.rsiWeek) + (f.rsiMonth != null ? ' and monthly RSI ' + fx(f.rsiMonth) : '') + ', which is stretched, and you are up ' + fx(gain) + '%.');
-  if(gain != null && gain >= limits.gainBig) trim.push('You are up ' + fx(gain) + '%, a large gain to protect.');
-  if(mos != null && mos < limits.mosThin && gain != null && gain >= limits.mosThinGain) trim.push('The margin of safety is down to ' + fx(mos) + '% and you are up ' + fx(gain) + '%.');
+  if(gain != null && gain >= limits.gainTrim && (stretched || warm)) trim.push('Weekly RSI is ' + fixedOrNull(f.rsiWeek) + (f.rsiMonth != null ? ' and monthly RSI ' + fixedOrNull(f.rsiMonth) : '') + ', which is stretched, and you are up ' + fixedOrNull(gain) + '%.');
+  if(gain != null && gain >= limits.gainBig) trim.push('You are up ' + fixedOrNull(gain) + '%, a large gain to protect.');
+  if(mos != null && mos < limits.mosThin && gain != null && gain >= limits.mosThinGain) trim.push('The margin of safety is down to ' + fixedOrNull(mos) + '% and you are up ' + fixedOrNull(gain) + '%.');
   if(trim.length){
     reasons.push(...trim);
-    if(mos != null) reasons.push('Margin of safety is ' + fx(mos) + '%.');
+    if(mos != null) reasons.push('Margin of safety is ' + fixedOrNull(mos) + '%.');
     return out('trim');
   }
 
   // Add: still a good verdict, a roomy cushion, not stretched, and near the price you paid.
   if(f.verdict && GOOD.has(f.verdict) && mos != null && mos >= limits.mosAdd && (f.rsiWeek == null || f.rsiWeek <= limits.rsiAddMax) && gain != null && Math.abs(gain) <= limits.nearEntry){
-    reasons.push('The verdict is still ' + (f.verdict === 'buy' ? 'Strong' : 'Good') + ', the margin of safety is ' + fx(mos) + '%, and the price is within ' + limits.nearEntry + '% of your buy price' + (f.rsiWeek != null ? ' with weekly RSI at ' + fx(f.rsiWeek) : '') + '.');
+    reasons.push('The verdict is still ' + (f.verdict === 'buy' ? 'Strong' : 'Good') + ', the margin of safety is ' + fixedOrNull(mos) + '%, and the price is within ' + limits.nearEntry + '% of your buy price' + (f.rsiWeek != null ? ' with weekly RSI at ' + fixedOrNull(f.rsiWeek) : '') + '.');
     return out('add');
   }
 
   if(f.verdict && GOOD.has(f.verdict)) reasons.push('The verdict is still ' + (f.verdict === 'buy' ? 'Strong' : 'Good') + '.');
-  if(mos != null) reasons.push('Margin of safety is ' + fx(mos) + '%.');
-  if(gain != null) reasons.push('You are ' + (gain >= 0 ? 'up ' : 'down ') + fx(Math.abs(gain)) + '% on the buy price.');
-  if(f.rsiWeek != null) reasons.push('Weekly RSI is ' + fx(f.rsiWeek) + ', not stretched.');
+  if(mos != null) reasons.push('Margin of safety is ' + fixedOrNull(mos) + '%.');
+  if(gain != null) reasons.push('You are ' + (gain >= 0 ? 'up ' : 'down ') + fixedOrNull(Math.abs(gain)) + '% on the buy price.');
+  if(f.rsiWeek != null) reasons.push('Weekly RSI is ' + fixedOrNull(f.rsiWeek) + ', not stretched.');
   return out('hold');
 }
 
@@ -82,8 +82,7 @@ function factsFor(trade, stock){
 const KEEP_DAYS = 400;
 function addSignalPoint(history, ymd, sig, facts){
   const cur = Array.isArray(history) ? history : [];
-  const r = v => (typeof v === 'number' && isFinite(v)) ? Math.round(v * 100) / 100 : null;
-  const pt = [ymd, sig.call, r(facts.price), r(facts.score), r(facts.rsiWeek), r(sig.mos), r(sig.gain)];
+  const pt = [ymd, sig.call, round2OrNull(facts.price), round2OrNull(facts.score), round2OrNull(facts.rsiWeek), round2OrNull(sig.mos), round2OrNull(sig.gain)];
   const same = cur.filter(p => p[0] !== ymd);
   same.push(pt);
   same.sort((a, b) => a[0] - b[0]);

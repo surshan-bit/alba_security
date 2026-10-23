@@ -5,6 +5,7 @@ import { ldForceKeys } from '../livedata/fundamental.js';
 import { LD_BATCH_MAX, getLdBatch, ldBatchStart, ldBatchStop } from '../livedata/batch.js';
 import { activityDropWhere, activityEnd, activityNotify, activityRun, setNoticeDismissHandler } from '../ui/activity.js';
 import { pcTickerKey } from '../prices/store.js';
+import { sleep } from '../core/util.js';
 import { tvMcp } from '../tv/connector.js';
 import { dbCapabilityPromise } from '../core/store.js';
 import { registerBusy } from '../core/busy.js';
@@ -174,7 +175,6 @@ function enqueueJob(kind, list, source, label, force) {
   return keys.length;
 }
 const engineBusy = () => { const b = getLdBatch(); return !!(b && b.running); };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function pump() {
   if (pumping) return;
   pumping = true;

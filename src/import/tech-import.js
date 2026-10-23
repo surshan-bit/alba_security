@@ -1,12 +1,11 @@
 // Technical Score import: apply and run.
-import { lockBusy, lockText, startBeat, tabId } from './joblock.js';
 import { technicalCsvUploadLog } from '../core/store.js';
 import { uploadsSettled } from './upload-history.js';
-import { sanitizeDocId, tickerSymbol } from '../core/util.js';
+import { sanitizeDocId, sleep, tickerSymbol } from '../core/util.js';
 import { recordAttempt, saveRecord } from './last-file.js';
-import { ALBA_FI_PUBLISHED, albaFiDay, albaFiLoadRaw, albaFiPersist, albaFiReadAsset, albaFiRetry, albaFiSleep, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { albaFiConfirmSoft, albaFiDay, albaFiLoadRaw, albaFiMarkFailed, albaFiNewestUpload, albaFiPersist, albaFiReadUpload, albaFiRetry, albaFiShowFailure, albaFiTakeLock, albaFiThrowHard, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { albaFiCheck, albaFiPrevInfo, albaFiSym } from './fund-check.js';
-import { fiAsk, setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
+import { setFiPfx, fiReset, fiSet, fiShowResult } from './panel.js';
 import { AlbaTechEngine } from './tech-engine.js';
 import { techValLabel } from '../engine/technical.js';
 import { albaWlResolveBse } from './wlsync.js';
@@ -121,18 +120,14 @@ async function albaTiRunImport(){
   let rec = null, recId = null, tiRes = null, runError = '';
   const t0 = Date.now(), startedAt = new Date().toISOString();
   try {
-    const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
-    if(lockBusy(ld)) throw new Error('another import is already running (' + lockText(ld) + '). It was started from another tab or device. If that one was closed, it counts as interrupted after 3 minutes without activity; then try again.');
-    await albaFiRetry(() => job.set({ status: 'running', startedAt: new Date().toISOString(), kind: 'technical', owner: tabId })); locked = true; stopBeat = startBeat(job);
+    stopBeat = await albaFiTakeLock(job, when => 'another import is already running (' + when + '). It was started from another tab or device. If that one was closed, it counts as interrupted after 3 minutes without activity; then try again.', { kind: 'technical' }); locked = true;
 
     // 1. the uploaded file (always the one recorded in the upload log, never a cached copy)
     current = 'read'; fiSet('read', 'running', 'Waiting for the file to finish saving…', 0.3);
     await uploadsSettled();
-    for(const [id, r] of technicalCsvUploadLog.entries()){ if(r.status === 'uploaded' && (!rec || String(r.uploadedAt) > String(rec.uploadedAt))){ rec = r; recId = id; } }
+    [rec, recId] = albaFiNewestUpload(technicalCsvUploadLog);
     if(!rec) throw new Error('there is no uploaded file waiting. Use "Browse CSV…" to upload the TradingView Growth List export first.');
-    const resp = await albaFiReadAsset(assets, rec.assetId);
-    if(!resp.ok) throw new Error('could not read the stored file "' + rec.filename + '" (' + resp.status + ')');
-    const csvText = await resp.text();
+    const csvText = await albaFiReadUpload(assets, rec);
     const rows0 = AlbaTechEngine.parseCSV(csvText);
     if(rows0.length < 2) throw new Error('the file has no data rows.');
     const cm = AlbaTechEngine.buildColumnMap(rows0[0]);
@@ -166,7 +161,7 @@ async function albaTiRunImport(){
     fiSet('load', 'done', raw.stocks.length.toLocaleString('en-IN') + ' stocks (data v' + raw.meta.version + ')');
 
     // 3. score
-    current = 'score'; fiSet('score', 'running', '', 0.3); await albaFiSleep(30);
+    current = 'score'; fiSet('score', 'running', '', 0.3); await sleep(30);
     const prev = albaFiPrevInfo(raw.stocks);
     const avg = () => { let n = 0, t = 0; for(const s of raw.stocks) if(s.technical && typeof s.technical.score === 'number'){ n++; t += s.technical.score; } return n ? t / n : 0; };
     const avgBefore = avg();
@@ -176,18 +171,15 @@ async function albaTiRunImport(){
     fiSet('score', 'done', res.rescored.toLocaleString('en-IN') + ' rescored' + (res.kept.length ? ', ' + res.kept.length + ' kept' : ''));
 
     // 5. checks
-    current = 'check'; fiSet('check', 'running', '', 0.5); await albaFiSleep(30);
+    current = 'check'; fiSet('check', 'running', '', 0.5); await sleep(30);
     const chk = albaFiCheck(raw.stocks, prev);
     if(res.matched === 0) chk.hard.push('no stock in the file matched a stock on the dashboard');
     const soft = [];
     if(res.matched > 0 && res.matched < 1500) soft.push('Only ' + res.matched + ' dashboard stocks matched a row in the file (normally about 2,100). That can mean a partial export or the wrong file.');
     if(res.kept.length > 25) soft.push(res.kept.length + ' stocks have a component missing from this file that they had before, so their previous reading was kept.');
-    if(chk.hard.length) throw new Error('integrity check failed, nothing was written:\n• ' + chk.hard.slice(0, 6).join('\n• '));
+    albaFiThrowHard(chk);
     fiSet('check', 'done', 'passed');
-    if(soft.length){
-      const go = await fiAsk(soft.join(' ') + ' Nothing has been written yet.', 'Import anyway');
-      if(!go) throw Object.assign(new Error('cancelled before anything was written.'), { cancelled: true });
-    }
+    await albaFiConfirmSoft(soft);
 
     // 6 + 7. write and verify
     current = 'write';
@@ -218,11 +210,10 @@ async function albaTiRunImport(){
   } catch(e){
     console.error('Technical import failed', e);
     recordAttempt('tech', rec, recId, e, db);
-    if(getFiState()){ getFiState().error = e; if(current && getFiState().status[current] !== 'done') fiSet(current, 'error', ''); }
     const msg = (e && e.message) ? e.message : String(e);
     runError = (e && e.cancelled ? 'cancelled: ' : '') + msg.slice(0, 200);
-    fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);
-    if(locked){ try { await job.set({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500), kind: 'technical' }); } catch(x){} }
+    albaFiShowFailure(e, current, msg);
+    if(locked) await albaFiMarkFailed(job, msg, { kind: 'technical' });
   } finally {
     stopBeat();
     if(rec && getFiDb()) await saveRunLog(getFiDb(), 'csv', startedAt, t0, { planned: tiRes ? tiRes.matched : 0, saved: tiRes && !runError ? tiRes.rescored : 0, unchanged: 0, scored: tiRes && !runError ? tiRes.rescored : 0, kept: tiRes ? tiRes.kept.length : 0, skipped: tiRes ? tiRes.frozen : 0, stopped: !!runError, error: runError || null, file: rec.filename });
