@@ -4,6 +4,7 @@
   "description": "Alba Securities - Stock Analyzer: source modules (src/), build (tools/) and regression tests (tests/).",
   "scripts": {
     "build": "node tools/build.js",
+    "release": "node tools/release-prep.js",
     "postbuild": "node tools/dist.js",
     "lint": "node tools/lint.js",
     "check": "node tests/check.js",

@@ -11,9 +11,18 @@ const themeToggleBtns = Array.from(document.querySelectorAll('.theme-toggle-btn'
 function saveThemePref(theme){
   prefSet(THEME_PREF_KEY, theme);
 }
+// The White theme's wordmark uses Quicksand from Google Fonts. No other theme does, so the stylesheet is added only when White is in use
+// (as a plain <link> in index.html it held up the first paint of every page).
+function ensureBrandFont(){
+  if(document.getElementById('brandFont')) return;
+  const link = document.createElement('link');
+  link.id = 'brandFont'; link.rel = 'stylesheet'; link.href = 'https://fonts.googleapis.com/css2?family=Quicksand:wght@700&display=swap';
+  document.head.appendChild(link);
+}
 function applyTheme(theme){
   const resolved = THEME_CHOICES.has(theme) ? theme : 'dark';
   document.documentElement.setAttribute('data-theme', resolved);
+  if(resolved === 'white') ensureBrandFont();
   themeToggleBtns.forEach(btn => btn.classList.toggle('active', /** @type {HTMLElement} */ (btn).dataset.themeChoice === resolved));
 }
 

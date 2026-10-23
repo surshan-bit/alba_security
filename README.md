@@ -29,6 +29,7 @@ src/                          THE APPLICATION: ES modules, one responsibility pe
   sections/                   the pages that load on first use: refreshlog, strategies, business, tradelog
 app.js, chunks/*.js           BUILD OUTPUT (ES modules, code-split, hashed chunk names). Never edit by hand
 tools/build.js                bundles src/ and styles/ with esbuild and stamps index.html
+tools/release-prep.js         after a merge and a build: writes publish/index.html, publish/publish.json (files for the Artifact tool) and publish/release.json (for appMeta/release)
 tools/css-snapshot.js         proves a styles/ change did not change the page (see "Changing styles" below)
 tools/lint.js                 structure checks (undefined names, start-up order, unused code, mutable exports, import graph)
 tests/run.js                  regression harness (jsdom; bundles the same sources into one script, as jsdom cannot run ES modules)
@@ -82,7 +83,7 @@ tests/fixtures/stocks.json    anonymised sample of the stock list used by the ha
 ```
 npm install            once per fresh checkout (needs network); Playwright is a pinned devDependency, `npx playwright install chromium` fetches its browser once
 # edit files in src/ and styles/ (and partials/, js/loader.js)
-npm run check          build (app.js, chunks/, styles.css) + syntax + lint + regression harness; must print OK before publishing
+npm run check          build (app.js, chunks/, styles.css) + syntax + lint + regression harness + browser suites; must print OK before publishing (CI runs `-- --part=main` and `-- --part=imports` as two parallel jobs)
 npm run update-golden  after reviewing an intended change in behaviour, accept the new snapshots (hashes and their text)
 npm run types          type check src/ (also part of npm run check); new findings fail, the 230 known ones are in tests/types.baseline.txt
 ```

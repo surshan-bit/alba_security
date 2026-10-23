@@ -1,4 +1,4 @@
-# Runs on every push to main and every pull request: builds the app and runs all the checks. A red cross on GitHub means "do not release this".
+# Runs on every push to main and every pull request: builds the app and runs all the checks (the slow import flows in their own job, side by side with the rest). A red cross on GitHub means "do not release this".
 name: checks
 on:
   push:
@@ -7,7 +7,8 @@ on:
 permissions:
   contents: read
 jobs:
-  check:
+  # Everything except the import flows (about 4 minutes).
+  check-main:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -16,5 +17,24 @@ jobs:
       - run: npm ci
       - run: npm audit --omit=dev --audit-level=high   # fails on a known high-severity problem in a package the site ships
       - run: npx playwright install --with-deps chromium   # the Playwright version is pinned in package.json
-      - run: npm run check
+      - run: npm run check -- --part=main
       - run: npm run platform
+  # The import flows in Chromium: by far the slowest suite (about 7 minutes), so it runs beside the rest.
+  check-imports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check -- --part=imports
+  # The one result to look at (and to require on a pull request): green only when both parts are.
+  check:
+    needs: [check-main, check-imports]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "check-main: ${{ needs.check-main.result }}, check-imports: ${{ needs.check-imports.result }}"
+          test "${{ needs.check-main.result }}" = success && test "${{ needs.check-imports.result }}" = success
