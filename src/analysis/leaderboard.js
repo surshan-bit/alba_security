@@ -11,6 +11,10 @@ import { browserFullscreen, fullscreenLabel, watchFullscreenExit } from '../ui/f
 import { getRefreshKit } from '../refresh/hook.js';
 import { closestEl } from '../core/evt.js';
 
+// Rows drawn at first and added by each "Show more": a table of thousands of rows is slow to lay out.
+const LB_STEP = 300;
+let lbRows = LB_STEP;
+
 // ---- full screen ----
 // The leaderboard can fill the whole window. The state lives here so a redraw of the section keeps it. Esc and the browser's own full screen are handled in ui/fullscreen.js.
 let lbFull = false;
@@ -56,6 +60,7 @@ function leaderboardHtml(chartBlock){
           <tbody id="analysisLeaderboardBody"></tbody>
         </table>
       </div>
+      <div class="strat-empty" id="analysisLeaderboardMore" hidden></div>
       ${kit ? kit.selbarSlot('analysis') : ''}
     </div>`;
 }
@@ -92,7 +97,12 @@ function renderLeaderboardRows(filtered){
   const colOrder = analysisColumnOrder();
   lbBody.innerHTML = ranked.length === 0
     ? `<tr><td colspan="${colOrder.length + (getRefreshKit() ? 1 : 0)}" class="analysis-lb-empty">No stocks in the current RSI range.</td></tr>`
-    : ranked.map((s, i) => leaderboardRowHtml(s, i, colOrder)).join('');
+    : ranked.slice(0, lbRows).map((s, i) => leaderboardRowHtml(s, i, colOrder)).join('');
+  const moreEl = document.getElementById('analysisLeaderboardMore');
+  if(moreEl){
+    moreEl.hidden = ranked.length <= lbRows;
+    moreEl.innerHTML = moreEl.hidden ? '' : `Showing the first ${lbRows} rows. <button type="button" class="analysis-reset-btn" data-lb-more="1">Show ${Math.min(LB_STEP, ranked.length - lbRows)} more</button>`;
+  }
   setAnalysisShownIdx(ranked.map(s => stockIndex.get(s)));
   updateAnalysisRefresh();
 }
@@ -115,6 +125,9 @@ function wireLeaderboard({ update, rerender, openStock, hideTooltip }){
     hideTooltip();
     openStock(Number(row.dataset.idx));
   });
+
+  const moreEl = document.getElementById('analysisLeaderboardMore');
+  if(moreEl) moreEl.addEventListener('click', (evt) => { if(closestEl(evt, '[data-lb-more]')){ lbRows += LB_STEP; update(); } });
 
   // "Sort by" only reorders the rows, so it needs update(), not a full render.
   const sortSelect = /** @type {HTMLInputElement} */ (document.getElementById('analysisSortSelect'));

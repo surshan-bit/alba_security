@@ -320,10 +320,32 @@ async function layoutTests(browser){
   }
 }
 
+// ---------------------------------------------------------------- 4. long grids: Analysis and Strategies draw 300 rows, then 300 more on request
+async function rowCapTests(browser){
+  const many = [];   // the sample list repeated under new names until the default Analysis range alone holds more than 300
+  for(let i = 0; many.length < 1400; i++){ const s = JSON.parse(JSON.stringify(FIXTURE[i % FIXTURE.length])); s.ticker = (i + 1) + ' \u00b7 X' + i; s.name = s.name + ' ' + i; s.isin = 'INE' + String(100000 + i).padStart(6, '0') + '01'; many.push(s); }
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const { page, errs } = await openPage(ctx, { chunks: [many.slice(0, 700), many.slice(700)] }, 'rowcap');
+  await appReady(page); await page.waitForTimeout(600);
+  const rows = sel => page.evaluate(sel => document.querySelectorAll(sel).length, sel);
+  const total = await page.evaluate(() => (document.getElementById('analysisLeaderboardCount').textContent.match(/Showing (\d+)/) || [])[1]);
+  ok(Number(total) > 300, 'row cap: the test list should put more than 300 stocks in the Analysis range, got ' + total);
+  ok(await rows('#analysisLeaderboardBody tr') === 300, 'row cap: Analysis draws 300 rows first');
+  await page.locator('[data-lb-more]').click(); await page.waitForTimeout(300);
+  ok(await rows('#analysisLeaderboardBody tr') === Math.min(600, Number(total)), 'row cap: Show more adds 300 Analysis rows');
+  await goto(page, 'strategies'); await page.waitForTimeout(300);
+  await page.evaluate(() => document.getElementById('stratNew').click()); await page.waitForTimeout(400);   // a new strategy has no rules: every stock qualifies
+  ok(await rows('#stratResults .strat-row') === 300, 'row cap: Strategies draws 300 rows first');
+  await page.locator('[data-strat-more]').click(); await page.waitForTimeout(300);
+  ok(await rows('#stratResults .strat-row') === 600, 'row cap: Show more adds 300 Strategies rows');
+  ok(errs.length === 0, 'row cap: console errors: ' + errs.slice(0, 3).join(' | '));
+  await page.close(); await ctx.close();
+}
+
 (async () => {
   base = await srv.listen();
   const browser = await chromium.launch();
-  try { await bootTests(browser); await markupNameTests(browser); await businessTests(browser); await layoutTests(browser); }
+  try { await bootTests(browser); await markupNameTests(browser); await businessTests(browser); await layoutTests(browser); await rowCapTests(browser); }
   finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('browser smoke test FAILED (' + problems.length + ' of ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('browser smoke test: ' + checks + ' checks passed');
