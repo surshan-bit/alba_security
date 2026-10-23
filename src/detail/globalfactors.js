@@ -1,6 +1,6 @@
 // Global & Macro panel.
 import { panelIcon } from './icons.js';
-import { escapeHtml } from '../core/util.js';
+import { escapeHtml, safeText } from '../core/util.js';
 
 function renderGlobalFactorsPanel(s){
   const g = s.globalFactors;
@@ -11,7 +11,7 @@ function renderGlobalFactorsPanel(s){
     return typeof f.url === 'string' && /^https?:\/\//i.test(f.url)
       ? `<a href="${escapeHtml(f.url)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>` : label;
   };
-  const item = (f) => `<li class="global-item">${f.text}${f.source ? `<span class="global-item-source">Source: ${srcHtml(f)}</span>` : ''}</li>`;
+  const item = (f) => `<li class="global-item">${safeText(f.text)}${f.source ? `<span class="global-item-source">Source: ${srcHtml(f)}</span>` : ''}</li>`;
   if(!hasContent){
     return `
       <div class="global-panel" id="jump-global">
@@ -40,7 +40,7 @@ function renderGlobalFactorsPanel(s){
       ${g.events && g.events.length ? `
       <div class="global-events">
         <div class="global-col-title">&#9888; Critical news &amp; world events</div>
-        <ul class="global-list">${g.events.map(e => `<li class="global-item global-event ev-${['positive','negative','mixed'].indexOf(e.impact) >= 0 ? e.impact : 'mixed'}"><span class="ev-tag">${e.impact === 'positive' ? 'Helps' : e.impact === 'negative' ? 'Hurts' : 'Mixed'}</span> <strong>${e.headline}</strong>${e.why ? `<div>${e.why}</div>` : ''}${e.source ? `<span class="global-item-source">Source: ${srcHtml(e)}</span>` : ''}</li>`).join('')}</ul>
+        <ul class="global-list">${g.events.map(e => `<li class="global-item global-event ev-${['positive','negative','mixed'].indexOf(e.impact) >= 0 ? e.impact : 'mixed'}"><span class="ev-tag">${e.impact === 'positive' ? 'Helps' : e.impact === 'negative' ? 'Hurts' : 'Mixed'}</span> <strong>${safeText(e.headline)}</strong>${e.why ? `<div>${safeText(e.why)}</div>` : ''}${e.source ? `<span class="global-item-source">Source: ${srcHtml(e)}</span>` : ''}</li>`).join('')}</ul>
       </div>` : ''}
     </div>
   `;

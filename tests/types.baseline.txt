@@ -1,1 +1,228 @@
-
+src/analysis/columns.js: error TS18048: 'c' is possibly 'undefined'.
+src/analysis/columns.js: error TS18048: 'c' is possibly 'undefined'.
+src/analysis/columns.js: error TS18048: 'c' is possibly 'undefined'.
+src/analysis/columns.js: error TS18048: 'c' is possibly 'undefined'.
+src/analysis/columns.js: error TS18048: 'col' is possibly 'undefined'.
+src/analysis/controls.js: error TS18047: 'b' is possibly 'null'.
+src/analysis/controls.js: error TS18047: 'btn' is possibly 'null'.
+src/analysis/controls.js: error TS18047: 'btn' is possibly 'null'.
+src/analysis/controls.js: error TS18047: 'btn' is possibly 'null'.
+src/analysis/controls.js: error TS18047: 'btn' is possibly 'null'.
+src/analysis/controls.js: error TS18047: 'input' is possibly 'null'.
+src/analysis/controls.js: error TS18047: 'monthLabel' is possibly 'null'.
+src/analysis/controls.js: error TS18047: 'mosLabel' is possibly 'null'.
+src/analysis/controls.js: error TS18047: 'weekLabel' is possibly 'null'.
+src/analysis/controls.js: error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+src/analysis/filterpanel.js: error TS18047: 'c.textContent' is possibly 'null'.
+src/analysis/filterpanel.js: error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/analysis/filterpanel.js: error TS2532: Object is possibly 'undefined'.
+src/analysis/filterpanel.js: error TS2532: Object is possibly 'undefined'.
+src/analysis/leaderboard.js: error TS18047: 'lbBody' is possibly 'null'.
+src/analysis/leaderboard.js: error TS18047: 'row' is possibly 'null'.
+src/analysis/leaderboard.js: error TS18047: 'row' is possibly 'null'.
+src/analysis/leaderboard.js: error TS18047: 'row' is possibly 'null'.
+src/analysis/leaderboard.js: error TS18047: 'row' is possibly 'null'.
+src/analysis/leaderboard.js: error TS18047: 'row' is possibly 'null'.
+src/analysis/leaderboard.js: error TS2345: Argument of type 'Element | null' is not assignable to parameter of type 'Node'.
+src/analysis/leaderboard.js: error TS2345: Argument of type 'Element | null' is not assignable to parameter of type 'Node'.
+src/analysis/leaderboard.js: error TS2345: Argument of type 'Element | null' is not assignable to parameter of type 'Node'.
+src/analysis/leaderboard.js: error TS2531: Object is possibly 'null'.
+src/analysis/section.js: error TS2531: Object is possibly 'null'.
+src/analysis/tooltip.js: error TS18047: 'tooltip' is possibly 'null'.
+src/analysis/tooltip.js: error TS18047: 'tooltip' is possibly 'null'.
+src/analysis/tooltip.js: error TS18047: 'tooltip' is possibly 'null'.
+src/analysis/tooltip.js: error TS18047: 'tooltip' is possibly 'null'.
+src/analysis/tooltip.js: error TS18047: 'tooltip' is possibly 'null'.
+src/analysis/tooltip.js: error TS18047: 'tooltip' is possibly 'null'.
+src/boot/status.js: error TS2531: Object is possibly 'null'.
+src/boot/stockdata.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/boot/stockdata.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/business/calc.js: error TS2339: Property 'd' does not exist on type 'never'.
+src/business/calc.js: error TS2339: Property 'd' does not exist on type 'never'.
+src/business/calc.js: error TS2339: Property 'd' does not exist on type 'never'.
+src/business/calc.js: error TS2339: Property 'd' does not exist on type 'never'.
+src/business/calc.js: error TS2339: Property 'has' does not exist on type 'never'.
+src/business/news.js: error TS18048: 'res.added' is possibly 'undefined'.
+src/business/news.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/business/news.js: error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/business/news.js: error TS2345: Argument of type 'string' is not assignable to parameter of type 'never'.
+src/business/panel.js: error TS2322: Type 'Set<any> | null' is not assignable to type 'null | undefined'.
+src/business/panel.js: error TS2322: Type 'Set<any> | null' is not assignable to type 'null | undefined'.
+src/business/panel.js: error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+src/business/panel.js: error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+src/business/panel.js: error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+src/business/panel.js: error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+src/business/panel.js: error TS2345: Argument of type 'ChildNode | null' is not assignable to parameter of type 'string | Node'.
+src/core/refreshrequests.js: error TS2339: Property 'collection' does not exist on type 'never'.
+src/core/refreshrequests.js: error TS2339: Property 'collection' does not exist on type 'never'.
+src/detail/pending.js: error TS18047: 'moN' is possibly 'null'.
+src/detail/render.js: error TS18047: 'detailEl' is possibly 'null'.
+src/detail/render.js: error TS18047: 'detailEl' is possibly 'null'.
+src/history/scorehistory.js: error TS2322: Type 'string' is not assignable to type 'null'.
+src/history/scorehistory.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/identity/prefs.js: error TS2345: Argument of type 'null' is not assignable to parameter of type 'string'.
+src/identity/prefs.js: error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/identity/session.js: error TS2322: Type 'string | null' is not assignable to type 'null'.
+src/identity/session.js: error TS2339: Property 'doc' does not exist on type 'never'.
+src/identity/strategies.js: error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/import/csv-upload.js: error TS18046: 'err' is of type 'unknown'.
+src/import/csv-upload.js: error TS18046: 'err' is of type 'unknown'.
+src/import/csv-upload.js: error TS18047: 'resultEl' is possibly 'null'.
+src/import/csv-upload.js: error TS18047: 'resultEl' is possibly 'null'.
+src/import/csv-upload.js: error TS18047: 'resultEl' is possibly 'null'.
+src/import/csv-upload.js: error TS18047: 'resultEl' is possibly 'null'.
+src/import/csv-upload.js: error TS18047: 'resultEl' is possibly 'null'.
+src/import/csv-upload.js: error TS18047: 'resultEl' is possibly 'null'.
+src/import/csv-upload.js: error TS2531: Object is possibly 'null'.
+src/import/csv-upload.js: error TS2531: Object is possibly 'null'.
+src/import/fund-engine.js: error TS18047: 'a' is possibly 'null'.
+src/import/fund-engine.js: error TS18047: 'b' is possibly 'null'.
+src/import/fund-engine.js: error TS2531: Object is possibly 'null'.
+src/import/fund-import.js: error TS18046: 'e' is of type 'unknown'.
+src/import/fund-import.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/import/fund-import.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/import/fund-import.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/import/last-file.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/import/last-file.js: error TS2339: Property 'doc' does not exist on type 'never'.
+src/import/last-file.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/import/tech-import.js: error TS2339: Property 'cancelled' does not exist on type '{}'.
+src/import/tech-import.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/import/tech-import.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/import/upload-history.js: error TS2339: Property 'collection' does not exist on type 'never'.
+src/import/wlsync.js: error TS18046: 'e' is of type 'unknown'.
+src/import/wlsync.js: error TS18046: 'e' is of type 'unknown'.
+src/import/wlsync.js: error TS18046: 'e' is of type 'unknown'.
+src/import/wlsync.js: error TS18046: 'e' is of type 'unknown'.
+src/import/wlsync.js: error TS18046: 'e' is of type 'unknown'.
+src/import/wlsync.js: error TS2339: Property 'ambiguous' does not exist on type '{}'.
+src/import/wlsync.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/import/wlsync.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/import/wlsync.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/import/wlsync.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/import/wlsync.js: error TS2339: Property 'collection' does not exist on type 'never'.
+src/import/wlsync.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/import/wlsync.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/import/wlsync.js: error TS2339: Property 'retryable' does not exist on type '{}'.
+src/industry/render.js: error TS18047: 'body' is possibly 'null'.
+src/industry/render.js: error TS18047: 'detailEl' is possibly 'null'.
+src/industry/render.js: error TS18047: 'detailEl' is possibly 'null'.
+src/industry/render.js: error TS18047: 'detailEl' is possibly 'null'.
+src/industry/render.js: error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/industry/render.js: error TS2532: Object is possibly 'undefined'.
+src/industry/render.js: error TS2532: Object is possibly 'undefined'.
+src/joblogs/integrity.js: error TS18047: 'expected' is possibly 'null'.
+src/live/ticker.js: error TS18047: 'detailEl' is possibly 'null'.
+src/live/ticker.js: error TS18047: 'search.parentNode' is possibly 'null'.
+src/livedata/bar.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/livedata/claude.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/livedata/claude.js: error TS2339: Property 'fromClaude' does not exist on type 'object'.
+src/livedata/claude.js: error TS2339: Property 'fromClaude' does not exist on type 'object'.
+src/livedata/claudegate.js: error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/livedata/fundamental.js: error TS2322: Type 'number | undefined' is not assignable to type 'number'.
+src/livedata/fundamental.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/livedata/fundamental.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/livedata/fundamental.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/livedata/fundamental.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/livedata/fundamental.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/livedata/fundamental.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/livedata/fundamental.js: error TS2531: Object is possibly 'null'.
+src/prices/chart.js: error TS18047: 'ch' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'ch' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'el' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'el' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'el' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'el' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'el' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'panels' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'panels' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'svg' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'svg' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'tip' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'xh' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'xh' is possibly 'null'.
+src/prices/chart.js: error TS18047: 'xh' is possibly 'null'.
+src/prices/chart.js: error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/prices/chart.js: error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/prices/chart.js: error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/prices/chart.js: error TS2531: Object is possibly 'null'.
+src/prices/chart.js: error TS2531: Object is possibly 'null'.
+src/prices/chart.js: error TS2531: Object is possibly 'null'.
+src/prices/chart.js: error TS2531: Object is possibly 'null'.
+src/prices/chart.js: error TS2532: Object is possibly 'undefined'.
+src/prices/chart.js: error TS2532: Object is possibly 'undefined'.
+src/refresh/historyplan.js: error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/refresh/tvrefresh.js: error TS18047: 'res' is possibly 'null'.
+src/refresh/tvrefresh.js: error TS18047: 'res' is possibly 'null'.
+src/refresh/tvrefresh.js: error TS18047: 'res' is possibly 'null'.
+src/refresh/tvrefresh.js: error TS18047: 'res' is possibly 'null'.
+src/refresh/tvrefresh.js: error TS18047: 'res' is possibly 'null'.
+src/refresh/tvrefresh.js: error TS18047: 'res' is possibly 'null'.
+src/refresh/tvrefresh.js: error TS18047: 'res' is possibly 'null'.
+src/refresh/tvrefresh.js: error TS18047: 'res' is possibly 'null'.
+src/refresh/tvrefresh.js: error TS18047: 'res' is possibly 'null'.
+src/refresh/tvrefresh.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/strategies/editor.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/editor.js: error TS2532: Object is possibly 'undefined'.
+src/strategies/learnpanel.js: error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+src/strategies/learnpanel.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/strategies/learnpanel.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/strategies/practice.js: error TS18048: 'f.options' is possibly 'undefined'.
+src/strategies/results.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/results.js: error TS2322: Type 'string | null' is not assignable to type 'string'.
+src/strategies/results.js: error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/strategies/results.js: error TS2532: Object is possibly 'undefined'.
+src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
+src/strategies/section.js: error TS2531: Object is possibly 'null'.
+src/strategies/section.js: error TS2531: Object is possibly 'null'.
+src/strategies/section.js: error TS2531: Object is possibly 'null'.
+src/strategies/tracking.js: error TS2339: Property 'doc' does not exist on type 'never'.
+src/strategies/trackpanel.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/tradelog/form.js: error TS2531: Object is possibly 'null'.
+src/tv/connector.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/tv/connector.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/tv/connector.js: error TS2339: Property 'message' does not exist on type '{}'.
+src/tv/connector.js: error TS2339: Property 'retryable' does not exist on type '{}'.
+src/tv/isin.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/tv/isin.js: error TS2339: Property 'code' does not exist on type '{}'.
+src/ui/claudecontrols.js: error TS2531: Object is possibly 'null'.
+src/ui/claudecontrols.js: error TS2531: Object is possibly 'null'.
+src/ui/confirm.js: error TS2531: Object is possibly 'null'.
+src/ui/confirm.js: error TS2531: Object is possibly 'null'.
+src/ui/deeplink.js: error TS2810: Expected 1 argument, but got 0. 'new Promise()' needs a JSDoc hint to produce a 'resolve' that can be called without arguments.
+src/ui/globalsearch.js: error TS18047: 'clear' is possibly 'null'.
+src/ui/globalsearch.js: error TS18047: 'clear' is possibly 'null'.
+src/ui/globalsearch.js: error TS18047: 'clear' is possibly 'null'.
+src/ui/globalsearch.js: error TS18047: 'clear' is possibly 'null'.
+src/ui/globalsearch.js: error TS18047: 'input' is possibly 'null'.
+src/ui/globalsearch.js: error TS18047: 'input' is possibly 'null'.
+src/ui/inlinedetail.js: error TS18047: 'detailEl' is possibly 'null'.
+src/ui/inlinedetail.js: error TS18047: 'detailEl' is possibly 'null'.
+src/ui/inlinedetail.js: error TS18047: 'detailEl' is possibly 'null'.
+src/ui/inlinedetail.js: error TS18047: 'detailHome' is possibly 'null'.
+src/ui/inlinedetail.js: error TS2345: Argument of type 'HTMLElement | null' is not assignable to parameter of type 'Node'.
+src/ui/inlinedetail.js: error TS2345: Argument of type 'HTMLElement | null' is not assignable to parameter of type 'Node'.
+src/ui/inlinedetail.js: error TS2345: Argument of type 'HTMLElement | null' is not assignable to parameter of type 'Node'.
+src/ui/navigation.js: error TS18047: 'detailEl' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'menuToggle' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'sidebar' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'sidebar' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'sidebar' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'sidebarOverlay' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'sidebarOverlay' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'sidebarOverlay' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'toolsGroup' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'toolsGroup' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'toolsGroup' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'toolsToggle' is possibly 'null'.
+src/ui/navigation.js: error TS18047: 'toolsToggle' is possibly 'null'.
+src/ui/navigation.js: error TS2531: Object is possibly 'null'.

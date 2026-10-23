@@ -145,7 +145,7 @@ async function albaTiRunImport(){
     let bseFound = 0;
     try {
       if(typeof albaWlResolveBse === 'function'){
-        let tried = {}; try { const td = await albaFiRetry(() => db.doc('stockMeta/bseLookupTried').get()); if(td && td.exists) tried = td.data() || {}; } catch(e){}
+        let tried = {}; try { const td = await albaFiRetry(() => db.doc('stockMeta/bseLookupTried').get()); if(td && td.exists) tried = td.data() || {}; } catch(e){ /* no lookup record yet: search again */ }
         const todo = raw.stocks.map(s => ({ code: albaFiSym(s), name: s.name })).filter(x => /^\d+$/.test(x.code) && !bse[x.code] && !(tried[x.code] && Date.now() - (Date.parse(tried[x.code]) || 0) < 30 * 86400000)).slice(0, 12);
         if(todo.length){
           fiSet('load', 'running', 'Looking up ' + todo.length + ' BSE symbol(s)…', 1);

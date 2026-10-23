@@ -622,6 +622,13 @@ test('golden: the scores for the made-up universe have not moved', () => {
   assert.strictEqual(moved.length, 0, moved.length + ' entries differ (e.g. ' + moved.slice(0, 3).join(', ') + '); if intended run: node tests/engines.js --update');
 });
 
+// =========================================================== saved text is never drawn as markup
+test('escaping: safeText turns raw < and > into text and never escapes twice', () => {
+  const U = load('src/core/util.js');
+  assert.strictEqual(U.safeText('<b>a</b> &amp; &lt;x'), '&lt;b&gt;a&lt;/b&gt; &amp; &lt;x');
+  assert.strictEqual(U.safeText(null), '');
+});
+
 // =========================================================== score history (the trend on the stock page)
 const H = load('src/history/scorehistory.js', 'export { BUCKETS, SCORE_ENGINE, addPoint, bucketId, bucketOf, pointFor, tickerKey };');
 const R = load('src/detail/scoretrend.js', 'export { scoreTrendHtml };');

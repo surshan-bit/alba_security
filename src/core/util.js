@@ -58,6 +58,11 @@ function formatDate(iso){
   return d.toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'});
 }
 // ---- Weekly CSV upload / diff ----
+// For text that is saved already escaped (the research texts are escaped when they are stored) but could have been written by another
+// tool without it: turns any raw < or > into text, and leaves everything else (including &amp; and &lt;) as it is, so nothing is escaped twice.
+function safeText(str){
+  return String(str == null ? '' : str).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 function escapeHtml(str){
   return String(str)
     .replace(/&/g,'&amp;')
@@ -90,4 +95,4 @@ function screenerUrl(s){
   return `https://www.screener.in/company/${encodeURIComponent(sym)}/${suffix}`;
 }
 
-export { daysSinceDate, escapeHtml, fixedOrNull, formatDate, formatDeepRefreshTimestamp, formatRequestedAt, formatUploadTimestamp, pctChangeSpan, round2OrNull, sanitizeDocId, screenerUrl, sleep, tickerIndustry, tickerKey, tickerSymbol };
+export { daysSinceDate, escapeHtml, fixedOrNull, formatDate, formatDeepRefreshTimestamp, formatRequestedAt, formatUploadTimestamp, pctChangeSpan, round2OrNull, safeText, sanitizeDocId, screenerUrl, sleep, tickerIndustry, tickerKey, tickerSymbol };

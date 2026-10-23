@@ -23,6 +23,7 @@ const KEY = 'albaDashboard.business.v1';
 let bizFull = false;   // the table (or the heat map) fills the whole window
 const newsOpen = new Set();   // industries whose News section is open (closed at first)
 let bizFiltersOpen = false;   // phones: the view, period, grouping and strategy controls fold into one "Filters" line, closed at first
+let drawnRows = [], drawnCols = 6;   // what the table on the page was last drawn from, so a row can open or close without a redraw
 let period = '1M', by = 'industry', view = 'table', heatSize = 'chg', strategyId = '', showMatched = false, rebound = false, loadState = 'idle';   // loadState: 'idle' | 'loading' | 'failed' (price bars for long periods)
 const open = new Set();                                    // industries whose detail is open
 try { const v = JSON.parse(localStorage.getItem(KEY) || '{}'); if(PERIODS.some(p => p.key === v.period)) period = v.period; if(v.by === 'group') by = 'group'; if(v.view === 'heat') view = 'heat'; if(v.heatSize === 'count') heatSize = 'count'; if(typeof v.strategy === 'string') strategyId = v.strategy; if(v.matched === true) showMatched = true; if(v.rebound === true) rebound = true; } catch(e){ /* storage unavailable: defaults */ }
@@ -181,6 +182,7 @@ function draw(el){
   const filterNote = strategyOn() ? '<p class="upload-hint biz-showing">Matched ' + total + ' of ' + stocks.length + ' stocks</p>' : '';
   const head = '<tr><th>' + (by === 'group' ? 'Industry group' : 'Industry') + '</th><th class="num">Stocks</th><th class="num">Average ' + p.key + '</th><th class="num">Median</th><th>Up / down</th><th class="num">News</th>' + (strategyOn() ? '<th class="num">Matching</th><th class="num">Match avg ' + p.key + '</th><th class="num">vs industry</th>' : '') + '</tr>';
   const cols = strategyOn() ? 9 : 6;
+  drawnRows = rows; drawnCols = cols;
   const body = rows.map(r => {
     const isOpen = open.has(r.name);
     return '<tr class="biz-row' + (isOpen ? ' open' : '') + '" data-biz-name="' + escapeHtml(r.name) + '" tabindex="0" role="button" aria-expanded="' + isOpen + '"><td class="biz-name">' + '<button type="button" class="biz-open" data-biz-open="' + escapeHtml(r.name) + '" title="Open the industry page: factors, news and charts">' + escapeHtml(r.name) + '</button></td><td class="num">' + r.count + '</td><td class="num">' + pct(r.mean) + '</td><td class="num">' + pct(r.median) + '</td><td>' + breadth(r) + '</td><td class="num">' + (r.news.length ? r.news.length + (r.pos || r.neg ? ' <span class="news-pos">+' + r.pos + '</span> <span class="news-neg">&minus;' + r.neg + '</span>' : '') : '') + '</td>' + (strategyOn() ? '<td class="num">' + (r.matches ? '<b class="biz-matchcount">' + r.matches + '</b> of ' + r.count : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null ? pct(r.matchMean) : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null && r.mean !== null ? signedPp(r.matchMean - r.mean) : '') + '</td>' : '') + '</tr>' + (isOpen ? detailHtml(r, cols) : '');
@@ -203,10 +205,19 @@ function ensureData(){
   loadState = 'loading'; render();
   ensureAllPriceBars().then(ok => { loadState = ok ? 'idle' : 'failed'; render(); });
 }
+// Opens or closes one industry in place: only its detail row is added or removed, the rest of the page is not redrawn.
 function toggleRow(row){
-  const name = row.dataset.bizName;
-  if(open.has(name)) open.delete(name); else open.add(name);
-  render();
+  const name = row.dataset.bizName, r = drawnRows.find(x => x.name === name);
+  const isOpen = !open.has(name);
+  if(isOpen) open.add(name); else open.delete(name);
+  if(!r){ render(); return; }   // not drawn from the rows we know (should not happen): redraw as before
+  const next = row.nextElementSibling;
+  if(next && next.classList.contains('biz-detail')) next.remove();
+  if(isOpen) row.insertAdjacentHTML('afterend', detailHtml(r, drawnCols));
+  row.classList.toggle('open', isOpen);
+  row.setAttribute('aria-expanded', String(isOpen));
+  const all = /** @type {HTMLElement | null} */ (document.querySelector('#businessBody [data-biz-all]'));
+  if(all){ const allOpen = drawnRows.length > 0 && drawnRows.every(x => open.has(x.name)); all.dataset.bizAll = allOpen ? 'collapse' : 'expand'; all.textContent = allOpen ? 'Collapse all' : 'Expand all'; }
 }
 
 function init(){

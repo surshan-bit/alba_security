@@ -85,7 +85,7 @@ npm install            once per fresh checkout (needs network); Playwright is a 
 # edit files in src/ and styles/ (and partials/, js/loader.js)
 npm run check          build (app.js, chunks/, styles.css) + syntax + lint + regression harness + browser suites; must print OK before publishing (CI runs `-- --part=main` and `-- --part=imports` as two parallel jobs)
 npm run update-golden  after reviewing an intended change in behaviour, accept the new snapshots (hashes and their text)
-npm run types          type check src/ (also part of npm run check); new findings fail, the 230 known ones are in tests/types.baseline.txt
+npm run types          type check src/ (also part of npm run check); new findings fail, the 228 known ones are in tests/types.baseline.txt (strict null and function checks are on, so new code must handle a missing element; implicit any is off)
 ```
 
 If `check` reports differing snapshots, the new ones are written to `tests/out/`. To see what changed, run the harness on the previous version
