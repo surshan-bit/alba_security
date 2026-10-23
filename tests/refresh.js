@@ -9,6 +9,8 @@
 //  5. (v1.193) The Refresh menu (open, arrow keys, Escape, outside click), the confirmation for a big Fundamental run, and a run on another
 //     device (shown in the bell, no second run, Stop asks it to stop): the behaviour the split of src/refresh/kit.js must keep.
 //  6. (v1.194) A saved update redraws the Analysis grid but keeps its sideways scroll, and waits while the viewer is scrolling.
+//  7. (v1.253) Refresh Fundamental Info end to end with a scripted Claude and TradingView: the prompts asked, the research and update documents
+//     written and the notice shown are compared with tests/fixtures/ld-fundamental.expected.json (node tests/refresh.js --update-ld rewrites it).
 // It uses the stand-in database and TradingView of tests/lib/env.js; it does not test the real claude.ai runtime. Playwright is optional.
 // Usage: node tests/refresh.js
 const fs = require('fs'), path = require('path');
@@ -221,9 +223,75 @@ async function scrollKeepTests(){
   } finally { await ctx.close(); }
 }
 
+
+// ---- 7. Refresh Fundamental Info end to end (a scripted Claude and TradingView; the saved documents are compared with a checked-in file)
+const LD_EXPECTED = path.join(__dirname, 'fixtures', 'ld-fundamental.expected.json');
+const ldScript = () => {
+  window.__prompts = [];
+  window.__tvFund = {
+    'mcp-tv-get-financials': { revenue: [1, 2, 3], note: 'made-up financials' },
+    'mcp-tv-get-forecasts': { quality_note: 'made-up', eps: [1, 2] },
+    'mcp-tv-get-news': { headlines: [
+      { id: 'n1', title: 'Company wins a big order', published: 1791439200, provider: { name: 'Wire' }, link: 'https://news.example/n1', paywall: false },
+      { id: 'n2', title: 'Regulator opens a probe', published: 1791352800, provider: { name: 'Wire' }, link: 'https://news.example/n2', paywall: false },
+      { id: 'n3', title: 'Quarterly note', published: 1789884000, provider: { name: 'Desk' }, link: 'https://news.example/n3', paywall: true }] },
+    'mcp-tv-get-news-story': { summary: 'made-up story', short_description: 'short' },
+    'mcp-tv-get-documents': input => ({ items: input.event === 'earning' ? [{ reported: 1785542400, title: 'Q1 results', correlation_id: 'e1', provider: { name: 'Exch' } }] : input.event === 'corporate_event' ? [{ reported: 1788220800, title: 'Dividend', correlation_id: 'c1', provider: { name: 'Exch' } }] : [] })
+  };
+  window.__sample = async (prompt, opts) => {
+    const task = String(prompt).split('TASK:')[1] || '';
+    window.__prompts.push({ tier: opts && opts.modelTier, len: String(prompt).length, task: task.slice(0, 60) });
+    const reply = o => ({ text: JSON.stringify(o) });
+    if(/NEWS HEADLINES TO LABEL/.test(prompt)){ const labels = {}; for(let i = 0; i < 60; i++) labels[i] = ['positive', 'negative', 'neutral'][i % 3]; return reply({ labels }); }
+    if(/These metrics are "n\/a"/.test(task)){ const f = {}; for(const m of task.matchAll(/\[(\w+)\] ([^;\[]+?)(?:;|\.\n)/g)){ const metrics = {}; m[2].split(', ').forEach(l => { metrics[l.trim()] = '12.5%'; }); f[m[1]] = { metrics, note: 'basis: made-up' }; } return reply({ factors: f }); }
+    if(/Refresh the written analysis on these Fundamental Score factor cards/.test(task)){
+      const f = {}; for(const m of task.split('\n')[0].matchAll(/"(\w+)" \(/g)) f[m[1]] = { score: 0.5, note: 'rescored: made-up', research: { headline: 'Headline for ' + m[1], points: ['Point one', 'Point two <b>x</b>'], positives: ['Plus'], negatives: ['Minus'], sources: [{ title: 'Order win', url: 'https://news.example/n1' }, { title: 'Invented', url: 'https://invented.example/x' }] } };
+      return reply({ factors: f });
+    }
+    if(/Global & Macro Information/.test(task)) return reply({ positive: [{ text: 'Demand is firm <i>now</i>', source: 'Wire, 2026-10-08', url: 'https://news.example/n1' }], negative: [{ text: 'Input costs rising', source: 'Claude analysis, no live source', url: '' }],
+      events: [{ headline: 'Oil shock', impact: 'negative', why: 'Raises freight cost.', source: 'Wire', url: 'https://news.example/n2' }, { headline: 'Odd impact', impact: 'sideways', why: 'x', source: '', url: 'https://invented.example/y' }] });
+    if(/Strengths and Watch-outs box/.test(task)) return reply({ strengths: [{ text: 'Cheap for its quality', tone: 'strong' }, { text: 'Steady', tone: 'weird' }], watchouts: [{ text: 'Debt is rising', tone: 'concern' }] });
+    return reply({});
+  };
+};
+async function ldFundamentalTests(){
+  const { ctx, page, errs } = await open('ldfund', {}, { fn: ldScript });
+  try {
+    const idOf = st => symOf(st).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_');
+    // opens the stock, presses its Refresh > Fundamental and waits for `count` finished notices naming it
+    const run = async (st, count) => {
+      await page.fill('#globalSearch', st.name); await page.waitForTimeout(250); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+      await page.waitForSelector('#detail .rk-stockbtn', { timeout: 8000 });
+      await page.evaluate(() => document.querySelector('#detail .rk-stockbtn').click()); await page.waitForTimeout(250);
+      await page.evaluate(() => { const b = Array.from(document.querySelectorAll('.rk-menu [data-rk-act]')).find(x => /Fundamental/.test(x.textContent)); if(b) b.click(); });
+      let mine = [];
+      for(let i = 0; i < 80 && mine.length < count; i++){
+        await page.waitForTimeout(250);
+        mine = await page.evaluate(([q, name]) => { const d = window.__store.get(q); return d ? (d.notices || []).filter(x => /Fundamental refresh/.test(x.title) && x.title.includes(name)).map(x => ({ title: x.title, text: x.text, tone: x.tone })) : []; }, [QUEUE, st.name]);
+      }
+      await page.waitForTimeout(500);
+      return mine[0];
+    };
+    const grab = st => page.evaluate(id => ({ research: window.__store.get('stockResearch/' + id) || null, updates: window.__store.get('stockUpdates/' + id) || null, prompts: window.__prompts.slice() }), idOf(st));
+    const A = FIXTURE[0], B = FIXTURE[1];
+    const firstA = await run(A, 1), afterA = await grab(A);
+    const secondA = await run(A, 2), afterA2 = await grab(A);   // researched just now: nothing to ask again
+    const firstB = await run(B, 1), afterB = await grab(B);     // a stock with figures missing from the file
+    const got = JSON.parse(JSON.stringify({ firstA, afterA, promptsAfterSecondA: afterA2.prompts.length, firstB, afterB }));
+    if(process.argv.includes('--update-ld')){ fs.writeFileSync(LD_EXPECTED, JSON.stringify(got, null, 1) + '\n'); console.log('ld-fundamental.expected.json written'); }
+    const want = fs.existsSync(LD_EXPECTED) ? JSON.parse(fs.readFileSync(LD_EXPECTED, 'utf8')) : null;
+    ok(want && JSON.stringify(got) === JSON.stringify(want), 'Refresh Fundamental Info: the prompts asked, the documents saved and the notices shown are unchanged (' + JSON.stringify(firstA) + ' / ' + JSON.stringify(firstB) + ')');
+    ok(firstA && /finished/.test(firstA.title) && secondA && /finished/.test(secondA.title), 'both runs on the first stock end with a finished notice');
+    ok(afterA.research && afterA.research.factors && afterA.updates && afterA.updates.globalFactors, 'research and Global & Macro were saved');
+    ok(afterA2.prompts.length === afterA.prompts.length, 'a stock researched just now is not asked about again: ' + afterA.prompts.length + ' -> ' + afterA2.prompts.length);
+    ok(afterB.prompts.length > afterA2.prompts.length && afterB.prompts.some(p => /These metrics/.test(p.task)), 'a stock with missing figures is asked for them');
+    ok(errs.length === 0, 'ldfund: errors in the page: ' + errs.slice(0, 2).join(' | '));
+  } finally { await ctx.close(); }
+}
+
 (async () => {
   base = await srv.listen(); browser = await chromium.launch();
-  try { for(const f of [countTests, menuTests, resumeTests, symbolTests, barMenuTests, confirmTests, remoteTests, scrollKeepTests]){ try { await f(); } catch(e){ problems.push(f.name + ' crashed: ' + String(e && e.message || e).split('\n').slice(0, 3).join(' | ')); checks++; } } }
+  try { for(const f of [countTests, menuTests, resumeTests, symbolTests, barMenuTests, confirmTests, remoteTests, scrollKeepTests, ldFundamentalTests]){ try { await f(); } catch(e){ problems.push(f.name + ' crashed: ' + String(e && e.message || e).split('\n').slice(0, 3).join(' | ')); checks++; } } }
   finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('refresh tests FAILED (' + problems.length + ' of ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('refresh tests: ' + checks + ' checks passed');

@@ -127,6 +127,8 @@ function installStub(cfg){
   }
   const mcp = { callTool: async (server, tool, input) => { await delay(window.__tvDelay || 0);
     if(window.__tvRefuse > 0){ window.__tvRefuse--; throw Object.assign(new Error('tool_pre_invoke blocked by plugin ToolQuotaPlugin: TOOL_QUOTA_EXCEEDED - Tool call quota exceeded (test)'), { code: 'tool_error' }); }
+    // a test can script the answers of the Fundamental refresh's TradingView reads: window.__tvFund = { '<tool>': data | (input) => data }
+    if(window.__tvFund && window.__tvFund[tool] !== undefined){ const f = window.__tvFund[tool]; return { payload: { data: clone(typeof f === 'function' ? f(input) : f) } }; }
     // ISIN lookups (how the page finds a stock's TradingView symbol): answered from the seeded stock documents
     const isinStock = isin => { for(const [k, v] of store) if(k.startsWith('stockData/') && v && v.stocks){ const s = v.stocks.find(x => x.isin === isin); if(s) return s; } return null; };
     const isinSym = s => 'NSE:' + String(s.ticker).split('·')[0].trim().replace(/-/g, '_');
@@ -149,7 +151,7 @@ function installStub(cfg){
     assets.read = async id => { const t = await window.__blobGet(id); return t == null ? new Response('not found', { status: 404 }) : new Response(t); };
   }
   const user = { id: async () => cfg.noUser ? null : 'u_SMOKE', isOwner: () => cfg.owner !== false };
-  const stubs = { mcp: cfg.noMcp ? null : mcp, sample: async () => ({ text: '{}' }), permissions: { state: async () => 'granted', request: async () => ({}), manage: async () => {} }, assets, user };
+  const stubs = { mcp: cfg.noMcp ? null : mcp, sample: async (prompt, opts) => (window.__sample ? window.__sample(prompt, opts) : { text: '{}' }), permissions: { state: async () => 'granted', request: async () => ({}), manage: async () => {} }, assets, user };
   window.__gets = gets; window.__sets = sets; window.__uploads = uploads; window.__deletedAssets = [];
   window.__setDoc = (p, d) => { store.set(p, clone(d)); notify(p); }; window.__store = store; window.__seedReady = seedP;
   if(!cfg.noClaude) window.claude = { use: async name => name === 'db' ? db : (name in stubs ? stubs[name] : null) };
