@@ -308,7 +308,6 @@
   :root[data-theme="white"] #section-trackrecord .help-table{width:100%;}
 }
 /* Strategies: fewer boxes, more free flow. Fields become underlined, the setup bar and secondary buttons lose their frames, and the list actions are plain links. */
-@media (min-width:901px){
   :root[data-theme="white"] #section-strategies #stratMain :is(input:not([type=checkbox]):not([type=radio]),select,textarea){border:0;border-bottom:1px solid #c9cfdf;border-radius:0;background-color:transparent;box-shadow:none;padding-left:2px;padding-right:6px;}
   :root[data-theme="white"] #section-strategies #stratMain :is(input,select,textarea):focus{border-bottom:2px solid var(--accent);box-shadow:none;outline:none;}
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{border:0;border-bottom:1px solid #e6e9f2;border-radius:0;background:transparent;padding:12px 0;}
@@ -316,7 +315,6 @@
   :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.on):hover{background:color-mix(in srgb,var(--accent) 8%,#fff);}
   :root[data-theme="white"] #section-strategies #stratList :is(.strat-new,.strat-restore){border:0;background:transparent;color:var(--accent);padding-left:9px;}
   :root[data-theme="white"] #section-strategies #stratList :is(.strat-new,.strat-restore):hover{background:color-mix(in srgb,var(--accent) 8%,#fff);}
-}
 /* Buttons: one primary and one secondary style everywhere (wide screens).
    Primary = filled indigo; secondary = white with a thin edge. Both: 40px tall, small spaced capitals, 6px corners. */
 @media (min-width:901px){
@@ -342,10 +340,8 @@
   :root[data-theme="white"] #section-refreshlog .wl-help{margin:0 0 6px;}
   :root[data-theme="white"] #section-refreshlog #refreshWatchlistBtn{display:flex;width:fit-content;margin-left:auto;}
 /* Strategies: a single line under the closed setup bar, and the "+ Add a rule" box lined up with the rule fields above it. */
-@media (min-width:901px){
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold:not([open]) > summary{border-bottom:0;}
   :root[data-theme="white"] #section-strategies #stratMain .sr-add{width:260px;max-width:100%;}
-}
 /* Explorer industry table: cell text centred vertically in every row (a two-line name no longer pushes the # or the numbers to the bottom). */
 @media (min-width:901px){
   :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > td{vertical-align:middle;}
@@ -422,4 +418,26 @@
   :root[data-theme="white"] #section-refreshlog .upload-row:has(#tvSnapshotBtn) .upload-text{flex:1 0 100%;}
   :root[data-theme="white"] #section-refreshlog #tvSnapshotBtn{flex:none;width:auto;}
   :root[data-theme="white"] #section-refreshlog #refreshWatchlistBtn{display:flex;width:fit-content;margin-left:auto;}
+}
+/* Phones, grid screens (Explorer, Analysis, Strategies): the laptop type sizes and spacing for the tables, and the same primary / secondary buttons. */
+@media (max-width:900px){
+  :root[data-theme="white"] :is(.strat-table,.biz-table){font-size:1rem;}
+  :root[data-theme="white"] :is(.strat-table:not(.peers-table) td,.biz-table > tbody > tr > td){font-size:.98rem;padding:13px 6px;line-height:1.35;}
+  :root[data-theme="white"] :is(.strat-table th,.biz-table > thead > tr > th,.strat-table:not(.peers-table) th){font-size:.92rem;font-weight:500;padding:10px 6px;text-transform:none;letter-spacing:0;white-space:nowrap;}
+  :root[data-theme="white"] :is(.strat-table,.biz-table) :is(th,td){vertical-align:middle;}
+  /* Buttons in the toolbars */
+  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;height:auto;padding:0 14px;font-size:.76rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
+  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;}
+  :root[data-theme="white"] .sort-select{min-height:40px;font-size:.92rem;border:1px solid #c9cfdf;background-color:#fff;color:#1b1f2a;}
+  :root[data-theme="white"] :is(div:has(> .analysis-reset-btn),div:has(> .biz-expand),#section-business .biz-toolbar,.analysis-leaderboard-head .rk-headline){display:flex;flex-wrap:wrap;align-items:center;gap:8px;overflow:visible;}
+  :root[data-theme="white"] :is(.analysis-reset-btn,.biz-expand,.rk-bar){flex:1 1 auto;}
+  :root[data-theme="white"] :is(.analysis-reset-btn,.strat-btn,.biz-expand,.refresh-btn){padding:0 10px;letter-spacing:.06em;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{padding-right:30px;}
+}
+/* The sort box above a results grid looks the same in Analysis and Strategies (boxed), not underlined like the form fields. */
+:root[data-theme="white"] #section-strategies #stratMain .sort-select{border:1px solid #c9cfdf;border-radius:8px;background-color:#fff;padding-left:10px;}
+@media (max-width:900px){
+  :root[data-theme="white"] #section-business .biz-toolbar .biz-match-toggle{flex:none;width:auto;max-width:none;min-width:max-content;height:42px;}
+  :root[data-theme="white"] #section-business .biz-toolbar .biz-match-toggle .tl-view-btn{flex:none;}
 }
