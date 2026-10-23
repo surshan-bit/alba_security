@@ -8,7 +8,8 @@ import { openStockInline } from '../ui/inlinedetail.js';
 import { qualifyingStocks, ruleReady } from './rules.js';
 import { addStrategy, deleteStrategy, duplicateStrategy, restoreStarters, saveStrategies, selectStrategy, selectedStrategy, strategies } from './state.js';
 import { rulesEditorHtml, wireRulesEditor } from './editor.js';
-import { orderedPicks, resultsHtml, setResultsSort, sortSelectHtml, whyDatalist, whyHtml } from './results.js';
+import { orderedPicks, resultsHtml, setResultsSort, sortLabel, sortSelectHtml, whyDatalist, whyHtml } from './results.js';
+import { sheetFrame } from '../ui/phonesheet.js';
 import { cleanGoal } from './goal.js';
 import { pcTickerKey } from '../prices/store.js';
 import { kit } from '../refresh/kit.js';
@@ -27,6 +28,7 @@ function openStockFromStrategies(idx){
 
 const readyRules = (st) => st.rules.filter(ruleReady);
 
+let stratFiltersOpen = false;   // phones: the sort and the buttons above the picks sit in the Filters pop-up, closed at first
 const folds = new Set();   // which collapsible blocks are open (kept across redraws)
 // The picks in the order the table shows them: what a refresh works through.
 const refreshList = (st) => orderedPicks(qualifyingStocks(stocks, st.rules));
@@ -103,9 +105,10 @@ function mainHtml(st){
       </details>
     </div>
     <div class="analysis-panel strat-panel">
-      <div class="strat-result-head">
+      <div class="strat-result-head strat-filters-panel${stratFiltersOpen ? '' : ' filters-collapsed'}">
+        <button type="button" class="biz-filters-toggle" data-strat-filters="1" aria-expanded="${stratFiltersOpen}"><span class="ft-label">Filters</span><span class="ft-summary">${escapeHtml('Sort: ' + sortLabel())}</span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
         <div class="strat-result-title"><span class="strat-count" aria-label="Qualifying stocks">Showing <b id="stratCount">${matches.length}</b> of ${stocks.length} stocks${ignored ? ` &middot; ${ignored} rule${ignored === 1 ? '' : 's'} not applied yet` : ''}</span></div>
-        <div class="strat-total">${sortSelectHtml()}<button type="button" class="strat-btn" id="stratTrackBtn"${matches.length ? '' : ' disabled'} title="Save the ticked picks (or all of today's list when none is ticked) with their prices and judge them against the goal later">${trackLabel(matches)}</button>${(kit.defineScope('strat', { label: 'picks', source: 'strat', selName: 'strat', stocks: () => refreshList(st) }), kit.barHtml('strat'))}</div>
+        ${sheetFrame(`<div class="strat-total">${sortSelectHtml()}<button type="button" class="strat-btn" id="stratTrackBtn"${matches.length ? '' : ' disabled'} title="Save the ticked picks (or all of today's list when none is ticked) with their prices and judge them against the goal later">${trackLabel(matches)}</button>${(kit.defineScope('strat', { label: 'picks', source: 'strat', selName: 'strat', stocks: () => refreshList(st) }), kit.barHtml('strat'))}</div>`)}
       </div>
       <div id="stratResults">${resultsHtml(matches, selected)}</div>
       ${kit.selbarSlot('strat')}
@@ -150,6 +153,7 @@ function init_strategies_section(){
     if(d){ if(/** @type {HTMLDetailsElement} */ (d).open) folds.add(d.dataset.fold); else folds.delete(d.dataset.fold); }
   }, true);
   sec.addEventListener('click', (e) => {
+    if(closestEl(e, '[data-strat-filters]')){ stratFiltersOpen = !stratFiltersOpen; renderStrategiesSection(); return; }
     const card = closestEl(e, '.strat-card');
     if(card){ selectStrategy(card.dataset.id); renderStrategiesSection(); return; }
     if(closestEl(e, '#stratNew')){ addStrategy(); renderStrategiesSection(); return; }
