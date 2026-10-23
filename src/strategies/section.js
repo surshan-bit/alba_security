@@ -106,7 +106,7 @@ function mainHtml(st){
     </div>
     <div class="analysis-panel strat-panel">
       <div class="strat-result-head strat-filters-panel${stratFiltersOpen ? '' : ' filters-collapsed'}">
-        <button type="button" class="biz-filters-toggle" data-strat-filters="1" aria-expanded="${stratFiltersOpen}"><span class="ft-label">Filters</span><span class="ft-summary">${escapeHtml('Sort: ' + sortLabel())}</span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
+        <button type="button" class="biz-filters-toggle" data-strat-filters="1" aria-expanded="${stratFiltersOpen}"><span class="ft-label" aria-label="Filters"></span><span class="ft-summary">${escapeHtml('Sort: ' + sortLabel())}</span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
         <div class="strat-result-title"><span class="strat-count" aria-label="Qualifying stocks">Showing <b id="stratCount">${matches.length}</b> of ${stocks.length} stocks${ignored ? ` &middot; ${ignored} rule${ignored === 1 ? '' : 's'} not applied yet` : ''}</span></div>
         ${sheetFrame(`<div class="strat-total">${sortSelectHtml()}<button type="button" class="strat-btn" id="stratTrackBtn"${matches.length ? '' : ' disabled'} title="Save the ticked picks (or all of today's list when none is ticked) with their prices and judge them against the goal later">${trackLabel(matches)}</button>${(kit.defineScope('strat', { label: 'picks', source: 'strat', selName: 'strat', stocks: () => refreshList(st) }), kit.barHtml('strat'))}</div>`)}
       </div>

@@ -158,6 +158,16 @@
   .sheet-head::before{content:"";position:absolute;top:9px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--line);}
   .sheet-title{font-size:1.15rem;font-weight:700;}
   .sheet-close{width:36px;height:36px;border:0;border-radius:50%;background:var(--panel2);color:var(--text);font-size:1.5rem;line-height:1;cursor:pointer;}
+  /* the row that opens the sheet shows the icon and what is chosen, no "Filters" word */
+  .biz-filters-toggle .ft-label::before,.analysis-filters-panel .filters-toggle .ft-label::before{margin-right:0;vertical-align:-4px;}
+  .biz-filters-toggle .ft-label,.analysis-filters-panel .filters-toggle .ft-label{display:inline-flex;align-items:center;}
+  /* bigger touch targets for the switches and options inside the sheet */
+  .sheet-panel .tl-view-toggle{display:flex;width:100%;box-sizing:border-box;padding:4px;margin:0 0 14px;}
+  .sheet-panel .tl-view-btn{flex:1 1 0;min-height:46px;padding:0 6px;font-size:1rem;}
+  .sheet-panel .filter-group-title,.sheet-panel .filter-group > :first-child:not(.filter-group-row){font-size:.8rem;margin:6px 0 8px;}
+  .sheet-panel .filter-group-row{gap:8px;}
+  .sheet-panel .filter-btn{width:auto;min-height:46px;padding:0 16px;font-size:1rem;border-color:var(--line);border-radius:10px;}
+  .sheet-slot .tl-view-toggle{margin:0;}
   .sheet-panel .filter-groups{display:block;padding:0;}
   .sheet-panel .filter-group-row{flex-wrap:wrap;overflow:visible;}
   .sheet-panel .biz-controls{padding-top:0;}
