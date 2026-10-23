@@ -44,3 +44,17 @@
 :root[data-theme="white"] body :is(.strat-fold-sum,.strat-section-hint){font-size:var(--t-sm) !important;font-weight:var(--w-reg) !important;}
 /* Titles inside the Strategies panels are one step down so the setup line and the grid stay the focus. */
 :root[data-theme="white"] body :is(.strat-panel .analysis-panel-title,summary.strat-sub,.strat-panel .analysis-panel-title *){font-size:var(--t-md) !important;}
+
+/* Explorer heat map: smaller type in the tiles so the names and numbers fit and stay readable, most of all with "All" (many small tiles). */
+:root[data-theme="white"] body :is(.hm-tile,.hm-name,.hm-chg){font-size:var(--t-sm) !important;line-height:1.25 !important;}
+:root[data-theme="white"] body .hm-n{font-size:var(--t-xs) !important;line-height:1.25 !important;}
+:root[data-theme="white"] body .hm-name{font-weight:var(--w-strong) !important;}
+
+/* Trade Log cards: smaller type inside the card so the labels and values fit on fewer lines. */
+:root[data-theme="white"] body #section-trackrecord .tl-card :is(div,dd,li,p,span):not(.tl-card-name):not(.tl-card-retval):not(.tl-card-retval *){font-size:var(--t-sm) !important;}
+:root[data-theme="white"] body #section-trackrecord .tl-card :is(.tl-card-grid dt,.tl-signal-label,.tl-card-retlbl){font-size:var(--t-xs) !important;}
+:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-name{font-size:var(--t-md) !important;font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-retval{font-size:var(--t-lg) !important;font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-grid dt{font-weight:var(--w-strong) !important;text-transform:uppercase;}
+:root[data-theme="white"] #section-trackrecord .tl-card{padding:16px 18px;}
+:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-retval *{font-size:inherit !important;font-weight:inherit !important;}
