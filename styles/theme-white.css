@@ -431,8 +431,10 @@
   :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;}
   :root[data-theme="white"] .sort-select{min-height:40px;font-size:.92rem;border:1px solid #c9cfdf;background-color:#fff;color:#1b1f2a;}
   :root[data-theme="white"] :is(div:has(> .analysis-reset-btn),div:has(> .biz-expand),#section-business .biz-toolbar,.analysis-leaderboard-head .rk-headline){display:flex;flex-wrap:wrap;align-items:center;gap:8px;overflow:visible;}
-  :root[data-theme="white"] :is(.analysis-reset-btn,.biz-expand,.rk-bar){flex:1 1 auto;}
-  :root[data-theme="white"] :is(.analysis-reset-btn,.strat-btn,.biz-expand,.refresh-btn){padding:0 10px;letter-spacing:.06em;}
+  :root[data-theme="white"] :is(.analysis-reset-btn,.biz-expand,.rk-bar){flex:0 1 auto;}
+  :root[data-theme="white"] :is(div:has(> .analysis-reset-btn),div:has(> .biz-expand),#section-business .biz-toolbar){gap:4px;justify-content:flex-start;}
+  :root[data-theme="white"] :is(.analysis-reset-btn,.strat-btn,.biz-expand,.refresh-btn,.rk-main,#section-business .biz-toolbar .rk-btn){padding:0 6px;font-size:.68rem;letter-spacing:.02em;gap:3px;}
+  :root[data-theme="white"] #section-business .biz-toolbar .biz-match-toggle .tl-view-btn{padding:0 10px;}
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{padding-right:30px;}
 }
 /* The sort box above a results grid looks the same in Analysis and Strategies (boxed), not underlined like the form fields. */
@@ -440,4 +442,13 @@
 @media (max-width:900px){
   :root[data-theme="white"] #section-business .biz-toolbar .biz-match-toggle{flex:none;width:auto;max-width:none;min-width:max-content;height:42px;}
   :root[data-theme="white"] #section-business .biz-toolbar .biz-match-toggle .tl-view-btn{flex:none;}
+}
+/* Phones: the toolbar buttons share one line equally; only the All / Matched switch (Explorer) sits on its own line above them. */
+@media (max-width:900px){
+  :root[data-theme="white"] div:has(> .analysis-reset-btn){flex-wrap:nowrap;}
+  :root[data-theme="white"] :is(.analysis-reset-btn,.biz-expand,.rk-bar){flex:1 1 0;min-width:0;}
+  :root[data-theme="white"] .rk-bar > :is(.rk-btn,.rk-main,.refresh-btn){width:100%;}
+  :root[data-theme="white"] #section-business .biz-toolbar{flex-wrap:wrap;}
+  :root[data-theme="white"] #section-business .biz-toolbar .biz-match-toggle{margin-right:100%;}
+  :root[data-theme="white"] #section-business .biz-toolbar :is(.biz-expand,.rk-bar){flex:1 1 0;}
 }
