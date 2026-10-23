@@ -10,6 +10,7 @@ import { EVENT_GROUPS, eventsByBar } from '../prices/events.js';
 import { analysisLbCell, analysisRowContext, columnHeaderHtml, stockGridColumnIds } from '../analysis/columns.js';
 import { industryFactors, industryGlobal, industryNews, industrySeries } from './calc.js';
 import { bindJumpSpy } from '../detail/jumpnav.js';
+import { newsItemHtml } from '../business/newsitem.js';
 
 const IST = 19800;
 const NEWS_SHOWN = 30;
@@ -54,11 +55,7 @@ function globalHtml(g){
 
 function newsHtml(news){
   const glyph = { news: '⚡', earn: 'E', corp: 'C' };
-  const list = news.length ? '<ul class="biz-news ind-timeline">' + news.slice(0, NEWS_SHOWN).map(n => {
-    const tag = n.s === 'pos' ? '<span class="news-pos">positive</span>' : n.s === 'neg' ? '<span class="news-neg">negative</span>' : '';
-    const title = /^https?:\/\//i.test(n.url) ? `<a href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.t)}</a>` : escapeHtml(n.t);
-    return `<li><span class="biz-news-date">${escapeHtml(n.d)}</span> <span class="pc-evk pc-evk-${n.k}${n.k === 'news' && n.s ? ' s-' + n.s : ''}">${glyph[n.k]}</span> ${tag} ${title}<span class="biz-news-meta"> · ${escapeHtml(n.stock)}${n.src ? ' · ' + escapeHtml(n.src) : ''}</span></li>`;
-  }).join('') + '</ul>' + (news.length > NEWS_SHOWN ? `<p class="upload-hint">Showing the newest ${NEWS_SHOWN} of ${news.length}.</p>` : '') : '<p class="upload-hint">No news saved for the stocks in this group. Headlines come from Refresh Fundamental Info, or the Refresh news button on the Explorer page.</p>';
+  const list = news.length ? '<ul class="biz-news ind-timeline">' + news.slice(0, NEWS_SHOWN).map(n => newsItemHtml(n, `<span class="pc-evk pc-evk-${n.k}${n.k === 'news' && n.s ? ' s-' + n.s : ''}">${glyph[n.k]}</span>`)).join('') + '</ul>' + (news.length > NEWS_SHOWN ? `<p class="upload-hint">Showing the newest ${NEWS_SHOWN} of ${news.length}.</p>` : '') : '<p class="upload-hint">No news saved for the stocks in this group. Headlines come from Refresh Fundamental Info, or the Refresh news button on the Explorer page.</p>';
   return `<div class="tech-panel" id="jump-ind-news"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('global')}News timeline</div><span class="completeness-badge complete">${news.length} item${news.length === 1 ? '' : 's'}</span></div>${list}</div>`;
 }
 

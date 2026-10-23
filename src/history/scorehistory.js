@@ -5,12 +5,12 @@
 // Points are sorted by date. A score or price that was not known is null. `engine` is SCORE_ENGINE at the time, so
 // the chart can mark where the scoring rules changed (a jump there is the rules, not the company).
 import { dbCapabilityPromise } from '../core/store.js';
+import { round2OrNull, tickerKey } from '../core/util.js';
 
 const SCORE_ENGINE = 3;        // 1 = before v1.171 scoring fixes, 2 = v1.171 onward, 3 = v1.181 onward (live refresh scores completed bars only). Raise it whenever the scoring rules change.
 const BUCKETS = 64;
 const KEEP_YEARS = 3;
 
-function tickerKey(s){ return String((s && s.ticker) || '').split(' · ')[0].trim(); }
 function bucketOf(key){
   let h = 2166136261;
   for(let i = 0; i < key.length; i++){ h ^= key.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
@@ -20,11 +20,10 @@ function bucketId(n){ return 'h' + String(n).padStart(2, '0'); }
 function ymdOf(d){ return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
 function ymdToDate(n){ return new Date(Math.floor(n / 10000), Math.floor(n / 100) % 100 - 1, n % 100); }
 function cutoffYmd(todayYmd){ return todayYmd - KEEP_YEARS * 10000; }
-const r2 = v => (typeof v === 'number' && isFinite(v)) ? Math.round(v * 100) / 100 : null;
 
 // The point to record for a stock as it is now, or null when it has no scores at all.
 function pointFor(s, ymd){
-  const f = r2(s.score), t = r2(s.technical && s.technical.score), p = r2(s.valuation && s.valuation.currentPrice);
+  const f = round2OrNull(s.score), t = round2OrNull(s.technical && s.technical.score), p = round2OrNull(s.valuation && s.valuation.currentPrice);
   if(f == null && t == null) return null;
   return [ymd, f, t, p, SCORE_ENGINE];
 }
@@ -98,4 +97,4 @@ async function loadScoreHistory(s){
   return Array.isArray(all[key]) ? all[key] : [];
 }
 
-export { loadScoreHistory, recordScoreHistory, tickerKey, ymdOf, ymdToDate };
+export { loadScoreHistory, recordScoreHistory, ymdOf, ymdToDate };

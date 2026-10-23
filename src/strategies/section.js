@@ -34,7 +34,6 @@ const folds = new Set();   // which collapsible blocks are open (kept across red
 const refreshList = (st) => orderedPicks(qualifyingStocks(stocks, st.rules));
 
 const selected = new Set();   // symbols ticked in the results table (kept while you move between strategies)
-const symOf = (s) => tickerSymbol(s);
 // What is ticked on screen is the truth: bring the saved set in line with the visible tick boxes.
 function syncSelected(){
   document.querySelectorAll('#stratResults tbody .strat-sel').forEach(b => { if(/** @type {HTMLInputElement} */ (b).checked) selected.add(/** @type {HTMLElement} */ (b).dataset.sym); else selected.delete(/** @type {HTMLElement} */ (b).dataset.sym); });
@@ -42,7 +41,7 @@ function syncSelected(){
   if(head) /** @type {HTMLInputElement} */ (head).checked = rows.length > 0 && Array.from(rows).every(b => /** @type {HTMLInputElement} */ (b).checked);
   return selected;
 }
-const trackLabel = (matches) => { const k = matches.filter(s => selected.has(symOf(s))).length; return k ? `Track ${k} ticked pick${k === 1 ? '' : 's'}` : 'Track these picks'; };
+const trackLabel = (matches) => { const k = matches.filter(s => selected.has(tickerSymbol(s))).length; return k ? `Track ${k} ticked pick${k === 1 ? '' : 's'}` : 'Track these picks'; };
 // Save status, shown beside the "Rules" heading: "Saving..." while a change is on its way, a brief "Saved" afterwards, and
 // (kept on screen) a warning when it could not be saved to the account or when you are not signed in.
 const SAVE_NOTE = { browser: ['Not signed in: saved in this browser only', 'warn'], saving: ['Saving&hellip;', ''], saved: ['&#10003; Saved to your account', 'ok'],
@@ -139,7 +138,7 @@ function drawStrategiesSection(){
 }
 
 function init_strategies_section(){
-  kit.useExternalSelection('strat', () => new Set(stocks.filter(s => selected.has(symOf(s))).map(pcTickerKey)));
+  kit.useExternalSelection('strat', () => new Set(stocks.filter(s => selected.has(tickerSymbol(s))).map(pcTickerKey)));
   document.addEventListener('alba-rk-clear', (e) => {
     if(!/** @type {CustomEvent} */ (e).detail || /** @type {CustomEvent} */ (e).detail.name !== 'strat') return;
     selected.clear();
@@ -169,7 +168,7 @@ function init_strategies_section(){
     const tick = closestEl(e, '.strat-sel');
     if(tick){   // (a click on a tick box must not open the stock)
       const sym = tick.dataset.sym;
-      if(sym === '*'){ const all = st ? qualifyingStocks(stocks, st.rules) : []; if(/** @type {HTMLInputElement} */ (tick).checked) all.forEach(s => selected.add(symOf(s))); else all.forEach(s => selected.delete(symOf(s))); document.querySelectorAll('.strat-sel').forEach(b => { /** @type {HTMLInputElement} */ (b).checked = /** @type {HTMLInputElement} */ (tick).checked; }); }
+      if(sym === '*'){ const all = st ? qualifyingStocks(stocks, st.rules) : []; if(/** @type {HTMLInputElement} */ (tick).checked) all.forEach(s => selected.add(tickerSymbol(s))); else all.forEach(s => selected.delete(tickerSymbol(s))); document.querySelectorAll('.strat-sel').forEach(b => { /** @type {HTMLInputElement} */ (b).checked = /** @type {HTMLInputElement} */ (tick).checked; }); }
       else if(/** @type {HTMLInputElement} */ (tick).checked) selected.add(sym); else selected.delete(sym);
       syncSelected();
       const tb = document.getElementById('stratTrackBtn');

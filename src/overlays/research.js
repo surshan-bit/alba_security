@@ -1,4 +1,5 @@
 // Applies saved research (stockResearch) on top of the base stock data.
+import { openKvDb } from '../core/idbkv.js';
 import { stocks } from '../core/stocks.js';
 import { renderLoadedPart } from '../core/lazy.js';
 import { applyFundamentalConfidence } from '../core/fundscore.js';
@@ -150,19 +151,8 @@ function applyResearchDocs(docs){
 const CACHE_DB = 'albaResearchCache', CACHE_STORE = 'kv', CACHE_KEY = 'docs';
 let liveSeen = false, cacheTimer = null;
 const askedAlone = new Set();
-function cacheOpen(){
-  return new Promise((resolve) => {
-    try {
-      const r = indexedDB.open(CACHE_DB, 1);
-      r.onupgradeneeded = () => { try { r.result.createObjectStore(CACHE_STORE); } catch(e){ /* the cache is optional */ } };
-      r.onsuccess = () => resolve(r.result);
-      r.onerror = () => resolve(null);
-      r.onblocked = () => resolve(null);
-    } catch(e){ resolve(null); }
-  });
-}
 async function readResearchCache(){
-  const idb = await cacheOpen(); if(!idb) return [];
+  const idb = await openKvDb(CACHE_DB, CACHE_STORE); if(!idb) return [];
   return new Promise((resolve) => {
     try {
       const q = idb.transaction(CACHE_STORE, 'readonly').objectStore(CACHE_STORE).get(CACHE_KEY);
@@ -176,7 +166,7 @@ function saveResearchCache(docs){
   cacheTimer = setTimeout(async () => {
     cacheTimer = null;
     let json; try { const o = {}; docs.forEach(d => { o[d.id] = d.data; }); json = JSON.stringify(o); } catch(e){ return; }
-    const idb = await cacheOpen(); if(!idb) return;
+    const idb = await openKvDb(CACHE_DB, CACHE_STORE); if(!idb) return;
     try {
       const tx = idb.transaction(CACHE_STORE, 'readwrite');
       tx.objectStore(CACHE_STORE).put(json, CACHE_KEY);

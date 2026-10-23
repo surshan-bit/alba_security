@@ -96,6 +96,25 @@ const refreshlogSection = document.getElementById('section-refreshlog');
 // Help links to Knowledge Base sections (e.g. Technical Score -> KB section 4): switch section first, then scroll.
 const helpSectionEl = document.getElementById('section-help');
 
+// A link inside one page that points at text in another page (Help, Knowledge Base): switch to that page first, then scroll to the anchor.
+// destOf(anchorId) names the page the anchor lives in.
+function wireJumpLinks(sectionEl, linkSelector, destOf){
+  if(!sectionEl) return;
+  sectionEl.addEventListener('click', (e)=>{
+    const a = closestEl(e, linkSelector);
+    if(!a) return;
+    e.preventDefault();
+    const targetId = a.getAttribute('href').slice(1);
+    showSection(destOf(targetId)).then(()=>{
+      closeSidebar();
+      requestAnimationFrame(()=>{
+        const target = document.getElementById(targetId);
+        if(target){ target.scrollIntoView({block:'start'}); }
+      });
+    });
+  });
+}
+
 function init_ui_navigation(){
 // Sections are switched in a few places (menu, links, "Back to ..."), so follow the active class rather than each caller.
 const topbarObserver = new MutationObserver(updateTopbarSection);
@@ -131,52 +150,9 @@ toolsToggle.addEventListener('click', (e)=>{ e.stopPropagation(); setToolsOpen(!
 document.addEventListener('click', (e)=>{ if(!closestEl(e, '#navToolsGroup')) setToolsOpen(false); });
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') setToolsOpen(false); });
 toolsGroup.querySelectorAll('.nav-item').forEach(btn=> btn.addEventListener('click', ()=> setToolsOpen(false)));
-if(kbSection){
-  kbSection.addEventListener('click', (e)=>{
-    const a = closestEl(e, 'a[href^="#help"]');
-    if(!a) return;
-    e.preventDefault();
-    const targetId = a.getAttribute('href').slice(1);
-    showSection('help').then(()=>{
-      closeSidebar();
-      requestAnimationFrame(()=>{
-        const target = document.getElementById(targetId);
-        if(target){ target.scrollIntoView({block:'start'}); }
-      });
-    });
-  });
-}
-if(refreshlogSection){
-  refreshlogSection.addEventListener('click', (e)=>{
-    const a = closestEl(e, 'a[href^="#help"], a[href^="#kb"]');
-    if(!a) return;
-    e.preventDefault();
-    const targetId = a.getAttribute('href').slice(1);
-    const destSection = targetId.startsWith('kb') ? 'knowledgebase' : 'help';
-    showSection(destSection).then(()=>{
-      closeSidebar();
-      requestAnimationFrame(()=>{
-        const target = document.getElementById(targetId);
-        if(target){ target.scrollIntoView({block:'start'}); }
-      });
-    });
-  });
-}
-if(helpSectionEl){
-  helpSectionEl.addEventListener('click', (e)=>{
-    const a = closestEl(e, 'a[href^="#kb"]');
-    if(!a) return;
-    e.preventDefault();
-    const targetId = a.getAttribute('href').slice(1);
-    showSection('knowledgebase').then(()=>{
-      closeSidebar();
-      requestAnimationFrame(()=>{
-        const target = document.getElementById(targetId);
-        if(target){ target.scrollIntoView({block:'start'}); }
-      });
-    });
-  });
-}
+wireJumpLinks(kbSection, 'a[href^="#help"]', () => 'help');
+wireJumpLinks(refreshlogSection, 'a[href^="#help"], a[href^="#kb"]', (id) => id.startsWith('kb') ? 'knowledgebase' : 'help');
+wireJumpLinks(helpSectionEl, 'a[href^="#kb"]', () => 'knowledgebase');
 }
 
 export { appSections, init_ui_navigation, showSection };
