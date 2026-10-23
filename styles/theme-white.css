@@ -471,3 +471,6 @@
 /* Explorer's # (row number) looks like the # column in Analysis and Strategies: same size and weight as the cell values, heading weight in the heading. */
 :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{font-weight:500 !important;font-size:inherit;color:inherit !important;}
 :root[data-theme="white"] .biz-table > thead > tr > th:first-child::before{font-weight:400 !important;color:#000 !important;}
+/* The # column (row numbers) is regular weight in every grid. */
+:root[data-theme="white"] :is(.analysis-lb-rank,.strat-table td.analysis-lb-rank){font-weight:400 !important;}
+:root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{font-weight:400 !important;}
