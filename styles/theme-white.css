@@ -421,9 +421,18 @@
 }
 /* Phones, grid screens (Explorer, Analysis, Strategies): the laptop type sizes and spacing for the tables, and the same primary / secondary buttons. */
 @media (max-width:900px){
-  :root[data-theme="white"] :is(.strat-table,.biz-table){font-size:1rem;}
-  :root[data-theme="white"] :is(.strat-table:not(.peers-table) td,.biz-table > tbody > tr > td){font-size:.98rem;padding:13px 6px;line-height:1.35;}
-  :root[data-theme="white"] :is(.strat-table th,.biz-table > thead > tr > th,.strat-table:not(.peers-table) th){font-size:.92rem;font-weight:500;padding:10px 6px;text-transform:none;letter-spacing:0;white-space:nowrap;}
+  :root[data-theme="white"] :is(.strat-table,.biz-table){font-size:.82rem;}
+  :root[data-theme="white"] :is(.strat-table:not(.peers-table) td,.biz-table > tbody > tr > td){font-size:.82rem;padding:10px 4px;line-height:1.3;}
+  :root[data-theme="white"] :is(.strat-table th,.biz-table > thead > tr > th,.strat-table:not(.peers-table) th){font-size:.74rem;font-weight:500;padding:8px 4px;text-transform:none;letter-spacing:0;white-space:nowrap;}
+  :root[data-theme="white"] :is(.strat-table,.biz-table) :is(.score-pill,.pill,.chip,.tl-chip){font-size:.74rem;padding:2px 7px;}
+  /* One count line for Explorer, Analysis and Strategies: left aligned, same size, colour and spacing, straight above the grid. */
+  :root[data-theme="white"] :is(.biz-showing,.strat-count,.analysis-leaderboard-head .rk-headline){display:block;width:100%;margin:0 0 10px;padding:0;text-align:left;font-size:.8rem;line-height:1.4;color:var(--muted);white-space:normal;overflow:visible;}
+  :root[data-theme="white"] .strat-count b{font-weight:inherit;}
+  :root[data-theme="white"] .strat-count{margin:0;}
+  :root[data-theme="white"] .strat-result-head{gap:10px;}
+  :root[data-theme="white"] .strat-result-title{margin:0;}
+  :root[data-theme="white"] .analysis-leaderboard-head{justify-content:flex-start !important;margin-bottom:0 !important;}
+  :root[data-theme="white"] :is(.strat-result-title,.analysis-leaderboard-head .rk-headline){flex:1 1 100%;}
   :root[data-theme="white"] :is(.strat-table,.biz-table) :is(th,td){vertical-align:middle;}
   /* Buttons in the toolbars */
   :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,#section-business .biz-expand,#section-business .rk-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;height:auto;padding:0 14px;font-size:.76rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
