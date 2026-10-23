@@ -71,7 +71,6 @@
 @media (min-width:901px){:root[data-theme="white"] .analysis-filters-panel :is(.filter-btn,.filter-group-title,.filter-group label){font-size:.95rem;}}
 @media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:2.1rem;}}
 /* Data Refresh and Settings: one big white card on the lavender page, like Explorer, with flat rows split by hairlines. */
-@media (min-width:901px){
   :root[data-theme="white"] :is(#section-refreshlog,#section-settings){background:#fff;border-radius:12px;box-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);padding:22px 28px 28px;}
   /* Readable line length: the card is full width, the content inside is capped and centred, not stretched. */
   :root[data-theme="white"] :is(#section-refreshlog,#section-settings) > *{max-width:960px;margin-left:auto;margin-right:auto;}
@@ -81,14 +80,12 @@
   :root[data-theme="white"] #section-settings .settings-row{padding-top:18px;padding-bottom:18px;}
   :root[data-theme="white"] #section-settings .settings-subhead{margin-top:28px;}
   :root[data-theme="white"] :is(#section-refreshlog,#section-settings) .sub{max-width:none;}
-}
 :root[data-theme="white"] #section-strategies #stratMain .strat-panel{border-top-width:0;}
 /* Wide screens: the search box grows into the free space between the menu and the Live / bell buttons. */
 @media (min-width:1600px){:root[data-theme="white"] .topbar .topbar-search{width:calc(100vw - 1110px - 179px);max-width:600px;}}
 /* Score and rating badges: black text for clarity (the tinted background still shows the verdict). */
 :root[data-theme="white"] .badge:is(.b-buy,.b-mbuy,.b-hold,.b-avoid){color:#000;font-weight:600;}
 /* Primary headings (Data Refresh jobs, Settings, Help and Knowledge Base sections): a topic icon before the title, a larger heavier face and a short accent bar. */
-@media (min-width:901px){
   :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon]){display:flex;align-items:center;gap:12px;font-size:1.6rem;font-weight:700;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;}
   :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon])::before{content:"";width:28px;height:28px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
   :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon])::after{content:"";position:absolute;left:0;bottom:0;width:56px;height:3px;border-radius:2px;background:var(--accent);}
@@ -105,7 +102,6 @@
   :root[data-theme="white"] h2[data-icon="package"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 8l-9-5-9 5v8l9 5 9-5z'/%3E%3Cpolyline points='3 8 12 13 21 8'/%3E%3Cline x1='12' y1='13' x2='12' y2='22'/%3E%3C/svg%3E");}
   :root[data-theme="white"] h2[data-icon="clock"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolyline points='12 6 12 12 16 14'/%3E%3C/svg%3E");}
   :root[data-theme="white"] h2[data-icon="spark"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'/%3E%3Cpath d='M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z'/%3E%3C/svg%3E");}
-}
 /* Stock detail and Industry detail (they share one shell): the Screener company page. A white header card, a tab bar, white section cards,
    zebra-striped metric rows and a peer table with a median row. Wide screens only. */
 @media (min-width:901px){
@@ -223,11 +219,9 @@
   :root[data-theme="white"] #section-settings .theme-toggle-btn{font-size:.92rem;padding:8px 16px;}
 }
 /* Settings: "Themes" is a primary heading like "Claude controls": palette icon, large bold title, accent bar. */
-@media (min-width:901px){
   :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title{display:flex;align-items:center;gap:12px;font-size:1.6rem;font-weight:700;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='13.5' cy='6.5' r='.5'/%3E%3Ccircle cx='17.5' cy='10.5' r='.5'/%3E%3Ccircle cx='8.5' cy='7.5' r='.5'/%3E%3Ccircle cx='6.5' cy='12.5' r='.5'/%3E%3Cpath d='M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.8 1.7-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.5-.7-.5-1.1 0-.9.8-1.7 1.7-1.7H16c3.3 0 6-2.7 6-6 0-4.9-4.5-8.4-10-8.4z'/%3E%3C/svg%3E");}
   :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title::before{content:"";width:28px;height:28px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
   :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title::after{content:"";position:absolute;left:0;bottom:0;width:56px;height:3px;border-radius:2px;background:var(--accent);}
-}
 /* Trade Log: text raised to the readable sizes used elsewhere in White (cards, summary rows, signals, ideas, form). */
 @media (min-width:901px){
   :root[data-theme="white"] #section-trackrecord .data-chip{font-size:1rem;}
@@ -368,4 +362,39 @@
 @media (min-width:901px){
   :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > .biz-name::before{vertical-align:middle;}
   :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > .biz-name .biz-open{display:inline-block;vertical-align:middle;text-indent:0;}
+}
+/* Phones: the laptop card layout, scaled down. White cards on the lavender page for the detail pages and the Tools screens, topic icons and accent bars on
+   the main headings, flat rows inside the cards, readable dark heading colours. */
+@media (max-width:900px){
+  :root[data-theme="white"]{--card-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);}
+  /* Stock and industry pages */
+  :root[data-theme="white"] #detail{padding:0;}
+  :root[data-theme="white"] #detail .detail-top{background:#fff;border-radius:16px;box-shadow:var(--card-shadow);padding:18px 18px 16px;margin:0 0 12px;}
+  :root[data-theme="white"] #detail .detail-title .detail-name{font-size:1.7rem;font-weight:500;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;}
+  :root[data-theme="white"] #detail .detail-title .detail-ticker{font-size:.95rem;color:#4a5163;}
+  :root[data-theme="white"] #detail .detail-meta-links{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;}
+  :root[data-theme="white"] #detail .detail-meta-links a,:root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn{font-size:1rem;font-weight:500;color:var(--accent);background:transparent;border:0;padding:0;}
+  :root[data-theme="white"] #detail :is(.val-panel,.global-panel,.fund-panel,.tech-panel){background:#fff;border:0;border-radius:16px;box-shadow:var(--card-shadow);padding:18px 16px 20px;margin-top:12px;}
+  :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title){font-size:1.25rem;font-weight:500;letter-spacing:-.01em;color:#1b1f2a;}
+  :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title) svg{color:var(--accent);}
+  :root[data-theme="white"] #detail :is(.val-panel-head,.global-panel-head,.fund-panel-head,.tech-panel-head){margin-bottom:14px;}
+  :root[data-theme="white"] #detail :is(.fund-subsection-title,.fund-pc-title){font-size:.85rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#1b1f2a;}
+  :root[data-theme="white"] #detail .data-chips > .data-chip:nth-child(odd){background:#f3f5fb;}
+  :root[data-theme="white"] #detail .data-chips > .data-chip{border:0;border-radius:8px;}
+  :root[data-theme="white"] #detail .peers-table tbody tr:nth-child(even) td{background:#f7f8fc;}
+  :root[data-theme="white"] #detail .detail-back-bar{position:static;height:auto;margin:0 0 10px;}
+  /* Data Refresh and Settings: one white card with flat rows */
+  :root[data-theme="white"] :is(#section-refreshlog,#section-settings){padding:16px 14px 22px;}
+  :root[data-theme="white"] :is(#section-refreshlog,#section-settings) :is(.refreshlog-job,.settings-subhead){margin-top:0;}
+  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title){font-size:1.3rem;gap:10px;margin-top:26px;margin-bottom:12px;padding-bottom:10px;}
+  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title)::before{width:24px;height:24px;}
+  :root[data-theme="white"] :is(.refreshlog-job-title,#section-help h2[data-icon],#section-knowledgebase h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title):first-child{margin-top:0;}
+  :root[data-theme="white"] #section-refreshlog .refreshlog-job:first-of-type .refreshlog-job-title{margin-top:0;}
+  :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row{padding:0;border:0;}
+  :root[data-theme="white"] #section-settings .settings-row{align-items:flex-start;}
+  /* Help and Knowledge Base */
+  :root[data-theme="white"] .help-panel{border-radius:12px;box-shadow:var(--card-shadow);padding:16px 14px 22px;}
+  :root[data-theme="white"] #section-help h3,:root[data-theme="white"] #section-knowledgebase h3{font-size:1.1rem;font-weight:700;color:#1b1f2a;margin-top:22px;}
+  /* Page background and gutters */
+  :root[data-theme="white"] .wrap{padding-left:10px;padding-right:10px;}
 }
