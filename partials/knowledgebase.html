@@ -221,6 +221,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.254 &middot; 2026-10-23</h3>
+            <ul>
+              <li><strong>Tidy-up, no change in what you see.</strong> A Claude error is now recognised because the failed Claude call is marked, not by guessing from which step was running. The bar-download progress is reported by named steps instead of by reading message text.</li>
+            </ul>
+
             <h3>v1.253 &middot; 2026-10-23</h3>
             <ul>
               <li><strong>Tidy-up, no change in what you see.</strong> The three longest pieces of code (Refresh Fundamental Info, Refresh all stocks and the stock page) are each split into short, named steps. A new test runs Refresh Fundamental Info end to end with a scripted Claude and TradingView and checks every document it saves, so the split could be proved not to change anything.</li>

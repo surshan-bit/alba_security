@@ -5,7 +5,7 @@ import { escapeHtml } from '../core/util.js';
 import { fundamentalPendingItems, globalPendingInfo, priceHistoryStatus } from '../detail/pending.js';
 import { pcTickerKey } from '../prices/store.js';
 import { ldRunFundamental } from './fundamental.js';
-import { ldErrText, ldIsClaudeError, setLdPhase } from './claude.js';
+import { ldErrText, ldIsClaudeError } from './claude.js';
 import { ldRunTechnical } from './technical.js';
 import { getLdBatch, ldBatchPaint } from './batch.js';
 import { activityEnd, activityNotify, activityRun } from '../ui/activity.js';
@@ -174,7 +174,6 @@ async function ldStart(s, kind){
   const key = pcTickerKey(s);
   if(ldRunning(key)) return;
   ldSet(key, kind, { state: 'running', pct: 1, msg: 'Starting…', perm: false });
-  setLdPhase('tv');
   try {
     const msg = kind === 'fund' ? await ldRunFundamental(s) : await ldRunTechnical(s);
     ldSet(key, kind, { state: 'ok', pct: 100, msg });

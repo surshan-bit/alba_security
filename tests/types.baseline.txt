@@ -105,8 +105,6 @@ src/live/ticker.js: error TS18047: 'detailEl' is possibly 'null'.
 src/live/ticker.js: error TS18047: 'search.parentNode' is possibly 'null'.
 src/livedata/bar.js: error TS2339: Property 'code' does not exist on type '{}'.
 src/livedata/claude.js: error TS2339: Property 'code' does not exist on type '{}'.
-src/livedata/claude.js: error TS2339: Property 'fromClaude' does not exist on type 'object'.
-src/livedata/claude.js: error TS2339: Property 'fromClaude' does not exist on type 'object'.
 src/livedata/claudegate.js: error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
 src/livedata/fundamental.js: error TS2322: Type 'number | undefined' is not assignable to type 'number'.
 src/livedata/fundamental.js: error TS2339: Property 'code' does not exist on type '{}'.

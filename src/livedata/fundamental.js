@@ -7,7 +7,7 @@ import { pcTickerKey } from '../prices/store.js';
 import { tvCall, tvErrorText, tvIstDate, tvMcp } from '../tv/connector.js';
 import { priceJobs, refreshOneNow } from '../prices/refresh.js';
 import { ldAbort, ldGet, ldJson, ldSet } from './bar.js';
-import { ldAskJson, ldEnsureClaudeAccess, ldErrText, setLdPhase } from './claude.js';
+import { ldAskJson, ldEnsureClaudeAccess, ldErrText } from './claude.js';
 import { claudeAnyOn, claudeStepOn } from './claudegate.js';
 import { ldVerifiedSymbol } from './symbols.js';
 import { ldApplyLabels, ldBuildEvents, ldLabelPrompt, ldMergeEvents, ldUnlabeledNews } from './events.js';
@@ -146,7 +146,6 @@ function ldPromptKit(c){
 function ldCheckFresh(c){
   const { s, key, failed, news } = c;
   // ---- 1. Missing metrics not available in the CSV ----
-  setLdPhase('claude');
   const pend = fundamentalPendingItems(s);
   const withGaps = pend.filter(x => x.missing.length);
   // Skip the Claude calls when nothing would change: research is recent, no metric is missing and TradingView shows no news newer than it.
@@ -254,7 +253,6 @@ async function ldSaveResearch(c){
   // Save the fundamental findings now, so a later failure in Global & Macro does not lose them.
   if(Object.keys(upd).length){
     set(76, 'Saving fundamental research…');
-    setLdPhase('tv');
     const rref = db.doc('stockResearch/' + docId);
     const rcur = await rref.get();
     const rdata = rcur && rcur.exists ? rcur.data() : null;
@@ -278,7 +276,6 @@ async function ldSaveResearch(c){
 async function ldGlobalMacro(c){
   const { s, sym0, docId, today, set, notes, failed, db, offNote, news, allowedUrls, stories, headFor, ask, gfMissing, needCards } = c;
   // ---- 3. Global & Macro plus recent news ----
-  setLdPhase('claude');
   let gfOut = null;
   const needGlobal = (needCards || gfMissing) && !offNote('globalMacro', 'Global & Macro');
   if(needGlobal) set(78, 'Researching Global & Macro and recent news…');
@@ -301,7 +298,6 @@ async function ldGlobalMacro(c){
     const sourced = pos.concat(neg).some(x => x.url);
     const gf = { scope: sourced ? 'company' : (g0.scope || 'sector'), asof: today, positive: pos, negative: neg, events };
     if(!sourced && g0.sectorLabel) gf.sectorLabel = g0.sectorLabel;
-    setLdPhase('tv');
     set(84, 'Saving Global & Macro…');
     const uref = db.doc('stockUpdates/' + docId);
     const ucur = await uref.get();
@@ -319,7 +315,6 @@ async function ldGlobalMacro(c){
 async function ldTechnicalSignals(c){
   const { s, key, set, halt, notes, failed } = c;
   // ---- 4. Technical signals: fill in what is missing from TradingView bars ----
-  setLdPhase('tv');
   try {
     const tp = technicalPendingItems(s);
     if(tp.none || tp.keys.length || tp.noScore){
@@ -342,7 +337,6 @@ async function ldTechnicalSignals(c){
 async function ldStrengths(c){
   const { s, key, sym0, docId, today, set, notes, failed, db, offNote, news, factors, headFor, ask, needCards, upd, metricsFilled, gfOut } = c;
   // ---- 5. Strengths and Watch-outs box, rewritten from everything above ----
-  setLdPhase('claude');
   const doStrengths = (needCards || metricsFilled) && !offNote('strengths', 'Strengths and Watch-outs');
   if(doStrengths) set(90, 'Reviewing the Strengths and Watch-outs…');
   if(doStrengths) try {
@@ -363,7 +357,6 @@ async function ldStrengths(c){
     const strengths = take(r && r.strengths, ['strong', 'good'], 'good');
     const watchouts = take(r && r.watchouts, ['caution', 'concern'], 'caution');
     if(!strengths.length && !watchouts.length) throw new Error('Claude returned no usable points.');
-    setLdPhase('tv');
     set(97, 'Saving the Strengths and Watch-outs…');
     const sref = db.doc('stockResearch/' + docId);
     const scur = await sref.get();
@@ -395,7 +388,6 @@ async function ldRunFundamental(s){
   const halt = () => { if(signal.aborted) throw { code: 'cancelled' }; };
   const c = { s, key, sym0, docId, today, set, halt, signal, notes: [], failed: [], labelled: 0 };   // labelled: news headlines labelled by Claude in this run
   try {
-    setLdPhase('tv');
     set(2, 'Preparing…');
     await ldPrepare(c);
     await ldGather(c);

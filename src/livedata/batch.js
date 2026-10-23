@@ -6,7 +6,7 @@ import { renderLoadedPart } from '../core/lazy.js';
 import { pcTickerKey } from '../prices/store.js';
 import { sectionOf } from '../refresh/kit-lookup.js';
 import { LD_LABEL, ldAbort, ldGet, ldRunning, ldStart } from './bar.js';
-import { ldEnsureClaudeAccess, setLdParallel } from './claude.js';
+import { ldEnsureClaudeAccess } from './claude.js';
 import { claudeAnyOn } from './claudegate.js';
 import { activityEnd, activityNotify, activityRun } from '../ui/activity.js';
 import { getRefreshKit } from '../refresh/hook.js';
@@ -121,7 +121,6 @@ async function ldBatchStart(kind, list, source = 'strat'){
   // A few stocks at a time: both refreshes mostly wait on TradingView (and Claude), so the waits overlap.
   const workers = Math.min(LD_PARALLEL, list.length);
   ldBatch = { kind, source, total: list.length, done: 0, active: new Map(), workers, slow: false, running: true, stop: false, failed: [], skipped: 0, note: '', perm: false };
-  setLdParallel(workers > 1);
   ldBatchPaint();
   if(kind === 'fund' && claudeAnyOn()) await ldEnsureClaudeAccess();   // one permission dialog up front, not one per stock
   let next = 0, halted = false;
@@ -150,7 +149,7 @@ async function ldBatchStart(kind, list, source = 'strat'){
   await Promise.all(Array.from({ length: workers }, (_, w) => worker(w)));
   ldBatch.skipped = list.length - ldBatch.done;
   if(ldBatch.stop && !ldBatch.note) ldBatch.note = 'Stopped.';
-  ldBatch.running = false; ldBatch.active.clear(); setLdParallel(false);
+  ldBatch.running = false; ldBatch.active.clear();
   if(!ldBatch.note) ldBatch.note = 'Finished.';
   {
     // Keep the result in that screen's card for this kind, so later redraws and a run of the other kind do not wipe it.

@@ -1,12 +1,9 @@
 // Live Data Refresh: Claude access, errors and JSON replies.
 import { tvErrorText } from '../tv/connector.js';
 
-// Error text. TradingView errors carry the connector codes, Claude errors the sample codes; ldPhase says which one was running.
-var ldPhase = 'tv';
-// With several stocks refreshing at once the shared phase can belong to another stock, so a failed Claude call marks its own
-// error (fromClaude) and, during a parallel run, only marked errors are read as Claude errors.
-var ldParallel = false;
-function ldIsClaudeError(e){ return !!(e && e.fromClaude) || (!ldParallel && ldPhase === 'claude'); }
+// Error text. TradingView errors carry the connector codes, Claude errors the sample codes; ldAskJson marks a failed Claude call
+// with fromClaude, which is how the two are told apart.
+function ldIsClaudeError(e){ return !!(e && e.fromClaude); }
 function ldErrText(e){
   const c = e && e.code;
   if(ldIsClaudeError(e)){
@@ -49,15 +46,15 @@ function ldParseJson(text){
 async function ldAskJson(sample, prompt, opts){
   const textOf = r => (r && typeof r === 'object' && 'text' in r) ? r.text : r;
   let reply;
-  try { reply = await sample(prompt, opts); }
-  catch(e){
-    if(e && e.code === 'invalid_request') reply = await sample(Object.assign({ prompt }, opts));
-    else { if(e && typeof e === 'object') e.fromClaude = true; throw e; }
-  }
-  try { return ldParseJson(textOf(reply)); } catch(e){ if(e && typeof e === 'object') e.fromClaude = true; throw e; }
+  const fromClaude = e => { if(e && typeof e === 'object') e.fromClaude = true; return e; };
+  try {
+    try { reply = await sample(prompt, opts); }
+    catch(e){
+      if(e && e.code === 'invalid_request') reply = await sample(Object.assign({ prompt }, opts));
+      else throw e;
+    }
+    return ldParseJson(textOf(reply));
+  } catch(e){ throw fromClaude(e); }
 }
 
-function setLdParallel(v){ ldParallel = !!v; }
-function setLdPhase(v){ ldPhase = v; }
-
-export { ldIsClaudeError, ldAskJson, ldEnsureClaudeAccess, ldErrText, setLdParallel, setLdPhase };
+export { ldIsClaudeError, ldAskJson, ldEnsureClaudeAccess, ldErrText };
