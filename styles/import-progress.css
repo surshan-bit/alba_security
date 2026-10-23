@@ -27,15 +27,11 @@
 .select-mode-btn:disabled{opacity:.55;cursor:not-allowed;filter:none;}
 .fi-prompt-msg{margin-top:12px;font-size:.84rem;line-height:1.45;color:var(--text);}
 .fi-prompt-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
-.fi-backup-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line);}
-.fi-backup-row:first-of-type{border-top:none;}
-.fi-backup-info{min-width:0;}
-.fi-backup-title{font-size:.84rem;font-weight:600;color:var(--text);overflow-wrap:anywhere;}
 @media (max-width:560px){
 .fi-step{grid-template-columns:20px 1fr;}
 .fi-detail{grid-column:2;text-align:left;}
 }
-#section-refreshlog :is(.upload-title,.refreshlog-runs-title,.refreshlog-freshness-title,.fi-backup-title,.refreshlog-run-time){font-size:1.05rem;}
+#section-refreshlog :is(.upload-title,.refreshlog-runs-title,.refreshlog-freshness-title,.refreshlog-run-time){font-size:1.05rem;}
 #section-refreshlog :is(.fi-detail,.fi-line-muted,.data-chip,.data-chip b,.refreshlog-run-status){font-size:.82rem;}
 .last-file .lf-file{margin-top:8px;font-weight:600;color:var(--text);word-break:break-word;}
 .last-file .lf-status{margin-top:8px;font-weight:700;}

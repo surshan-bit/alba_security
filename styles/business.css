@@ -13,7 +13,7 @@
 .biz-breadth i{display:block;height:100%;}
 .biz-breadth .up{background:var(--buy);}
 .biz-breadth .down{background:var(--avoid);}
-.biz-table > tbody > .biz-detail > td{padding-bottom:6px;padding-bottom:6px;padding:0;border-bottom:1px solid var(--line);padding-bottom:6px;}
+.biz-table > tbody > .biz-detail > td{padding:0 0 6px;border-bottom:1px solid var(--line);}
 .biz-detail-box{position:sticky;left:0;box-sizing:border-box;width:100cqw;margin-right:-100cqw;padding:10px;}
 /* the negative right margin cancels the width, so an opened industry does not widen the columns above it; the box carries the shade, so it reaches the end of the grid inside it */
 /* an opened industry is as wide as the screen and stays in view while the table scrolls sideways; its grid scrolls on its own */
@@ -95,3 +95,6 @@ a.stock-link{color:inherit;text-decoration:none;}
 .biz-open:hover,.biz-open:focus-visible{color:var(--accent);text-decoration:underline;}
 .fund-verdicts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px;}
 .ind-timeline .pc-evk{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;font-size:.62rem;font-weight:700;color:#fff;vertical-align:middle;}
+
+/* Expanded industries: the browser skips layout of a stocks grid until it nears the screen (row height ~38px, header ~40px). */
+.biz-detail-box .strat-table-wrap{content-visibility:auto;contain-intrinsic-block-size:auto calc(40px + var(--biz-rows,10) * 38px);}

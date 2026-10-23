@@ -10,7 +10,6 @@
 .rk-btn:disabled{opacity:.45;cursor:default;}
 .rk-btn:focus-visible,.rk-row-btn:focus-visible,.rk-item:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
 .rk-go{background:var(--accent);border-color:var(--accent);color:#fff;}
-.rk-sum{color:var(--muted);font-size:12px;}
 .rk-run{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-size:12px;}
 .rk-spin{width:10px;height:10px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;display:inline-block;animation:rk-rot .8s linear infinite;}
 @keyframes rk-rot{to{transform:rotate(360deg)}}
@@ -50,7 +49,6 @@ tr:hover .rk-row-btn,.rk-row-btn:focus-visible,.rk-row-btn[aria-expanded="true"]
 .rk-menu-note{margin:0;padding:2px 8px 8px;font-size:12px;color:var(--muted);}
 .rk-bar{margin-left:auto;}
 @media (max-width:640px){
-.rk-sum{flex:1 1 100%;}
 .rk-selbar{max-width:none;margin:12px 0 0;}
 .rk-cell{width:46px;min-width:46px;}
 }
@@ -139,7 +137,7 @@ tr:hover .rk-row-btn,.rk-row-btn:focus-visible,.rk-row-btn[aria-expanded="true"]
 .app-section > header .sub{font-size:.8rem;line-height:1.45;}
 /* Data Refresh */
 #section-refreshlog .refreshlog-job-title{font-size:.9rem;margin:0 0 6px;}
-#section-refreshlog :is(.upload-title,.refreshlog-runs-title,.refreshlog-freshness-title,.fi-backup-title,.refreshlog-run-time){font-size:.86rem;}
+#section-refreshlog :is(.upload-title,.refreshlog-runs-title,.refreshlog-freshness-title,.refreshlog-run-time){font-size:.86rem;}
 #section-refreshlog :is(.refreshlog-freshness-summary,.refreshlog-freshness-row,.refreshlog-run-stats,.upload-hint,.fi-step,.fi-result,.fi-prompt-msg,.fi-pct,.live-status,.help-tab-link){font-size:.8rem;}
 #section-refreshlog :is(.fi-detail,.fi-line-muted,.data-chip,.data-chip b,.refreshlog-run-status){font-size:.76rem;}
 #section-refreshlog :is(.browse-btn,.refresh-btn,.strat-btn,.select-mode-btn){font-size:.76rem;min-height:var(--ph-ctl-lg);box-sizing:border-box;}

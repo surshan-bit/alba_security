@@ -117,7 +117,7 @@ function detailHtml(r, cols){
     const idx = stockIndex.get(x.stock), ctx = analysisRowContext(x.stock, i, idx);
     return '<tr class="strat-row' + (x.match ? ' biz-match' : '') + '" data-idx="' + idx + '" tabindex="0">' + kit.rowCell() + colIds.map(id => analysisLbCell(id, ctx)).join('') + '<td class="num">' + pct(x.change) + '</td></tr>';
   }).join('');
-  const grid = '<div class="strat-table-wrap"><table class="strat-table"><thead><tr>' + kit.headCell() + colIds.map(columnHeaderHtml).join('') + '<th class="num">' + p.key + ' chg</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  const grid = '<div class="strat-table-wrap" style="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + kit.headCell() + colIds.map(columnHeaderHtml).join('') + '<th class="num">' + p.key + ' chg</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   return '<tr class="biz-detail"><td colspan="' + cols + '"><div class="biz-detail-box"><div class="biz-stocks-head"><h3>Stocks</h3>' + (strategyOn() ? '<span class="upload-hint">' + r.matches + ' of ' + r.count + ' match the strategy</span>' : '') + kit.barHtml('biz:' + r.name) + '</div>' + grid + '<div class="biz-stocks-head biz-news-bar"><h3 class="biz-news-head"><button type="button" class="biz-news-toggle" data-biz-newstoggle="' + escapeHtml(r.name) + '" aria-expanded="' + newsOpen.has(r.name) + '">' + (newsOpen.has(r.name) ? '▾' : '▸') + ' News' + (r.news.length ? ' (' + r.news.length + ')' : '') + '</button></h3>' + (newsOpen.has(r.name) ? newsRefreshBtn(r.items.map(x => x.stock), r.items.filter(x => x.match).map(x => x.stock), r.name) : '') + newsStatusFor(r.name) + '</div>' + (newsOpen.has(r.name) ? newsHtml(r) : '') + '</div></td></tr>';
 }
 function openStockFromBusiness(idx){
@@ -182,14 +182,13 @@ function draw(el){
   }
   const total = rows.reduce((a, r) => a + r.matches, 0);
   const filterNote = strategyOn() ? '<p class="upload-hint biz-showing">Matched ' + total + ' of ' + stocks.length + ' stocks</p>' : '';
-  const note = '';
   const head = '<tr><th>' + (by === 'group' ? 'Industry group' : 'Industry') + '</th><th class="num">Stocks</th><th class="num">Average ' + p.key + '</th><th class="num">Median</th><th>Up / down</th><th class="num">News</th>' + (strategyOn() ? '<th class="num">Matching</th><th class="num">Match avg ' + p.key + '</th><th class="num">vs industry</th>' : '') + '</tr>';
   const cols = strategyOn() ? 9 : 6;
   const body = rows.map(r => {
     const isOpen = open.has(r.name);
     return '<tr class="biz-row' + (isOpen ? ' open' : '') + '" data-biz-name="' + escapeHtml(r.name) + '" tabindex="0" role="button" aria-expanded="' + isOpen + '"><td class="biz-name">' + '<button type="button" class="biz-open" data-biz-open="' + escapeHtml(r.name) + '" title="Open the industry page: factors, news and charts">' + escapeHtml(r.name) + '</button></td><td class="num">' + r.count + '</td><td class="num">' + pct(r.mean) + '</td><td class="num">' + pct(r.median) + '</td><td>' + breadth(r) + '</td><td class="num">' + (r.news.length ? r.news.length + (r.pos || r.neg ? ' <span class="news-pos">+' + r.pos + '</span> <span class="news-neg">&minus;' + r.neg + '</span>' : '') : '') + '</td>' + (strategyOn() ? '<td class="num">' + (r.matches ? '<b class="biz-matchcount">' + r.matches + '</b> of ' + r.count : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null ? pct(r.matchMean) : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null && r.mean !== null ? signedPp(r.matchMean - r.mean) : '') + '</td>' : '') + '</tr>' + (isOpen ? detailHtml(r, cols) : '');
   }).join('');
-  if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + viewToggle + sizeToggle + fullBtn + '</div></div>' + heatMap(rows, p, el) + note); syncSheets(); return; }
+  if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + viewToggle + sizeToggle + fullBtn + '</div></div>' + heatMap(rows, p, el)); syncSheets(); return; }
   kit.defineToolbar('biz', () => {
     const st = r => r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock), out = [];
     if(strategyOn()) out.push({ id: 'matched', label: 'Matched stocks', stocks: () => rows.flatMap(r => r.items.filter(x => x.match).map(x => x.stock)) });
@@ -198,7 +197,7 @@ function draw(el){
     out.push({ id: 'all', label: 'Every stock in the table', stocks: () => rows.flatMap(st) });
     return out;
   });
-  el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + expandBtn + kit.toolbarButton('biz') + '</div></div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + note + kit.selbarSlot('biz'));
+  el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + expandBtn + kit.toolbarButton('biz') + '</div></div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + kit.selbarSlot('biz'));
   syncSheets();
 }
 
@@ -242,7 +241,7 @@ function init(){
     if(pb){ period = pb.dataset.bizPeriod; save(); open.clear(); render(); ensureData(); return; }
     if(gb){ by = gb.dataset.bizBy; save(); open.clear(); render(); return; }
     if(closestEl(e, '[data-biz-newsstop]')){ stopNewsCollect(); return; }
-        const all = closestEl(e, '[data-biz-all]');
+    const all = closestEl(e, '[data-biz-all]');
     if(all){
       if(all.dataset.bizAll === 'collapse') open.clear();
       else visibleRows().forEach(r => open.add(r.name));
