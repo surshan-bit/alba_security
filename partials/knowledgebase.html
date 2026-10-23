@@ -21,7 +21,7 @@
       <ul>
         <li><b>Source:</b> <code>src/</code> (JavaScript modules, one responsibility per file), <code>styles/</code> (CSS in cascade order, imported from <code>styles/main.css</code>), <code>partials/</code> (Help, Data Refresh and Knowledge Base text) and <code>index.html</code> (the page shell).</li>
         <li><b>Build:</b> <code>node tools/build.js</code> bundles the source with esbuild into <code>app.js</code> (the small start-up file), hashed <code>chunks/</code> (code-split, so Data Refresh, Strategies, Explorer and Trade Log download only when first opened) and <code>styles.css</code>. These outputs are never edited by hand.</li>
-        <li><b>Start-up:</b> <code>js/loader.js</code> imports <code>app.js</code>, which loads the stock data from the database (a copy is kept in the browser, so repeat visits only download after a refresh), fetches the partials, then loads the application chunk. Every build gets an id so old and new files never mix.</li>
+        <li><b>Start-up:</b> <code>js/loader.js</code> imports <code>app.js</code>, which loads the stock list from the database (a copy is kept in the browser, so repeat visits only download after a refresh) while it also looks up who is viewing and their saved preferences, then loads the application chunk. The Help, Data Refresh and Knowledge Base text (<code>partials/</code>) is fetched the first time you open those pages, and the logo font the White theme uses is requested only when that theme is in use. Every build gets an id so old and new files never mix.</li>
         <li><b>Data:</b> the stock list lives in the shared database (<code>stockMeta</code> and <code>stockData</code>), with researched factors and technical updates layered on top on load (&sect;7). Nothing needs republishing when data is refreshed.</li>
         <li><b>Hosting:</b> every release is a new version of the same Artifact URL; only changed files are uploaded.</li>
       </ul>
@@ -29,9 +29,9 @@
       <div class="help-table-wrap"><table class="help-table">
         <thead><tr><th>Screen</th><th>Code</th><th>Notes</th></tr></thead>
         <tbody>
-          <tr><td>Analysis</td><td><code>src/analysis/</code></td><td>Leaderboard (sort, columns with drag-and-drop order, Show chart for the RSI Quadrant and its filters, Full screen) with the Live Data Refresh cards below the grid.</td></tr>
-          <tr><td>Strategies</td><td><code>src/strategies/</code></td><td>Strategy list (green dot = published, grey = not), collapsible Strategy / Goal / Rules blocks that start closed, qualifying stocks with tick boxes that only choose what <i>Track these picks</i> saves, refresh cards, Track record and the why-in-or-out lookup.</td></tr>
-          <tr><td>Explorer</td><td><code>src/business/</code></td><td>Industry table with All / Matched, Expand all, Full screen; each opened industry has its grid, refresh cards and a News block that starts closed.</td></tr>
+          <tr><td>Analysis</td><td><code>src/analysis/</code></td><td>Leaderboard (sort, columns with drag-and-drop order, Show chart for the RSI Quadrant and its filters, Full screen) with the Live Data Refresh cards below the grid. It draws 300 rows at a time; Show more adds 300 (counts, Select all and refresh still cover every stock).</td></tr>
+          <tr><td>Strategies</td><td><code>src/strategies/</code></td><td>Strategy list (green dot = published, grey = not), collapsible Strategy / Goal / Rules blocks that start closed, qualifying stocks (300 at a time, Show more for the rest) with tick boxes that only choose what <i>Track these picks</i> saves, refresh cards, Track record and the why-in-or-out lookup.</td></tr>
+          <tr><td>Explorer</td><td><code>src/business/</code></td><td>Industry table with All / Matched, Expand all, Full screen; each opened industry has its grid, refresh cards and a News block that starts closed. The industry page's Stocks grid also shows 300 rows with Show more.</td></tr>
           <tr><td>Stock page</td><td><code>src/detail/</code></td><td>Valuation, fundamentals, technicals, global factors, peers; opens inside the screen you came from.</td></tr>
           <tr><td>Data Refresh, Trade Log</td><td><code>src/joblogs/</code>, <code>src/import/</code>, <code>src/tradelog/</code></td><td>CSV imports, freshness, logs; real positions.</td></tr>
         </tbody>
@@ -40,9 +40,11 @@
       <div class="help-table-wrap"><table class="help-table">
         <thead><tr><th>Module</th><th>What it centralises</th></tr></thead>
         <tbody>
-          <tr><td><code>core/config.js</code></td><td>The shared limits: <code>BATCH_ROWS</code> (50: stocks per refresh press and rows kept live), the live ticker's interval, back-off and parallelism, and the Strategies table row cap.</td></tr>
-          <tr><td><code>livedata/cursor.js</code></td><td>The place a refresh card has reached: ranks 1&ndash;50, then 51&ndash;100 and so on, then back to the top. Pure code, unit-tested.</td></tr>
-          <tr><td><code>livedata/rounds.js</code>, <code>panel.js</code>, <code>batch.js</code></td><td>The two refresh cards (markup, labels, tooltips) and the batch runner, used identically by Analysis, Strategies and every Explorer industry.</td></tr>
+          <tr><td><code>refresh/kit*.js</code></td><td>Every Refresh button, used identically by Analysis, Strategies and every Explorer industry: <code>kit-controls</code> (the buttons, their menus, the row ticks and selection bar), <code>kit-queue</code> (the saved queue of refresh jobs, the runner, the bell notices and the other-device sync), <code>kit-menu</code> (the floating menu) and <code>kit-lookup</code> (finding stocks by key, the registries of scopes and selections).</td></tr>
+          <tr><td><code>livedata/batch.js</code>, <code>panel.js</code></td><td>The batch runner behind the Live Data Refresh cards and their markup. <code>LD_BATCH_MAX</code> caps one press at 50 stocks for each kind of refresh.</td></tr>
+          <tr><td><code>core/util.js</code>, <code>core/idbkv.js</code></td><td>Small helpers defined once: <code>sleep</code>, the stock's ticker code, number formatting that returns nothing for a missing value, and opening a browser-side cache.</td></tr>
+          <tr><td><code>import/fund-import.js</code></td><td>The steps the Fundamental import, the Technical import and the watchlist sync share: take the job lock, pick the newest upload, read the stored file, stop on hard integrity failures, ask about soft warnings, free a failed lock and show the failure.</td></tr>
+          <tr><td><code>business/newsitem.js</code></td><td>One headline row, used by the Explorer industry list and the industry page's news timeline.</td></tr>
           <tr><td><code>live/ticker.js</code></td><td>Live prices: while the market is open, the open stock first and then the rows on screen (up to 50, in grid order) refresh every 20 seconds, with W % chg and M % chg measured against last week's and last month's close read from TradingView's weekly and monthly bars. The Live switch is in the top bar on every screen size.</td></tr>
           <tr><td><code>ui/fullscreen.js</code></td><td>Full screen for the big grids: the button label, the browser's own full screen and Esc handling, shared by Analysis and Explorer.</td></tr>
           <tr><td><code>ui/activity.js</code></td><td>The notification bell: running refreshes and finished notices.</td></tr>
@@ -53,7 +55,7 @@
       <ul>
         <li>Imports are explicit; a module cannot assign to another module's variable; start-up code lives in <code>init_*()</code> functions called from <code>src/main.js</code>; unused code fails the lint.</li>
         <li>Screens share behaviour through the modules above rather than copies, so a change to refresh batches, full screen or the phone layout is made once.</li>
-        <li>Tests: engine unit tests (CSV engines and refresh batches), a jsdom regression harness compared with stored snapshots, and four Chromium suites (smoke and layout including phone sizes, state, live ticker, imports).</li>
+        <li>Tests: engine unit tests (CSV engines and refresh batches), a jsdom regression harness compared with stored snapshots, and five Chromium suites (smoke and layout including phone sizes and the Show more grids, state, live ticker, refresh menus, imports).</li>
       </ul>
 
       <h2 id="kb-maintenance" data-icon="tool">2. How this screener stays up to date</h2>
@@ -211,9 +213,12 @@
       <h2 id="kb-pipeline" data-icon="package">8. Build, test and release</h2>
       <ol>
         <li>Edit only <code>src/</code>, <code>styles/</code>, <code>partials/</code> and <code>index.html</code>. The built files are generated.</li>
-        <li><code>npm run check</code> does everything before a release: build, "built files are up to date", syntax check, strict lint (undefined names, start-up order, unused code), the engine unit tests, the jsdom regression harness against <code>tests/golden.json</code>, and the Chromium suites. After a reviewed, intended change, <code>npm run update-golden</code> accepts the new snapshots.</li>
+        <li><code>npm run check</code> does everything before a release: build, "built files are up to date", syntax check, strict lint (undefined names, start-up order, unused code), the engine unit tests, the jsdom regression harness against <code>tests/golden.json</code>, and the Chromium suites. After a reviewed, intended change, <code>npm run update-golden</code> accepts the new snapshots. On GitHub the same check runs as two jobs side by side (<code>--part=main</code>, and <code>--part=imports</code> for the slowest suite); a final job named <code>check</code> is green only when both are.</li>
         <li>Bump the version badge in <code>index.html</code>, add a Version History entry here, and rebuild.</li>
-        <li>Publish with the Artifact tool: the page shell plus only the files that changed (the hashed chunk files change on every build, so the old names are removed). Stock data, research and logs live in the database and never need republishing.</li>
+        <li>Merge the pull request into <code>main</code> when <code>check</code> is green. If another pull request merged first without rebuilt files, run <code>npm run build</code> and merge the regenerated <code>app.js</code>, <code>chunks/</code> and <code>index.html</code> in a small follow-up pull request, so GitHub matches what is published.</li>
+        <li>On <code>main</code>, after a build, <code>npm run release -- --since &lt;merge commit of the previous release&gt;</code> writes the page file, the list of files for the Artifact tool (the files that changed since then plus every chunk, with the old chunk names removed) and the release record. <code>--since</code> is required because the previous tip of <code>main</code> is not always the last published commit.</li>
+        <li>Check the live Artifact's version id has not moved, then publish the page shell and only those files. Stock data, research and logs live in the database and never need republishing.</li>
+        <li>Write the release record (<code>appMeta/release</code>: build, version, time) right after publishing. Open pages compare their own build with it, reload once and then stop asking; a stale record makes every open tab show "A new version is available".</li>
       </ol>
 
       <h2 id="kb-versions" data-icon="clock">9. Version history</h2>
@@ -221,6 +226,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.249 &middot; 2026-10-23</h3>
+            <ul>
+              <li><strong>Fundamental import.</strong> A stock added by an import now gets its own Industry, not its Industry Group, when the file lists the Industry Group column first.</li>
+              <li><strong>Knowledge Base brought up to date.</strong> Start-up, the Show more grids, the shared building blocks, the tests and the release steps now describe how the dashboard works today.</li>
+            </ul>
+
             <h3>v1.248 &middot; 2026-10-23</h3>
             <ul>
               <li><strong>Quicker first paint.</strong> The logo font used by the White theme is now fetched only when that theme is in use, so it no longer holds up the page for everyone else.</li>
