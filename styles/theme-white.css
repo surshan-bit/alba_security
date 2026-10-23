@@ -271,12 +271,13 @@
   :root[data-theme="white"] .biz-side .tl-view-toggle .tl-view-btn{padding:0 8px;}
   :root[data-theme="white"] :is(#tradeAddBtn,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main){height:42px;display:inline-flex;align-items:center;font-size:.85rem;}
 }
-/* Phones: a visible menu button and no logo in the top bar, so the search box gets the room. */
+/* Phones: a visible menu button, no logo and no Live pill in the top bar, so the search box gets the room. */
 @media (max-width:900px){
   :root[data-theme="white"] .topbar{height:auto;min-height:56px;padding:6px 10px;gap:8px;margin-bottom:10px;}
   :root[data-theme="white"] .topbar .menu-toggle{color:#1b1f2a;margin:0;}
   :root[data-theme="white"] .topbar .menu-toggle:hover{background:#eef0f6;}
   :root[data-theme="white"] .topbar .topbar-title{display:none;}
+  :root[data-theme="white"] .topbar .live-toggle,:root[data-theme="white"] .topbar .live-px{display:none;}
   :root[data-theme="white"] .topbar .topbar-search{margin:0;flex:1 1 auto;min-width:0;width:auto;max-width:none;}
   :root[data-theme="white"] .topbar .topbar-search-input{width:100%;font-size:1rem;}
 }
