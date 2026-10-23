@@ -332,7 +332,6 @@
   :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;}
 }
 /* Watchlist sync picker: rows like Settings > Claude controls (bold name, short description, tick box at the right, hairline between rows). */
-@media (min-width:901px){
   :root[data-theme="white"] #section-refreshlog .refreshlog-manual:has(#wlStrategyPicker){display:block;}
   :root[data-theme="white"] .wl-picker{gap:0;margin-bottom:18px;width:100%;}
   :root[data-theme="white"] .wl-pick{justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid #eef0f6;}
@@ -342,7 +341,6 @@
   :root[data-theme="white"] .wl-pick-name{font-size:1rem;font-weight:700;color:#1b1f2a;}
   :root[data-theme="white"] #section-refreshlog .wl-help{margin:0 0 6px;}
   :root[data-theme="white"] #section-refreshlog #refreshWatchlistBtn{display:flex;width:fit-content;margin-left:auto;}
-}
 /* Strategies: a single line under the closed setup bar, and the "+ Add a rule" box lined up with the rule fields above it. */
 @media (min-width:901px){
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold:not([open]) > summary{border-bottom:0;}
@@ -404,3 +402,13 @@
   :root[data-theme="white"] .topbar-brand::before{width:27px;height:27px;}
 }
 @media (min-width:1400px){:root[data-theme="white"] .sidebar{left:278px;}}
+/* Phones, Data Refresh: the same primary and secondary buttons as on the laptop.
+   Primary (filled indigo): Import data, Refresh all stocks, Sync selected. Secondary (white, thin edge): Browse CSV. */
+@media (max-width:900px){
+  :root[data-theme="white"] #section-refreshlog :is(.browse-btn,.select-mode-btn){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 18px;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
+  :root[data-theme="white"] #section-refreshlog :is(.browse-btn,.select-mode-btn:not(.fi-btn-primary)){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
+  :root[data-theme="white"] #section-refreshlog .select-mode-btn.fi-btn-primary{color:#fff;background:var(--accent);border:1px solid var(--accent);}
+  :root[data-theme="white"] #section-refreshlog .select-mode-btn.fi-btn-primary:disabled{color:#fff;background:color-mix(in srgb,var(--accent) 45%,#fff);border-color:transparent;cursor:not-allowed;}
+  :root[data-theme="white"] #section-refreshlog .select-mode-btn.fi-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 88%,#000);}
+  :root[data-theme="white"] #section-refreshlog :is(.browse-btn,.select-mode-btn):hover:not(.fi-btn-primary):not(:disabled){color:var(--accent);border-color:var(--accent);}
+}
