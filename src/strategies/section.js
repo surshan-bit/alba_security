@@ -8,7 +8,7 @@ import { openStockInline } from '../ui/inlinedetail.js';
 import { qualifyingStocks, ruleReady } from './rules.js';
 import { addStrategy, deleteStrategy, duplicateStrategy, restoreStarters, saveStrategies, selectStrategy, selectedStrategy, strategies } from './state.js';
 import { rulesEditorHtml, wireRulesEditor } from './editor.js';
-import { orderedPicks, resultsHtml, setResultsSort, sortLabel, sortSelectHtml, whyDatalist, whyHtml } from './results.js';
+import { orderedPicks, resetResultsRows, resultsHtml, setResultsSort, showMoreResults, sortLabel, sortSelectHtml, whyDatalist, whyHtml } from './results.js';
 import { sheetFrame } from '../ui/phonesheet.js';
 import { cleanGoal } from './goal.js';
 import { pcTickerKey } from '../prices/store.js';
@@ -122,6 +122,12 @@ function mainHtml(st){
     </div>`;
 }
 
+// Redraws only the picks table (a new sort or more rows), keeping the tick boxes.
+function redrawResults(st){
+  syncSelected();
+  document.getElementById('stratResults').innerHTML = resultsHtml(qualifyingStocks(stocks, st.rules), selected);
+  syncSelected();
+}
 function renderStrategiesSection(){ keepScroll(document.getElementById('section-strategies'), drawStrategiesSection); }
 function drawStrategiesSection(){
   const listEl = document.getElementById('stratList'), mainEl = document.getElementById('stratMain');
@@ -155,10 +161,11 @@ function init_strategies_section(){
   sec.addEventListener('click', (e) => {
     if(closestEl(e, '[data-strat-filters]')){ stratFiltersOpen = !stratFiltersOpen; renderStrategiesSection(); return; }
     const card = closestEl(e, '.strat-card');
-    if(card){ selectStrategy(card.dataset.id); renderStrategiesSection(); return; }
+    if(card){ selectStrategy(card.dataset.id); resetResultsRows(); renderStrategiesSection(); return; }
     if(closestEl(e, '#stratNew')){ addStrategy(); renderStrategiesSection(); return; }
     if(closestEl(e, '#stratRestore')){ restoreStarters(); renderStrategiesSection(); return; }
     const st = selectedStrategy();
+    if(closestEl(e, '[data-strat-more]') && st){ showMoreResults(); redrawResults(st); return; }
     const tick = closestEl(e, '.strat-sel');
     if(tick){   // (a click on a tick box must not open the stock)
       const sym = tick.dataset.sym;
@@ -193,9 +200,7 @@ function init_strategies_section(){
       forgetLearned(st.id); saveStrategies(); renderStrategiesSection();
     }
     else if(targetEl(e).id === 'stratSort' && st){
-      syncSelected(); setResultsSort(targetEl(e).value);
-      document.getElementById('stratResults').innerHTML = resultsHtml(qualifyingStocks(stocks, st.rules), selected);
-      syncSelected();
+      setResultsSort(targetEl(e).value); redrawResults(st);
     }
     else if(targetEl(e).id === 'stratNote' && st){ st.note = targetEl(e).value.trim(); saveStrategies(); }
     else if(targetEl(e).id === 'stratWhy' && st){

@@ -7,7 +7,10 @@ import { ANALYSIS_SORT_KEYS, ANALYSIS_SORT_OPTIONS, analysisSortComparator } fro
 import { analysisLbCell, analysisRowContext, columnHeaderHtml, stockGridColumnIds } from '../analysis/columns.js';
 import { kit } from '../refresh/kit.js';
 
-const ROW_CAP = 300;
+const ROW_STEP = 300;   // rows drawn at first and added by each "Show more"
+let rowCap = ROW_STEP;
+const showMoreResults = () => { rowCap += ROW_STEP; };
+const resetResultsRows = () => { rowCap = ROW_STEP; };
 
 // The "Sort by" choices are the Analysis page's (same list, same meaning). The choice is kept in this browser.
 const SORT_KEY = 'albaDashboard.strategySort.v1', DEFAULT_SORT = 'score_desc';
@@ -29,14 +32,14 @@ function resultsHtml(matches, selected){
   if(!matches.length) return `<div class="strat-empty">No stock passes all of these rules right now.</div>`;
   const sorted = orderedPicks(matches);
   const cols = stockGridColumnIds();   // the order set in Analysis
-  const rows = sorted.slice(0, ROW_CAP).map((s, i) => {
+  const rows = sorted.slice(0, rowCap).map((s, i) => {
     const idx = stockIndex.get(s), ctx = analysisRowContext(s, i, idx);
     return `<tr class="strat-row" data-idx="${idx}" tabindex="0">
       <td class="strat-selcell"><input type="checkbox" class="strat-sel" data-sym="${escapeHtml(tickerSymbol(s))}"${selected.has(tickerSymbol(s)) ? ' checked' : ''} aria-label="Select ${escapeHtml(s.name)} to track">${kit.rowBtn()}</td>
       ${cols.map(id => analysisLbCell(id, ctx)).join('')}
     </tr>`;
   }).join('');
-  const more = sorted.length > ROW_CAP ? `<div class="strat-empty">Showing the first ${ROW_CAP} of ${sorted.length}, sorted by ${escapeHtml(sortLabel().toLowerCase())}.</div>` : '';
+  const more = sorted.length > rowCap ? `<div class="strat-empty">Showing the first ${rowCap} of ${sorted.length}, sorted by ${escapeHtml(sortLabel().toLowerCase())}. <button type="button" class="analysis-reset-btn" data-strat-more="1">Show ${Math.min(ROW_STEP, sorted.length - rowCap)} more</button></div>` : '';
   return `<div class="strat-table-wrap"><table class="strat-table">
       <thead><tr><th class="strat-selcell"><input type="checkbox" class="strat-sel" data-sym="*" aria-label="Select all to track"></th>${cols.map(columnHeaderHtml).join('')}</tr></thead>
       <tbody>${rows}</tbody></table></div>${more}`;
@@ -68,4 +71,4 @@ function whyHtml(query, rules){
   return head + `<ul class="strat-why-list">${rows}</ul>`;
 }
 
-export { orderedPicks, resultsHtml, setResultsSort, sortLabel, sortSelectHtml, whyDatalist, whyHtml };
+export { orderedPicks, resetResultsRows, resultsHtml, setResultsSort, showMoreResults, sortLabel, sortSelectHtml, whyDatalist, whyHtml };
