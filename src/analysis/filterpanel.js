@@ -201,7 +201,7 @@ function analysisFiltersHtml(){
   const facetCount = facetCounts();
   return `
     <div class="filters analysis-filters-panel${analysisFiltersOpen ? '' : ' filters-collapsed'}" id="analysisFilterPanel">
-      <button type="button" class="filters-toggle" id="analysisFiltersToggle" aria-expanded="${analysisFiltersOpen}" aria-controls="analysisFilterGroups"><span class="ft-label">Filters</span><span class="ft-summary" id="analysisFiltersSummary"></span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
+      <button type="button" class="filters-toggle" id="analysisFiltersToggle" aria-expanded="${analysisFiltersOpen}" aria-controls="analysisFilterGroups"><span class="ft-label" aria-label="Filters"></span><span class="ft-summary" id="analysisFiltersSummary"></span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
       ${sheetFrame(`      <div class="filter-groups" id="analysisFilterGroups">
       ${strategyGroup()}
       ${filterGroup('analysisVerdictFilters', 'Fundamental Score', 'averdict', analysisFilters.verdicts, VERDICT_BUTTONS, facetCount)}

@@ -68,4 +68,4 @@ function whyHtml(query, rules){
   return head + `<ul class="strat-why-list">${rows}</ul>`;
 }
 
-export { orderedPicks, resultsHtml, setResultsSort, sortSelectHtml, whyDatalist, whyHtml };
+export { orderedPicks, resultsHtml, setResultsSort, sortLabel, sortSelectHtml, whyDatalist, whyHtml };

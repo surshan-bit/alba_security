@@ -145,7 +145,7 @@ function strategyGroupHtml(){
 function filtersToggleHtml(){
   const x = publishedStrategies().find(y => y.id === chosenStrategy());
   const summary = [view === 'heat' ? 'Heat map' : 'Table', periodOf(period).key, by === 'group' ? 'Industry group' : 'Industry', (x ? x.name : 'All') + (rebound ? ' + Rebound' : '')].join(' \u00b7 ');
-  return '<button type="button" class="biz-filters-toggle" data-biz-filters="1" aria-expanded="' + bizFiltersOpen + '"><span class="ft-label">Filters</span><span class="ft-summary">' + escapeHtml(summary) + '</span><span class="ft-caret" aria-hidden="true">\u25be</span></button>';
+  return '<button type="button" class="biz-filters-toggle" data-biz-filters="1" aria-expanded="' + bizFiltersOpen + '"><span class="ft-label" aria-label="Filters"></span><span class="ft-summary">' + escapeHtml(summary) + '</span><span class="ft-caret" aria-hidden="true">\u25be</span></button>';
 }
 const layoutHtml = (controls, main) => '<div class="biz-layout"><aside class="biz-side' + (bizFiltersOpen ? '' : ' filters-collapsed') + '">' + filtersToggleHtml() + sheetFrame(controls) + '</aside><div class="biz-main' + (bizFull ? ' biz-full' : '') + '">' + main + '</div></div>';
 

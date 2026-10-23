@@ -34,7 +34,7 @@ function syncSheet(panelSel, actionsSel){
 function syncSheets(){ SHEETS.forEach(([p, a]) => syncSheet(p, a)); }
 
 function closeSheet(from){
-  const host = from.closest('.biz-side, .analysis-filters-panel');
+  const host = from.closest('.biz-side, .analysis-filters-panel, .strat-filters-panel');
   const toggle = host && host.querySelector('.biz-filters-toggle, .filters-toggle');
   savedScroll = 0;
   if(toggle) /** @type {HTMLElement} */ (toggle).click();
@@ -47,7 +47,7 @@ function init_ui_phonesheet(){
   });
   document.addEventListener('keydown', (e) => {
     if(e.key !== 'Escape' || !phone()) return;
-    const open = document.querySelector('.biz-side:not(.filters-collapsed) .sheet-panel, .analysis-filters-panel:not(.filters-collapsed) .sheet-panel');
+    const open = document.querySelector('.biz-side:not(.filters-collapsed) .sheet-panel, .analysis-filters-panel:not(.filters-collapsed) .sheet-panel, .strat-filters-panel:not(.filters-collapsed) .sheet-panel');
     if(open) closeSheet(open);
   });
   document.addEventListener('scroll', (e) => {
