@@ -1,4 +1,5 @@
 import { panelIcon } from './icons.js';
+import { marginOfSafety } from '../core/mos.js';
 // Valuation panel on the stock detail page.
 
 // A single, merged 6-factor fundamental framework — replaces the earlier dual
@@ -17,8 +18,9 @@ import { panelIcon } from './icons.js';
 // Price Target cell (target12m/target12mSources) and the FII Ownership Trend cell
 // (fiiOwnership/renderFiiCell) — see Knowledge Base §5.
 function valGapMarkup(currentPrice, iv){
-  if(iv == null || currentPrice == null) return null;
-  const gapPct = ((currentPrice - iv) / iv) * 100;
+  const mos = marginOfSafety(iv, currentPrice);
+  if(mos === null) return null;
+  const gapPct = -mos;
   const gapBand = gapPct > 15 ? 'fs-avoid' : gapPct > 0 ? 'fs-hold' : gapPct > -15 ? 'fs-mbuy' : 'fs-buy';
   const gapLabel = gapPct >= 0
     ? `${gapPct.toFixed(1)}% above intrinsic value (${gapPct > 15 ? 'overvalued' : 'slightly overvalued'})`
@@ -33,8 +35,9 @@ function renderValuationPanel(s){
   const ivGap = valGapMarkup(v.currentPrice, v.intrinsicValue);
   // Margin of safety sits in the heading, written like the Fundamental Score's: "Valuation · +18.2%" with a tag after it.
   let mosText = '', mosTag = '';
-  if(hasIv && v.currentPrice != null){
-    const g = ((v.currentPrice - v.intrinsicValue) / v.intrinsicValue) * 100, mos = -g;
+  const mos = marginOfSafety(v.intrinsicValue, v.currentPrice);
+  if(mos !== null){
+    const g = -mos;
     const band = g > 15 ? 'avoid' : g > 0 ? 'hold' : g > -15 ? 'mbuy' : 'buy';
     mosText = ` &middot; ${mos > 0 ? '+' : mos < 0 ? '−' : ''}${Math.abs(mos).toFixed(1)}%`;
     mosTag = `<span class="badge b-${band}" title="Margin of safety = (Intrinsic Value − Current Price) ÷ Intrinsic Value">Margin of safety</span>`;
@@ -51,7 +54,7 @@ function renderValuationPanel(s){
           <div class="val-row">
             <div class="val-text">
               <div class="val-cell-value val-iv">Intrinsic value ₹${v.intrinsicValue.toLocaleString('en-IN')}</div>
-              <div class="val-cell-sub">${ivGap}</div>
+              <div class="val-cell-sub">${ivGap || ''}</div>
             </div>
           </div>` : `
           <div class="val-cell-sub">No reliable intrinsic-value source found for this stock.</div>`}

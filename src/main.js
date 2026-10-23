@@ -4,7 +4,6 @@ import './core/dom.js';
 import './core/store.js';
 import './core/pins.js';
 import './core/util.js';
-import './core/refreshrequests.js';
 import { init_joblogs_integrity } from './joblogs/integrity.js';
 import { init_analysis_section } from './analysis/section.js';
 import './strategies/fields.js';

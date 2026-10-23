@@ -3,12 +3,6 @@ import { verdictLabel } from '../core/stocks.js';
 import { escapeHtml } from '../core/util.js';
 import { scoreBand } from '../list/metrics.js';
 
-// Detail-view switches (2026-10-06). Both are hidden on purpose and kept in the code so they can be
-// brought back by flipping the flag to true: the per-stock "Request refresh" button (and its
-// "Refresh requested" pending pill), and the "What changed" note under the score.
-const SHOW_REQUEST_REFRESH = false;
-const SHOW_CHANGE_NOTE = false;
-
 // Quick links under the stock header: jump straight to a section instead of scrolling the long page.
 // The small score and status shown inside the Fundamental / Technical links, so the verdicts can be read without scrolling.
 function jumpPreview(score, status){
@@ -81,4 +75,4 @@ function bindDetailJumpNav(root){
   });
 }
 
-export { SHOW_CHANGE_NOTE, SHOW_REQUEST_REFRESH, bindDetailJumpNav, bindJumpSpy, renderDetailJumpNav };
+export { bindDetailJumpNav, bindJumpSpy, renderDetailJumpNav };

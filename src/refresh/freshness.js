@@ -5,10 +5,9 @@ import { isPinned } from '../core/pins.js';
 import { publishedStrategies } from '../strategies/state.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { stockResearchAgeDays } from '../research/status.js';
-import { daysSinceDate, escapeHtml } from '../core/util.js';
+import { daysSinceDate } from '../core/util.js';
 import { stocks } from '../core/stocks.js';
 
-const esc = escapeHtml;
 // Up to the first number is fresh, up to the second is ageing. Pinned stocks are checked most often; Technical is fresh for a day for all.
 const TIERS = {
   priority: { label: "Pinned", rank: 0, fund: [7, 21], tech: [1, 3] },
@@ -61,16 +60,6 @@ function freshness(s) {
 }
 const ago = (n) => n === null ? "never" : n === 0 ? "today" : n === 1 ? "1 day ago" : n + " days ago";
 const needs = (kind, s) => freshness(s)[kind].state !== "fresh";
-function freshText(s) {
-  const f = freshness(s);
-  return "Fundamental info: " + (f.fund.age === null ? "not researched yet" : "researched " + ago(f.fund.age)) + ". Technical info: " + (f.tech.age === null ? "no price date on file" : "price as of " + ago(f.tech.age)) + ".";
-}
-function dots(s) {
-  return "";  // F/T badges removed from the grids (too much information)
-  /* eslint-disable-next-line no-unreachable */
-  const f = freshness(s), t = freshText(s);
-  return '<span class="rk-dots" role="img" aria-label="' + esc(t) + '" title="' + esc(t) + '"><i class="rk-dot ' + f.fund.state + '">F</i><i class="rk-dot ' + f.tech.state + '">T</i></span>';
-}
 function counts(list) {
   let fund = 0, tech = 0, attn = 0;
   for (const s of list) { const f = freshness(s); if (f.fund.state !== "fresh") fund++; if (f.tech.state !== "fresh") tech++; if (f.why.length) attn++; }
@@ -83,4 +72,4 @@ function priorityOrder(kind, list) {
   return list.slice().sort((a, b) => { const x = k.get(a), y = k.get(b); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; });
 }
 
-export { ago, counts, dots, freshness, needs, priorityOrder };
+export { ago, counts, freshness, needs, priorityOrder };

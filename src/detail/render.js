@@ -3,11 +3,8 @@ import { keepScroll } from '../ui/scrollkeep.js';
 import { LINK_ICON } from './icons.js';
 import { detailEl } from '../core/dom.js';
 import { stocks } from '../core/stocks.js';
-import { getDb, getRefreshRequest } from '../core/store.js';
 import { isPinned, togglePin } from '../core/pins.js';
-import { escapeHtml, formatRequestedAt, sanitizeDocId, screenerUrl, tickerSymbol } from '../core/util.js';
-import { cancelRefreshRequest, requestRefresh } from '../core/refreshrequests.js';
-import { scoreDelta } from '../list/metrics.js';
+import { escapeHtml, screenerUrl } from '../core/util.js';
 import { renderValuationPanel } from './valuation.js';
 import { renderFundamentals } from './fundamentals.js';
 import { renderTvChart } from '../tv/links.js';
@@ -16,7 +13,7 @@ import { renderStockResearchBar } from './pending.js';
 import { renderGlobalFactorsPanel } from './globalfactors.js';
 import { renderPeersPanel } from './peers.js';
 import { SHOW_SCORE_TREND, initScoreTrend, renderScoreTrendPanel } from './scoretrend.js';
-import { SHOW_CHANGE_NOTE, SHOW_REQUEST_REFRESH, bindDetailJumpNav, renderDetailJumpNav } from './jumpnav.js';
+import { bindDetailJumpNav, renderDetailJumpNav } from './jumpnav.js';
 import { loadPriceBarsFor } from '../prices/store.js';
 import { initPriceChart } from '../prices/chart.js';
 import { bindLiveDataBar } from '../livedata/bar.js';
@@ -47,7 +44,6 @@ function renderDetail(idx){
   shownIdx = idx;
   const s = stocks[idx];
   if(detailOpenHook) detailOpenHook(s);
-  const delta = scoreDelta(s);
   const pinned = isPinned(s);
   detailEl.innerHTML = `
     ${detailBackTo ? `<div class="detail-back-bar"><button type="button" class="detail-back" id="detailBackBtn" title="Back (Esc)">&larr; Back to ${detailBackTo.label || 'Analysis'}<span class="detail-back-key">Esc</span></button></div>` : ''}
@@ -57,17 +53,6 @@ function renderDetail(idx){
         <div class="detail-title-text"><div class="detail-name">${escapeHtml(s.name)}</div><div class="detail-ticker">${escapeHtml(s.ticker)}</div></div>
       </div>
     <div class="detail-meta">
-     ${SHOW_REQUEST_REFRESH ? `<div class="detail-meta-row">
-      ${(() => {
-        const reqId = sanitizeDocId(tickerSymbol(s));
-        const pending = getRefreshRequest(reqId);
-        if(pending){
-          return `<button type="button" class="refresh-pending" id="cancelRefreshBtn" title="Click to cancel this request">⏳ Refresh requested ${escapeHtml(formatRequestedAt(pending.requestedAt))} ✕</button>`;
-        }
-        if(!getDb()) return '';
-        return `<button type="button" class="refresh-btn" id="requestRefreshBtn">↻ Request refresh</button>`;
-      })()}
-     </div>` : ''}
      <div class="detail-meta-row detail-meta-links">
       <a href="${screenerUrl(s)}" target="_blank" rel="noopener noreferrer">${LINK_ICON}<span>View on screener.in</span></a>
       ${renderTvChart(s)}
@@ -78,7 +63,6 @@ function renderDetail(idx){
     </div>
     ${renderDetailJumpNav(s)}
     ${renderStockResearchBar(s)}
-    ${SHOW_CHANGE_NOTE && delta !== 0 && s.changeNote ? `<div class="change-note"><span class="change-note-label">What changed</span><span>${s.changeNote}</span></div>` : ''}
     ${renderValuationPanel(s)}
     ${renderGlobalFactorsPanel(s)}
     ${renderFundamentals(s)}
@@ -133,20 +117,6 @@ function renderDetail(idx){
   const detailPinBtn = document.getElementById('detailPinBtn');
   if(detailPinBtn){
     detailPinBtn.onclick = () => togglePin(s.ticker);
-  }
-
-  const requestRefreshBtn = /** @type {HTMLButtonElement} */ (document.getElementById('requestRefreshBtn'));
-  if(requestRefreshBtn){
-    requestRefreshBtn.onclick = () => {
-      requestRefreshBtn.disabled = true;
-      requestRefreshBtn.textContent = 'Requesting…';
-      requestRefresh(s);
-    };
-  }
-
-  const cancelRefreshBtn = document.getElementById('cancelRefreshBtn');
-  if(cancelRefreshBtn){
-    cancelRefreshBtn.onclick = () => cancelRefreshRequest(sanitizeDocId(tickerSymbol(s)));
   }
 
   bindLiveDataBar(s);   // Live Data Refresh buttons (js/livedata.js)

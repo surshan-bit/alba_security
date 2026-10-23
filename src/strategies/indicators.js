@@ -2,7 +2,9 @@
 // (src/engine/technical.js): EMAs are seeded with the first close, RSI is Wilder-smoothed and seeded with a simple
 // average. `peek` gives the reading you would see if one more, still unfinished, bar closed at a given price, which is
 // how the live Technical Score treats the current week or month.
-const K12 = 2 / 13, K26 = 2 / 27, K9 = 2 / 10;
+import { techEma } from '../engine/technical.js';
+
+const K12 = 2 / 13, K26 = 2 / 27, K9 = 2 / 10;   // smoothing weights of the 12, 26 and 9 bar averages (peek continues them one bar)
 const MACD_STATES = ['bull_above', 'bull_below', 'bear_above', 'bear_below'];
 const MIN_MACD_BARS = 35, MIN_RSI_BARS = 15;   // same minimums as the engine
 
@@ -11,14 +13,9 @@ const macdCode = (level, signal) => (level > signal ? 0 : 2) + (level > 0 ? 0 : 
 
 function buildIndicators(c){
   const n = c.length;
-  const e12 = new Float64Array(n), e26 = new Float64Array(n), macd = new Float64Array(n), sig = new Float64Array(n);
+  const e12 = Float64Array.from(techEma(c, 12)), e26 = Float64Array.from(techEma(c, 26));
+  const macd = e12.map((v, i) => v - e26[i]), sig = Float64Array.from(techEma(macd, 9));
   const ag = new Float64Array(n), al = new Float64Array(n);
-  for(let i = 0; i < n; i++){
-    e12[i] = i ? c[i] * K12 + e12[i - 1] * (1 - K12) : c[0];
-    e26[i] = i ? c[i] * K26 + e26[i - 1] * (1 - K26) : c[0];
-    macd[i] = e12[i] - e26[i];
-    sig[i] = i ? macd[i] * K9 + sig[i - 1] * (1 - K9) : macd[0];
-  }
   if(n > 14){
     let g = 0, l = 0;
     for(let i = 1; i <= 14; i++){ const d = c[i] - c[i - 1]; if(d > 0) g += d; else l -= d; }

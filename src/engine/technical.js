@@ -1,4 +1,4 @@
-// Technical Score engine: EMA, MACD, RSI and the composite.
+// Technical Score engine: EMA, MACD, RSI and the composite. The one home of this maths: techscore2.js and the strategy search reuse it.
 
 // ---- Technical score from price bars (added 2026-10-07) ----
 // Same rules as Knowledge Base section 4 and the Part B prompt: MACD(12,26,9) level and signal and RSI(14) on
@@ -120,4 +120,4 @@ function techKeepsBarsBlock(t, today, days = 3){
   return techDayNo(today) - techDayNo(t.asof) <= days;
 }
 
-export { computeTechnical, snapshotTechnical, techCompleted, techComposite, techKeepsBarsBlock, techMacdStateOf, techRsiState, techValLabel };
+export { computeTechnical, snapshotTechnical, techCompleted, techComposite, techEma, techKeepsBarsBlock, techMacdStateOf, techRsi, techRsiState, techValLabel };
