@@ -18,6 +18,7 @@ import { analysisFilters } from './state.js';
 import { appSections } from '../ui/navigation.js';
 import { openStockInline } from '../ui/inlinedetail.js';
 import { analysisBucket, renderAnalysisFilterPanel } from './filterpanel.js';
+import { syncSheets } from '../ui/phonesheet.js';
 import { chartGeometry, stocksInRange, valueFor } from './geometry.js';
 import { analysisControlsHtml, wireAnalysisControls } from './controls.js';
 import { TOOLTIP_HTML, createAnalysisTooltip, wireDotEvents } from './tooltip.js';
@@ -138,6 +139,7 @@ function drawAnalysisSection(){
   wireAnalysisControls({ mosBoundLo: geo.mosBoundLo, mosBoundHi: geo.mosBoundHi, update: updateAnalysisChart, schedule: scheduleAnalysisChartUpdate, rerender: renderAnalysisSection, onRelease: () => renderAnalysisFilterPanel(renderAnalysisSection) });
 
   updateAnalysisChart();
+  syncSheets();
 }
 
 // Redraw the chart when the window is resized, so it keeps filling the available width.

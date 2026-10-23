@@ -36,7 +36,7 @@ function leaderboardHtml(chartBlock){
   return `<div class="analysis-leaderboard${lbFull ? ' lb-full' : ''}">
       <div class="analysis-leaderboard-head" style="margin-top:0;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div class="rk-headline"><p class="upload-hint biz-showing" style="margin:0"><span id="analysisLeaderboardCount"></span></p>${(defineAnalysisScope(), '')}</div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div class="analysis-actions" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <label class="analysis-filter-label" style="display:flex;align-items:center;gap:6px;">Sort by:
             <select class="sort-select" id="analysisSortSelect">
               ${ANALYSIS_SORT_OPTIONS.map(o => `<option value="${o.value}"${analysisFilters.sortBy === o.value ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}

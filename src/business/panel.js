@@ -13,6 +13,7 @@ import { prefSet } from '../identity/prefs.js';
 import { browserFullscreen, fullscreenLabel, watchFullscreenExit } from '../ui/fullscreen.js';
 import { kit } from '../refresh/kit.js';
 import { heatmapHtml } from './heatmap.js';
+import { sheetFrame, syncSheets } from '../ui/phonesheet.js';
 import { PERIODS, industryTable, needsBars, periodOf } from './calc.js';
 import { closestEl } from '../core/evt.js';
 import { isRebound } from '../list/rebound.js';
@@ -146,7 +147,7 @@ function filtersToggleHtml(){
   const summary = [view === 'heat' ? 'Heat map' : 'Table', periodOf(period).key, by === 'group' ? 'Industry group' : 'Industry', (x ? x.name : 'All') + (rebound ? ' + Rebound' : '')].join(' \u00b7 ');
   return '<button type="button" class="biz-filters-toggle" data-biz-filters="1" aria-expanded="' + bizFiltersOpen + '"><span class="ft-label">Filters</span><span class="ft-summary">' + escapeHtml(summary) + '</span><span class="ft-caret" aria-hidden="true">\u25be</span></button>';
 }
-const layoutHtml = (controls, main) => '<div class="biz-layout"><aside class="biz-side' + (bizFiltersOpen ? '' : ' filters-collapsed') + '">' + filtersToggleHtml() + controls + '</aside><div class="biz-main' + (bizFull ? ' biz-full' : '') + '">' + main + '</div></div>';
+const layoutHtml = (controls, main) => '<div class="biz-layout"><aside class="biz-side' + (bizFiltersOpen ? '' : ' filters-collapsed') + '">' + filtersToggleHtml() + sheetFrame(controls) + '</aside><div class="biz-main' + (bizFull ? ' biz-full' : '') + '">' + main + '</div></div>';
 
 // Redraws the page but keeps the scroll of each stocks grid, so a redraw during a refresh does not jump the view.
 function render(){
@@ -183,7 +184,7 @@ function draw(el){
     const isOpen = open.has(r.name);
     return '<tr class="biz-row' + (isOpen ? ' open' : '') + '" data-biz-name="' + escapeHtml(r.name) + '" tabindex="0" role="button" aria-expanded="' + isOpen + '"><td class="biz-name">' + '<button type="button" class="biz-open" data-biz-open="' + escapeHtml(r.name) + '" title="Open the industry page: factors, news and charts">' + escapeHtml(r.name) + '</button></td><td class="num">' + r.count + '</td><td class="num">' + pct(r.mean) + '</td><td class="num">' + pct(r.median) + '</td><td>' + breadth(r) + '</td><td class="num">' + (r.news.length ? r.news.length + (r.pos || r.neg ? ' <span class="news-pos">+' + r.pos + '</span> <span class="news-neg">&minus;' + r.neg + '</span>' : '') : '') + '</td>' + (strategyOn() ? '<td class="num">' + (r.matches ? '<b class="biz-matchcount">' + r.matches + '</b> of ' + r.count : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null ? pct(r.matchMean) : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null && r.mean !== null ? signedPp(r.matchMean - r.mean) : '') + '</td>' : '') + '</tr>' + (isOpen ? detailHtml(r, cols) : '');
   }).join('');
-  if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + viewToggle + sizeToggle + '</div>' + heatmapHtml(rows, period, Math.max(300, el.clientWidth - 280), heatSize) + note); return; }
+  if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + viewToggle + sizeToggle + '</div></div>' + heatmapHtml(rows, period, Math.max(300, el.clientWidth - 280), heatSize) + note); syncSheets(); return; }
   kit.defineToolbar('biz', () => {
     const st = r => r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock), out = [];
     if(strategyOn()) out.push({ id: 'matched', label: 'Matched stocks', stocks: () => rows.flatMap(r => r.items.filter(x => x.match).map(x => x.stock)) });
@@ -192,7 +193,8 @@ function draw(el){
     out.push({ id: 'all', label: 'Every stock in the table', stocks: () => rows.flatMap(st) });
     return out;
   });
-  el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + expandBtn + kit.toolbarButton('biz') + '</div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + note + kit.selbarSlot('biz'));
+  el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + expandBtn + kit.toolbarButton('biz') + '</div></div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + note + kit.selbarSlot('biz'));
+  syncSheets();
 }
 
 function ensureData(){

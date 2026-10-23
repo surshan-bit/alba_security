@@ -10,6 +10,7 @@ import { stocksInRange } from './geometry.js';
 import { publishedStrategies } from '../strategies/state.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { strategyStockSet } from '../strategies/pick.js';
+import { sheetFrame } from '../ui/phonesheet.js';
 import { escapeHtml } from '../core/util.js';
 import { isRebound } from '../list/rebound.js';
 import { ensureAllPriceBars } from '../prices/store.js';
@@ -201,7 +202,7 @@ function analysisFiltersHtml(){
   return `
     <div class="filters analysis-filters-panel${analysisFiltersOpen ? '' : ' filters-collapsed'}" id="analysisFilterPanel">
       <button type="button" class="filters-toggle" id="analysisFiltersToggle" aria-expanded="${analysisFiltersOpen}" aria-controls="analysisFilterGroups"><span class="ft-label">Filters</span><span class="ft-summary" id="analysisFiltersSummary"></span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
-      <div class="filter-groups" id="analysisFilterGroups">
+      ${sheetFrame(`      <div class="filter-groups" id="analysisFilterGroups">
       ${strategyGroup()}
       ${filterGroup('analysisVerdictFilters', 'Fundamental Score', 'averdict', analysisFilters.verdicts, VERDICT_BUTTONS, facetCount)}
       ${filterGroup('analysisMosFilters', 'MoS Rating', 'amos', analysisFilters.mosRatings, MOS_BUTTONS, facetCount)}
@@ -209,6 +210,7 @@ function analysisFiltersHtml(){
       ${reboundGroup(facetCount)}
       ${filterGroup('analysisTechMFilters', 'M Tech Rating', 'atechm', analysisFilters.techM, TECH_BUTTONS, facetCount)}
       </div>
+`)}
     </div>
   `;
 }
