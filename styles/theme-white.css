@@ -425,7 +425,7 @@
   :root[data-theme="white"] :is(.strat-table:not(.peers-table) td,.biz-table > tbody > tr > td){font-size:.78rem;padding:10px 4px;line-height:1.3;}
   /* Every value in a grid cell is the same size and weight (scores, MoS, % changes, ratings, names, prices); only the colour and the pill tell them apart. */
   :root[data-theme="white"] :is(.strat-table,.biz-table) td :is(a,span,b,button,.num){font-size:.78rem;font-weight:500;letter-spacing:0;}
-  :root[data-theme="white"] :is(.strat-table,.biz-table) td .badge{font-size:.78rem !important;font-weight:400;padding:2px 8px;}
+  :root[data-theme="white"] :is(.strat-table,.biz-table) td .badge{font-size:var(--t-sm) !important;font-weight:400;padding:2px 8px;}
   :root[data-theme="white"] :is(.strat-table,.biz-table) td{font-variant-numeric:tabular-nums;}
   :root[data-theme="white"] :is(.strat-table th,.biz-table > thead > tr > th,.strat-table:not(.peers-table) th){font-size:.72rem;font-weight:500;padding:8px 4px;text-transform:none;letter-spacing:0;white-space:nowrap;}
   :root[data-theme="white"] :is(.strat-table,.biz-table) :is(.score-pill,.pill,.chip,.tl-chip){font-size:.78rem;padding:2px 8px;}

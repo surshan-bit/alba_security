@@ -1,0 +1,46 @@
+/* White theme: one type scale for every screen.
+   Family: Inter everywhere (the logo keeps Quicksand, code keeps a monospace face).
+   Sizes:  --t-xl page titles and the detail-page name   --t-lg card, section and panel headings, big scores
+           --t-md body text, grid values, names, menus   --t-sm grid headings, counts, buttons, pills, small labels
+           --t-xs the tiniest tags (version, Pro, key hints)
+   Weights: 400 for text and values, 600 for headings, the active choice, buttons and bold words. Nothing else. */
+:root[data-theme="white"]{--t-xl:32px;--t-lg:20px;--t-md:16px;--t-sm:13px;--t-xs:11px;--w-reg:400;--w-strong:600;}
+@media (max-width:900px){
+  :root[data-theme="white"]{--t-xl:24px;--t-lg:17px;--t-md:13px;--t-sm:12px;--t-xs:10px;}
+}
+
+/* 1. Base: blocks and controls are body text. Inline words inherit from the block they sit in. */
+:root[data-theme="white"] body :is(p,li,td,div,label,button,summary,input,select,textarea,dd,dt,blockquote,pre){font-family:var(--ff-white) !important;font-size:var(--t-md) !important;font-weight:var(--w-reg) !important;}
+:root[data-theme="white"] body *{font-family:var(--ff-white) !important;}
+:root[data-theme="white"] body :is(span,a,i,em,small,sub,sup){font-size:inherit !important;font-weight:inherit !important;}
+:root[data-theme="white"] body :is(b,strong){font-family:inherit !important;font-size:inherit !important;font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body :is(code,.help-formula,.help-formula *){font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace !important;font-size:var(--t-md) !important;font-weight:var(--w-reg) !important;}
+:root[data-theme="white"] body .help-formula b{font-weight:var(--w-strong) !important;}
+
+/* 2. Headings */
+:root[data-theme="white"] body h1,:root[data-theme="white"] body .detail-name{font-family:var(--ff-white) !important;font-size:var(--t-xl) !important;font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body :is(h2,h3,.brand-title,.refreshlog-job-title,.settings-row-title,.upload-title,.tech-panel-title,.global-panel-title,.val-panel-title,.fund-panel-title,.analysis-panel-title,summary.analysis-panel-title,.detail-star,.fund-cell-score,.fund-cell-score *,.val-cell-value b){font-family:var(--ff-white) !important;font-size:var(--t-lg) !important;font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body :is(h4,h5,h6,.refreshlog-freshness-title,.refreshlog-runs-title,.refreshlog-sub-title,.val-cell-value,.glossary-term,.pcs-val,.wl-pick-name){font-size:var(--t-md) !important;font-weight:var(--w-strong) !important;}
+/* the small uppercase labels above groups */
+:root[data-theme="white"] body :is(.filters h2,.filter-group h2,.strat-section-title,.fund-cell-label,.fund-pc-title,.fund-subsection-title,.nav-section-label){font-size:var(--t-sm) !important;font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body .nav-section-label{font-size:var(--t-xs) !important;}
+
+/* 3. Grids: headings, values and pills share one rule on every grid */
+:root[data-theme="white"] body :is(th,.strat-table th,.biz-table th,.help-table th){font-family:var(--ff-white) !important;font-size:var(--t-sm) !important;font-weight:var(--w-reg) !important;}
+:root[data-theme="white"] body :is(td,td *,.chg-up,.chg-down,.ind-w,.analysis-lb-name,.biz-open){font-weight:var(--w-reg) !important;}
+:root[data-theme="white"] body :is(td .badge,.badge,.completeness-badge,.tech-badge,.fund-cell-max,.analysis-lb-ticker,.filter-n,.strat-card-n,.sr-opt,.sr-unit,.sr-and,.sr-count,.help-tab-link,.data-chip){font-size:var(--t-sm) !important;font-weight:var(--w-reg) !important;}
+:root[data-theme="white"] body :is(.completeness-badge){font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body :is(.strat-count,.strat-empty,.biz-showing,#analysisLeaderboardCount,.filter-note,.strat-section-hint,.analysis-filter-label,.peers-hint){font-size:var(--t-sm) !important;}
+:root[data-theme="white"] body :is(.biz-showing,.strat-count,.strat-count b){font-weight:var(--w-reg) !important;}
+
+/* 4. Buttons, menus and choices */
+:root[data-theme="white"] body :is(.biz-expand,.detail-back,.analysis-reset-btn,.rk-btn,.rk-main,.rk-barbtn,.rk-toolbtn,.strat-btn,.refresh-btn,.browse-btn,.select-mode-btn,.tl-btn-primary,.fi-btn-primary){font-size:var(--t-sm) !important;font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body :is(.nav-item.active,.tl-view-btn.active,.theme-toggle-btn.active,.filter-btn.active,.strat-card.active .strat-card-name,.live-toggle){font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body :is(.live-toggle,.rk-row-btn,.pin-btn,.sr-del){font-size:var(--t-md) !important;}
+:root[data-theme="white"] body :is(.brand-version,.pro-pill,.detail-back-key,.pcs-key,.pcs-arrow){font-size:var(--t-xs) !important;font-weight:var(--w-strong) !important;}
+
+/* The logo keeps its own face and size; the small summary / hint texts are regular. */
+:root[data-theme="white"] body .topbar-brand,:root[data-theme="white"] body .topbar-brand *{font-family:"Quicksand","Nunito","Varela Round",-apple-system,"Segoe UI",sans-serif !important;font-size:28px !important;font-weight:700 !important;}
+:root[data-theme="white"] body :is(.strat-fold-sum,.strat-section-hint){font-size:var(--t-sm) !important;font-weight:var(--w-reg) !important;}
+/* Titles inside the Strategies panels are one step down so the setup line and the grid stay the focus. */
+:root[data-theme="white"] body :is(.strat-panel .analysis-panel-title,summary.strat-sub,.strat-panel .analysis-panel-title *){font-size:var(--t-md) !important;}
