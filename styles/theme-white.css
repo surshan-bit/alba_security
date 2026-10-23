@@ -468,3 +468,6 @@
 :root[data-theme="white"] :is(.strat-table,.biz-table,.peers-table) td .badge{color:#000 !important;font-weight:400 !important;}
 /* Column headings in the grids: black, regular weight, like the values under them. */
 :root[data-theme="white"] :is(.strat-table,.biz-table) thead th{color:#000 !important;font-weight:400 !important;}
+/* Explorer's # (row number) looks like the # column in Analysis and Strategies: same size and weight as the cell values, heading weight in the heading. */
+:root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{font-weight:500 !important;font-size:inherit;color:inherit !important;}
+:root[data-theme="white"] .biz-table > thead > tr > th:first-child::before{font-weight:400 !important;color:#000 !important;}
