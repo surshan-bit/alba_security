@@ -434,11 +434,17 @@
   :root[data-theme="white"] .strat-count b{font-weight:inherit;}
   /* the same spacing on every grid screen: 10px under the Filters row, the count line, 10px above the grid */
   :root[data-theme="white"] .analysis-leaderboard-head{justify-content:flex-start !important;margin:5px 0 10px !important;}
-  :root[data-theme="white"] .strat-result-head{gap:0;margin:0 0 10px;}
+  :root[data-theme="white"] .strat-result-head{gap:0;margin:0 0 8px;}
+  /* Strategies: less empty space between the setup line, the Filters row and the grid */
+  :root[data-theme="white"] #section-strategies #stratMain .strat-panel:has(.strat-result-head){margin-top:0;padding-top:0;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{padding-top:8px;padding-bottom:8px;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-fold{margin-bottom:0;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-result-head{margin-bottom:10px;}
   :root[data-theme="white"] :is(.strat-result-title,.analysis-leaderboard-head .rk-headline){flex:1 1 100%;margin:0;}
   :root[data-theme="white"] .strat-result-head .strat-result-title{margin-top:10px;}
   :root[data-theme="white"] .biz-main{margin-top:-18px;}
   :root[data-theme="white"] .biz-toolbar .biz-showing{margin:0 0 10px;}
+  :root[data-theme="white"] .biz-toolbar:has(.biz-showing){margin:20px 0 0;}
   :root[data-theme="white"] :is(.strat-table,.biz-table) :is(th,td){vertical-align:middle;}
   /* Explorer: the # hangs in front of the industry name (the name cell is indented to make room for it) */
   :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name,:root[data-theme="white"] .biz-table > thead > tr > th:first-child{padding-left:calc(4px + 2.6em);}
@@ -448,7 +454,12 @@
   :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,#section-business .biz-expand,#section-business .rk-btn):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
   :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;}
   :root[data-theme="white"] .sort-select{min-height:40px;font-size:.92rem;border:1px solid #c9cfdf;background-color:#fff;color:#1b1f2a;}
-  :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{padding-right:30px;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{padding-right:22px;}
+  /* Track these picks is a button like Refresh: outlined, same height */
+  :root[data-theme="white"] #section-strategies #stratMain .strat-total #stratTrackBtn{border:1px solid #c9cfdf;background:#fff;color:#1b1f2a;min-height:40px;border-radius:6px;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-total #stratTrackBtn:disabled{opacity:.5;}
+  /* the setup caret sits on the same right edge as the Filters caret below it */
+  :root[data-theme="white"] #section-strategies #stratMain .strat-group > summary.analysis-panel-title:before{right:0;}
 }
 /* The sort box above a results grid looks the same in Analysis and Strategies (boxed), not underlined like the form fields. */
 :root[data-theme="white"] #section-strategies #stratMain .sort-select{border:1px solid #c9cfdf;border-radius:8px;background-color:#fff;padding-left:10px;}
