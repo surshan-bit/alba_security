@@ -159,6 +159,8 @@ async function businessTests(browser){
   await page.locator('.biz-row').first().click();
   if(process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   ok((await page.locator('.biz-detail').count()) === 1 && (await page.locator('.biz-detail .strat-row').count()) >= 1, 'business: clicking an industry opens its stocks and news');
+  // (the grids of opened industries are skipped by the browser until the next frame, see styles/business.css, so their text reads empty for an instant after the click: wait for it)
+  await page.waitForFunction(() => /M RSI/i.test((document.querySelector('.biz-detail .strat-table thead') || {}).innerText || ''), null, { timeout: 5000 });
   ok(/M RSI/i.test(await page.locator('.biz-detail .strat-table thead').innerText()) && /M Tech Rating/i.test(await page.locator('.biz-detail .strat-table thead').innerText()), 'business: the stocks use the same grid columns as Analysis and Strategies');
   await page.locator('.biz-detail .strat-row').first().click(); await page.waitForTimeout(300);
   ok(await page.evaluate(() => { const b = document.getElementById('section-business'); return b.classList.contains('active') && b.contains(document.getElementById('detail')) && !!document.querySelector('#detail .detail-name'); }) && /Back to Explorer/.test(await page.locator('#detailBackBtn').innerText()), 'business: clicking a stock opens its detail right there with a way back');
