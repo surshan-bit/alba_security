@@ -221,6 +221,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.248 &middot; 2026-10-23</h3>
+            <ul>
+              <li><strong>Correct industry for newly added stocks.</strong> When a Fundamental CSV lists Industry Group before Industry, a stock added by the import was given its Industry Group as its industry (for example Armee Infotech showed &ldquo;IT - Services&rdquo; instead of &ldquo;IT Enabled Services&rdquo;). The import now reads both columns correctly. Stocks already in the dashboard keep their existing industry label.</li>
+            </ul>
+
             <h3>v1.247 &middot; 2026-10-23</h3>
             <ul>
               <li><strong>Tidier behind the scenes.</strong> Code that was written twice (the import steps, the upload records, the Help and Knowledge Base links, the news lists and a number of small helpers) now lives in one place. Nothing you see or use has changed.</li>
