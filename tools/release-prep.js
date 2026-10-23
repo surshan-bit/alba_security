@@ -1,8 +1,9 @@
 // Prepares a publish of the dashboard artifact from the files `npm run build` made. Run it on `main` after the pull request is merged and
 // the build has been run, then hand publish/publish.json to the Artifact tool and write publish/release.json to appMeta/release.
-//   node tools/release-prep.js [--since <git ref>]
-//     --since  the commit the live artifact was last published from (default: HEAD^1, the previous tip of main). Files that changed since
-//              then are published, and chunks that existed then but not now are removed.
+//   node tools/release-prep.js --since <git ref>
+//     --since  (required) the commit the live artifact was last published from: the merge commit of the previous release, NOT simply HEAD^1,
+//              because another pull request can merge in between. Files that changed since then are published, and chunks that existed then
+//              but not now are removed. The commit of the last release is in the release notes and in `git log --merges`.
 // Writes (publish/ is not committed):
 //   publish/index.html    the page: index.html from the first <!DOCTYPE html> to the last </body></html>
 //   publish/publish.json  { file_path, root, files } for the Artifact tool: changed files, app.js, styles.css, js/loader.js, every chunk, and null for old chunks
@@ -11,8 +12,12 @@
 const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
 const root = path.resolve(__dirname, '..'), out = path.join(root, 'publish');
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-const since = process.argv.includes('--since') ? process.argv[process.argv.indexOf('--since') + 1] : 'HEAD^1';
-if(!since || since.startsWith('--')){ console.error('--since needs a git ref'); process.exit(1); }
+const sinceAt = process.argv.indexOf('--since'), since = sinceAt >= 0 ? process.argv[sinceAt + 1] : '';
+if(!since || since.startsWith('--')){
+  console.error('usage: node tools/release-prep.js --since <git ref>\n--since is the commit the live artifact was last published from (the previous release\'s merge commit). It is required: guessing it can leave out files that another pull request changed.');
+  process.exit(1);
+}
+try { git('rev-parse', '--verify', since + '^{commit}'); } catch(e){ console.error('--since: "' + since + '" is not a commit in this repository'); process.exit(1); }
 
 // Only these kinds of files go to the artifact (the rest of the repo is not part of the page), and never these.
 const SENT = [/^(src|styles|partials|types)\//, /^tests\//, /^tools\//, /^(README\.md|package\.json|package-lock\.json|tsconfig\.json)$/];

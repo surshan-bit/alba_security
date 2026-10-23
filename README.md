@@ -29,7 +29,7 @@ src/                          THE APPLICATION: ES modules, one responsibility pe
   sections/                   the pages that load on first use: refreshlog, strategies, business, tradelog
 app.js, chunks/*.js           BUILD OUTPUT (ES modules, code-split, hashed chunk names). Never edit by hand
 tools/build.js                bundles src/ and styles/ with esbuild and stamps index.html
-tools/release-prep.js         after a merge and a build: writes publish/index.html, publish/publish.json (files for the Artifact tool) and publish/release.json (for appMeta/release)
+tools/release-prep.js         `--since <last published commit>`, after a merge and a build: writes publish/index.html, publish/publish.json (files for the Artifact tool) and publish/release.json (for appMeta/release)
 tools/css-snapshot.js         proves a styles/ change did not change the page (see "Changing styles" below)
 tools/lint.js                 structure checks (undefined names, start-up order, unused code, mutable exports, import graph)
 tests/run.js                  regression harness (jsdom; bundles the same sources into one script, as jsdom cannot run ES modules)
