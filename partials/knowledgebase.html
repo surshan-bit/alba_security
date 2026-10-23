@@ -43,7 +43,7 @@
           <tr><td><code>refresh/kit*.js</code></td><td>Every Refresh button, used identically by Analysis, Strategies and every Explorer industry: <code>kit-controls</code> (the buttons, their menus, the row ticks and selection bar), <code>kit-queue</code> (the saved queue of refresh jobs, the runner, the bell notices and the other-device sync), <code>kit-menu</code> (the floating menu) and <code>kit-lookup</code> (finding stocks by key, the registries of scopes and selections).</td></tr>
           <tr><td><code>livedata/batch.js</code>, <code>panel.js</code></td><td>The batch runner behind the Live Data Refresh cards and their markup. <code>LD_BATCH_MAX</code> caps one press at 50 stocks for each kind of refresh.</td></tr>
           <tr><td><code>core/util.js</code>, <code>core/idbkv.js</code></td><td>Small helpers defined once: <code>sleep</code>, the stock's ticker code, number formatting that returns nothing for a missing value, and opening a browser-side cache.</td></tr>
-          <tr><td><code>import/fund-import.js</code></td><td>The steps the Fundamental import, the Technical import and the watchlist sync share: take the job lock, pick the newest upload, read the stored file, stop on hard integrity failures, ask about soft warnings, free a failed lock and show the failure.</td></tr>
+          <tr><td><code>import/fund-import.js</code></td><td>The steps the Fundamental import and the watchlist sync share: take the job lock, pick the newest upload, read the stored file, stop on hard integrity failures, ask about soft warnings, free a failed lock and show the failure.</td></tr>
           <tr><td><code>business/newsitem.js</code></td><td>One headline row, used by the Explorer industry list and the industry page's news timeline.</td></tr>
           <tr><td><code>live/ticker.js</code></td><td>Live prices: while the market is open, the open stock first and then the rows on screen (up to 50, in grid order) refresh every 20 seconds, with W % chg and M % chg measured against last week's and last month's close read from TradingView's weekly and monthly bars. The Live switch is in the top bar on every screen size.</td></tr>
           <tr><td><code>ui/fullscreen.js</code></td><td>Full screen for the big grids: the button label, the browser's own full screen and Esc handling, shared by Analysis and Explorer.</td></tr>
@@ -72,13 +72,7 @@
             <li><b>This is the only way a new stock enters the dashboard.</b> A first-time ticker gets full onboarding.</li>
           </ul>
         </li>
-        <li><b>Technical Score:</b> upload a TradingView Growth List CSV in the Technical job's panel.
-          <ul>
-            <li>It is the sole source, and is pure arithmetic on RSI/MACD/price data.</li>
-            <li>It never onboards a new stock; unmatched symbols are skipped.</li>
-            <li>The old live TradingView fetch was retired on 2026-09-29.</li>
-          </ul>
-        </li>
+        <li><b>Technical Score:</b> <b>Refresh all stocks</b> in the Technical job's panel, straight from TradingView. It is pure arithmetic on RSI/MACD/price data and never onboards a new stock.</li>
         <li><b>Fundamental/Valuation research pass:</b> retired 2026-09-29. These now update only from a fresh screener.in CSV.</li>
         <li><b>Global &amp; Macro Factors:</b> researched by the Fundamental refresh, for any stock whatever its rating. See <a href="#kb-global">Knowledge Base §6</a>.</li>
         <li><b>Manual refresh queue:</b> the &#8635; button on a stock writes a timestamped request to the database; Claude clears it when asked.</li>
@@ -114,8 +108,8 @@
 
       <h2 id="kb-technical" data-icon="trend">4. Technical Score &mdash; stack &amp; sources</h2>
       <ul>
-        <li><b>Refresh:</b> manual only. Upload a Growth List CSV in the Technical job's panel; there's no schedule or live fetch (removed 2026-09-29).</li>
-        <li><b>Source:</b> a TradingView Growth List export with 1-week/1-month price change, RSI(14) and MACD(12,26,9) level and signal.</li>
+        <li><b>Refresh:</b> manual only. Press <b>Refresh all stocks</b> in the Technical job's panel (the Growth List CSV import was removed in v1.252); there is no schedule.</li>
+        <li><b>Source:</b> TradingView, through the page's connector: price, 1-week/1-month change, RSI(14), MACD(12,26,9) level and signal, and weekly and monthly bars.</li>
         <li><b>BSE-only tickers:</b> the dashboard stores a numeric BSE code as a placeholder. The <code>tradingview-watchlist-symbol-mapping</code> skill maps it to the TradingView alpha symbol so the row can be matched.</li>
         <li><b>Computation:</b> a deterministic 0&ndash;10 composite, with no buy/sell bucket labels (removed 2026-09-29).
           <ul>
@@ -204,7 +198,6 @@
           <tr><td>stockUpdates</td><td>Technical block (Part B) and company-level Global &amp; Macro items (Part C) per stock (doc id = ticker). Layered on top of the stock list on load, so research runs never need to republish the page. Delete a document to revert that stock.</td></tr>
           <tr><td>stockResearch</td><td>Researched factors per stock (doc id = ticker). Layered on top of the stock list, so CSV refreshes can't overwrite them. Delete a document to revert that stock.</td></tr>
           <tr><td>fundamentalCsvUploadLog</td><td>Fundamental CSV upload history (filename, size, row/new/dropped counts, asset id).</td></tr>
-          <tr><td>technicalCsvUploadLog</td><td>Growth List CSV upload history (same fields).</td></tr>
         </tbody>
       </table></div>
       <ul>
@@ -228,6 +221,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.252 &middot; 2026-10-23</h3>
+            <ul>
+              <li><strong>Removed two hidden features.</strong> The Score trend panel on the stock page and the Technical CSV import (Growth List upload) are gone. The TradingView refresh is the only route for the Technical Score. Every import still records its scores.</li>
+            </ul>
+
             <h3>v1.251 &middot; 2026-10-23</h3>
             <ul>
               <li><strong>Tidy-up, no change to scores.</strong> The averages, MACD and RSI maths now live in one place (the Technical Score engine) and are reused by Technical Score 2 and the rules search. Margin of safety is one shared formula. The live database listeners share one helper.</li>
@@ -567,7 +565,6 @@
             </ul>
             <h3>v1.194 &middot; 2026-10-15</h3>
             <ul>
-              <li><b>Score trend is hidden for now:</b> the Score trend panel on each stock page (the Fundamental and Technical score over time) is switched off. Nothing is deleted: every import still records its scores, so when the panel is brought back it will show everything saved in the meantime.</li>
             </ul>
             <h3>v1.193 &middot; 2026-10-15</h3>
             <ul>

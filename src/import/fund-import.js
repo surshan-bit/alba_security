@@ -6,7 +6,6 @@ import { primeStockCache } from '../boot/stockdata.js';
 import { fiAsk, fiEl, fiReset, fiSet, fiShowResult, getFiState, setFiPfx } from './panel.js';
 import { albaApplyFundamental } from './fund-engine.js';
 import { albaFiCheck, albaFiPrevInfo, albaFiSym } from './fund-check.js';
-import { SHOW_TECH_CSV, albaTiRunImport } from './tech-import.js';
 import { albaWlRunSync } from './wlsync.js';
 import { registerBusy } from '../core/busy.js';
 import { sanitizeDocId as albaFiSid, sleep } from '../core/util.js';
@@ -117,7 +116,7 @@ function albaFiReadAsset(assets, id){
   return assets && typeof assets.read === 'function' ? assets.read(id) : fetch('/_blob/' + id);
 }
 
-// ---- Steps the Fundamental import, the Technical import and the watchlist sync share ----
+// ---- Steps the Fundamental import and the watchlist sync share ----
 // Takes the job lock (importJobs/*), or stops with busyMessage(when it started) if another tab or device holds it.
 // Resolves to the function that stops the heartbeat. `fields` are saved with the lock.
 async function albaFiTakeLock(job, busyMessage, fields){
@@ -162,7 +161,6 @@ let fiRunning = false, fiUser = null, fiDb = null, fiAssets = null, fiOwner = fa
 function fiSetButtons(){
   const defs = [
     ['importFundamentalDataBtn', 'Scores the uploaded CSV and updates the stock data, right here on this page'],
-    ['importTechnicalDataBtn', 'Scores the uploaded Growth List and updates the technical data, right here on this page'],
     ['refreshWatchlistBtn', 'Writes each ticked strategy to a TradingView watchlist, right here on this page', 'Sync selected', 'Syncing…']
   ];
   for(const [bid, tip, idle, busy] of defs){
@@ -324,20 +322,16 @@ function init_import_fund_import(){
   } catch(e){ fiOwner = false; }
   fiSetButtons();
   paintLastRuns(fiDb);
-  const csvOption = document.getElementById('techCsvOption'); if(csvOption) csvOption.hidden = !SHOW_TECH_CSV;
   const b = fiEl('importFundamentalDataBtn');
   if(b) b.addEventListener('click', albaFiRunImport);
   const wb = document.getElementById('refreshWatchlistBtn');
   if(wb) wb.addEventListener('click', () => (typeof albaWlRunSync === 'function' ? albaWlRunSync() : undefined));
-  const tb = document.getElementById('importTechnicalDataBtn');
-  if(tb) tb.addEventListener('click', () => (typeof albaTiRunImport === 'function' ? albaTiRunImport() : undefined));
 })();
 }
 
 function getFiRunning(){ return fiRunning; }
 function getFiDb(){ return fiDb; }
-function getFiAssets(){ return fiAssets; }
 function getFiOwner(){ return fiOwner; }
 function setFiRunning(v){ fiRunning = v; }
 
-export { albaFiConfirmSoft, albaFiDay, albaFiErr, albaFiLoadRaw, albaFiMarkFailed, albaFiNewestUpload, albaFiPersist, albaFiReadUpload, albaFiRetry, albaFiShowFailure, albaFiTakeLock, albaFiThrowHard, fiSetButtons, getFiAssets, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning };
+export { albaFiErr, albaFiMarkFailed, albaFiRetry, albaFiTakeLock, fiSetButtons, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning };
