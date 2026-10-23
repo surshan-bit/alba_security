@@ -1,6 +1,7 @@
 // Live Data Refresh: Technical Info (price, MoS, bars, technical score).
 import { dbCapabilityPromise } from '../core/store.js';
 import { sanitizeDocId, tickerSymbol } from '../core/util.js';
+import { marginOfSafety } from '../core/mos.js';
 import { pcTickerKey } from '../prices/store.js';
 import { tvIstDate, tvMcp } from '../tv/connector.js';
 import { setPriceJobHook, priceJobs, refreshOneNow } from '../prices/refresh.js';
@@ -31,7 +32,7 @@ async function ldRunTechnical(s){
   const v = s.valuation || {};
   const iv = typeof v.intrinsicValue === 'number' && v.intrinsicValue > 0 ? v.intrinsicValue : null;
   const oldPx = typeof v.currentPrice === 'number' ? v.currentPrice : null;
-  const mosAt = pr => (iv != null && pr != null) ? ((iv - pr) / iv) * 100 : null;
+  const mosAt = pr => marginOfSafety(iv, pr);
   const oldMos = mosAt(oldPx), newMos = mosAt(px);
   set(20, 'Saving the price…');
   const id = sanitizeDocId(tickerSymbol(s));

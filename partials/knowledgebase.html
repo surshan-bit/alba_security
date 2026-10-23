@@ -193,7 +193,6 @@
         <tbody>
           <tr><td>users/&lt;id&gt;</td><td>One small record per signed-in user (id, first and last seen). Ids only, no names or emails. Readable by editors only.</td></tr>
           <tr><td>data/users/&lt;id&gt;/prefs, pins, portfolio/trades, clientErrors</td><td>Each user's private preferences (theme, Analysis filters and sort, Trade Log view), pinned tickers and Trade Log, and the last 20 errors that happened on that user's pages. Nobody else can read these, not even the owner.</td></tr>
-          <tr><td>refreshRequests</td><td>Pending manual "Request refresh" tickers, cleared once processed.</td></tr>
           <tr><td>deepRefreshLog</td><td>Retired weekend deep-refresh history (kept for the record).</td></tr>
           <tr><td>techFetchLog</td><td>Retired weekday TradingView fetch history (kept for the record).</td></tr>
           <tr><td>watchlistSyncLog</td><td>Watchlist rebuild history (status, counts, tickers). Manual runs only; the 3 most recent are kept.</td></tr>
@@ -229,6 +228,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.251 &middot; 2026-10-23</h3>
+            <ul>
+              <li><strong>Tidy-up, no change to scores.</strong> The averages, MACD and RSI maths now live in one place (the Technical Score engine) and are reused by Technical Score 2 and the rules search. Margin of safety is one shared formula. The live database listeners share one helper.</li>
+              <li><strong>Removed unused parts.</strong> The hidden &ldquo;Request refresh&rdquo; button and its database listener, the hidden &ldquo;What changed&rdquo; note and some empty placeholders are gone.</li>
+            </ul>
+
             <h3>v1.250 &middot; 2026-10-23</h3>
             <ul>
               <li><strong>Safer text.</strong> The Strengths / Watch-outs box and the Global &amp; Macro lists now always show saved text as plain text. Before, text written by Claude from news could carry markup into the page; a test showed an injected script running.</li>
@@ -1311,7 +1316,6 @@
       <ul>
             <li><b>One "Research this stock" button</b> per stock covers Data-proxy factors, incomplete factors, missing Technical inputs and Global &amp; Macro in one go. First runs: Mahalaxmi Rubtech 9.00 &rarr; 8.30, OCCL 6.59 &rarr; 6.61.</li>
             <li><b>Researched factors</b> swap the amber "Data proxy" tag for a green "Researched" tag with headline, summary, positives, negatives and sources. Figures that truly don't exist stay n/a with an explanation.</li>
-            <li><b>Hidden, not removed:</b> "Request refresh" and "What changed" are behind switches (<code>SHOW_REQUEST_REFRESH</code>, <code>SHOW_CHANGE_NOTE</code>).</li>
             <li><b>Showing line</b> above the grid shows the count, e.g. "Showing 42 of 2186 stocks", and updates with the sliders.</li>
             <li><b>Performance:</b> RSI slider redraws coalesced to one per animation frame.</li>
             <li><b>Cleanup:</b> removed leftover button styling; dead-code check found the rest in use.</li>

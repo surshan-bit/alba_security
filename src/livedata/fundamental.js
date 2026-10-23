@@ -1,6 +1,7 @@
 // Live Data Refresh: Fundamental Info (asks Claude, writes research).
 import { dbCapabilityPromise } from '../core/store.js';
 import { daysSinceDate, escapeHtml, sanitizeDocId, tickerIndustry, tickerSymbol } from '../core/util.js';
+import { marginOfSafety } from '../core/mos.js';
 import { fundamentalPendingItems, globalPendingInfo, technicalPendingItems } from '../detail/pending.js';
 import { pcTickerKey } from '../prices/store.js';
 import { tvCall, tvErrorText, tvIstDate, tvMcp } from '../tv/connector.js';
@@ -306,7 +307,7 @@ async function ldRunFundamental(s){
       const v = s.valuation || {};
       const ivNow = typeof v.intrinsicValue === 'number' && v.intrinsicValue > 0 ? v.intrinsicValue : null;
       const pxNow = typeof v.currentPrice === 'number' ? v.currentPrice : null;
-      const mosNow = ivNow != null && pxNow != null ? ((ivNow - pxNow) / ivNow) * 100 : null;
+      const mosNow = marginOfSafety(ivNow, pxNow);
       const state = factors.map(f => {
         const u = upd[f.key] || {};
         const score = u.score !== undefined ? u.score : f.score;

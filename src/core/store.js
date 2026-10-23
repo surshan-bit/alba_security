@@ -18,7 +18,6 @@ const state = {
   db: null,                        // the shared database handle; null until the capability resolves, or when this view has none
   tradeDb: null,                   // the same handle, set only for a signed-in viewer (the Trade Log is per user)
   pinned: new Set(),               // tickers pinned to the top of the list (saved per user)
-  refreshRequests: new Map(),      // sanitized ticker id -> {ticker, name, requestedAt}: stocks queued for a refresh
   tradeLog: new Map()              // doc id (`<TICKER>-<buy date ISO>`) -> trade record, with `_id` added
 };
 
@@ -46,10 +45,6 @@ function replacePinnedTickers(tickers){
   state.pinned = next;
   return true;
 }
-
-// ---- Refresh requests ----
-function getRefreshRequest(id){ return state.refreshRequests.get(id); }
-function replaceRefreshRequests(next){ state.refreshRequests = next; }
 
 // ---- Trade Log ----
 // One document per real position taken from this dashboard's verdicts, in the signed-in user's own collection
@@ -79,4 +74,4 @@ const fundamentalCsvUploadLog = createLog();
 const technicalCsvUploadLog = createLog();
 const watchlistSyncLog = createLog();
 
-export { allTrades, attachDb, attachTradeDb, dbCapabilityPromise, fundamentalCsvUploadLog, getDb, getRefreshRequest, getTrade, getTradeDb, isPinnedTicker, replacePinnedTickers, replaceRefreshRequests, replaceTradeLog, technicalCsvUploadLog, togglePinnedTicker, watchlistSyncLog };
+export { allTrades, attachDb, attachTradeDb, dbCapabilityPromise, fundamentalCsvUploadLog, getDb, getTrade, getTradeDb, isPinnedTicker, replacePinnedTickers, replaceTradeLog, technicalCsvUploadLog, togglePinnedTicker, watchlistSyncLog };

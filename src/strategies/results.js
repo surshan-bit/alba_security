@@ -5,7 +5,6 @@ import { FIELD_BY_ID } from './fields.js';
 import { describeRule, evaluateStock, formatValue } from './rules.js';
 import { ANALYSIS_SORT_KEYS, ANALYSIS_SORT_OPTIONS, analysisSortComparator } from '../analysis/state.js';
 import { analysisLbCell, analysisRowContext, columnHeaderHtml, stockGridColumnIds } from '../analysis/columns.js';
-import { kit } from '../refresh/kit.js';
 
 const ROW_STEP = 300;   // rows drawn at first and added by each "Show more"
 let rowCap = ROW_STEP;
@@ -35,7 +34,7 @@ function resultsHtml(matches, selected){
   const rows = sorted.slice(0, rowCap).map((s, i) => {
     const idx = stockIndex.get(s), ctx = analysisRowContext(s, i, idx);
     return `<tr class="strat-row" data-idx="${idx}" tabindex="0">
-      <td class="strat-selcell"><input type="checkbox" class="strat-sel" data-sym="${escapeHtml(tickerSymbol(s))}"${selected.has(tickerSymbol(s)) ? ' checked' : ''} aria-label="Select ${escapeHtml(s.name)} to track">${kit.rowBtn()}</td>
+      <td class="strat-selcell"><input type="checkbox" class="strat-sel" data-sym="${escapeHtml(tickerSymbol(s))}"${selected.has(tickerSymbol(s)) ? ' checked' : ''} aria-label="Select ${escapeHtml(s.name)} to track"></td>
       ${cols.map(id => analysisLbCell(id, ctx)).join('')}
     </tr>`;
   }).join('');

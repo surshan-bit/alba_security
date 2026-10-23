@@ -34,12 +34,6 @@ function formatDeepRefreshTimestamp(iso){
   return d.toLocaleString('en-IN', {day:'numeric', month:'short', hour:'numeric', minute:'2-digit', timeZone:'Asia/Kolkata'}) + ' IST';
 }
 
-function formatRequestedAt(iso){
-  if(!iso) return '';
-  const d = new Date(iso);
-  if(isNaN(d.getTime())) return iso;
-  return d.toLocaleString('en-IN', {day:'numeric', month:'short', hour:'numeric', minute:'2-digit'});
-}
 function daysSinceDate(str){
   if(!str) return null;
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(str));
@@ -95,4 +89,4 @@ function screenerUrl(s){
   return `https://www.screener.in/company/${encodeURIComponent(sym)}/${suffix}`;
 }
 
-export { daysSinceDate, escapeHtml, fixedOrNull, formatDate, formatDeepRefreshTimestamp, formatRequestedAt, formatUploadTimestamp, pctChangeSpan, round2OrNull, safeText, sanitizeDocId, screenerUrl, sleep, tickerIndustry, tickerKey, tickerSymbol };
+export { daysSinceDate, escapeHtml, fixedOrNull, formatDate, formatDeepRefreshTimestamp, formatUploadTimestamp, pctChangeSpan, round2OrNull, safeText, sanitizeDocId, screenerUrl, sleep, tickerIndustry, tickerKey, tickerSymbol };

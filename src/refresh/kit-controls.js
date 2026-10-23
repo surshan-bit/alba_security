@@ -43,8 +43,6 @@ function barInner(id) {
 function barHtml(id) {
   return '<span class="rk-bar" data-rk-bar="' + esc(id) + '">' + barInner(id) + "</span>";
 }
-function headCell() { return ""; }   // no checkbox column on Analysis and Explorer: it had nothing to do there
-function rowBtn() { return ""; }     // no per-row refresh button in the grids
 const choices = new Map();     // id -> () => { head, note, items: [{ label, small, off, run }] }
 function defineChoices(id, fn) { choices.set(id, fn); }
 function choiceBtn(id, off, title) {
@@ -61,7 +59,6 @@ let menuChoices = [];
 function stockBtn(s) {
   return '<button type="button" class="rk-row-btn rk-stockbtn" data-rk-row="' + esc(pcTickerKey(s)) + '" data-rk-sel="stock" aria-haspopup="menu" title="Refresh Fundamental or Technical info for this stock">↻ Refresh ▾</button>';
 }
-function rowCell() { return ""; }   // no checkbox column on Analysis and Explorer: it had nothing to do there
 function selbarInner(name) {
   const n = selKeys(name).size;
   if (!n) return "";
@@ -264,4 +261,4 @@ function installControls() {
   installListeners();
 }
 
-export { barHtml, choiceBtn, defineChoices, headCell, installControls, repaint, rowBtn, rowCell, selbarSlot, selectionChanged, stockBtn, toolbarButton };
+export { barHtml, choiceBtn, defineChoices, installControls, repaint, selbarSlot, selectionChanged, stockBtn, toolbarButton };

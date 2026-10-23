@@ -1,5 +1,5 @@
 // Live database subscriptions (research, updates, triggers, pins, logs).
-import { attachDb, attachTradeDb, dbCapabilityPromise, fundamentalCsvUploadLog, replacePinnedTickers, replaceRefreshRequests, replaceTradeLog, technicalCsvUploadLog, watchlistSyncLog } from '../core/store.js';
+import { attachDb, attachTradeDb, dbCapabilityPromise, fundamentalCsvUploadLog, replacePinnedTickers, replaceTradeLog, technicalCsvUploadLog, watchlistSyncLog } from '../core/store.js';
 import { refreshAnalysisSoon } from '../analysis/section.js';
 import { setResearchTriggerKinds, setResearchTriggers } from '../research/status.js';
 import { rerenderDetail } from '../detail/render.js';
@@ -59,104 +59,33 @@ function init_sync_subscriptions(){
     if(ref0) ref0.get().then((snap) => { if(!pinsHeard && !pinWritesInFlight() && snap && snap.exists) showPins(snap.data()); }).catch((e) => console.error('Pins could not be read', e));
   } catch(e){ console.error('Pins could not be read', e); }
 
-  try {
-    db.collection('stockResearch').onSnapshot(
-      (snap) => {
-        const docs = [];
-        snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
-        applyResearchOverlay(docs);
-      },
-      (err) => console.error('Stock research sync error', err)
-    );
-  } catch(e){
-    console.error('Stock research overlay unavailable', e);
-  }
-
-  // Saved Global & Macro, technical and price updates. If the listener fails it is started again after a pause, so the
-  // overlay does not silently disappear until the page is reloaded.
-  const watchUpdates = (attempt) => {
+  // Listens to one collection and hands every snapshot to `apply` as [{ id, data }]. If the listener fails it is started again after a
+  // pause (up to 5 times), so the overlay does not silently disappear until the page is reloaded. `label` names it in the console.
+  const watchCollection = (name, apply, label, attempt = 0) => {
     try {
-      db.collection('stockUpdates').onSnapshot(
+      db.collection(name).onSnapshot(
         (snap) => {
           const docs = [];
           snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
-          try { applyUpdatesOverlay(docs); } catch(e){ console.error('Stock updates could not be applied', e); }
+          try { apply(docs); } catch(e){ console.error(label + ' could not be applied', e); }
         },
-        (err) => { console.error('Stock updates sync error', err); if(attempt < 5) setTimeout(() => watchUpdates(attempt + 1), 3000 * (attempt + 1)); }
+        (err) => { console.error(label + ' sync error', err); if(attempt < 5) setTimeout(() => watchCollection(name, apply, label, attempt + 1), 3000 * (attempt + 1)); }
       );
     } catch(e){
-      console.error('Stock updates overlay unavailable', e);
+      console.error(label + ' overlay unavailable', e);
     }
   };
-  watchUpdates(0);
-
+  watchCollection('stockResearch', applyResearchOverlay, 'Stock research');
+  // Saved Global & Macro, technical and price updates.
+  watchCollection('stockUpdates', applyUpdatesOverlay, 'Stock updates');
   // The live snapshot of Refresh all stocks: one record per batch of 50 stocks, laid under each stock's own saved update.
-  const watchSnapshot = (attempt) => {
-    try {
-      db.collection('liveSnapshot').onSnapshot(
-        (snap) => {
-          const docs = [];
-          snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
-          try { applySnapshotOverlay(docs); } catch(e){ console.error('Live snapshot could not be applied', e); }
-        },
-        (err) => { console.error('Live snapshot sync error', err); if(attempt < 5) setTimeout(() => watchSnapshot(attempt + 1), 3000 * (attempt + 1)); }
-      );
-    } catch(e){
-      console.error('Live snapshot overlay unavailable', e);
-    }
-  };
-  watchSnapshot(0);
-
+  watchCollection('liveSnapshot', applySnapshotOverlay, 'Live snapshot');
   // Completed-weeks technical blocks of Refresh all stocks: one record per 50 stocks, laid under each stock's own saved update.
-  const watchTechBlocks = (attempt) => {
-    try {
-      db.collection('techBlocks').onSnapshot(
-        (snap) => {
-          const docs = [];
-          snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
-          try { applyTechBlocksOverlay(docs); } catch(e){ console.error('Technical blocks could not be applied', e); }
-        },
-        (err) => { console.error('Technical blocks sync error', err); if(attempt < 5) setTimeout(() => watchTechBlocks(attempt + 1), 3000 * (attempt + 1)); }
-      );
-    } catch(e){
-      console.error('Technical blocks overlay unavailable', e);
-    }
-  };
-  watchTechBlocks(0);
-
+  watchCollection('techBlocks', applyTechBlocksOverlay, 'Technical blocks');
   // The recent weekly and monthly bars of Refresh all stocks (about 3 MB in all): W % chg and M % chg are worked out from them.
-  const watchRecentBars = (attempt) => {
-    try {
-      db.collection('barsRecent').onSnapshot(
-        (snap) => {
-          const docs = [];
-          snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
-          try { applyRecentBarsOverlay(docs); } catch(e){ console.error('Recent bars could not be applied', e); }
-        },
-        (err) => { console.error('Recent bars sync error', err); if(attempt < 5) setTimeout(() => watchRecentBars(attempt + 1), 3000 * (attempt + 1)); }
-      );
-    } catch(e){
-      console.error('Recent bars overlay unavailable', e);
-    }
-  };
-  watchRecentBars(0);
-
+  watchCollection('barsRecent', applyRecentBarsOverlay, 'Recent bars');
   // Technical Score 2: one record per 250 stocks, saved by Refresh all stocks.
-  const watchTech2 = (attempt) => {
-    try {
-      db.collection('techScore2').onSnapshot(
-        (snap) => {
-          const docs = [];
-          snap.docs.forEach(d => { if(d.exists) docs.push({ id: d.id, data: d.data() }); });
-          try { applyTech2Overlay(docs); } catch(e){ console.error('Technical Score 2 could not be applied', e); }
-        },
-        (err) => { console.error('Technical Score 2 sync error', err); if(attempt < 5) setTimeout(() => watchTech2(attempt + 1), 3000 * (attempt + 1)); }
-      );
-    } catch(e){
-      console.error('Technical Score 2 overlay unavailable', e);
-    }
-  };
-  watchTech2(0);
+  watchCollection('techScore2', applyTech2Overlay, 'Technical Score 2');
 
   try {
     db.collection('researchTriggers').onSnapshot(
@@ -178,64 +107,10 @@ function init_sync_subscriptions(){
     console.error('Research trigger log unavailable', e);
   }
 
-  try {
-    db.collection('refreshRequests').onSnapshot(
-      (snap) => {
-        const next = new Map();
-        snap.docs.forEach(d => { if(d.exists) next.set(d.id, d.data()); });
-        const _rsig = JSON.stringify([...next]);
-        if(_rsig === window.__rrSig) return;
-        window.__rrSig = _rsig;
-        replaceRefreshRequests(next);
-        rerenderDetail();
-      },
-      (err) => console.error('Refresh queue sync error', err)
-    );
-  } catch(e){
-    console.error('Refresh queue unavailable', e);
-  }
-
-  try {
-    db.collection('watchlistSyncLog').onSnapshot(
-      (snap) => {
-        snap.docs.forEach(d => {
-          if(d.exists) watchlistSyncLog.put(d.id, d.data());
-        });
-        renderLoadedPart('refreshlog');
-      },
-      (err) => console.error('Watchlist sync log sync error', err)
-    );
-  } catch(e){
-    console.error('Watchlist sync log persistence unavailable', e);
-  }
-
-  try {
-    db.collection('fundamentalCsvUploadLog').onSnapshot(
-      (snap) => {
-        snap.docs.forEach(d => {
-          if(d.exists) fundamentalCsvUploadLog.put(d.id, d.data());
-        });
-        renderLoadedPart('refreshlog');
-      },
-      (err) => console.error('Fundamental CSV upload log sync error', err)
-    );
-  } catch(e){
-    console.error('Fundamental CSV upload log persistence unavailable', e);
-  }
-
-  try {
-    db.collection('technicalCsvUploadLog').onSnapshot(
-      (snap) => {
-        snap.docs.forEach(d => {
-          if(d.exists) technicalCsvUploadLog.put(d.id, d.data());
-        });
-        renderLoadedPart('refreshlog');
-      },
-      (err) => console.error('Technical CSV upload log sync error', err)
-    );
-  } catch(e){
-    console.error('Technical CSV upload log persistence unavailable', e);
-  }
+  // The Data Refresh page's history lists: kept in the store, and the page redrawn if it is loaded.
+  [{ name: 'watchlistSyncLog', log: watchlistSyncLog, label: 'Watchlist sync log' }, { name: 'fundamentalCsvUploadLog', log: fundamentalCsvUploadLog, label: 'Fundamental CSV upload log' },
+    { name: 'technicalCsvUploadLog', log: technicalCsvUploadLog, label: 'Technical CSV upload log' }]
+    .forEach(({ name, log, label }) => watchCollection(name, (docs) => { docs.forEach(d => log.put(d.id, d.data)); renderLoadedPart('refreshlog'); }, label));
 
   try {
     const _tradeCol = tradeCol(db);

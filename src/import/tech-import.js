@@ -2,6 +2,7 @@
 import { technicalCsvUploadLog } from '../core/store.js';
 import { uploadsSettled } from './upload-history.js';
 import { sanitizeDocId, sleep, tickerSymbol } from '../core/util.js';
+import { marginOfSafety } from '../core/mos.js';
 import { recordAttempt, saveRecord } from './last-file.js';
 import { albaFiConfirmSoft, albaFiDay, albaFiLoadRaw, albaFiMarkFailed, albaFiNewestUpload, albaFiPersist, albaFiReadUpload, albaFiRetry, albaFiShowFailure, albaFiTakeLock, albaFiThrowHard, getFiAssets, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { albaFiCheck, albaFiPrevInfo, albaFiSym } from './fund-check.js';
@@ -64,7 +65,7 @@ function albaApplyTechnical(csvText, stocks, bseMap, asof){
     const v = s.valuation;
     if(!v || !(v.intrinsicValue > 0)){ noValuation++; continue; }
     v.currentPrice = price; v.asof = asof;
-    const mos = (v.intrinsicValue - price) / v.intrinsicValue * 100, mosTxt = f1(mos) + '%';
+    const mos = marginOfSafety(v.intrinsicValue, price), mosTxt = f1(mos) + '%';
     const dcf = ((s.fundamentals && s.fundamentals.factors) || []).find(f => f.key === 'dcf');
     if(dcf){
       for(const mt of dcf.metrics || []){ if(mt[0] === 'Current price') mt[1] = String(price); else if(mt[0] === 'Margin of safety') mt[1] = mosTxt; }

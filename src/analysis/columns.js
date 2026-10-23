@@ -10,7 +10,6 @@ import { isPinned } from '../core/pins.js';
 import { mosPct, mosRatingAny, scoreBand } from '../list/metrics.js';
 import { techRatingInfo } from '../detail/technical.js';
 import { newsCellHtml } from '../strategies/news.js';
-import { getRefreshKit } from '../refresh/hook.js';
 
 // Analysis leaderboard column registry (added 2026-10-06) — the table's columns used to be
 // hardcoded in both the <thead> markup and the per-row <td> template, in a fixed order. Both
@@ -82,7 +81,7 @@ function analysisLbCellRaw(colId, ctx){
     }
     case 'pin': return `<td><button type="button" class="pin-btn${pinned ? ' pinned' : ''}" data-ticker="${escapeHtml(s.ticker)}" title="${pinned ? 'Unpin' : 'Pin to top'}">${pinned ? '★' : '☆'}</button></td>`;
     case 'rank': return `<td class="analysis-lb-rank">${i + 1}</td>`;
-    case 'stock': return `<td><a class="stock-link" href="${escapeHtml(stockShareLink(s))}"><span class="analysis-lb-name">${escapeHtml(s.name)}</span></a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}</span>${getRefreshKit() ? getRefreshKit().dots(s) : ''}</td>`;
+    case 'stock': return `<td><a class="stock-link" href="${escapeHtml(stockShareLink(s))}"><span class="analysis-lb-name">${escapeHtml(s.name)}</span></a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}</span></td>`;
     case 'industry': {
       const m = industryMedianW(s);
       const chg = m === null ? '' : `<span class="ind-w ${m > 0 ? 'chg-up' : m < 0 ? 'chg-down' : ''}" title="Median weekly change of this industry">${m > 0 ? '+' : ''}${m.toFixed(1)}% W</span> `;

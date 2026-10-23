@@ -4,7 +4,7 @@
 // price sits (moving-average stack, distance from the 52-week high, RSI zone, on-balance volume, volume breakouts), the weekly MACD,
 // and the last week's and last four weeks' move. The weights are fixed here; a re-fit is a new version of this file. Completed weekly bars only.
 import { sanitizeDocId, tickerSymbol } from '../core/util.js';
-import { techCompleted } from './technical.js';
+import { techCompleted, techEma, techRsi } from './technical.js';
 
 const T2_MIN_BARS = 60;
 const T2_WEIGHTS = [0.11034, 0.36898, 0.12924, 0.06497, 0.27126, 0.30203, 0.06286, -0.02101, -0.10541, 0.04323, -1.07844, 0.03593, 0.01748, -0.04041, 0.22604, -0.00871, 1.5953, -4.11067, 0.40297];
@@ -12,14 +12,8 @@ const T2_BIAS = -1.79728;
 // The model's raw output at the 0, 10, 20 ... 100th percentile of all the fitting stock-weeks; the 0-10 score is the position between them.
 const T2_CUTS = [-1.74763, -1.4641, -1.37366, -1.31351, -1.26524, -1.21671, -1.15953, -1.09435, -1.02559, -0.92692, 0.63518];
 
-function t2Ema(x, n){ const k = 2 / (n + 1), e = [x[0]]; for(let i = 1; i < x.length; i++) e.push(x[i] * k + e[i - 1] * (1 - k)); return e; }
-function t2Rsi(c, n = 14){
-  let ag = 0, al = 0;
-  for(let i = 1; i <= n; i++){ const d = c[i] - c[i - 1]; if(d > 0) ag += d; else al -= d; }
-  ag /= n; al /= n;
-  for(let i = n + 1; i < c.length; i++){ const d = c[i] - c[i - 1]; ag = (ag * (n - 1) + Math.max(d, 0)) / n; al = (al * (n - 1) + Math.max(-d, 0)) / n; }
-  return al === 0 ? 100 : 100 - 100 / (1 + ag / al);
-}
+// A flat series has no RSI in the Technical Score engine (null); this model reads it as 100, as it always has.
+const t2Rsi = (c) => { const r = techRsi(c); return r === null ? 100 : r; };
 const t2Mean = (x, from, to) => { let s = 0; for(let i = from; i < to; i++) s += x[i]; return s / (to - from); };
 function t2Scale(z){
   if(z <= T2_CUTS[0]) return 0;
@@ -33,12 +27,12 @@ function computeTech2(weekBars, today){
   if(n < T2_MIN_BARS) return null;
   const c = B.map(b => b[4]), h = B.map(b => b[2]), v = B.map(b => b[5]), i = n - 1;
   if(!(c[i] > 0) || !(c[i - 1] > 0)) return null;
-  const a12 = t2Ema(c, 12), a26 = t2Ema(c, 26), m = a12.map((x, j) => x - a26[j]), sg = t2Ema(m, 9);
+  const a12 = techEma(c, 12), a26 = techEma(c, 26), m = a12.map((x, j) => x - a26[j]), sg = techEma(m, 9);
   const ret1 = c[i] / c[i - 1] - 1, bull = m[i] > sg[i];
   const week = new Date((B[i][0] + 19800) * 1000).toISOString().slice(0, 10);
   const s4 = t2Mean(c, i - 3, i + 1), s10 = t2Mean(c, i - 9, i + 1), s40 = t2Mean(c, i - 39, i + 1), s20 = t2Mean(c, i - 19, i + 1);
   const stack = c[i] > s4 && s4 > s10 && s10 > s40 ? 15 : (c[i] > s10 && s10 > s40 ? 10 : (c[i] > s40 ? 5 : 0));
-  const r = t2Rsi(c), e30 = t2Ema(c, 30);
+  const r = t2Rsi(c), e30 = techEma(c, 30);
   let hh26 = 0, hh20 = 0, hi52 = 0, c26hi = 0;
   for(let j = i - 26; j < i; j++){ hh26 = Math.max(hh26, h[j]); c26hi = Math.max(c26hi, c[j]); }
   for(let j = i - 20; j < i; j++) hh20 = Math.max(hh20, h[j]);

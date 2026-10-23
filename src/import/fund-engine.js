@@ -1,5 +1,6 @@
 // Fundamental Score engine: turns a screener.in CSV row into factor scores.
 import { parseCSV } from './csvparse.js';
+import { marginOfSafety } from '../core/mos.js';
 
 // ---- Fundamental Score engine v3, ported unchanged from the saved devTools script `fundamental_engine` ----
 const AlbaFundEngine = (function(){
@@ -183,7 +184,7 @@ function ownHistGap(r) { if (r.histPe5 == null || r.histPe5 <= 0 || r.pe == null
 function capexDragsCroic(r) { const fcf = r.fcf3 != null ? r.fcf3 : r.fcf5, ocf = r.ocf3 != null ? r.ocf3 : r.ocf5; return fcf != null && ocf != null && fcf < 0 && ocf > 0 && r.roic != null; }
 function useCroic(r) { return r.croic != null && !capexDragsCroic(r); }
 function reinvestMetric(r) { return useCroic(r) ? r.croic : r.roic != null ? r.roic : r.croic; }
-function marginOfSafetyPct(r) { if (r.intrinsicValue == null || r.intrinsicValue <= 0 || r.currentPrice == null) return null; return ((r.intrinsicValue - r.currentPrice) / r.intrinsicValue) * 100; }
+function marginOfSafetyPct(r) { return marginOfSafety(r.intrinsicValue, r.currentPrice); }
 const groupKey = r => r.industryGroup;
 
 // ---- Verdict thresholds (section 6) ----

@@ -3,6 +3,7 @@
 // the same data always gives the same call. It is a reference for the person's own decision, never an order.
 // The thresholds below are the defaults; they are plain numbers so they can become settings later.
 import { fixedOrNull, round2OrNull } from '../core/util.js';
+import { marginOfSafety } from '../core/mos.js';
 
 const LIMITS = {
   lossReview: -15,       // % below the buy price: look at the position again
@@ -22,7 +23,7 @@ const CALLS = { hold: 'Hold', trim: 'Consider trimming', add: 'Consider adding',
 function tradeSignal(facts, limits = LIMITS){
   const f = facts || {};
   const gain = (f.price != null && f.buyPrice) ? (f.price - f.buyPrice) / f.buyPrice * 100 : null;
-  const mos = (f.price != null && f.intrinsic) ? (f.intrinsic - f.price) / f.intrinsic * 100 : null;
+  const mos = marginOfSafety(f.intrinsic, f.price);
   const drop = (f.entryScore != null && f.score != null) ? f.entryScore - f.score : null;
   const reasons = [];
   const out = (call) => ({ call, label: CALLS[call], reasons, gain, mos });

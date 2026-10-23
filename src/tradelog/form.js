@@ -2,6 +2,7 @@
 import { stockByTickerSymbolAny, stocks } from '../core/stocks.js';
 import { getTrade, getTradeDb } from '../core/store.js';
 import { escapeHtml, formatDate, sanitizeDocId, tickerSymbol } from '../core/util.js';
+import { marginOfSafety } from '../core/mos.js';
 import { fundamentalCompleteness, technicalCompleteness } from '../detail/completeness.js';
 import { buildSuggestions, sgMark } from '../ui/suggest.js';
 import { holdingDaysBetween, tlSetView } from './panel.js';
@@ -26,7 +27,7 @@ function tlSnapshot(s){
     verdict: s.verdict || null,
     currentPriceAtSnapshot: price,
     intrinsicValue: iv,
-    marginOfSafetyPct: (iv && price != null) ? ((iv - price) / iv) * 100 : null,
+    marginOfSafetyPct: marginOfSafety(iv, price),
     fundamentalFactorsComplete: fc.complete,
     fundamentalFactorsTotal: fc.total,
     technicalComponentsComplete: tc.complete,

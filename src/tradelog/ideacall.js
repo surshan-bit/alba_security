@@ -4,6 +4,7 @@
 // like one that moves 5% soon: swing.js). Buy needs both; the Buy list is ranked by setup, then quality. Fixed rules on
 // the dashboard's own numbers, so the same data always gives the same answer. A reference for your own decision, not an order.
 import { fixedOrNull } from '../core/util.js';
+import { marginOfSafety } from '../core/mos.js';
 import { factsFor, tradeSignal } from './signals.js';
 
 const BUY_SETUP = 2, AVOID_AT = -2, MOS_MIN = 10, SCORE_MIN = 5;
@@ -16,7 +17,7 @@ function qualityOf(f){
   const why = [];
   const add = (n, text) => { pts += n; why.push(text); };
   if(f.verdict && VERDICT_PTS[f.verdict] != null) add(VERDICT_PTS[f.verdict], 'Verdict ' + VERDICT_NAME[f.verdict]);
-  const mos = (f.price != null && f.intrinsic) ? (f.intrinsic - f.price) / f.intrinsic * 100 : null;
+  const mos = marginOfSafety(f.intrinsic, f.price);
   if(mos != null){
     if(mos >= 30) add(2, 'margin of safety ' + fixedOrNull(mos) + '%');
     else if(mos >= 10) add(1, 'margin of safety ' + fixedOrNull(mos) + '%');
