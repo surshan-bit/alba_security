@@ -434,11 +434,12 @@
   :root[data-theme="white"] .strat-count b{font-weight:inherit;}
   /* the same spacing on every grid screen: 10px under the Filters row, the count line, 10px above the grid */
   :root[data-theme="white"] .analysis-leaderboard-head{justify-content:flex-start !important;margin:5px 0 10px !important;}
-  :root[data-theme="white"] .strat-result-head{gap:0;margin:0 0 10px;}
+  :root[data-theme="white"] .strat-result-head{gap:0;margin:0 0 8px;}
   :root[data-theme="white"] :is(.strat-result-title,.analysis-leaderboard-head .rk-headline){flex:1 1 100%;margin:0;}
   :root[data-theme="white"] .strat-result-head .strat-result-title{margin-top:10px;}
   :root[data-theme="white"] .biz-main{margin-top:-18px;}
   :root[data-theme="white"] .biz-toolbar .biz-showing{margin:0 0 10px;}
+  :root[data-theme="white"] .biz-toolbar:has(.biz-showing){margin:20px 0 0;}
   :root[data-theme="white"] :is(.strat-table,.biz-table) :is(th,td){vertical-align:middle;}
   /* Explorer: the # hangs in front of the industry name (the name cell is indented to make room for it) */
   :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name,:root[data-theme="white"] .biz-table > thead > tr > th:first-child{padding-left:calc(4px + 2.6em);}
