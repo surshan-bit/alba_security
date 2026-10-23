@@ -107,3 +107,4 @@
 :root[data-theme="white"] :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){background:#fff;border-color:#c9cfdf;}
 :root[data-theme="white"] :is(input,select,textarea)::placeholder{color:#5b6274;}
 :root[data-theme="white"] .search-suggest{box-shadow:0 10px 28px rgba(27,31,42,.16);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .sheet-done{color:#fff;}
