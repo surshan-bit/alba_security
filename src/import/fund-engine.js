@@ -108,7 +108,7 @@ function interpolateCurve(curve, x) {
 // Header phrases -> field name, matched by substring (case-insensitive) — robust to column reordering.
 const COLUMN_MATCHERS = [
   ['name', ['name']], ['bseCode', ['bse', 'code']], ['nseCode', ['nse', 'code']], ['isin', ['isin']],
-  ['industryGroup', ['industry', 'group']], ['industry', ['industry']],
+  ['industryGroup', ['industry', 'group']], ['industry', ['industry'], ['group', 'industry pe']],
   ['currentPrice', ['current', 'price']], ['intrinsicValue', ['intrinsic', 'value']], ['bookValue', ['book', 'value']],
   ['profitGrowthTTM', ['profit', 'growth'], ['3years', '5years']],
   ['profitGrowth3', ['profit', 'growth', '3years']], ['profitGrowth5', ['profit', 'growth', '5years']],
