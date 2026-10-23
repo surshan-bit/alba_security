@@ -1,5 +1,7 @@
 // Pre-publish check: build, syntax, lint, then the regression harness compared with tests/golden.json.
 // Usage: node tests/check.js            run everything, exit 1 on any difference
+//        node tests/check.js --part=main      everything except the import flows (CI runs this beside --part=imports; together they are the whole check)
+//        node tests/check.js --part=imports   only the import flows in Chromium (the slowest suite)
 //        node tests/check.js --update   accept the current behaviour as the new golden (after reviewing the differences)
 const { spawnSync } = require('child_process'), fs = require('fs'), path = require('path');
 // The app works on India time (market hours, week and month starts), so every test runs on India time whatever machine it is on.
@@ -8,11 +10,18 @@ const root = path.resolve(__dirname, '..'), out = path.join(__dirname, 'out');
 // --live: test the published build as it is (app.js, chunks/, styles.css, index.html). Use this while src/ is behind the published build:
 // it skips the build-from-src and lint steps, which would otherwise rebuild the files from the older sources.
 const LIVE = process.argv.includes('--live');
+const PART = (process.argv.find(a => a.startsWith('--part=')) || '').slice(7);   // '' = everything
+if(PART && PART !== 'main' && PART !== 'imports'){ console.error('--part must be main or imports'); process.exit(1); }
 const step = (title, cmd, args) => {
   process.stdout.write('== ' + title + '\n');
   const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit' });
   if(r.status !== 0){ console.error('\nFAILED: ' + title); process.exit(1); }
 };
+if(PART === 'imports'){
+  step('import flows in Chromium (upload, import, backup, restore, watchlist sync; skipped if Playwright is missing)', 'node', ['tests/imports.js']);
+  console.log('\nOK: import flows');
+  process.exit(0);
+}
 if(!LIVE){ step('build app.js, chunks/ and styles.css from src/ and styles/', 'node', ['tools/build.js']); step('built files are up to date', 'node', ['tools/build.js', '--check']); }
 step('syntax check js/loader.js', 'node', ['--check', 'js/loader.js']);
 { // app.js and chunks/ are ES modules (node --check reads .js as CommonJS), so parse them as modules
@@ -30,7 +39,7 @@ step('browser smoke test (Chromium; skipped if Playwright is missing)', 'node', 
 step('state tests in Chromium (pins, Trade Log; skipped if Playwright is missing)', 'node', ['tests/state.js']);
 step('live ticker in Chromium (price, MoS, W% CHG, M% CHG; skipped if Playwright is missing)', 'node', ['tests/ticker.js']);
 step('refresh menus, tiers, resume and Analysis counts in Chromium (skipped if Playwright is missing)', 'node', ['tests/refresh.js']);
-step('import flows in Chromium (upload, import, backup, restore, watchlist sync; skipped if Playwright is missing)', 'node', ['tests/imports.js']);
+if(PART !== 'main') step('import flows in Chromium (upload, import, backup, restore, watchlist sync; skipped if Playwright is missing)', 'node', ['tests/imports.js']);
 const now = JSON.parse(fs.readFileSync(path.join(out, '_index.json'), 'utf8'));
 
 // ---- readable differences: the text behind each golden hash is kept (compressed) in tests/golden-text.json.gz, so a mismatch can show

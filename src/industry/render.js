@@ -11,6 +11,7 @@ import { analysisLbCell, analysisRowContext, columnHeaderHtml, stockGridColumnId
 import { industryFactors, industryGlobal, industryNews, industrySeries } from './calc.js';
 import { bindJumpSpy } from '../detail/jumpnav.js';
 import { newsItemHtml } from '../business/newsitem.js';
+import { closestEl } from '../core/evt.js';
 
 const IST = 19800;
 const NEWS_SHOWN = 30;
@@ -59,14 +60,39 @@ function newsHtml(news){
   return `<div class="tech-panel" id="jump-ind-news"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('global')}News timeline</div><span class="completeness-badge complete">${news.length} item${news.length === 1 ? '' : 's'}</span></div>${list}</div>`;
 }
 
+// The stocks grid draws ROW_STEP rows at first and ROW_STEP more each time "Show more" is pressed (a big industry would otherwise be slow to draw).
+const ROW_STEP = 300;
+const stocksCols = () => stockGridColumnIds().filter(id => id !== 'industry');
+const byScore = (members) => members.slice().sort((a, b) => (b.score || 0) - (a.score || 0));
+const stockRowsHtml = (sorted, cols, from, to) => sorted.slice(from, to).map((s, k) => {
+  const idx = stockIndex.get(s), ctx = analysisRowContext(s, from + k, idx);
+  return `<tr class="strat-row" data-idx="${idx}" tabindex="0">${cols.map(id => analysisLbCell(id, ctx)).join('')}</tr>`;
+}).join('');
+const stocksMoreHtml = (shown, total) => total > shown ? `Showing the first ${shown} of ${total}. <button type="button" class="analysis-reset-btn" data-ind-more="1">Show ${Math.min(ROW_STEP, total - shown)} more</button>` : '';
 function stocksHtml(members){
-  const cols = stockGridColumnIds().filter(id => id !== 'industry');
-  const rows = members.slice().sort((a, b) => (b.score || 0) - (a.score || 0)).map((s, k) => {
-    const idx = stockIndex.get(s), ctx = analysisRowContext(s, k, idx);
-    return `<tr class="strat-row" data-idx="${idx}" tabindex="0">${cols.map(id => analysisLbCell(id, ctx)).join('')}</tr>`;
-  }).join('');
+  const cols = stocksCols(), sorted = byScore(members);
   return `<div class="tech-panel" id="jump-ind-stocks"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('peers')}Stocks</div><span class="completeness-badge complete">${members.length}</span></div>
-    <div class="peers-scroll strat-table-wrap"><table class="strat-table peers-table"><thead><tr>${cols.map(columnHeaderHtml).join('')}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    <div class="peers-scroll strat-table-wrap"><table class="strat-table peers-table"><thead><tr>${cols.map(columnHeaderHtml).join('')}</tr></thead><tbody>${stockRowsHtml(sorted, cols, 0, ROW_STEP)}</tbody></table></div>${members.length > ROW_STEP ? `<div class="strat-empty ind-stocks-more">${stocksMoreHtml(ROW_STEP, members.length)}</div>` : ''}</div>`;
+}
+// Opens a stock from a row (one listener on the panel, so rows added by "Show more" work too) and adds rows on "Show more".
+function wireStocks(members, openStock){
+  const panel = detailEl.querySelector('#jump-ind-stocks'); if(!panel) return;
+  const sorted = byScore(members), cols = stocksCols(), body = panel.querySelector('tbody'), more = panel.querySelector('.ind-stocks-more');
+  let shown = Math.min(ROW_STEP, sorted.length);
+  const open = (tr) => openStock(Number(/** @type {HTMLElement} */ (tr).dataset.idx));
+  panel.addEventListener('click', (e) => {
+    if(closestEl(e, '[data-ind-more]')){
+      body.insertAdjacentHTML('beforeend', stockRowsHtml(sorted, cols, shown, shown + ROW_STEP));
+      shown = Math.min(shown + ROW_STEP, sorted.length);
+      if(more) more.innerHTML = stocksMoreHtml(shown, sorted.length);
+      return;
+    }
+    const tr = closestEl(e, 'tr.strat-row[data-idx]'); if(tr) open(tr);
+  });
+  panel.addEventListener('keydown', (e) => {
+    if(/** @type {KeyboardEvent} */ (e).key !== 'Enter') return;
+    const tr = closestEl(e, 'tr.strat-row[data-idx]'); if(tr) open(tr);
+  });
 }
 
 // ---- Weekly / monthly average % change charts, with news, results and company events as tags under the bars ----
@@ -186,11 +212,7 @@ function renderIndustryDetail(by, name, backLabel, openStock){
     const el = document.getElementById(/** @type {HTMLElement} */ (a).dataset.jump);
     if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
-  detailEl.querySelectorAll('tr.strat-row[data-idx]').forEach(tr => {
-    const open = () => openStock(Number(/** @type {HTMLElement} */ (tr).dataset.idx));
-    tr.addEventListener('click', open);
-    tr.addEventListener('keydown', (e) => { if(/** @type {KeyboardEvent} */ (e).key === 'Enter') open(); });
-  });
+  wireStocks(members, openStock);
   initCharts(members, events);
 }
 

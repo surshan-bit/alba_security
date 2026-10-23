@@ -164,7 +164,7 @@
   :root[data-theme="white"] #detail .detail-jump .detail-jump-who.is-current .detail-jump-name,:root[data-theme="white"] #detail .detail-jump a.is-current{color:var(--accent);}
   :root[data-theme="white"] #detail .detail-jump a.is-current{border-bottom-color:var(--accent);}
 }
-/* Wordmark: lowercase rounded geometric type (Quicksand, loaded in index.html) with the bar-chart mark in front, like the Screener logo. */
+/* Wordmark: lowercase rounded geometric type (Quicksand, added by src/ui/theme.js when White is in use) with the bar-chart mark in front, like the Screener logo. */
 :root[data-theme="white"] .topbar-brand{font-family:"Quicksand","Nunito","Varela Round",-apple-system,"Segoe UI",sans-serif;text-transform:lowercase;font-weight:700;letter-spacing:-.01em;}
 @media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:2.2rem;line-height:1;}}
 /* Strategies list (left): same type as the Analysis filter list: size, weight, spacing and count badges. */
