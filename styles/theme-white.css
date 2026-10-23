@@ -398,3 +398,9 @@
   /* Page background and gutters */
   :root[data-theme="white"] .wrap{padding-left:10px;padding-right:10px;}
 }
+/* Logo at 80% of its size (wide screens): wordmark 2.2rem -> 1.76rem, mark 34px -> 27px; the menu moves left to follow. */
+@media (min-width:901px){
+  :root[data-theme="white"] .topbar-brand{font-size:1.76rem;gap:8px;}
+  :root[data-theme="white"] .topbar-brand::before{width:27px;height:27px;}
+}
+@media (min-width:1400px){:root[data-theme="white"] .sidebar{left:278px;}}
