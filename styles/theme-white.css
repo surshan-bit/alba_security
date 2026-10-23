@@ -452,3 +452,12 @@
   :root[data-theme="white"] #section-business .biz-toolbar .biz-match-toggle{margin-right:100%;}
   :root[data-theme="white"] #section-business .biz-toolbar :is(.biz-expand,.rk-bar){flex:1 1 0;}
 }
+/* Phones: the toolbar button text shrinks with the screen width so a label never spills over its button. */
+@media (max-width:900px){
+  :root[data-theme="white"] :is(.analysis-reset-btn,.strat-btn,.biz-expand,.refresh-btn,.rk-main,#section-business .biz-toolbar .rk-btn){font-size:clamp(.54rem,2.55vw,.68rem);letter-spacing:.01em;padding:0 4px;gap:2px;overflow:hidden;}
+}
+/* Very narrow phones (320px class): four labels cannot fit on one line, so they wrap to two rows instead of shrinking further. */
+@media (max-width:340px){
+  :root[data-theme="white"] div:has(> .analysis-reset-btn){flex-wrap:wrap;}
+  :root[data-theme="white"] div:has(> .analysis-reset-btn) > :is(.analysis-reset-btn,.rk-bar){flex:1 1 40%;}
+}
