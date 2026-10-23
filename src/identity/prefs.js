@@ -9,9 +9,9 @@ function prefsObject(){
   for(const k of Object.keys(PREF_FIELDS)){
     const [field, kind] = PREF_FIELDS[k];
     let raw = null;
-    try { raw = localStorage.getItem(k); } catch(e){}
+    try { raw = localStorage.getItem(k); } catch(e){ /* storage unavailable: no saved value */ }
     if(raw == null) continue;
-    try { o[field] = kind === 'json' ? JSON.parse(raw) : raw; } catch(e){}
+    try { o[field] = kind === 'json' ? JSON.parse(raw) : raw; } catch(e){ /* a saved value that does not parse is ignored */ }
   }
   return o;
 }
@@ -63,13 +63,13 @@ async function syncPrefs(){
     const prev = localStorage.getItem(PREFS_OWNER_KEY);
     if(prev && prev !== getUid()){ for(const k of Object.keys(PREF_FIELDS)) localStorage.removeItem(k); localStorage.removeItem(PREFS_LOCAL_AT_KEY); localStorage.removeItem(STRAT_KEY); localStorage.removeItem(STRAT_AT_KEY); }  // another person used this browser
     localStorage.setItem(PREFS_OWNER_KEY, getUid());
-  } catch(e){}
+  } catch(e){ /* storage unavailable: nothing to compare with */ }
   try {
     const snap = await ref.get();
     const d = snap && snap.exists ? snap.data() : null;
     // If this browser holds a newer change than the saved record (the page was refreshed before the save finished),
     // keep the browser's copy and send it to the database instead of overwriting it with the older one.
-    let localAt = 0; try { localAt = Date.parse(localStorage.getItem(PREFS_LOCAL_AT_KEY)) || 0; } catch(e){}
+    let localAt = 0; try { localAt = Date.parse(localStorage.getItem(PREFS_LOCAL_AT_KEY)) || 0; } catch(e){ /* storage unavailable: counts as never saved here */ }
     const dbAt = d ? (Date.parse(d.updatedAt) || 0) : 0;
     if(d && localAt > dbAt){
       const o = prefsObject(); o.updatedAt = new Date().toISOString();
@@ -81,7 +81,7 @@ async function syncPrefs(){
       for(const k of Object.keys(PREF_FIELDS)){
         const [field, kind] = PREF_FIELDS[k];
         if(d[field] === undefined) continue;
-        try { localStorage.setItem(k, kind === 'json' ? JSON.stringify(d[field]) : String(d[field])); } catch(e){}
+        try { localStorage.setItem(k, kind === 'json' ? JSON.stringify(d[field]) : String(d[field])); } catch(e){ /* storage unavailable: the copy in the database still applies */ }
       }
       if(d.theme === 'light' || d.theme === 'indigo' || d.theme === 'white' || d.theme === 'dark') document.documentElement.setAttribute('data-theme', d.theme);
     } else {

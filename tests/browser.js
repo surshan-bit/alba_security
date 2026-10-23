@@ -338,6 +338,21 @@ async function rowCapTests(browser){
   ok(await rows('#stratResults .strat-row') === 300, 'row cap: Strategies draws 300 rows first');
   await page.locator('[data-strat-more]').click(); await page.waitForTimeout(300);
   ok(await rows('#stratResults .strat-row') === 600, 'row cap: Show more adds 300 Strategies rows');
+  // Explorer: opening and closing an industry changes only that row (the rest of the table is not redrawn)
+  await goto(page, 'business'); await page.waitForSelector('.biz-row', { timeout: 5000 });
+  const tog = await page.evaluate(async () => {
+    const r = Array.from(document.querySelectorAll('.biz-row')), keep = r[r.length - 1]; keep.dataset.keep = '1';
+    r[0].click(); await new Promise(x => setTimeout(x, 50));
+    const opened = !!(r[0].nextElementSibling && r[0].nextElementSibling.classList.contains('biz-detail')) && r[0].classList.contains('open') && r[0].getAttribute('aria-expanded') === 'true';
+    const survived = document.querySelector('.biz-row[data-keep="1"]') === keep;   // the same element: the table was not rebuilt
+    const label = document.querySelector('[data-biz-all]').textContent;
+    r[0].click(); await new Promise(x => setTimeout(x, 50));
+    const closed = !(r[0].nextElementSibling && r[0].nextElementSibling.classList.contains('biz-detail')) && !r[0].classList.contains('open') && r[0].getAttribute('aria-expanded') === 'false';
+    return { opened, survived, closed, label };
+  });
+  ok(tog.opened && tog.closed, 'explorer toggle: a row opens its detail and closes it again, ' + JSON.stringify(tog));
+  ok(tog.survived, 'explorer toggle: opening a row does not redraw the other rows');
+  ok(tog.label === 'Expand all' || tog.label === 'Collapse all', 'explorer toggle: the Expand all button keeps a label');
   // an industry page with more than 300 stocks: 300 rows first, 300 more on request, and a row still opens its stock
   await goto(page, 'business'); await page.waitForSelector('.biz-row', { timeout: 5000 });
   const big = await page.evaluate(() => { const n = {}; window.__alba.stocks.forEach(s => { const k = (s.ticker.split('\u00b7')[1] || '').trim(); n[k] = (n[k] || 0) + 1; }); const top = Object.entries(n).sort((a, b) => b[1] - a[1])[0]; return { name: top[0], count: top[1] }; });
@@ -352,10 +367,54 @@ async function rowCapTests(browser){
   await page.close(); await ctx.close();
 }
 
+// ---------------------------------------------------------------- 5. text saved with a stock is never drawn as markup
+async function escapeTests(browser){
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const { page, errs } = await openPage(ctx, {}, 'escape');
+  await appReady(page); await page.waitForTimeout(500);
+  const code = FIXTURE[3].ticker.split('\u00b7')[0].trim();
+  await page.evaluate(c => {   // what Claude (or another tool) could have saved with the stock: text with markup in it
+    const bad = '<img src=x data-evil=1 onerror="window.__evil=1">';
+    const s = window.__alba.stocks.find(x => x.ticker.split('\u00b7')[0].trim() === c);
+    s.__fundSummary = { strengths: [{ text: bad + ' steady & strong', tone: 'strong' }], watchouts: [{ text: '<script>window.__evil=2</script>', tone: 'concern' }] };
+    s.globalFactors = { positive: [{ text: bad + ' tailwind', source: 'Src' }], negative: [{ text: 'risk' }], events: [{ impact: 'negative', headline: bad, why: bad, source: 'Src' }] };
+    location.hash = c;
+  }, code);
+  await page.waitForSelector('#detail .detail-name', { timeout: 5000 });
+  const r = await page.evaluate(() => ({ imgs: document.querySelectorAll('#detail [data-evil]').length, scripts: document.querySelectorAll('#detail script').length, evil: window.__evil || 0, summary: (document.querySelector('#detail .fund-overall-summary') || {}).textContent || '', global: (document.querySelector('#jump-global') || {}).textContent || '' }));
+  ok(r.imgs === 0 && r.scripts === 0 && !r.evil, 'escaping: saved text drew markup on the stock page: ' + JSON.stringify({ imgs: r.imgs, scripts: r.scripts, evil: r.evil }));
+  ok(r.summary.includes('<img src=x') && r.summary.includes('steady & strong'), 'escaping: Strengths / Watch-outs show the text as written, got: ' + r.summary.slice(0, 120));
+  ok(r.global.includes('tailwind') && r.global.includes('<img src=x'), 'escaping: Global & Macro shows the text as written');
+  ok(errs.length === 0, 'escaping: console errors: ' + errs.slice(0, 3).join(' | '));
+  await page.close(); await ctx.close();
+}
+
+// ---------------------------------------------------------------- 6. errors on the page are recorded
+async function errorLogTests(browser){
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const { page } = await openPage(ctx, {}, 'errorlog');   // (the two errors below are on purpose, so the console is not checked here)
+  await appReady(page); await page.waitForTimeout(500);
+  await page.evaluate(() => {
+    const boom = () => { throw new Error('boom one'); };
+    setTimeout(boom, 0);
+    Promise.reject(new Error('boom two'));
+    setTimeout(boom, 20);   // the same error from the same place again: recorded once
+    setTimeout(() => { throw new Error('ResizeObserver loop completed with undelivered notifications.'); }, 40);   // browser noise: ignored
+  });
+  await page.waitForTimeout(3800);
+  const rec = await page.evaluate(() => window.__store.get('data/users/u_SMOKE/clientErrors'));
+  const msgs = rec && rec.errors ? rec.errors.map(e => e.msg) : [];
+  ok(msgs.length === 2 && msgs.some(m => /boom one/.test(m)) && msgs.some(m => /boom two/.test(m)), 'error log: expected the two different errors once each, got ' + JSON.stringify(msgs));
+  ok(rec && rec.errors[0].page && rec.errors[0].version && rec.errors[0].when, 'error log: each entry says when, on which page and in which version');
+  await page.click('#activityBell'); await page.waitForTimeout(200);
+  ok(/Something went wrong on this page/.test(await page.locator('#activityPanel').innerText()), 'error log: the bell shows a notice');
+  await page.close(); await ctx.close();
+}
+
 (async () => {
   base = await srv.listen();
   const browser = await chromium.launch();
-  try { await bootTests(browser); await markupNameTests(browser); await businessTests(browser); await layoutTests(browser); await rowCapTests(browser); }
+  try { await bootTests(browser); await markupNameTests(browser); await businessTests(browser); await layoutTests(browser); await rowCapTests(browser); await escapeTests(browser); await errorLogTests(browser); }
   finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('browser smoke test FAILED (' + problems.length + ' of ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('browser smoke test: ' + checks + ' checks passed');

@@ -2,7 +2,7 @@
 // their Global & Macro notes, weekly / monthly average % change charts with news tags, the combined news timeline and the stocks.
 import { detailEl } from '../core/dom.js';
 import { stockIndex, stocks, verdictLabel } from '../core/stocks.js';
-import { escapeHtml, tickerIndustry } from '../core/util.js';
+import { escapeHtml, safeText, tickerIndustry } from '../core/util.js';
 import { panelIcon } from '../detail/icons.js';
 import { scoreBand } from '../list/metrics.js';
 import { ensureAllPriceBars, pcTickerKey, priceHistoryByTicker } from '../prices/store.js';
@@ -45,7 +45,7 @@ function globalHtml(g){
   const item = (f) => {
     const src = f.source ? `<span class="global-item-source">Source: ${/^https?:\/\//i.test(f.url) ? `<a href="${escapeHtml(f.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(f.source)} ↗</a>` : escapeHtml(f.source)}</span>` : '';
     const who = f.stocks.length > 1 ? `<span class="global-item-source">Applies to ${f.stocks.length} stocks: ${escapeHtml(f.stocks.slice(0, 4).join(', '))}${f.stocks.length > 4 ? ', …' : ''}</span>` : `<span class="global-item-source">${escapeHtml(f.stocks[0])}</span>`;
-    return `<li class="global-item">${f.text}${who}${src}</li>`;
+    return `<li class="global-item">${safeText(f.text)}${who}${src}</li>`;
   };
   const col = (cls, title, list) => `<div class="global-col"><div class="global-col-title ${cls}">${title}</div><ul class="global-list">${list.length ? list.slice(0, 8).map(item).join('') : '<li class="global-item">None identified.</li>'}</ul>${list.length > 8 ? `<p class="upload-hint">Showing 8 of ${list.length}.</p>` : ''}</div>`;
   const head = `<div class="global-panel-head"><div class="global-panel-title">${panelIcon('global')}Global &amp; Macro Information</div></div>`;

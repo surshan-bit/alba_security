@@ -28,9 +28,9 @@ async function ldEnsureClaudeAccess(){
   const perms = (typeof claude !== 'undefined' && claude && typeof claude.use === 'function') ? await claude.use('permissions').catch(() => null) : null;
   if(!perms) return;
   let st = null;
-  try { st = await perms.state('sample'); } catch(e){}
+  try { st = await perms.state('sample'); } catch(e){ /* permission state unknown: asked for below */ }
   if(st == null || st === 'granted' || st === 'unavailable') return;
-  try { await perms.request(['sample']); } catch(e){}
+  try { await perms.request(['sample']); } catch(e){ /* the person can still allow it from the page */ }
 }
 
 // Asks Claude for one JSON value. Works with the current call style, sample(prompt, options), and falls back to the older

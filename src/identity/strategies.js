@@ -32,9 +32,9 @@ async function syncStrategies(){
     const snap = await ref.get();
     const d = snap && snap.exists ? snap.data() : null;
     let local = null, localAt = 0;
-    try { local = localStorage.getItem(STRAT_KEY); localAt = Date.parse(localStorage.getItem(STRAT_AT_KEY)) || 0; } catch(e){}
+    try { local = localStorage.getItem(STRAT_KEY); localAt = Date.parse(localStorage.getItem(STRAT_AT_KEY)) || 0; } catch(e){ /* storage unavailable: the database copy is used */ }
     if(d && typeof d.json === 'string' && !(local && localAt > (Date.parse(d.updatedAt) || 0))){
-      try { localStorage.setItem(STRAT_KEY, d.json); } catch(e){}
+      try { localStorage.setItem(STRAT_KEY, d.json); } catch(e){ /* storage unavailable: the database copy still applies */ }
       window.dispatchEvent(new Event('alba-strategies-synced'));
     } else if(local){
       await ref.set({ v: 1, json: local, updatedAt: new Date().toISOString() });   // first visit with this feature, or a newer change not yet saved

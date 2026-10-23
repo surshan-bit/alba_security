@@ -20,13 +20,13 @@ function stockCodeFromHash(){
     }catch(e){ return ''; }
   };
   let code = read(window.location);
-  if(!code){ try{ if(window.top && window.top !== window) code = read(window.top.location); }catch(e){} }
+  if(!code){ try{ if(window.top && window.top !== window) code = read(window.top.location); }catch(e){ /* a parent page on another site cannot be read */ } }
   return String(code || '').trim();
 }
 // The page address does not always reach the page (it runs inside the artifact frame), so a link opened in a new tab also
 // leaves a short-lived note in this site's storage, which the new tab reads once at start-up.
 const HANDOFF_KEY = 'alba.openStock', HANDOFF_TTL_MS = 30000, bootId = Math.random().toString(36).slice(2);
-function leaveHandoff(code){ try{ localStorage.setItem(HANDOFF_KEY, JSON.stringify({ code, from: bootId, at: Date.now() })); }catch(e){} }
+function leaveHandoff(code){ try{ localStorage.setItem(HANDOFF_KEY, JSON.stringify({ code, from: bootId, at: Date.now() })); }catch(e){ /* storage unavailable: no hand-off */ } }
 let launchHandoff;
 function takeHandoff(){
   if(launchHandoff !== undefined) return launchHandoff;
@@ -34,7 +34,7 @@ function takeHandoff(){
   try{
     const n = JSON.parse(localStorage.getItem(HANDOFF_KEY) || 'null');
     if(n && n.from !== bootId && Date.now() - n.at < HANDOFF_TTL_MS){ launchHandoff = String(n.code || ''); localStorage.removeItem(HANDOFF_KEY); }
-  }catch(e){}
+  }catch(e){ /* an unreadable hand-off is ignored */ }
   return launchHandoff;
 }
 // A link's code stays in the address (of this page or of the page around it) after the stock is closed, so a refresh would
@@ -42,7 +42,7 @@ function takeHandoff(){
 // a refresh ignores it and returns to the page you were last on.
 const USED_KEY = 'alba.usedStockCode';
 function codeUsed(code){ try{ return window.sessionStorage.getItem(USED_KEY) === code; }catch(e){ return false; } }
-function markCodeUsed(code){ try{ window.sessionStorage.setItem(USED_KEY, code); }catch(e){} }
+function markCodeUsed(code){ try{ window.sessionStorage.setItem(USED_KEY, code); }catch(e){ /* storage unavailable: the code may be used again */ } }
 let launchCode;
 function stockCodeFromAddress(){
   if(launchCode !== undefined) return launchCode;
@@ -69,10 +69,10 @@ function stockShareLink(s){ return ARTIFACT_BASE_URL + '#' + encodeURIComponent(
 // Puts the open stock's code in the address bar; with no stock, clears it.
 function syncStockHash(s){
   if(s) markCodeUsed(tickerSymbol(s));
-  try{ if(window.history && history.replaceState) history.replaceState(history.state, '', s ? '#' + encodeURIComponent(tickerSymbol(s)) : location.pathname + location.search); }catch(e){}
+  try{ if(window.history && history.replaceState) history.replaceState(history.state, '', s ? '#' + encodeURIComponent(tickerSymbol(s)) : location.pathname + location.search); }catch(e){ /* the address bar cannot be changed here */ }
 }
 function copyText(text){
-  try{ if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text); }catch(e){}
+  try{ if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text); }catch(e){ /* no clipboard access: falls back below */ }
   return new Promise((resolve, reject) => {
     try{
       const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';

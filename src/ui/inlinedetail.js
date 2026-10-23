@@ -33,9 +33,9 @@ function inlineOpenIn(){ return current ? current.section.id.replace(/^section-/
 // claude.ai bar above), take it back and put the focus on the Back button, which is also what Esc and Enter then act on.
 function takeKeyboardFocus(){
   const grab = () => {
-    try { if(!document.hasFocus()) window.focus(); } catch(e){}
+    try { if(!document.hasFocus()) window.focus(); } catch(e){ /* focus is only a convenience */ }
     const b = document.getElementById('detailBackBtn');
-    if(b && document.activeElement !== b){ try { b.focus({ preventScroll: true }); } catch(e){} }
+    if(b && document.activeElement !== b){ try { b.focus({ preventScroll: true }); } catch(e){ /* focus is only a convenience */ } }
   };
   grab(); setTimeout(grab, 60); setTimeout(grab, 400);
 }

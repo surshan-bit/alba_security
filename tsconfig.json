@@ -11,7 +11,7 @@
       "DOM",
       "DOM.Iterable"
     ],
-    "strict": false,
+    "strict": true,
     "noImplicitAny": false,
     "skipLibCheck": true
   },

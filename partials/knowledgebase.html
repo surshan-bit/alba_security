@@ -47,13 +47,16 @@
           <tr><td><code>business/newsitem.js</code></td><td>One headline row, used by the Explorer industry list and the industry page's news timeline.</td></tr>
           <tr><td><code>live/ticker.js</code></td><td>Live prices: while the market is open, the open stock first and then the rows on screen (up to 50, in grid order) refresh every 20 seconds, with W % chg and M % chg measured against last week's and last month's close read from TradingView's weekly and monthly bars. The Live switch is in the top bar on every screen size.</td></tr>
           <tr><td><code>ui/fullscreen.js</code></td><td>Full screen for the big grids: the button label, the browser's own full screen and Esc handling, shared by Analysis and Explorer.</td></tr>
+          <tr><td><code>ui/errorlog.js</code></td><td>Errors on the page: each new one (once per page, at most 30) goes into the viewer's private <code>clientErrors</code> record, and the first of a visit puts a notice in the bell. Saving is best effort and never raises an error of its own.</td></tr>
           <tr><td><code>ui/activity.js</code></td><td>The notification bell: running refreshes and finished notices.</td></tr>
           <tr><td><code>styles/phone.css</code></td><td>Everything phone-specific (up to 600px) in one file, loaded last, with its sizes as three variables at the top (<code>--ph-ctl</code>, <code>--ph-gap</code>, <code>--ph-fs</code>).</td></tr>
         </tbody>
       </table></div>
       <h3>Rules the code follows</h3>
       <ul>
-        <li>Imports are explicit; a module cannot assign to another module's variable; start-up code lives in <code>init_*()</code> functions called from <code>src/main.js</code>; unused code fails the lint.</li>
+        <li>Imports are explicit; a module cannot assign to another module's variable; start-up code lives in <code>init_*()</code> functions called from <code>src/main.js</code>; unused code fails the lint; an empty <code>catch</code> block must say in a comment why the error can be ignored.</li>
+        <li>Text that Claude or another tool saved with a stock is drawn as plain text (<code>escapeHtml</code>, or <code>safeText</code> for text that is saved already escaped), never as markup.</li>
+        <li>The type check runs with strict null and function checks on (implicit <code>any</code> stays off). Findings that existed when this was switched on are listed in <code>tests/types.baseline.txt</code>; a new one fails the check.</li>
         <li>Screens share behaviour through the modules above rather than copies, so a change to refresh batches, full screen or the phone layout is made once.</li>
         <li>Tests: engine unit tests (CSV engines and refresh batches), a jsdom regression harness compared with stored snapshots, and five Chromium suites (smoke and layout including phone sizes and the Show more grids, state, live ticker, refresh menus, imports).</li>
       </ul>
@@ -189,7 +192,7 @@
         <thead><tr><th>Collection / doc</th><th>Holds</th></tr></thead>
         <tbody>
           <tr><td>users/&lt;id&gt;</td><td>One small record per signed-in user (id, first and last seen). Ids only, no names or emails. Readable by editors only.</td></tr>
-          <tr><td>data/users/&lt;id&gt;/prefs, pins, portfolio/trades</td><td>Each user's private preferences (theme, Analysis filters and sort, Trade Log view), pinned tickers and Trade Log. Nobody else can read these, not even the owner.</td></tr>
+          <tr><td>data/users/&lt;id&gt;/prefs, pins, portfolio/trades, clientErrors</td><td>Each user's private preferences (theme, Analysis filters and sort, Trade Log view), pinned tickers and Trade Log, and the last 20 errors that happened on that user's pages. Nobody else can read these, not even the owner.</td></tr>
           <tr><td>refreshRequests</td><td>Pending manual "Request refresh" tickers, cleared once processed.</td></tr>
           <tr><td>deepRefreshLog</td><td>Retired weekend deep-refresh history (kept for the record).</td></tr>
           <tr><td>techFetchLog</td><td>Retired weekday TradingView fetch history (kept for the record).</td></tr>
@@ -226,6 +229,13 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.250 &middot; 2026-10-23</h3>
+            <ul>
+              <li><strong>Safer text.</strong> The Strengths / Watch-outs box and the Global &amp; Macro lists now always show saved text as plain text. Before, text written by Claude from news could carry markup into the page; a test showed an injected script running.</li>
+              <li><strong>Errors are recorded.</strong> If something goes wrong on a page, a notice appears in the bell and the error is saved to your own private record (the last 20), so it can be looked at instead of lost.</li>
+              <li><strong>Explorer.</strong> Opening or closing an industry changes only that row instead of redrawing the whole table, so it is near instant even with thousands of stocks.</li>
+            </ul>
+
             <h3>v1.249 &middot; 2026-10-23</h3>
             <ul>
               <li><strong>Fundamental import.</strong> A stock added by an import now gets its own Industry, not its Industry Group, when the file lists the Industry Group column first.</li>

@@ -61,7 +61,7 @@ function renderFundOverallSummary(s) {
   const li = (x) => {
     const isProxy = x.isProxy;
     if (isProxy) anyProxy = true;
-    return `<li><span class="fund-pc-dot ${x.band}"></span>${x.text}${isProxy ? proxyMark : ''}</li>`;
+    return `<li><span class="fund-pc-dot ${x.band}"></span>${escapeHtml(x.text)}${isProxy ? proxyMark : ''}</li>`;
   };
   const prosHtml = pros.length ? pros.map(li).join('') : '<li class="fund-pc-empty">No standout strengths this run.</li>';
   const consHtml = cons.length ? cons.map(li).join('') : '<li class="fund-pc-empty">No major red flags this run.</li>';

@@ -1,7 +1,7 @@
 // Type check of src/ with TypeScript's checkJs (no annotations needed: it infers from the code and from the DOM types).
 //   node tools/typecheck.js            fails on any error that is not in tests/types.baseline.txt
 //   node tools/typecheck.js --update   rewrites the baseline (review the diff first)
-// The baseline holds today's findings (mostly DOM typing: event.target.closest, element.dataset ... which are not bugs here), so the
+// `strict` is on (null checks, function types) with noImplicitAny off (3,000+ findings, mostly untyped event handlers). The baseline holds today's findings (mostly an element that getElementById may not find, and `catch (e)` being unknown: not bugs here), so the
 // check catches NEW wrong names, wrong argument counts and wrong shapes without forcing a rewrite of working code. Lines numbers are not
 // part of an entry, so editing a file does not make old findings look new.
 const { spawnSync } = require('child_process'), fs = require('fs'), path = require('path');

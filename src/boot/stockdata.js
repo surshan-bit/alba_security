@@ -110,7 +110,7 @@ async function loadStocks(){
           const d = snap && snap.exists ? snap.data() : null;
           if(d && info.version != null && d.version !== info.version) showUpdateBanner();
         }, () => {});
-      } catch(e){}
+      } catch(e){ /* the update banner is optional */ }
     }
   }
   return list;

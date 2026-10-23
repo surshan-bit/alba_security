@@ -3,6 +3,7 @@
 //  2. start-up order: module-level code may only use imports from modules that are evaluated before it
 //  3. no module-level declaration or export is unused                                    (catches dead code)
 //  4. no exported let/var and no set_x exports: shared state goes through accessors / named actions (catches the old pattern)
+//  5. no empty catch block without a comment saying why the error can be ignored                (catches silently swallowed errors)
 // Usage: node tools/lint.js
 const fs = require('fs'), path = require('path');
 const espree = require('espree'), escope = require('eslint-scope'), estraverse = require('estraverse');
@@ -57,6 +58,11 @@ for(const [f, m] of mods){
     if(!importedNames.has(dep)) importedNames.set(dep, new Set());
     n.specifiers.forEach(s => importedNames.get(dep).add(s.imported ? s.imported.name : 'default'));
   }
+}
+// 5. an empty catch block must say why the error can be ignored (a comment inside it), or handle the error
+for(const f of files){
+  const text = fs.readFileSync(f, 'utf8');
+  for(const m of text.matchAll(/catch\s*(\(\w*\))?\s*\{\s*\}/g)) err(rel(f) + ':' + (text.slice(0, m.index).split('\n').length) + ' empty catch block: add a comment saying why the error can be ignored, or handle it');
 }
 for(const [f, m] of mods){
   const isRoot = f === entry || dynTargets.has(f);

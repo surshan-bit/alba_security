@@ -46,7 +46,7 @@ function tvErrorText(e){
   if(c === 'not_in_manifest' || c === 'consent_required') return 'This page is not allowed to use TradingView. Allow it when asked (or in the page permissions) and try again.';
   if(c === 'server_not_connected' || c === 'server_not_found') return 'TradingView is not connected. Add it in claude.ai Settings, Connectors, then try again.';
   if(c === 'needs_reauth') return 'TradingView needs to be reconnected in claude.ai Settings, Connectors.';
-  if(c === 'tool_error') { let m = String(e.message || ''); try { const j = JSON.parse(m); m = j.error || m; } catch(_){} return 'TradingView reported: ' + m.slice(0, 140) + ' (tried 4 times).'; }
+  if(c === 'tool_error') { let m = String(e.message || ''); try { const j = JSON.parse(m); m = j.error || m; } catch(_){ /* the message is not JSON: shown as it is */ } return 'TradingView reported: ' + m.slice(0, 140) + ' (tried 4 times).'; }
   return (e && e.message ? String(e.message) : 'Unknown error').slice(0, 160);
 }
 function tvIstDate(sec){ return new Date(((sec == null ? Date.now() / 1000 : sec) + 19800) * 1000).toISOString().slice(0, 10); }

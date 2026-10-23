@@ -13,7 +13,7 @@ const priceJobHooks = new Map();   // ticker key -> function followed by the Liv
 function priceJobSet(key, state, msg){
   priceJobs.set(key, { state, msg, at: Date.now() });
   const hook = priceJobHooks.get(key);
-  if(typeof hook === 'function'){ try { hook(key, state, msg); } catch(e){} }
+  if(typeof hook === 'function'){ try { hook(key, state, msg); } catch(e){ console.error('A price job listener failed', e); } }
 }
 // lean: the bulk refresh asks only for the bar type that is out of date (weekly every week, monthly once a month): half the TradingView calls,
 // which matters because the connector has a daily call quota.
