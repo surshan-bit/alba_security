@@ -38,7 +38,7 @@ function jobStatusInfo(status, overrides){
 const HISTORY_LIMIT = 3;
 
 // After writing a new record into one of the three Data Refresh history collections
-// (technicalCsvUploadLog, fundamentalCsvUploadLog, watchlistSyncLog), trims that
+// (fundamentalCsvUploadLog, watchlistSyncLog), trims that
 // collection back down to HISTORY_LIMIT documents (most recent first, by sortField) so it never
 // grows without bound — a client-side backstop alongside the on-screen cap in
 // renderJobLogPanel above and the "keep it trimmed" instruction given to

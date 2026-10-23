@@ -4,7 +4,6 @@
 //   scoreHistory/hNN = { v: 1, stocks: { <ticker>: [[yyyymmdd, fundamental, technical, price, engine], ...] } }
 // Points are sorted by date. A score or price that was not known is null. `engine` is SCORE_ENGINE at the time, so
 // the chart can mark where the scoring rules changed (a jump there is the rules, not the company).
-import { dbCapabilityPromise } from '../core/store.js';
 import { round2OrNull, tickerKey } from '../core/util.js';
 
 const SCORE_ENGINE = 3;        // 1 = before v1.171 scoring fixes, 2 = v1.171 onward, 3 = v1.181 onward (live refresh scores completed bars only). Raise it whenever the scoring rules change.
@@ -18,7 +17,6 @@ function bucketOf(key){
 }
 function bucketId(n){ return 'h' + String(n).padStart(2, '0'); }
 function ymdOf(d){ return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
-function ymdToDate(n){ return new Date(Math.floor(n / 10000), Math.floor(n / 100) % 100 - 1, n % 100); }
 function cutoffYmd(todayYmd){ return todayYmd - KEEP_YEARS * 10000; }
 
 // The point to record for a stock as it is now, or null when it has no scores at all.
@@ -68,7 +66,7 @@ async function recordScoreHistory(db, stockList, ymd){
           const next = addPoint(stocks[key], pt);
           if(next){ stocks[key] = next; changed++; }
         }
-        if(changed){ await ref.set({ v: 1, stocks }); out.written++; out.stocks += changed; cache.delete(b); }
+        if(changed){ await ref.set({ v: 1, stocks }); out.written++; out.stocks += changed; }
       }
     };
     await Promise.all(Array.from({ length: 4 }, worker));
@@ -76,25 +74,4 @@ async function recordScoreHistory(db, stockList, ymd){
   return out;
 }
 
-// ---- reading, one bucket at a time, cached for the page session ----
-const cache = new Map();   // bucket number -> Promise of its `stocks` object
-function loadBucket(n){
-  if(!cache.has(n)){
-    cache.set(n, (async () => {
-      const db = await dbCapabilityPromise;
-      if(!db) return {};
-      const snap = await db.doc('scoreHistory/' + bucketId(n)).get();
-      const d = snap && snap.exists ? snap.data() : null;
-      return d && d.stocks ? d.stocks : {};
-    })().catch(e => { cache.delete(n); throw e; }));
-  }
-  return cache.get(n);
-}
-async function loadScoreHistory(s){
-  const key = tickerKey(s);
-  if(!key) return [];
-  const all = await loadBucket(bucketOf(key));
-  return Array.isArray(all[key]) ? all[key] : [];
-}
-
-export { loadScoreHistory, recordScoreHistory, ymdOf, ymdToDate };
+export { recordScoreHistory, ymdOf };

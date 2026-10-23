@@ -1,5 +1,5 @@
 // Live database subscriptions (research, updates, triggers, pins, logs).
-import { attachDb, attachTradeDb, dbCapabilityPromise, fundamentalCsvUploadLog, replacePinnedTickers, replaceTradeLog, technicalCsvUploadLog, watchlistSyncLog } from '../core/store.js';
+import { attachDb, attachTradeDb, dbCapabilityPromise, fundamentalCsvUploadLog, replacePinnedTickers, replaceTradeLog, watchlistSyncLog } from '../core/store.js';
 import { refreshAnalysisSoon } from '../analysis/section.js';
 import { setResearchTriggerKinds, setResearchTriggers } from '../research/status.js';
 import { rerenderDetail } from '../detail/render.js';
@@ -108,8 +108,7 @@ function init_sync_subscriptions(){
   }
 
   // The Data Refresh page's history lists: kept in the store, and the page redrawn if it is loaded.
-  [{ name: 'watchlistSyncLog', log: watchlistSyncLog, label: 'Watchlist sync log' }, { name: 'fundamentalCsvUploadLog', log: fundamentalCsvUploadLog, label: 'Fundamental CSV upload log' },
-    { name: 'technicalCsvUploadLog', log: technicalCsvUploadLog, label: 'Technical CSV upload log' }]
+  [{ name: 'watchlistSyncLog', log: watchlistSyncLog, label: 'Watchlist sync log' }, { name: 'fundamentalCsvUploadLog', log: fundamentalCsvUploadLog, label: 'Fundamental CSV upload log' }]
     .forEach(({ name, log, label }) => watchCollection(name, (docs) => { docs.forEach(d => log.put(d.id, d.data)); renderLoadedPart('refreshlog'); }, label));
 
   try {

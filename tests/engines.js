@@ -1,5 +1,5 @@
 // Unit tests for the CSV import engines (no browser, no database): the fundamental scoring engine + apply step
-// (src/import/fund-engine.js), the technical import engine (src/import/tech-engine.js) and the shared CSV parser.
+// (src/import/fund-engine.js), the technical score engine (src/engine/technical.js) and the shared CSV parser.
 // Usage: node tests/engines.js            run all checks (exit 1 on any failure)
 //        node tests/engines.js --update   also rewrite tests/engines.golden.json (after reviewing why numbers moved)
 // All data here is made up on purpose (symbols like AAA1, values from a fixed pseudo-random sequence).
@@ -12,9 +12,8 @@ const rd = f => fs.readFileSync(path.join(root, f), 'utf8');
 
 const { load } = require('./lib/load.js');
 const F = load('src/import/fund-engine.js', 'export { AlbaFundEngine };');
-const T = load('src/import/tech-engine.js');
 const P = load('src/import/csvparse.js');
-const Fe = F.AlbaFundEngine, Te = T.AlbaTechEngine;
+const Fe = F.AlbaFundEngine;
 
 let passed = 0; const failures = [];
 const pending = [];   // async tests: awaited before the summary
@@ -25,7 +24,7 @@ function test(name, fn){
 const near = (a, b, d = 1e-9) => assert.ok(Math.abs(a - b) <= d, `${a} is not within ${d} of ${b}`);
 const throwsMsg = (fn, re) => assert.throws(fn, e => re.test(e.message));
 
-// =========================================================== CSV parsing: three copies must agree
+// =========================================================== CSV parsing: the shared parser and the fundamental engine's own copy must agree
 const PARSER_CASES = [
   'a,b,c\n1,2,3\n',
   'a,b\r\n1,2\r\n3,4',                                  // CRLF, no trailing newline
@@ -37,12 +36,6 @@ const PARSER_CASES = [
   'a,b\n"unterminated,2\n3,4',                         // unterminated quote swallows the rest (no crash)
   '﻿a,b\n1,2\n',                                  // BOM stays attached to the first header
 ];
-test('csv: the technical engine uses the shared parser (identical rows for tricky inputs)', () => {
-  for(const c of PARSER_CASES){
-    const a = JSON.stringify(P.parseCSV(c)), d = JSON.stringify(Te.parseCSV(c));
-    assert.strictEqual(d, a, 'tech parser differs for ' + JSON.stringify(c));
-  }
-});
 test('csv: quoted commas, escaped quotes, embedded newlines, CRLF, blank rows', () => {
   assert.deepStrictEqual(P.parseCSV(PARSER_CASES[1]), [['a', 'b'], ['1', '2'], ['3', '4']]);
   assert.deepStrictEqual(P.parseCSV(PARSER_CASES[2]), [['a', 'b'], ['x,y', 'he said "hi"']]);
@@ -51,103 +44,6 @@ test('csv: quoted commas, escaped quotes, embedded newlines, CRLF, blank rows', 
   assert.deepStrictEqual(P.parseCSV(PARSER_CASES[5]), [['a', 'b'], ['1', ''], ['', '2']]);
   assert.deepStrictEqual(P.parseCSV(PARSER_CASES[6]), []);
   assert.deepStrictEqual(P.parseCSV(PARSER_CASES[7]), [['a', 'b'], ['unterminated,2\n3,4']]);
-});
-
-// =========================================================== Technical engine
-test('tech toNum: numbers, thousands separators, percent signs, blanks and NaN markers', () => {
-  const t = Te.toNum;
-  assert.strictEqual(t('12.5'), 12.5); assert.strictEqual(t('1,234.5'), 1234.5); assert.strictEqual(t('7%'), 7); assert.strictEqual(t(' -3.2 '), -3.2);
-  for(const v of ['', '  ', 'NaN', 'nan', 'N/A', 'n/a', '-', null, undefined, 'abc']) assert.strictEqual(t(v), null, JSON.stringify(v));
-});
-test('tech symbols: normalisation, hyphen/underscore variants, ticker prefix', () => {
-  assert.strictEqual(Te.normalizeSymbol(' abc '), 'ABC');
-  assert.strictEqual(Te.hyphenVariant('BAJAJ-AUTO'), 'BAJAJ_AUTO'); assert.strictEqual(Te.hyphenVariant('BAJAJ_AUTO'), 'BAJAJ-AUTO'); assert.strictEqual(Te.hyphenVariant('ABC'), null);
-  assert.strictEqual(Te.tickerSymbol('abc · Some Industry'), 'ABC'); assert.strictEqual(Te.tickerSymbol('500112'), '500112');
-});
-
-const ist = (ticker, val) => ({ ticker, pillars: val === undefined ? undefined : { val } });
-
-test('tech columns: every field found by header text, in any order, with TradingView wording', () => {
-  const m = Te.buildColumnMap(TV_HEADER);
-  assert.deepStrictEqual(m, { symbol: 0, weekPctChange: 3, monthPctChange: 4, monthMacdSignal: 6, monthMacdLevel: 5, weekMacdSignal: 8, weekMacdLevel: 7, monthRsi: 9, weekRsi: 10 });
-  const shuffled = TV_HEADER.slice().reverse(), ms = Te.buildColumnMap(shuffled);
-  assert.strictEqual(shuffled[ms.symbol], 'Symbol'); assert.strictEqual(shuffled[ms.weekRsi], 'Relative Strength Index (14) 1 week');
-  assert.ok(/signal/i.test(shuffled[ms.monthMacdSignal]) && /month/i.test(shuffled[ms.monthMacdSignal]) && !/signal/i.test(shuffled[ms.monthMacdLevel]));
-  const short = Te.buildColumnMap(['Symbol', 'RSI 1 month', 'rsi 1 week']);
-  assert.strictEqual(short.monthRsi, 1); assert.strictEqual(short.weekRsi, 2); assert.strictEqual(short.monthMacdLevel, -1);
-});
-
-test('tech score: an inactive stock is not matched or rescored', () => {
-  const csv = tvCsv([['AAA1', 'x', '100', '2.5', '-1', '3', '2', '1', '2', '60', '50']]);
-  const off = Object.assign(ist('AAA1 · Test', 6), { active: false });
-  const r = Te.matchAndScore(csv, [off]);
-  assert.strictEqual(r.matched.length, 0); assert.strictEqual(off.technical, undefined);
-});
-test('tech score: hand-computed composite (all five components present)', () => {
-  // month MACD bullish above zero = 1 -> 2.5; week MACD bearish above zero = 0.5 -> 0.75; month RSI 60 -> 2.0; week RSI 50 -> 1.2; valuation 6/10*2 = 1.2
-  const csv = tvCsv([['AAA1', 'x', '100', '2.5', '-1', '3', '2', '1', '2', '60', '50']]);
-  const r = Te.matchAndScore(csv, [ist('AAA1 · Test', 6)]);
-  assert.strictEqual(r.matched.length, 1); assert.strictEqual(r.matched[0].score, 7.65);
-  assert.deepStrictEqual(r.matched[0].states, { monthMacd: 'bull_above', weekMacd: 'bear_above', monthRsi: 'strong', weekRsi: 'neutral' });
-  assert.strictEqual(r.matched[0].raw.weekPctChange, 2.5); assert.strictEqual(r.matched[0].raw.monthPctChange, -1);
-  assert.deepStrictEqual(r.matched[0].missing, []); assert.deepStrictEqual(r.missingColumns, []);
-});
-test('tech score: MACD states and RSI bands (boundaries included)', () => {
-  const score = (ml, ms, wl, ws, mr, wr, val = 5) => Te.matchAndScore(tvCsv([['Q', '', '', '', '', ml, ms, wl, ws, mr, wr]]), [ist('Q', val)]).matched[0];
-  assert.strictEqual(score(1, 0, 1, 0, 50, 50).states.monthMacd, 'bull_above');
-  assert.strictEqual(score(-1, -2, 1, 0, 50, 50).states.monthMacd, 'bull_below');
-  assert.strictEqual(score(1, 2, 1, 0, 50, 50).states.monthMacd, 'bear_above');
-  assert.strictEqual(score(-2, -1, 1, 0, 50, 50).states.monthMacd, 'bear_below');
-  const zone = r => score(1, 0, 1, 0, r, 50).states.monthRsi;
-  assert.deepStrictEqual([70, 69.99, 55, 54.99, 45, 44.99, 30, 29.99, 0].map(zone), ['overbought', 'strong', 'strong', 'neutral', 'neutral', 'weak', 'weak', 'oversold', 'oversold']);
-  // all-bullish, RSI 60/60, valuation 10 -> every component at its maximum except overbought-penalty none: (2.5+1.5+2+2+2)/10*10
-  assert.strictEqual(score(1, 0, 1, 0, 60, 60, 10).score, 10);
-  assert.strictEqual(score(-2, -1, -2, -1, 10, 10, 0).score, 0);
-});
-test('tech score: a missing component is dropped and the rest are rescaled', () => {
-  // week RSI blank: points 2.5 + 0.75 + 2.0 + 1.2 (val 6) = 6.45 over weight 8 -> 8.0625 -> 8.06
-  const csv = tvCsv([['AAA1', '', '', '', '', '3', '2', '1', '2', '60', '']]);
-  const r = Te.matchAndScore(csv, [ist('AAA1', 6)]).matched[0];
-  assert.strictEqual(r.score, 8.06); assert.deepStrictEqual(r.missing, ['weekly RSI']); assert.strictEqual(r.states.weekRsi, null);
-  // no indicators at all: only the valuation anchor would be left, which would copy the valuation score as a technical score, so the stock is not scored
-  const bare = Te.matchAndScore(tvCsv([['AAA1', '', '', '', '', '', '', '', '', '', '']]), [ist('AAA1', 6)]);
-  assert.strictEqual(bare.matched.length, 0); assert.strictEqual(bare.frozen.length, 1); assert.ok(/no technical indicators/.test(bare.frozen[0].reason));
-  assert.deepStrictEqual(bare.unmatchedCsvSymbols, []);
-  // one indicator is enough to score (weekly RSI 60 = 2.0 points, valuation 6 -> 1.2, over weight 4)
-  const one = Te.matchAndScore(tvCsv([['AAA1', '', '', '', '', '', '', '', '', '', '60']]), [ist('AAA1', 6)]).matched[0];
-  assert.strictEqual(one.score, 8); assert.strictEqual(one.missing.length, 3);
-});
-test('tech matching: BSE number via alpha map, hyphen/underscore variants, case, unmatched rows', () => {
-  const csv = tvCsv([['ABC', '', '', '', '', '3', '2', '1', '0', '60', '60'], ['BAJAJ_AUTO', '', '', '', '', '3', '2', '1', '0', '60', '60'], ['zzz', '', '', '', '', '3', '2', '1', '0', '60', '60'], ['LONE', '', '', '', '', '', '', '', '', '', '']]);
-  const stocks = [ist('500001 · Ind', 5), ist('BAJAJ-AUTO · Ind', 5), ist('ZZZ · Ind', 5), ist('NOPE · Ind', 5)];
-  const r = Te.matchAndScore(csv, stocks, { '500001': 'NSE:ABC' });
-  assert.deepStrictEqual(r.matched.map(m => m.matchedSymbol), ['ABC', 'BAJAJ-AUTO', 'ZZZ']);   // the file's BAJAJ_AUTO row is indexed under both spellings
-  assert.deepStrictEqual(r.unmatchedCsvSymbols, ['LONE']);
-  assert.strictEqual(r.matched.find(m => m.stock.ticker.startsWith('NOPE')), undefined);
-  // an alpha map entry without an exchange prefix works too, and a numeric ticker with no map entry is simply not matched
-  assert.strictEqual(Te.matchAndScore(csv, [ist('500001', 5)], { '500001': 'ABC' }).matched.length, 1);
-  assert.strictEqual(Te.matchAndScore(csv, [ist('500001', 5)], { '500001': 'nse: abc ' }).matched.length, 1);   // case and spaces in the map are tolerated
-  assert.strictEqual(Te.matchAndScore(csv, [ist('500001', 5)]).matched.length, 0);
-});
-test('tech matching: a stock without a valuation anchor is frozen, not scored', () => {
-  const csv = tvCsv([['AAA1', '', '', '', '', '3', '2', '1', '0', '60', '60']]);
-  const r = Te.matchAndScore(csv, [ist('AAA1 · T'), { ticker: 'AAA1 · T', pillars: {} }]);
-  assert.strictEqual(r.matched.length, 0); assert.strictEqual(r.frozen.length, 2); assert.ok(/pillars\.val missing/.test(r.frozen[0].reason));
-  assert.deepStrictEqual(r.unmatchedCsvSymbols, []);   // the row was used, just not scoreable
-});
-test('tech: bad files are rejected with a clear message and missing columns are reported', () => {
-  throwsMsg(() => Te.matchAndScore('', []), /No data rows/);
-  throwsMsg(() => Te.matchAndScore('Symbol\n', []), /No data rows/);
-  throwsMsg(() => Te.matchAndScore('Ticker,Price\nABC,1\n', []), /"Symbol" column/);
-  const r = Te.matchAndScore('Symbol,RSI 1 month\nAAA1,55\n', [ist('AAA1', 5)]);
-  assert.deepStrictEqual(r.missingColumns, ['weekPctChange', 'monthPctChange', 'monthMacdSignal', 'monthMacdLevel', 'weekMacdSignal', 'weekMacdLevel', 'weekRsi']);
-  assert.strictEqual(r.matched[0].score, Math.round(((2.0 + 1.0) / 4) * 10 * 100) / 100);   // month RSI 55 = 2.0, valuation 5 -> 1.0, weights 4
-});
-test('tech: duplicate symbols in the file, thousands separators and percent signs do not break scoring', () => {
-  const csv = tvCsv([['AAA1', '', '', '1.5%', '2,000.5', '3', '2', '1', '0', '60', '60'], ['AAA1', '', '', '', '', '-3', '2', '-1', '0', '20', '20']]);
-  const r = Te.matchAndScore(csv, [ist('AAA1', 5)]);
-  assert.strictEqual(r.matched.length, 1);                 // the last row for a symbol wins, exactly one result per stock
-  assert.strictEqual(r.matched[0].states.monthRsi, 'oversold');
 });
 
 // =========================================================== Fundamental engine
@@ -528,9 +424,9 @@ test('fix: a flat price series has no RSI (not 100)', () => {
   assert.strictEqual(TECH.computeTechnical(flat, flat, 5, '2026-10-14').raw.weekRsi, null);
   assert.strictEqual(TECH.computeTechnical(rising, rising, 5, '2026-10-14').raw.weekRsi, 100);
 });
-test('fix: both technical paths call a 4/10 valuation "fully valued"', () => {
-  const TECH = load('src/engine/technical.js');
-  assert.strictEqual(TECH.techValLabel(4), 'fully valued'); assert.strictEqual(TECH.techValLabel(3.9), 'expensive / stretched valuation');
+test('fix: a 4/10 valuation is called "fully valued"', () => {
+  const TECH = load('src/engine/technical.js', 'export { techValLabel as valLabel };');
+  assert.strictEqual(TECH.valLabel(4), 'fully valued'); assert.strictEqual(TECH.valLabel(3.9), 'expensive / stretched valuation');
 });
 
 // ---- v1.181: one set of scoring rules and completed bars only ----
@@ -561,20 +457,13 @@ test('v1.181: a weekly bar counts as finished from Saturday, a monthly bar from 
   const nov = TECH.computeTechnical(W, M, 5, '2026-11-02');
   assert.deepStrictEqual(nov.basis, { week: '2026-10-12', month: '2026-10-01' }); assert.strictEqual(nov.provisional, undefined);
 });
-test('v1.181: the CSV import and the live refresh score the same readings identically', () => {
-  const TECH = load('src/engine/technical.js'), { W, M } = mkBars();
-  const t = TECH.computeTechnical(W.slice(0, -1), M.slice(0, -1), 6, '2026-10-14'), r = t.raw;
-  const csv = Te.matchAndScore(tvCsv([['Q', '', '', '', '', r.monthMacdLevel, r.monthMacdSignal, r.weekMacdLevel, r.weekMacdSignal, r.monthRsi, r.weekRsi]]), [ist('Q', 6)]).matched[0];
-  assert.deepStrictEqual(csv.states, { monthMacd: t.states.monthMacd, weekMacd: t.states.weekMacd, monthRsi: t.states.monthRsi, weekRsi: t.states.weekRsi });
-  assert.strictEqual(csv.score, t.score);
-});
 // ---- v1.182: refresh from TradingView (snapshot readings, no bars) ----
-test('v1.182: a TradingView snapshot is scored by the same rules as the CSV import and is marked as a snapshot', () => {
+test('v1.182: a TradingView snapshot is scored by the engine rules and is marked as a snapshot', () => {
   const TECH = load('src/engine/technical.js');
   const r = { monthMacdLevel: 20.5, monthMacdSignal: 16.8, weekMacdLevel: 8.6, weekMacdSignal: 8.5, monthRsi: 62.7, weekRsi: 58.7, weekPctChange: 3.45, monthPctChange: 3.58 };
   const t = TECH.snapshotTechnical(r, 6, '2026-10-15');
-  const csv = Te.matchAndScore(tvCsv([['Q', '', '', '', '', r.monthMacdLevel, r.monthMacdSignal, r.weekMacdLevel, r.weekMacdSignal, r.monthRsi, r.weekRsi]]), [ist('Q', 6)]).matched[0];
-  assert.strictEqual(t.score, csv.score); assert.strictEqual(t.states.monthMacd, 'bull_above'); assert.strictEqual(t.states.weekRsi, 'strong');
+  assert.strictEqual(t.score, 9.2);   // 2.5 + 1.5 + 2 + 2 + 1.2 over a weight of 10
+   assert.strictEqual(t.states.monthMacd, 'bull_above'); assert.strictEqual(t.states.weekRsi, 'strong');
   assert.strictEqual(t.src, 'snapshot'); assert.strictEqual(t.asof, '2026-10-15'); assert.deepStrictEqual(t.basis, { week: null, month: null });
   assert.strictEqual(t.raw.valuationScore, 6); assert.ok(/in progress/.test(t.reason));
   assert.strictEqual(TECH.snapshotTechnical({}, 6, '2026-10-15'), null);   // nothing to score
@@ -609,11 +498,6 @@ const golden = {};
 for(const r of Fe.scoreCsv(csv, { exactIndustryBySym: exactMap }).records){
   const s = r.scored; golden['fund:' + r.sym] = [s.score, s.verdict, s.traditionalSubscore, s.buffettSubscore, s.valuationSubscore, s.moatBasis, s.govBasis, ...s.factors.map(f => f.score == null ? null : Math.round(f.score * 1e6) / 1e6)];
 }
-{
-  D.setSeed(777); const rows = []; const tvStocks = [];
-  for(let i = 0; i < 14; i++){ rows.push(['TV' + i, '', '', rv(-5, 5, 2), rv(-10, 10, 2), rv(-3, 3, 3), rv(-3, 3, 3), rv(-3, 3, 3), rv(-3, 3, 3), rv(15, 85, 1), rv(15, 85, 1)]); tvStocks.push(ist('TV' + i + ' · I', +rv(0, 10, 1))); }
-  for(const m of Te.matchAndScore(tvCsv(rows), tvStocks).matched) golden['tech:' + m.matchedSymbol] = [m.score, m.states.monthMacd, m.states.weekMacd, m.states.monthRsi, m.states.weekRsi];
-}
 const goldenFile = path.join(__dirname, 'engines.golden.json');
 if(process.argv.includes('--update')){ fs.writeFileSync(goldenFile, JSON.stringify(golden, null, 1) + '\n'); console.log('engines.golden.json updated (' + Object.keys(golden).length + ' entries)'); }
 test('golden: the scores for the made-up universe have not moved', () => {
@@ -629,9 +513,8 @@ test('escaping: safeText turns raw < and > into text and never escapes twice', (
   assert.strictEqual(U.safeText(null), '');
 });
 
-// =========================================================== score history (the trend on the stock page)
+// =========================================================== score history (recorded by each import)
 const H = load('src/history/scorehistory.js', 'export { BUCKETS, SCORE_ENGINE, addPoint, bucketId, bucketOf, pointFor, tickerKey };');
-const R = load('src/detail/scoretrend.js', 'export { scoreTrendHtml };');
 test('history: a stock always lands in the same one of 64 buckets', () => {
   assert.strictEqual(H.bucketOf('AAA1'), H.bucketOf('AAA1'));
   for(const k of ['AAA1', 'BBB2', '500325', 'X-Y_Z']) assert.ok(H.bucketOf(k) >= 0 && H.bucketOf(k) < H.BUCKETS);
@@ -673,14 +556,6 @@ test('history: recordScoreHistory writes one document per bucket, is idempotent,
   assert.deepStrictEqual(doc.stocks.AAA1.map(p => p[0]), [20261001, 20261015]);
   const bad = await H.recordScoreHistory({ doc: () => { throw new Error('db down'); } }, list, 20261016);
   assert.match(bad.error, /db down/);
-});
-test('history: the trend chart needs two points, marks engine changes, and says so when short', () => {
-  assert.match(R.scoreTrendHtml([]), /appears after the next import/);
-  assert.match(R.scoreTrendHtml([[20261001, 6, 5, 100, 2]]), /One reading so far/);
-  const html = R.scoreTrendHtml([[20261001, 6, 5, 100, 1], [20261008, 6.5, 4, 110, 2], [20261015, 7, null, null, 2]]);
-  assert.match(html, /<svg/); assert.match(html, /trend-engine/); assert.match(html, /Fundamental \+1\.00/);
-  assert.ok(!/NaN/.test(html));
-  assert.ok(!/trend-engine/.test(R.scoreTrendHtml([[20261001, 6, 5, 1, 2], [20261008, 7, 5, 1, 2]])));
 });
 
 // =========================================================== trade calls (Trade Log: Hold / trim / add / review)

@@ -130,7 +130,7 @@ Valuation Subscore = 0.81 &divide; 1.0 &times; 10 = <b>8.10</b></p>
       <ul>
         <li>A single <b>0&ndash;10</b> score for the stock's price momentum, built from five components.</li>
         <li>It uses <b>MACD(12,26,9)</b> and <b>RSI(14)</b> on the monthly and weekly charts, plus a valuation input.</li>
-        <li>It's plain arithmetic on a TradingView Growth List export. There is no research or judgment involved, and no buy/sell labels.</li>
+        <li>It's plain arithmetic on TradingView price, MACD and RSI readings. There is no research or judgment involved, and no buy/sell labels.</li>
       </ul>
 
       <h3>Step 1 &mdash; the five components and their maximum points</h3>
@@ -219,14 +219,14 @@ Valuation Subscore = 0.81 &divide; 1.0 &times; 10 = <b>8.10</b></p>
           </ul>
         </li>
         <li>The stock's data-completeness badge (e.g. "3/5 signals") shows how many components were available.</li>
-        <li>If a stock has no row in the latest upload, its previous Technical Score is kept unchanged.</li>
-        <li>The Technical Score is refreshed with <b>Refresh all stocks</b> in the same section, straight from TradingView (the Technical CSV import is hidden). One click takes the price, MACD and RSI of every stock (including the week or month still in progress), downloads the full price history for stocks that have none so they get the stricter completed-weeks score, and adds the newly finished weekly or monthly bars for the rest. Scores of stocks with a fresh completed-weeks score are left as they are.</li>
+        <li>If TradingView has no reading for a stock, its previous Technical Score is kept unchanged.</li>
+        <li>The Technical Score is refreshed with <b>Refresh all stocks</b> in the same section, straight from TradingView. One click takes the price, MACD and RSI of every stock (including the week or month still in progress), downloads the full price history for stocks that have none so they get the stricter completed-weeks score, and adds the newly finished weekly or monthly bars for the rest. Scores of stocks with a fresh completed-weeks score are left as they are.</li>
       </ul>
 
       <h3>Where the data comes from</h3>
       <ul>
-        <li>A TradingView Growth List export (.csv), uploaded on the Data Refresh page. It's the only source, and updates are manual.</li>
-        <li>Each upload also refreshes the stock's current price, and with it the Margin of Safety.</li>
+        <li>TradingView, through the Refresh all stocks button on the Data Refresh page. Updates are manual.</li>
+        <li>Each refresh also updates the stock's current price, and with it the Margin of Safety.</li>
         <li>More detail is in <a href="#kb-technical">Knowledge Base §4</a>.</li>
       </ul>
 

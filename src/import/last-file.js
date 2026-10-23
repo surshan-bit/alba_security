@@ -1,6 +1,6 @@
-// "Last file loaded" card of the Fundamental and Technical sections on the Data Refresh page: which file was uploaded last,
+// "Last file loaded" card of the Fundamental section on the Data Refresh page: which file was uploaded last,
 // when, and what became of it (waiting to be imported, imported, or the last attempt failed / was cancelled).
-import { getDb, fundamentalCsvUploadLog, technicalCsvUploadLog } from '../core/store.js';
+import { getDb, fundamentalCsvUploadLog } from '../core/store.js';
 import { escapeHtml, formatUploadTimestamp } from '../core/util.js';
 import { lockBusy } from './joblock.js';
 import { pruneLogCollection } from '../joblogs/panels.js';
@@ -9,8 +9,7 @@ import { pruneLogCollection } from '../joblogs/panels.js';
 let jobState = null;
 
 const KINDS = {
-  fund: { log: fundamentalCsvUploadLog, collection: 'fundamentalCsvUploadLog', el: 'fundamentalLastFile', stamps: 'Fundamental refresh date' },
-  tech: { log: technicalCsvUploadLog, collection: 'technicalCsvUploadLog', el: 'technicalLastFile', stamps: 'Technical refresh date' }
+  fund: { log: fundamentalCsvUploadLog, collection: 'fundamentalCsvUploadLog', el: 'fundamentalLastFile', stamps: 'Fundamental refresh date' }
 };
 
 function newest(log){
@@ -40,9 +39,9 @@ function describe(r, k){
 }
 
 // A job that is marked running: either it is, or the page that ran it was closed or reloaded before it finished.
-function jobBanner(kind){
+function jobBanner(){
   const j = jobState;
-  if(!j || j.status !== 'running' || (j.kind === 'technical') !== (kind === 'tech')) return '';
+  if(!j || j.status !== 'running') return '';
   const when = formatUploadTimestamp(j.startedAt);
   return lockBusy(j)
     ? '<div class="lf-status lf-warn">An import is running (started ' + escapeHtml(when) + ').</div><div class="upload-hint lf-line">If it was started from another tab or device that has since been closed, it counts as interrupted after 3 minutes without activity.</div>'
@@ -53,7 +52,7 @@ function renderLastFile(kind){
   const k = KINDS[kind], host = document.getElementById(k.el);
   if(!host) return;
   const r = newest(k.log);
-  const banner = jobBanner(kind);
+  const banner = jobBanner();
   if(!r){ host.innerHTML = '<div class="upload-title">Last file loaded</div><div class="upload-hint">No file has been uploaded yet.</div>' + banner; return; }
   const [cls, head, lines] = describe(r, k);
   host.innerHTML = '<div class="upload-title">Last file loaded</div>' + banner +
@@ -62,7 +61,7 @@ function renderLastFile(kind){
     '<div class="lf-status lf-' + cls + '">' + escapeHtml(head) + '</div>' +
     lines.map(t => '<div class="upload-hint lf-line">' + escapeHtml(t) + '</div>').join('');
 }
-function renderAllLastFiles(){ renderLastFile('fund'); renderLastFile('tech'); }
+function renderAllLastFiles(){ renderLastFile('fund'); }
 // Reads the job record first, so the cards can say that an import is running or was interrupted.
 async function refreshLastFiles(){
   try { const db = getDb(); if(db){ const d = await db.doc('importJobs/fundamental').get(); jobState = d && d.exists ? d.data() : null; } }

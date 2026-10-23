@@ -12,7 +12,6 @@ import { renderTechPanel } from './technical.js';
 import { renderStockResearchBar } from './pending.js';
 import { renderGlobalFactorsPanel } from './globalfactors.js';
 import { renderPeersPanel } from './peers.js';
-import { SHOW_SCORE_TREND, initScoreTrend, renderScoreTrendPanel } from './scoretrend.js';
 import { bindDetailJumpNav, renderDetailJumpNav } from './jumpnav.js';
 import { loadPriceBarsFor } from '../prices/store.js';
 import { initPriceChart } from '../prices/chart.js';
@@ -67,13 +66,11 @@ function renderDetail(idx){
     ${renderGlobalFactorsPanel(s)}
     ${renderFundamentals(s)}
     ${renderTechPanel(s)}
-    ${SHOW_SCORE_TREND ? renderScoreTrendPanel(s) : ''}
     ${renderPeersPanel(s, idx)}
   `;
 
   initPriceChart(s);
   loadPriceBarsFor(s, idx);
-  if(SHOW_SCORE_TREND) initScoreTrend(s);
   bindDetailJumpNav(detailEl);
   const peersPanel = document.getElementById('peersPanel');
   if(peersPanel){

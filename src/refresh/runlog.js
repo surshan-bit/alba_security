@@ -1,10 +1,10 @@
 // The run records of the Technical Score section: one record per run in refreshRunLog/<kind>-<start time>, and the "Last 2 runs" lists
-// under each option. Kinds: 'snapshot' (Refresh all stocks, including its price-bar stages) and 'csv' (Import CSV, hidden). Only the newest
+// under each option. Kind: 'snapshot' (Refresh all stocks, including its price-bar stages). Only the newest
 // KEEP records of each kind are kept; older ones are deleted when a new one is saved.
 import { escapeHtml, formatUploadTimestamp } from '../core/util.js';
 
 const KEEP = 2;
-const KINDS = ['snapshot', 'csv'];
+const KINDS = ['snapshot'];
 const num = x => Number(x || 0).toLocaleString('en-IN');
 
 // "2 min 14 s" for a run time in milliseconds.
@@ -31,7 +31,7 @@ function runLine(r){
   return '<div class="refreshlog-run"><span class="refreshlog-run-time">' + escapeHtml(when) + '</span> · ' + escapeHtml(what + bad) + '</div>';
 }
 
-// Fills the "Last 2 runs" list under each option (elements lastRuns_snapshot and lastRuns_csv).
+// Fills the "Last 2 runs" list under each option (element lastRuns_snapshot).
 async function paintLastRuns(db){
   const hosts = KINDS.map(k => [k, document.getElementById('lastRuns_' + k)]).filter(/** @type {(x: any[]) => boolean} */ (x => x[1]));
   if(!hosts.length) return;

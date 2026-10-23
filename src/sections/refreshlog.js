@@ -5,8 +5,6 @@ import { init_import_csv_upload } from '../import/csv-upload.js';
 import '../import/upload-history.js';
 import '../import/fund-engine.js';
 import { init_import_fund_import } from '../import/fund-import.js';
-import '../import/tech-engine.js';
-import '../import/tech-import.js';
 import { renderWlPicker } from '../import/wlsync.js';
 import { refreshLastFiles, renderAllLastFiles } from '../import/last-file.js';
 import { init_joblogs_freshness } from '../joblogs/freshness.js';

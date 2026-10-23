@@ -58,7 +58,6 @@ function replaceTradeLog(next){ state.tradeLog = next; }
 // ---- Upload and sync logs (Data Refresh page) ----
 // A log keeps its records private and is changed only through put / remove:
 //   fundamentalCsvUploadLog: one record per uploaded screener.in export, for the Fundamental Score import
-//   technicalCsvUploadLog:   one record per uploaded TradingView Growth List, for the Technical Score import
 //   watchlistSyncLog:        one record per TradingView watchlist sync run
 // Each import reads the newest record whose status is 'uploaded' and marks it 'processed' when it finishes.
 function createLog(){
@@ -71,7 +70,6 @@ function createLog(){
   };
 }
 const fundamentalCsvUploadLog = createLog();
-const technicalCsvUploadLog = createLog();
 const watchlistSyncLog = createLog();
 
-export { allTrades, attachDb, attachTradeDb, dbCapabilityPromise, fundamentalCsvUploadLog, getDb, getTrade, getTradeDb, isPinnedTicker, replacePinnedTickers, replaceTradeLog, technicalCsvUploadLog, togglePinnedTicker, watchlistSyncLog };
+export { allTrades, attachDb, attachTradeDb, dbCapabilityPromise, fundamentalCsvUploadLog, getDb, getTrade, getTradeDb, isPinnedTicker, replacePinnedTickers, replaceTradeLog, togglePinnedTicker, watchlistSyncLog };

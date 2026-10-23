@@ -1,10 +1,10 @@
 // A made-up stock database big enough for the import code to accept (it refuses fewer than 2,000 stocks): about 2,000 companies
-// scored by the real fundamental engine from a made-up screener.in table, most with a technical block from the real technical
-// engine, split into ~190 KB chunk documents exactly as the page stores them. Nothing here is real company data.
+// scored by the real fundamental engine from a made-up screener.in table, most with a technical block scored by the real technical
+// engine rules, split into ~190 KB chunk documents exactly as the page stores them. Nothing here is real company data.
 const { createData } = require('./data.js');
 const { load } = require('./load.js');
 const F = load('src/import/fund-engine.js', 'export { AlbaFundEngine };');
-const T = load('src/import/tech-engine.js');
+const E = load('src/engine/technical.js', 'export { techComposite as composite, techMacdStateOf as macdState, techRsiState as rsiState };');
 
 const sid = id => String(id).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_') || 'x';
 const symOf = s => s.ticker.split('·')[0].trim();
@@ -32,11 +32,15 @@ function buildDataset(){
   const special = ['BAJAJ-AUTO', 'J&KBANK', 'KLBRENG-B'];
   good.slice(0, 3).forEach(([s], k) => { const row = rows.find(r => r['NSE Code'] === symOf(s)); row['NSE Code'] = special[k]; });
   stocks = apply(rows, '2026-09-01');
-  // technical blocks for most stocks, from the real technical engine
+  // technical blocks for most stocks, scored by the real technical engine rules from made-up MACD and RSI readings
   D.setSeed(99);
-  const tvRows = stocks.filter((_, i) => i % 9 !== 0).map(s => [symOf(s), '', D.rv(50, 900, 2), D.rv(-5, 5, 2), D.rv(-10, 10, 2), D.rv(-3, 3, 3), D.rv(-3, 3, 3), D.rv(-3, 3, 3), D.rv(-3, 3, 3), D.rv(15, 85, 1), D.rv(15, 85, 1)]);
-  const mt = T.AlbaTechEngine.matchAndScore(D.tvCsv(tvRows), stocks, {});
-  for(const m of mt.matched){ m.stock.technical = { asof: '2026-09-01', score: m.score, states: Object.assign({}, m.states, { valuation: 'reasonably valued' }), raw: Object.assign({}, m.raw, { valuationScore: m.stock.pillars.val }), reason: 'made-up seed reading' }; }
+  stocks.filter((_, i) => i % 9 !== 0).forEach(s => {
+    const [price, weekPct, monthPct, monthLvl, monthSig, weekLvl, weekSig, monthRsi, weekRsi] = [D.rv(50, 900, 2), D.rv(-5, 5, 2), D.rv(-10, 10, 2), D.rv(-3, 3, 3), D.rv(-3, 3, 3), D.rv(-3, 3, 3), D.rv(-3, 3, 3), D.rv(15, 85, 1), D.rv(15, 85, 1)].map(Number);
+    if(!s.pillars || s.pillars.val == null) return;   // no valuation anchor: not scored
+    const states = { monthMacd: E.macdState(monthLvl, monthSig), weekMacd: E.macdState(weekLvl, weekSig), monthRsi: E.rsiState(monthRsi), weekRsi: E.rsiState(weekRsi) };
+    const raw = { monthMacdLevel: monthLvl, monthMacdSignal: monthSig, weekMacdLevel: weekLvl, weekMacdSignal: weekSig, weekPctChange: weekPct, monthPctChange: monthPct, monthRsi, weekRsi };
+    s.technical = { asof: '2026-09-01', score: E.composite(states, s.pillars.val), states: Object.assign({}, states, { valuation: 'reasonably valued' }), raw: Object.assign({}, raw, { valuationScore: s.pillars.val }), reason: 'made-up seed reading' };
+  });
   stocks.forEach((s, i) => { if(i % 7 === 0) s.globalFactors = { scope: 'sector', sectorLabel: 'x', asof: '2026-09-01', positive: ['made-up positive'], negative: [] }; });
   // chunk documents of about 190 KB, indexed the way stockMeta/main indexes them
   const chunks = {}, ids = []; let cur = [], curBytes = 0, n = 0;
@@ -65,4 +69,4 @@ function buildSmall(fixtureStocks){
   return { docs: { 'stockMeta/main': { version: 3, updatedAt: '2026-09-01T00:00:00Z', count: fixtureStocks.length, chunks: ['c001'], index }, 'stockData/c001': chunk, 'stockMeta/bseAlpha': {} } };
 }
 
-module.exports = { buildDataset, buildSmall, canon, symOf, sid, F, T };
+module.exports = { buildDataset, buildSmall, canon, symOf, sid, F };
