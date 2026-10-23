@@ -41,8 +41,9 @@ function tileColor(mean, period){
 }
 
 // rows: the industry rows (name, count, mean). width: the pixel width the map will be drawn at (decides which tiles have room for text).
-function heatmapHtml(rows, period, width, size){
-  const W = 1000, H = 780, pxScale = (width || 1000) / W;
+// hRatio: the map's height as a share of its width (0.78 when left out); full screen passes the ratio that fits the window.
+function heatmapHtml(rows, period, width, size, hRatio){
+  const W = 1000, H = Math.round(W * (hRatio || .78)), pxScale = (width || 1000) / W;
   const live = rows.filter(r => r.count > 0), bySize = size !== 'count';
   // Size by % change: the area follows how far the average moved (up or down); a floor keeps flat or missing industries visible.
   const maxMove = Math.max(0.0001, ...live.map(r => r.mean === null ? 0 : Math.abs(r.mean))), floor = maxMove * .08;

@@ -19,7 +19,7 @@ import { closestEl } from '../core/evt.js';
 import { isRebound } from '../list/rebound.js';
 
 const KEY = 'albaDashboard.business.v1';
-let bizFull = false;   // the table fills the whole window
+let bizFull = false;   // the table (or the heat map) fills the whole window
 const newsOpen = new Set();   // industries whose News section is open (closed at first)
 let bizFiltersOpen = false;   // phones: the view, period, grouping and strategy controls fold into one "Filters" line, closed at first
 let period = '1M', by = 'industry', view = 'table', heatSize = 'chg', strategyId = '', showMatched = false, rebound = false, loadState = 'idle';   // loadState: 'idle' | 'loading' | 'failed' (price bars for long periods)
@@ -154,8 +154,13 @@ function render(){
   const el = bodyEl(); if(!el) return;
   keepScroll(el, () => draw(el));
 }
+// The heat map: beside the filters it is as wide as the page leaves room for; in full screen it takes the whole window, with a height that fits it.
+function heatMap(rows, p, el){
+  if(!bizFull) return heatmapHtml(rows, period, Math.max(300, el.clientWidth - 280), heatSize);
+  const w = Math.max(300, window.innerWidth - 40), ratio = Math.min(.95, Math.max(.45, (window.innerHeight - 140) / w));
+  return heatmapHtml(rows, period, w, heatSize, ratio);
+}
 function draw(el){
-  if(view === 'heat') bizFull = false;   // full screen is for the table
   document.body.classList.toggle('biz-full-open', bizFull);
   const p = periodOf(period);
   const rows = visibleRows();
@@ -168,8 +173,8 @@ function draw(el){
     + '<button type="button" class="tl-view-btn' + (!matchedOnly() ? ' active' : '') + '" data-biz-show="all" title="Show every industry and stock">All</button>'
     + '<button type="button" class="tl-view-btn' + (matchedOnly() ? ' active' : '') + '" data-biz-show="matched"' + (strategyOn() ? ' title="Show only the industries and stocks that match the chosen strategy"' : ' disabled title="Choose a strategy or Rebound first"') + '>Matched</button></div>';
   const sizeToggle = '<div class="tl-view-toggle biz-match-toggle biz-size-toggle" role="group" aria-label="Size the tiles by"><button type="button" class="tl-view-btn' + (heatSize === 'chg' ? ' active' : '') + '" data-biz-size="chg" title="Bigger tiles = bigger average change">% Change</button><button type="button" class="tl-view-btn' + (heatSize === 'count' ? ' active' : '') + '" data-biz-size="count" title="Bigger tiles = more stocks">No. of stocks</button></div>';
-  const expandBtn = viewToggle + '<button type="button" class="biz-expand" data-biz-all="' + (allOpen ? 'collapse' : 'expand') + '">' + (allOpen ? 'Collapse all' : 'Expand all') + '</button>'
-    + '<button type="button" class="biz-expand" data-biz-full="1" aria-pressed="' + bizFull + '" title="Show the table across the whole window (Esc to leave)">' + fullscreenLabel(bizFull) + '</button>';
+  const fullBtn = '<button type="button" class="biz-expand" data-biz-full="1" aria-pressed="' + bizFull + '" title="Show the ' + (view === 'heat' ? 'heat map' : 'table') + ' across the whole window (Esc to leave)">' + fullscreenLabel(bizFull) + '</button>';
+  const expandBtn = viewToggle + '<button type="button" class="biz-expand" data-biz-all="' + (allOpen ? 'collapse' : 'expand') + '">' + (allOpen ? 'Collapse all' : 'Expand all') + '</button>' + fullBtn;
   let status = '';
   if(needsBars(period)){
     if(loadState === 'loading') status = '<p class="upload-hint">Loading price history…</p>';
@@ -184,7 +189,7 @@ function draw(el){
     const isOpen = open.has(r.name);
     return '<tr class="biz-row' + (isOpen ? ' open' : '') + '" data-biz-name="' + escapeHtml(r.name) + '" tabindex="0" role="button" aria-expanded="' + isOpen + '"><td class="biz-name">' + '<button type="button" class="biz-open" data-biz-open="' + escapeHtml(r.name) + '" title="Open the industry page: factors, news and charts">' + escapeHtml(r.name) + '</button></td><td class="num">' + r.count + '</td><td class="num">' + pct(r.mean) + '</td><td class="num">' + pct(r.median) + '</td><td>' + breadth(r) + '</td><td class="num">' + (r.news.length ? r.news.length + (r.pos || r.neg ? ' <span class="news-pos">+' + r.pos + '</span> <span class="news-neg">&minus;' + r.neg + '</span>' : '') : '') + '</td>' + (strategyOn() ? '<td class="num">' + (r.matches ? '<b class="biz-matchcount">' + r.matches + '</b> of ' + r.count : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null ? pct(r.matchMean) : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null && r.mean !== null ? signedPp(r.matchMean - r.mean) : '') + '</td>' : '') + '</tr>' + (isOpen ? detailHtml(r, cols) : '');
   }).join('');
-  if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + viewToggle + sizeToggle + '</div></div>' + heatmapHtml(rows, period, Math.max(300, el.clientWidth - 280), heatSize) + note); syncSheets(); return; }
+  if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + viewToggle + sizeToggle + fullBtn + '</div></div>' + heatMap(rows, p, el) + note); syncSheets(); return; }
   kit.defineToolbar('biz', () => {
     const st = r => r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock), out = [];
     if(strategyOn()) out.push({ id: 'matched', label: 'Matched stocks', stocks: () => rows.flatMap(r => r.items.filter(x => x.match).map(x => x.stock)) });
