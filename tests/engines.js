@@ -187,6 +187,13 @@ test('fund columns: similar headers are not confused (TTM vs 3/5-year growth, cu
   near(r.fcf3, +row['Free cash flow 3years']); near(r.ocf5, +row['Operating cash flow 5years']); near(r.de, +row['Debt to equity']);
   assert.strictEqual(r.nseCode, 'WID0'); assert.strictEqual(r.industryGroup, 'Alpha');
 });
+test('fund columns: Industry Group listed before Industry still maps both (real export order)', () => {
+  const swap = h => { const a = h.slice(); const i = a.indexOf('Industry'), j = a.indexOf('Industry Group'); a[i] = 'Industry Group'; a[j] = 'Industry'; return a; };
+  const hdr = swap(FUND_HEADER), row = universe[0];
+  const csvSwapped = [hdr.join(','), hdr.map(h => h === 'Industry Group' ? 'Grp' : h === 'Industry' ? 'Ind' : row[h]).join(',')].join('\n');
+  const r = Fe.scoreCsv(csvSwapped, {}).records[0];
+  assert.strictEqual(r.industryGroup, 'Grp'); assert.strictEqual(r.industry, 'Ind');
+});
 test('fund scoring: invariants (score 0-10, verdict matches score, nine factors, weights add up to 10)', () => {
   const { records } = Fe.scoreCsv(csv, { exactIndustryBySym: exactMap });
   assert.strictEqual(records.length, universe.length);
