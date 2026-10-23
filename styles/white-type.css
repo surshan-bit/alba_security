@@ -58,3 +58,6 @@
 :root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-grid dt{font-weight:var(--w-strong) !important;text-transform:uppercase;}
 :root[data-theme="white"] #section-trackrecord .tl-card{padding:16px 18px;}
 :root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-retval *{font-size:inherit !important;font-weight:inherit !important;}
+
+/* Trade Log panel titles (Positions, Buy / Sell ideas) are written like the other panel titles (Fundamental Score): same size and weight, not uppercase, no letter spacing. */
+:root[data-theme="white"] body #section-trackrecord .analysis-panel-head .analysis-panel-title{text-transform:none !important;letter-spacing:0 !important;}
