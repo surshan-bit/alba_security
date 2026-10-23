@@ -461,3 +461,13 @@
   :root[data-theme="white"] div:has(> .analysis-reset-btn){flex-wrap:wrap;}
   :root[data-theme="white"] div:has(> .analysis-reset-btn) > :is(.analysis-reset-btn,.rk-bar){flex:1 1 40%;}
 }
+/* Phones, Explorer: the All / Matched switch and the three buttons share one line (they wrap only when the screen is too narrow for all four). */
+@media (max-width:900px){
+  :root[data-theme="white"] #section-business .biz-toolbar .biz-match-toggle{margin-right:0;height:40px;}
+  :root[data-theme="white"] #section-business .biz-toolbar .biz-match-toggle .tl-view-btn{padding:0 8px;font-size:.72rem;}
+  :root[data-theme="white"] #section-business .biz-toolbar :is(.biz-expand,.rk-bar){flex:1 1 0;min-width:max-content;}
+}
+@media (max-width:380px){
+  :root[data-theme="white"] #section-business .biz-toolbar .biz-match-toggle .tl-view-btn{padding:0 6px;font-size:.66rem;}
+  :root[data-theme="white"] #section-business .biz-toolbar{gap:3px;}
+}
