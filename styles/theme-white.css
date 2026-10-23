@@ -435,6 +435,11 @@
   /* the same spacing on every grid screen: 10px under the Filters row, the count line, 10px above the grid */
   :root[data-theme="white"] .analysis-leaderboard-head{justify-content:flex-start !important;margin:5px 0 10px !important;}
   :root[data-theme="white"] .strat-result-head{gap:0;margin:0 0 8px;}
+  /* Strategies: less empty space between the setup line, the Filters row and the grid */
+  :root[data-theme="white"] #section-strategies #stratMain .strat-panel:has(.strat-result-head){margin-top:0;padding-top:0;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{padding-top:8px;padding-bottom:8px;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-fold{margin-bottom:0;}
+  :root[data-theme="white"] #section-strategies #stratMain .strat-result-head{margin-bottom:10px;}
   :root[data-theme="white"] :is(.strat-result-title,.analysis-leaderboard-head .rk-headline){flex:1 1 100%;margin:0;}
   :root[data-theme="white"] .strat-result-head .strat-result-title{margin-top:10px;}
   :root[data-theme="white"] .biz-main{margin-top:-18px;}
