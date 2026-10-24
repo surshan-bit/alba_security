@@ -7,6 +7,8 @@
       <div class="help-toc">
         <a href="#help-f1">Fundamental Score</a>
         <a href="#help-technical">Technical Score</a>
+        <a href="#help-charts">Price charts</a>
+        <a href="#help-updates">New versions</a>
         <a href="#help-glossary">Glossary</a>
       </div>
 
@@ -131,6 +133,7 @@ Valuation Subscore = 0.81 &divide; 1.0 &times; 10 = <b>8.10</b></p>
         <li>A single <b>0&ndash;10</b> score for the stock's price momentum, built from five components.</li>
         <li>It uses <b>MACD(12,26,9)</b> and <b>RSI(14)</b> on the monthly and weekly charts, plus a valuation input.</li>
         <li>It's plain arithmetic on TradingView price, MACD and RSI readings. There is no research or judgment involved, and no buy/sell labels.</li>
+        <li>Tech 2 and Tech 3 (two extra scores tried earlier) are hidden on every screen; this is the only technical score shown.</li>
       </ul>
 
       <h3>Step 1 &mdash; the five components and their maximum points</h3>
@@ -228,6 +231,28 @@ Valuation Subscore = 0.81 &divide; 1.0 &times; 10 = <b>8.10</b></p>
         <li>TradingView, through the Refresh all stocks button on the Data Refresh page. Updates are manual.</li>
         <li>Each refresh also updates the stock's current price, and with it the Margin of Safety.</li>
         <li>More detail is in <a href="#kb-technical">Knowledge Base §4</a>.</li>
+      </ul>
+
+      <h2 id="help-charts" data-icon="trend">Price charts and the MACD panel</h2>
+      <ul>
+        <li>Each stock page shows a Weekly and a Monthly candlestick chart with volume bars underneath.</li>
+        <li>Green candles closed above their open; red candles closed below it.</li>
+        <li>Below the volume there is a MACD panel: a blue MACD line, an orange signal line, and bars for the gap between them.</li>
+        <li>Blue bars mean MACD is above its signal line (bullish); orange bars mean it is below (bearish).</li>
+        <li>The dashed line is zero.</li>
+        <li>The first 33 bars are faded and dashed, labelled "warm-up: less reliable", because MACD needs about 34 bars to settle.</li>
+        <li>A stock with fewer than 35 bars has no MACD panel.</li>
+        <li>Hover or touch a bar to see its prices, MACD, signal and gap.</li>
+        <li>Press <b>Legend</b> to see what each colour means.</li>
+        <li>The panel is only a picture; it never changes a score.</li>
+      </ul>
+
+      <h2 id="help-updates" data-icon="steps">Getting a new version of the dashboard</h2>
+      <ul>
+        <li>The version number is shown at the top of the left menu.</li>
+        <li>When a new version is published, an open page reloads itself once.</li>
+        <li>It waits until nothing is running (a refresh or an import) and you are not typing.</li>
+        <li>If the new version does not arrive, a "Reload now" button appears at the bottom.</li>
       </ul>
 
       <h2 id="help-glossary" data-icon="book">Glossary</h2>
