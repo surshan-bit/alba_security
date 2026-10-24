@@ -78,6 +78,11 @@
 .pc-chart svg .pc-mhu{fill:var(--pc-macd);opacity:.35;}
 .pc-chart svg .pc-mhd{fill:var(--pc-sig);opacity:.35;}
 .pc-chart svg .pc-mzero{stroke:var(--muted);stroke-width:1;stroke-dasharray:4 3;opacity:.85;}
+/* Warm-up of the MACD (v1.260): the first bars, before the averages settle, are faded and dashed on a light shade. */
+.pc-chart svg .pc-mwarm{fill:var(--muted);opacity:.08;}
+.pc-chart svg .pc-mwarm-t{font-size:10px;font-style:italic;}
+.pc-chart svg .pc-mline.pc-early,.pc-chart svg .pc-msig.pc-early{opacity:.35;stroke-width:1.3;stroke-dasharray:3 2;}
+.pc-chart svg .pc-mhu.pc-early,.pc-chart svg .pc-mhd.pc-early{opacity:.14;}
 .pc-chart svg tspan.pc-mtitle{fill:var(--text);font-weight:700;}
 .pc-chart svg tspan.pc-mlab-m{fill:var(--pc-macd);font-weight:700;}
 .pc-chart svg tspan.pc-mlab-s{fill:var(--pc-sig);font-weight:700;}

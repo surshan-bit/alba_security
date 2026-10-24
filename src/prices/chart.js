@@ -100,10 +100,11 @@ function initPriceChart(s){
     if(bU) g += `<path d="${bU}" fill="var(--buy)"/>`;
     if(bD) g += `<path d="${bD}" fill="var(--avoid)"/>`;
     g += big;
-    // MACD band: histogram bars from zero, the MACD and signal lines, a dashed zero line; only bars past the warm-up (ms.from) are drawn.
+    // MACD band: histogram bars from zero, the MACD and signal lines, a dashed zero line. Bars before ms.from are the warm-up of the averages:
+    // they are drawn faded and dashed on a light shade (and the first reliable point joins the two parts), so the line spans the whole chart.
     if(ms){
       const mTop = vBase + MG, vis = [];
-      for(let i = 0; i < n; i++) if(off + i >= ms.from) vis.push(i);
+      for(let i = 0; i < n; i++) vis.push(i);
       if(vis.length){
         let mLo = 0, mHi = 0;
         vis.forEach(i => { const j = off + i; mLo = Math.min(mLo, ms.macd[j], ms.signal[j], ms.hist[j]); mHi = Math.max(mHi, ms.macd[j], ms.signal[j], ms.hist[j]); });
@@ -111,15 +112,24 @@ function initPriceChart(s){
         const mPad = (mHi - mLo) * .08; mLo -= mPad; mHi += mPad;
         const MY = v => mTop + (mHi - v) / (mHi - mLo) * MH;
         g += `<text x="${padL}" y="${vBase + 14}"><tspan class="pc-mtitle">MACD (12, 26, 9)</tspan><tspan class="pc-mlab-m" dx="12">— MACD</tspan><tspan class="pc-mlab-s" dx="10">— Signal</tspan></text>`;
+        const nEarly = Math.max(0, Math.min(n, ms.from - off));      // bars in view that are still warming up
+        if(nEarly){
+          const wx = X(nEarly - 1) + step / 2;
+          g += `<rect x="${padL}" y="${f(mTop)}" width="${f(Math.max(0, wx - padL))}" height="${MH}" class="pc-mwarm"/>`;
+          if(wx - padL > 120) g += `<text x="${f(padL + (wx - padL) / 2)}" y="${f(mTop + 11)}" text-anchor="middle" class="pc-mwarm-t">warm-up: less reliable</text>`;
+        }
         const mt = ticks(mLo, mHi, 3), mst = mt.length > 1 ? mt[1] - mt[0] : 1, mdp = mst >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(mst) - 1e-9));
         mt.forEach(v => { if(Math.abs(v) < mst / 1e3) return; g += `<line x1="${padL}" x2="${W - padR}" y1="${f(MY(v))}" y2="${f(MY(v))}" class="pc-grid"/><text x="${W - padR + 6}" y="${f(MY(v) + 4)}">${v.toFixed(mdp)}</text>`; });
-        const y0 = MY(0), hw = Math.max(1.2, step * .6); let hu = '', hd = '', lm = '', ls = '';
-        vis.forEach((i, q) => {
-          const j = off + i, x = X(i), hv = ms.hist[j], y1 = MY(hv), rc = `M${f(x - hw / 2)} ${f(Math.min(y0, y1))}h${f(hw)}v${f(Math.max(.5, Math.abs(y1 - y0)))}h${f(-hw)}z`;
-          if(hv >= 0) hu += rc; else hd += rc;
-          lm += (q ? 'L' : 'M') + f(x) + ' ' + f(MY(ms.macd[j])); ls += (q ? 'L' : 'M') + f(x) + ' ' + f(MY(ms.signal[j]));
+        const y0 = MY(0), hw = Math.max(1.2, step * .6);
+        const P = { hu: ['', ''], hd: ['', ''], lm: ['', ''], ls: ['', ''] };   // [warm-up, reliable]
+        vis.forEach(i => {
+          const j = off + i, x = X(i), hv = ms.hist[j], y1 = MY(hv), e = j < ms.from ? 0 : 1, rc = `M${f(x - hw / 2)} ${f(Math.min(y0, y1))}h${f(hw)}v${f(Math.max(.5, Math.abs(y1 - y0)))}h${f(-hw)}z`;
+          P[hv >= 0 ? 'hu' : 'hd'][e] += rc;
+          const pt = (k, v) => { const q = P[k]; q[e] += (q[e] ? 'L' : 'M') + f(x) + ' ' + f(MY(v)); if(!e && i === nEarly - 1) q[1] += 'M' + f(x) + ' ' + f(MY(v)); };
+          pt('lm', ms.macd[j]); pt('ls', ms.signal[j]);
         });
-        g += `<path d="${hu}" class="pc-mhu"/><path d="${hd}" class="pc-mhd"/><line x1="${padL}" x2="${W - padR}" y1="${f(y0)}" y2="${f(y0)}" class="pc-mzero"/><text x="${W - padR + 6}" y="${f(y0 + 4)}">0</text><path d="${lm}" class="pc-mline"/><path d="${ls}" class="pc-msig"/>`;
+        const path = (k, cls) => [0, 1].map(e => P[k][e] ? `<path d="${P[k][e]}" class="${cls}${e ? '' : ' pc-early'}"/>` : '').join('');
+        g += path('hu', 'pc-mhu') + path('hd', 'pc-mhd') + `<line x1="${padL}" x2="${W - padR}" y1="${f(y0)}" y2="${f(y0)}" class="pc-mzero"/><text x="${W - padR + 6}" y="${f(y0 + 4)}">0</text>` + path('lm', 'pc-mline') + path('ls', 'pc-msig');
       }
     }
     const every =c.every ? (W < 520 ? c.every * 2 : c.every) : Math.max(1, Math.round(n / (W < 520 ? 4 : 8)));
@@ -166,9 +176,9 @@ function initPriceChart(s){
   const pctTxt = v => v === null ? 'n/a' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
   // MACD, signal and histogram of the hovered bar (nothing for a bar still warming up, or a stock with no MACD).
   const macdTipHtml = (k, j) => {
-    const ms = macd[k]; if(!ms || j < ms.from) return '';
+    const ms = macd[k]; if(!ms) return '';
     const row = (name, v) => `<div class="r"><span>${name}</span><span>${v.toFixed(2)}</span></div>`;
-    return row('MACD', ms.macd[j]) + row('Signal', ms.signal[j]) + row('Histogram', ms.hist[j]);
+    return row('MACD', ms.macd[j]) + row('Signal', ms.signal[j]) + row('Histogram', ms.hist[j]) + (j < ms.from ? '<div class="r"><span>MACD still warming up</span><span></span></div>' : '');
   };
   // Events of the hovered bar, listed under its prices (newest first, at most 5).
   const eventTipHtml = (list, react, per) => {

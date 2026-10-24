@@ -137,7 +137,7 @@
             <li>Refreshes fetch only the delta: when bars are already stored, just the bars since the last stored one are pulled (plus 3 of overlap), merged into the stored history and cross-checked against it. If the overlap no longer matches (for example after a split), it falls back to a full re-download. The first run for a stock still fetches the full 5 years.</li>
             <li>Ticked on its own (nothing else flagged), the request only refreshes the price bars and needs no republish.</li>
             <li>Up to 5 years of history or everything since listing, validated and stored in the <code>priceHistory</code> collection (&sect;7). It never changes a score.</li>
-            <li><b>MACD panel (v1.259):</b> each chart shows MACD (12, 26, 9) under the volume, worked out on the page from the same bars with <code>techMacdSeries</code> in <code>src/engine/technical.js</code>, the one maths behind the saved MACD state. Nothing extra is stored.</li>
+            <li><b>MACD panel (v1.259):</b> each chart shows MACD (12, 26, 9) under the volume (the first 33 bars faded as warm-up since v1.260), worked out on the page from the same bars with <code>techMacdSeries</code> in <code>src/engine/technical.js</code>, the one maths behind the saved MACD state. Nothing extra is stored.</li>
           </ul>
         </li>
         <li><b>Upload panel:</b> shows new and dropped tickers and a refresh scope preview, and saves the file to the asset store (&sect;7).</li>
@@ -223,10 +223,16 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.260 &middot; 2026-10-24</h3>
+            <ul>
+              <li><strong>MACD now spans the whole chart.</strong> The first 33 bars of the MACD panel, where the averages are still settling, used to be blank. They are now drawn faded and dashed on a light grey shade, labelled &ldquo;warm-up: less reliable&rdquo;, and the solid lines carry on from the 34th bar. The hover on a faded bar shows its values with a &ldquo;MACD still warming up&rdquo; note. On Monthly (about 60 bars) the faded part is about half the chart; on Weekly it is the first few months.</li>
+              <li>It is a picture only: the MACD maths and every score are unchanged.</li>
+            </ul>
+
             <h3>v1.259 &middot; 2026-10-24</h3>
             <ul>
               <li><strong>MACD under the price charts.</strong> The Weekly and Monthly charts on a stock&rsquo;s page now have a MACD panel under the volume bars: the MACD line (blue), its signal line (orange), and the gap between them as bars (blue when the MACD is above its signal, orange when below), with a dashed zero line. The Legend button explains the colours, and hovering a bar shows that bar&rsquo;s MACD, signal and histogram next to its prices.</li>
-              <li>It uses the same MACD (12, 26, 9) as the Technical Score, worked out from the chart&rsquo;s own bars (the latest bar follows the current price). The first 33 bars are left out while the lines settle, so a stock with fewer than 35 bars shows no MACD panel. It is a picture only: no score changes.</li>
+              <li>It uses the same MACD (12, 26, 9) as the Technical Score, worked out from the chart&rsquo;s own bars (the latest bar follows the current price). The first 33 bars are faded while the lines settle (v1.260; before that they were left out), and a stock with fewer than 35 bars shows no MACD panel. It is a picture only: no score changes.</li>
             </ul>
 
             <h3>v1.258 &middot; 2026-10-24</h3>
