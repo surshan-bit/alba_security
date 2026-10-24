@@ -49,3 +49,24 @@ a.news-stock:hover{color:var(--accent);}
 .news-score.fs-hold{color:var(--hold);border-color:var(--hold);}
 .news-score.fs-avoid{color:var(--avoid);border-color:var(--avoid);}
 .news-et{display:inline-block;font:700 .6rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.04em;border:1px solid var(--line);border-radius:8px;padding:0 6px;margin-right:6px;}
+
+/* Layout like the stock page: flat sections, side padding, and nothing wider than the screen. */
+#newsBody{padding:0 6px 12px;min-width:0;max-width:100%;box-sizing:border-box;}
+#newsBody *{box-sizing:border-box;max-width:100%;}
+#newsBody :is(.news-text,.news-card,.news-why,.news-hint,.news-status,.news-empty,.news-watch,.news-link){overflow-wrap:anywhere;min-width:0;}
+.news-head{flex-wrap:wrap;padding:4px 0 8px;}
+.news-tabs .news-tab{flex:1;text-align:center;padding:10px 6px;}
+.news-sec{margin:20px 0 10px;padding-top:14px;border-top:1px solid var(--line);font-size:.8rem;color:var(--hd,var(--text));}
+.news-tabs + .news-sec{border-top:0;padding-top:0;margin-top:12px;}
+.news-grp{margin:16px 0 8px;font-size:.9rem;color:var(--hd,var(--text));}
+.news-hint,.news-status,.news-empty{font-size:.8rem;line-height:1.45;margin:6px 0 10px;}
+.news-tiles{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.news-tile{min-width:0;padding:8px;}
+.news-tile b{font-size:.68rem;line-height:1.25;}
+.news-tile span{font-size:.92rem;overflow-wrap:anywhere;}
+.news-why,.news-card{padding:12px;margin-left:0;margin-right:0;}
+.news-card h4{overflow-wrap:anywhere;}
+.news-row{gap:10px;padding:10px 0;}
+.news-date{flex:0 0 48px;}
+.news-filters{margin-bottom:8px;}
+@media (min-width:601px){.news-tiles{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));}}

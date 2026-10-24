@@ -102,6 +102,25 @@ function calValue(v, unit){
   return String(v) + (unit === '%' ? '%' : '');
 }
 
+// TradingView's economic calendar rows -> the rows this page saves. India keeps medium and high importance, every other country only high.
+// Shown values (forecast, previous, actual) are kept as TradingView prints them, so "29K" payrolls are not shown as 29000.
+const CAL_KEEP = 80;
+function buildCalendar(result, country){
+  const rows = Array.isArray(result) ? result : [];
+  const out = [];
+  rows.forEach(r => {
+    if(!r || !r.date || !r.title || !isNum(r.importance)) return;
+    if(r.importance < (country === 'IN' ? 0 : 1)) return;
+    const o = { date: String(r.date), title: String(r.title).slice(0, 120), country: String(r.country || country), importance: r.importance };
+    if(r.source) o.source = String(r.source).slice(0, 80);
+    if(typeof r.source_url === 'string' && /^https?:\/\//i.test(r.source_url)) o.url = r.source_url.replace(/^http:/i, 'https:');
+    if(r.unit) o.unit = String(r.unit);
+    ['forecast', 'previous', 'actual'].forEach(k => { if(r[k] !== null && r[k] !== undefined && r[k] !== '') o[k] = r[k]; });
+    out.push(o);
+  });
+  return out.sort((a, b) => a.date.localeCompare(b.date)).slice(0, CAL_KEEP);
+}
+
 // ---- stock events ----
 const EVENT_TYPES = [
   { id: 'results', label: 'Results', tag: 'RESULTS' },
@@ -143,4 +162,4 @@ function filterItems(items, f, today){
   return items.filter(x => (f.type === 'all' || x.type === f.type) && (!limit || x.date <= limit || x.date < today));
 }
 
-export { EVENT_TYPES, IMPORTANCE, PULSE_SYMBOLS, buildTiles, calValue, cleanReading, filterItems, groupCalendar, nextBigEvents, readingPrompt, recentItems, shortDate, tileView, typeTag, upcomingItems };
+export { EVENT_TYPES, buildCalendar, IMPORTANCE, PULSE_SYMBOLS, buildTiles, calValue, cleanReading, filterItems, groupCalendar, nextBigEvents, readingPrompt, recentItems, shortDate, tileView, typeTag, upcomingItems };

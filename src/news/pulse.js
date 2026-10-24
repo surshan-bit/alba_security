@@ -1,15 +1,25 @@
 // Refresh News: the market pulse tiles (TradingView quotes) and the three "why" lines (Claude, from those numbers only).
-// The briefings, the economic calendar and the upcoming stock events are written from a research session, not by this button.
+// The same button refreshes the economic calendar (TradingView). The briefings and the upcoming stock events are written from a research session.
 import { dbCapabilityPromise } from '../core/store.js';
 import { tvCall, tvErrorText, tvMcp } from '../tv/connector.js';
 import { ldAskJson, ldEnsureClaudeAccess, ldErrText } from '../livedata/claude.js';
 import { claudeStepOn } from '../livedata/claudegate.js';
-import { PULSE_SYMBOLS, buildTiles, cleanReading, nextBigEvents, readingPrompt } from './model.js';
+import { PULSE_SYMBOLS, buildCalendar, buildTiles, cleanReading, nextBigEvents, readingPrompt } from './model.js';
 import { news } from './store.js';
 
 /** @type {{ state: string, msg: string }} */
 let run = { state: 'idle', msg: '' };
 const getPulseRun = () => run;
+
+// The next 30 days of India (medium and high) and US (high) events from TradingView. Needs the economic calendar tool in the page's TradingView permission.
+async function fetchCalendar(){
+  const from = new Date(Date.now() + 19800000).toISOString().slice(0, 10);
+  const to = new Date(Date.now() + 19800000 + 30 * 86400000).toISOString().slice(0, 10);
+  const get = async (countries, min) => { const p = await tvCall('mcp-tv-get-economic-calendar', { countries, date_from: from, date_to: to, min_importance: min }); return p && p.result; };
+  const rows = buildCalendar(await get('IN', 0), 'IN').concat(buildCalendar(await get('US', 1), 'US'));
+  if(!rows.length) throw new Error('TradingView returned no events.');
+  return rows.sort((a, b) => a.date.localeCompare(b.date));
+}
 
 async function refreshPulse(onChange){
   if(run.state === 'running') return;
@@ -28,6 +38,16 @@ async function refreshPulse(onChange){
     const prev = cur && cur.exists ? (cur.data() || {}) : {};
     await ref.set({ at, tiles, reading: Array.isArray(prev.reading) ? prev.reading : [], readingAt: prev.readingAt || null });
     let note = tiles.length + ' quotes saved.';
+    try {
+      run = { state: 'running', msg: 'Getting the economic calendar…' };
+      onChange();
+      const rows = await fetchCalendar();
+      const mref = db.doc('news/macro'), mcur = await mref.get(), upd = { calendar: rows, calendarAt: new Date().toISOString() };
+      if(mcur && mcur.exists) await mref.update(upd); else await mref.set(upd);
+      note += ' Calendar updated: ' + rows.length + ' events.';
+    } catch(e){
+      note += ' The calendar was not updated (' + (tvErrorText(e) || String((e && e.message) || e)) + ').';
+    }
     if(claudeStepOn('newsPulse')){
       run = { state: 'running', msg: 'Writing the reading…' };
       onChange();
