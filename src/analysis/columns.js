@@ -9,7 +9,6 @@ import { pcTickerKey, priceLoaded } from '../prices/store.js';
 import { isPinned } from '../core/pins.js';
 import { mosPct, mosRatingAny, scoreBand } from '../list/metrics.js';
 import { techRatingInfo } from '../detail/technical.js';
-import { techScore3 } from '../engine/technical.js';
 import { newsCellHtml } from '../strategies/news.js';
 
 // Analysis leaderboard column registry (added 2026-10-06) — the table's columns used to be
@@ -21,8 +20,7 @@ const ANALYSIS_LB_COLUMNS = [
   { id: 'rank', label: '#', num: true },
   { id: 'score', label: 'Fund', num: true, title: 'Fundamental score (0-10)' },
   { id: 'techScore', label: 'Tech', num: true, title: 'Technical score (0-10): momentum from price trend and RSI' },
-  { id: 'techScore2', label: 'Tech 2', num: true, title: 'Technical Score 2 (0-10): from the weekly price bars (trend, RSI, volume, distance from the 52-week high, MACD, recent moves)' },
-  { id: 'techScore3', label: 'Tech 3', num: true, title: 'Technical Score 3 (0-10): the Tech score without the valuation point, from the same MACD and RSI readings' },
+  // Tech 2 and Tech 3 are not shown in this grid (hidden in v1.261). They are still computed and stay available in Strategies (fields) and on each stock's page.
   { id: 'mos', label: 'MoS', num: true },
   { id: 'stock', label: 'Stock' },
   { id: 'weekChg', label: 'W % chg', num: true },
@@ -74,16 +72,6 @@ function analysisLbCellRaw(colId, ctx){
     case 'techScore': {
       const ts = s.technical && typeof s.technical.score === 'number' ? s.technical.score : null;
       return ts === null ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge b-${scoreBand(ts).replace('fs-', '')}" style="padding:1px 8px;font-size:.68rem;">${ts.toFixed(1)}</span></td>`;
-    }
-    case 'techScore2': {
-      const t2 = s.technical2;
-      if(!t2) return '<td class="analysis-lb-score"></td>';
-      if(typeof t2.score !== 'number') return `<td class="analysis-lb-score" title="Not scored: this is an older saved result; refresh all stocks to update it"><span style="color:var(--muted,#888)">–</span></td>`;
-      return `<td class="analysis-lb-score" title="${escapeHtml('Technical Score 2, week of ' + (t2.week || ''))}"><span class="badge b-${scoreBand(t2.score).replace('fs-', '')}" style="padding:1px 8px;font-size:.68rem;">${t2.score.toFixed(1)}</span></td>`;
-    }
-    case 'techScore3': {
-      const t3 = techScore3(s.technical);
-      return t3 === null ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge b-${scoreBand(t3).replace('fs-', '')}" style="padding:1px 8px;font-size:.68rem;">${t3.toFixed(1)}</span></td>`;
     }
     case 'pin': return `<td><button type="button" class="pin-btn${pinned ? ' pinned' : ''}" data-ticker="${escapeHtml(s.ticker)}" title="${pinned ? 'Unpin' : 'Pin to top'}">${pinned ? '★' : '☆'}</button></td>`;
     case 'rank': return `<td class="analysis-lb-rank">${i + 1}</td>`;
