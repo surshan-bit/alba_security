@@ -1,9 +1,9 @@
 // The News page: a "Global & Macro" tab (market pulse, briefings, economic calendar) and a "Stock events" tab.
 import { escapeHtml, tickerSymbol } from '../core/util.js';
 import { stockByTickerSymbol, stockIndex, stocks } from '../core/stocks.js';
-import { mosPct, scoreBand } from '../list/metrics.js';
+import { scoreBand } from '../list/metrics.js';
 import { qualifyingStocks } from '../strategies/rules.js';
-import { strategies } from '../strategies/state.js';
+import { publishedStrategies } from '../strategies/state.js';
 import { IMPORTANCE, EVENT_TYPES, calValue, filterItems, groupCalendar, nextBigEvents, recentItems, shortDate, tileView, typeTag, upcomingItems } from './model.js';
 import { news } from './store.js';
 import { getPulseRun } from './pulse.js';
@@ -19,7 +19,7 @@ const BRIEFING_GROUPS = [
 const SCOPE_STRATEGY = 'Positive MoS';
 
 /** The screen's own choices (kept only while the page is open). */
-const view = { tab: 'macro', when: 'upcoming', type: 'all', upto: 30, calAll: false };
+const view = { strategy: '', tab: 'macro', when: 'upcoming', type: 'all', upto: 30, calAll: false };
 
 const IST_MS = 19800000;
 const todayIst = () => new Date(Date.now() + IST_MS).toISOString().slice(0, 10);
@@ -34,11 +34,21 @@ const stamp = (iso) => {
   return shortDate(d.toISOString().slice(0, 10)) + ', ' + ((h + 11) % 12 + 1) + ':' + m + ' ' + (h >= 12 ? 'pm' : 'am');
 };
 
-// The stocks the Stock events tab covers: the "Positive MoS" strategy if there is one, otherwise every stock with a positive margin of safety.
+// Which stocks the Stock events tab covers: the strategy picked in the drop-down ("all" = every stock). The first time, the "Positive MoS" strategy if there is one.
+const PICK_KEY = 'albaDashboard.newsStrategy.v1';
+function savedPick(){ try { return localStorage.getItem(PICK_KEY) || ''; } catch(e){ return ''; } }
+function setPick(v){ view.strategy = v; try { localStorage.setItem(PICK_KEY, v); } catch(e){ /* storage unavailable: the choice lasts until the page closes */ } }
+function pickedStrategy(){
+  const list = publishedStrategies(), want = view.strategy || savedPick();
+  if(want === 'all') return 'all';
+  const st = list.find(x => x.id === want) || (want ? null : list.find(x => x.name === SCOPE_STRATEGY));
+  return st || list.find(x => x.name === SCOPE_STRATEGY) || 'all';
+}
 function scopeInfo(){
-  const st = strategies.find(x => x && x.name === SCOPE_STRATEGY);
-  const list = st && Array.isArray(st.rules) && st.rules.length ? qualifyingStocks(stocks, st.rules) : stocks.filter(s => { const m = mosPct(s); return isFinite(m) && m > 0; });
-  return { list, label: st ? 'from your "' + SCOPE_STRATEGY + '" strategy' : 'with a positive margin of safety' };
+  const st = pickedStrategy();
+  if(st === 'all') return { list: stocks.slice(), label: 'in the dashboard (all stocks)', pick: 'all' };
+  const rules = Array.isArray(st.rules) ? st.rules : [];
+  return { list: rules.length ? qualifyingStocks(stocks, rules) : stocks.slice(), label: 'from your "' + st.name + '" strategy', pick: st.id };
 }
 
 function pulseHtml(){
@@ -117,8 +127,9 @@ function eventsTab(){
   const today = todayIst(), scope = scopeInfo(), inScope = new Set(scope.list.map(s => tickerSymbol(s)));
   const typeOpts = '<option value="all">All types</option>' + EVENT_TYPES.map(t => `<option value="${t.id}"${view.type === t.id ? ' selected' : ''}>${escapeHtml(t.label)}</option>`).join('');
   const rangeOpts = [[7, 'Next 7 days'], [30, 'Next 30 days'], [90, 'Next 90 days'], [0, 'Any date']].map(([v, l]) => `<option value="${v}"${view.upto === v ? ' selected' : ''}>${l}</option>`).join('');
+  const stratOpts = '<option value="all"' + (scope.pick === 'all' ? ' selected' : '') + '>All stocks</option>' + publishedStrategies().map(x => `<option value="${escapeHtml(x.id)}"${scope.pick === x.id ? ' selected' : ''}>${escapeHtml(x.name)}</option>`).join('');
   let h = '<h2 class="news-h2" data-icon="tag">' + (view.when === 'recent' ? 'Recent events' : 'Upcoming events') + '</h2>' + `<div class="news-filters"><button type="button" class="news-pill${view.when === 'upcoming' ? ' on' : ''}" data-news-when="upcoming">Upcoming</button><button type="button" class="news-pill${view.when === 'recent' ? ' on' : ''}" data-news-when="recent">Recent</button>` +
-    `<select class="news-select" data-news-type aria-label="Event type">${typeOpts}</select>` + (view.when === 'upcoming' ? `<select class="news-select" data-news-upto aria-label="Date range">${rangeOpts}</select>` : '') + '</div>';
+    `<select class="news-select news-select-strategy" data-news-strategy aria-label="Strategy">${stratOpts}</select>` + `<select class="news-select" data-news-type aria-label="Event type">${typeOpts}</select>` + (view.when === 'upcoming' ? `<select class="news-select" data-news-upto aria-label="Date range">${rangeOpts}</select>` : '') + '</div>';
   h += `<div class="news-hint">Covers ${scope.list.length.toLocaleString('en-IN')} stocks ${escapeHtml(scope.label)}.</div>`;
   if(view.when === 'upcoming'){
     const ev = news.events, all = ev && Array.isArray(ev.items) ? ev.items : [];
@@ -148,4 +159,4 @@ function newsHtml(){
   return head + (view.tab === 'events' ? eventsTab() : macroTab());
 }
 
-export { newsHtml, view };
+export { newsHtml, setPick, view };
