@@ -21,13 +21,14 @@ const appSections = {
   analysis: document.getElementById('section-analysis'),
   strategies: document.getElementById('section-strategies'),
   business: document.getElementById('section-business'),
+  news: document.getElementById('section-news'),
   trackrecord: document.getElementById('section-trackrecord'),
   knowledgebase: document.getElementById('section-knowledgebase'),
   settings: document.getElementById('section-settings')
 };
 
 // "Alba Securities > Analysis": the page name lives in the top bar, so the big heading above each page is hidden (CSS).
-const SECTION_LABELS = { analysis: 'Analysis', strategies: 'Strategies', business: 'Explorer', trackrecord: 'Trade Log', refreshlog: 'Data Refresh', help: 'Help', knowledgebase: 'Knowledge Base', settings: 'Settings' };
+const SECTION_LABELS = { analysis: 'Analysis', strategies: 'Strategies', business: 'Explorer', news: 'News', trackrecord: 'Trade Log', refreshlog: 'Data Refresh', help: 'Help', knowledgebase: 'Knowledge Base', settings: 'Settings' };
 function updateTopbarSection(){
   const el = document.getElementById('topbarSection');
   const active = Object.keys(appSections).find(k => appSections[k] && appSections[k].classList.contains('active'));
@@ -47,6 +48,7 @@ function closeSidebar(){
 definePart('refreshlog', { before: () => ensurePartial(document.getElementById('section-refreshlog')), load: () => import('../sections/refreshlog.js') });
 definePart('strategies', { load: () => import('../sections/strategies.js') });
 definePart('business', { load: () => import('../sections/business.js') });
+definePart('news', { load: () => import('../sections/news.js') });
 definePart('trackrecord', { load: () => import('../sections/tradelog.js') });
 
 // A page whose code could not be downloaded: say so in the page, with a way to try again.

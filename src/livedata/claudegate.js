@@ -10,6 +10,7 @@ const CLAUDE_STEPS = [
   { id: 'globalMacro', label: 'Write Global & Macro', sub: 'Macro, commodity and policy links, recent news and critical world events for one stock.' },
   { id: 'strengths', label: 'Write Strengths and Watch-outs', sub: 'The summary box at the top of the Fundamental Score panel.' },
   { id: 'newsLabels', label: 'Label news headlines', sub: 'Marks each headline on the price chart positive, negative or neutral.' },
+  { id: 'newsPulse', label: 'Explain the market pulse (News page)', sub: 'Writes the three plain "why" lines under the market numbers when you press Refresh News.' },
   { id: 'practice', label: 'Strategy practice ideas', sub: 'Asks Claude to suggest rule sets on the Strategies screen.' }
 ];
 
