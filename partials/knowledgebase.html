@@ -127,7 +127,15 @@
             <li><code>technical.reason</code> names what was missing.</li>
           </ul>
         </li>
-        <li><b>Tech 3 (v1.258; hidden from every screen since v1.261, still worked out):</b> the same composite with the valuation points left out, so the MACD and RSI weights add up to 8 instead of 10 and the sum is rescaled to 0&ndash;10 over them. It is worked out when the page loads from the MACD and RSI states saved in the stock's <code>technical</code> block (<code>techScore3</code> in <code>src/engine/technical.js</code>), so nothing extra is saved and it follows every Tech score update. It has no score when no MACD or RSI state is saved.</li>
+        <li><b>Tech 2 and Tech 3:</b> two extra scores, hidden from every screen since v1.261 but still worked out.
+          <ul>
+            <li>Tech 3 is the Tech score without the valuation points, rescaled to 0&ndash;10 (<code>techScore3</code> in <code>src/engine/technical.js</code>).</li>
+            <li>Tech 3 is worked out when the page loads from the saved MACD and RSI states, so nothing extra is saved.</li>
+            <li>Tech 2 is a weekly-bar score saved with each stock by Refresh all stocks (collection <code>techScore2</code>).</li>
+            <li>Hidden means: not in the Analysis grid, the Peers table or the Strategies rule picker (fields flagged <code>hidden</code> in <code>src/strategies/fields.js</code>).</li>
+            <li>A strategy saved earlier with a rule on either score still works.</li>
+          </ul>
+        </li>
         <li><b>Left untouched:</b> a stock's existing <code>technical</code> block stays as is when it has no row in the CSV, or when <code>pillars.val</code> is missing.</li>
         <li><b>No onboarding:</b> symbols not already on the dashboard are skipped. New stocks come only from the Fundamental CSV (&sect;3).</li>
         <li><b>Price refresh:</b> each import also updates matched stocks' current price (see v1.9).</li>
@@ -137,7 +145,14 @@
             <li>Refreshes fetch only the delta: when bars are already stored, just the bars since the last stored one are pulled (plus 3 of overlap), merged into the stored history and cross-checked against it. If the overlap no longer matches (for example after a split), it falls back to a full re-download. The first run for a stock still fetches the full 5 years.</li>
             <li>Ticked on its own (nothing else flagged), the request only refreshes the price bars and needs no republish.</li>
             <li>Up to 5 years of history or everything since listing, validated and stored in the <code>priceHistory</code> collection (&sect;7). It never changes a score.</li>
-            <li><b>MACD panel (v1.259):</b> each chart shows MACD (12, 26, 9) under the volume (the first 33 bars faded as warm-up since v1.260), worked out on the page from the same bars with <code>techMacdSeries</code> in <code>src/engine/technical.js</code>, the one maths behind the saved MACD state. Nothing extra is stored.</li>
+            <li><b>MACD panel under each chart:</b>
+              <ul>
+                <li>It shows MACD (12, 26, 9) under the volume, worked out on the page from the same bars (<code>techMacdSeries</code> in <code>src/engine/technical.js</code>).</li>
+                <li>It uses the same maths as the saved MACD state, and nothing extra is stored.</li>
+                <li>The first 33 bars are faded and dashed on a light shade (warm-up); a stock with under 35 bars has no panel.</li>
+                <li>It is drawn in <code>src/prices/chart.js</code>; the colours are in <code>styles/price-history.css</code>.</li>
+              </ul>
+            </li>
           </ul>
         </li>
         <li><b>Upload panel:</b> shows new and dropped tickers and a refresh scope preview, and saves the file to the asset store (&sect;7).</li>
@@ -215,7 +230,7 @@
         <li>Merge the pull request into <code>main</code> when <code>check</code> is green. If another pull request merged first without rebuilt files, run <code>npm run build</code> and merge the regenerated <code>app.js</code>, <code>chunks/</code> and <code>index.html</code> in a small follow-up pull request, so GitHub matches what is published.</li>
         <li>On <code>main</code>, after a build, <code>npm run release -- --since &lt;merge commit of the previous release&gt;</code> writes the page file, the list of files for the Artifact tool (the files that changed since then plus every chunk, with the old chunk names removed) and the release record. <code>--since</code> is required because the previous tip of <code>main</code> is not always the last published commit.</li>
         <li>Check the live Artifact's version id has not moved, then publish the page shell and only those files. Stock data, research and logs live in the database and never need republishing.</li>
-        <li>Write the release record (<code>appMeta/release</code>: build, version, time) right after publishing. Open pages compare their own build with it, reload once and then stop asking; a stale record makes every open tab show "A new version is available".</li>
+        <li>Write the release record (<code>appMeta/release</code>: build, version, time) right after every publish, without exception. Open pages compare their own build with it and reload once; a stale record makes every open tab keep asking to reload.</li>
       </ol>
 
       <h2 id="kb-versions" data-icon="clock">9. Version history</h2>
@@ -223,27 +238,40 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.262 &middot; 2026-10-24</h3>
+            <ul>
+              <li>Help and Knowledge Base brought up to date with the latest changes.</li>
+              <li>Help now explains the price charts, the MACD panel and the reload message.</li>
+              <li>Knowledge Base &sect;4 now describes the hidden Tech 2 and Tech 3 and the MACD panel in short bullets.</li>
+            </ul>
+
             <h3>v1.261 &middot; 2026-10-24</h3>
             <ul>
-              <li><strong>Tech 2 and Tech 3 hidden from every screen.</strong> The two columns no longer appear in the Analysis table or its Columns panel, and the two fields (&ldquo;Technical score 2&rdquo; and &ldquo;Technical score 3&rdquo;) are no longer offered when building a strategy rule or in the strategy learning. Nothing is deleted and no maths changed: both scores are still worked out in the background (Tech 2 is still saved with each stock by Refresh all stocks), a strategy saved earlier with a rule on either score keeps working, and a saved column order that mentions them is ignored.</li>
+              <li><strong>Tech 2 and Tech 3 hidden from every screen.</strong></li>
+              <li>Removed from the Analysis grid, its Columns panel, the Peers table and the Strategies rule picker.</li>
+              <li>Both scores are still worked out; strategies saved with a rule on them still work.</li>
             </ul>
 
             <h3>v1.260 &middot; 2026-10-24</h3>
             <ul>
-              <li><strong>MACD now spans the whole chart.</strong> The first 33 bars of the MACD panel, where the averages are still settling, used to be blank. They are now drawn faded and dashed on a light grey shade, labelled &ldquo;warm-up: less reliable&rdquo;, and the solid lines carry on from the 34th bar. The hover on a faded bar shows its values with a &ldquo;MACD still warming up&rdquo; note. On Monthly (about 60 bars) the faded part is about half the chart; on Weekly it is the first few months.</li>
-              <li>It is a picture only: the MACD maths and every score are unchanged.</li>
+              <li><strong>MACD now spans the whole chart.</strong></li>
+              <li>The first 33 bars, once blank, are drawn faded and dashed with the label &ldquo;warm-up: less reliable&rdquo;.</li>
+              <li>Hovering a faded bar says &ldquo;MACD still warming up&rdquo;.</li>
+              <li>A picture only: no score changes.</li>
             </ul>
 
             <h3>v1.259 &middot; 2026-10-24</h3>
             <ul>
-              <li><strong>MACD under the price charts.</strong> The Weekly and Monthly charts on a stock&rsquo;s page now have a MACD panel under the volume bars: the MACD line (blue), its signal line (orange), and the gap between them as bars (blue when the MACD is above its signal, orange when below), with a dashed zero line. The Legend button explains the colours, and hovering a bar shows that bar&rsquo;s MACD, signal and histogram next to its prices.</li>
-              <li>It uses the same MACD (12, 26, 9) as the Technical Score, worked out from the chart&rsquo;s own bars (the latest bar follows the current price). The first 33 bars are faded while the lines settle (v1.260; before that they were left out), and a stock with fewer than 35 bars shows no MACD panel. It is a picture only: no score changes.</li>
+              <li><strong>MACD under the price charts.</strong></li>
+              <li>The Weekly and Monthly charts get a MACD panel: MACD line, signal line, and bars for the gap.</li>
+              <li>Hovering a bar shows its MACD, signal and gap; the Legend button explains the colours.</li>
+              <li>A picture only: no score changes.</li>
             </ul>
 
             <h3>v1.258 &middot; 2026-10-24</h3>
             <ul>
-              <li><strong>New Tech 3 score.</strong> A third technical score, shown as a <strong>Tech 3</strong> column beside Tech and Tech 2 in the Analysis grid, and as a &ldquo;Technical score 3&rdquo; field in Strategies. It is the Tech score with one change: the valuation point is left out. It uses the same monthly and weekly MACD and RSI readings with the same weights, and the remaining components are rescaled to a 0&ndash;10 score, so a stock&rsquo;s Tech 3 no longer moves when its valuation changes.</li>
-              <li>Tech 3 is worked out from the readings already saved with each stock, so it needs no refresh of its own. It appears for every stock that has a Tech score, and changes whenever the Tech score is next updated. The Tech and Tech 2 scores are unchanged.</li>
+              <li><strong>New Tech 3 score</strong> (the Tech score without the valuation points); hidden again in v1.261.</li>
+              <li>It is worked out from the saved MACD and RSI readings, so it needs no refresh of its own.</li>
             </ul>
 
             <h3>v1.257 &middot; 2026-10-24</h3>
