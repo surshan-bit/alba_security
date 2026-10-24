@@ -84,6 +84,7 @@ function briefingsHtml(){
 function calendarHtml(){
   const m = news.macro, rows = m && Array.isArray(m.calendar) ? m.calendar : [];
   let h = '<div class="news-sec">Economic calendar &middot; next 30 days</div>';
+  if(m && m.calendarAt) h += `<div class="news-hint">Updated ${escapeHtml(stamp(m.calendarAt))} from TradingView.</div>`;
   if(!rows.length) return h + '<p class="news-empty">No calendar yet. It is saved from a Claude session.</p>';
   const groups = groupCalendar(rows, view.calAll ? -1 : 0), today = todayIst();
   const shown = groups.filter(g => g.date >= today);

@@ -947,6 +947,17 @@ test('trade call: history keeps one point a day and lists when the call changed'
     assert.strictEqual(N.calValue(4, '%'), '4%');
     assert.strictEqual(N.calValue(null, '%'), '');
   });
+  test('news: calendar rows from TradingView keep India medium+, others high only, with shown values and safe links', () => {
+    const src = [{ date: '2026-11-12T10:30:00.000Z', title: 'Inflation Rate YoY', country: 'IN', importance: 0, forecast: null, previous: 5.54, unit: '%', source: 'MOSPI', source_url: 'http://www.mospi.gov.in/' },
+      { date: '2026-11-06T13:30:00.000Z', title: 'Non Farm Payrolls', country: 'US', importance: 1, previous: 29, actual: 31, source_url: 'javascript:alert(1)' },
+      { date: '2026-11-05T13:30:00.000Z', title: 'Minor', country: 'US', importance: 0 }, { title: 'No date', importance: 1 }];
+    const inr = N.buildCalendar(src, 'IN'), us = N.buildCalendar(src, 'US');
+    assert.deepStrictEqual(inr.map(r => r.title), ['Minor', 'Non Farm Payrolls', 'Inflation Rate YoY']);
+    assert.strictEqual(inr.find(r => r.title === 'Inflation Rate YoY').url, 'https://www.mospi.gov.in/');
+    assert.ok(!('forecast' in inr.find(r => r.title === 'Inflation Rate YoY')));
+    assert.deepStrictEqual(us.map(r => r.title), ['Non Farm Payrolls']);
+    assert.ok(!('url' in us[0]) && us[0].actual === 31 && us[0].previous === 29);
+  });
   test('news: upcoming and recent stock events are selected and filtered', () => {
     const items = [{ ticker: 'A', type: 'results', date: '2026-10-30' }, { ticker: 'B', type: 'dividend', date: '2026-12-20' }, { ticker: 'C', type: 'results', date: '2026-10-01' }, { ticker: 'D', type: 'weird', date: '2026-10-30' }, { ticker: 'E', type: 'board', date: 'soon' }];
     const up = N.upcomingItems(items, '2026-10-24');
