@@ -2,6 +2,7 @@
 // whether it comes from price bars alone (`priceBased`). Price-based rules can be replayed on old bars later; the
 // others read today's stored fundamentals, so a backtest using them would look ahead.
 import { verdictLabel } from '../core/stocks.js';
+import { techScore3 } from '../engine/technical.js';
 import { isPinned } from '../core/pins.js';
 import { tickerIndustry } from '../core/util.js';
 import { mosPct, mosRatingAny } from '../list/metrics.js';
@@ -50,6 +51,7 @@ const FIELDS = [
   { id: 'monthPct', group: 'Technical', label: 'Monthly % change', type: 'num', unit: '%', dp: 1, priceBased: true, get: (s) => num(rawOf(s).monthPctChange) },
   { id: 'techScore', group: 'Technical', label: 'Technical score', type: 'num', unit: '/10', dp: 1, get: (s) => num(s.technical && s.technical.score) },
   { id: 'techScore2', group: 'Technical', label: 'Technical score 2', type: 'num', unit: '/10', dp: 1, get: (s) => num(s.technical2 && s.technical2.score) },
+  { id: 'techScore3', group: 'Technical', label: 'Technical score 3', type: 'num', unit: '/10', dp: 1, get: (s) => num(techScore3(s.technical)) },
   { id: 'newsPos', group: 'News and events', label: `Positive news items (last ${NEWS_DAYS} days)`, type: 'num', unit: '', dp: 0, get: (s) => { const c = newsCounts(s); return c ? c.pos : null; } },
   { id: 'newsNeg', group: 'News and events', label: `Negative news items (last ${NEWS_DAYS} days)`, type: 'num', unit: '', dp: 0, get: (s) => { const c = newsCounts(s); return c ? c.neg : null; } },
   { id: 'newsAll', group: 'News and events', label: `All news items (last ${NEWS_DAYS} days)`, type: 'num', unit: '', dp: 0, get: (s) => { const c = newsCounts(s); return c ? c.total : null; } },

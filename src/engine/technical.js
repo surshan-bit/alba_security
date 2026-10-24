@@ -33,6 +33,13 @@ function techComposite(st, valScore){
   if(valScore != null){ pts += valScore / 10 * 2.0; wt += 2.0; }
   return wt ? Math.round(pts / wt * 10 * 100) / 100 : null;
 }
+// Technical Score 3 (v1.258): the Technical Score with one change, the valuation pillar is not part of it. It reads the four
+// MACD / RSI states saved with the stock's technical block, so it always rests on the same bars as the Technical Score and needs no
+// saving of its own. Components that are missing are left out and the rest rescaled, as in the Technical Score. Null without any state.
+function techScore3(technical){
+  const st = technical && technical.states;
+  return st ? techComposite(st, null) : null;
+}
 // ---- Completed bars only (v1.181) ----
 // A weekly or monthly bar that is still in progress keeps moving, so a score saved from it can flip on the next refresh.
 // The saved score therefore uses completed bars only; the in-progress reading is kept apart as `provisional`.
@@ -120,4 +127,4 @@ function techKeepsBarsBlock(t, today, days = 3){
   return techDayNo(today) - techDayNo(t.asof) <= days;
 }
 
-export { computeTechnical, snapshotTechnical, techCompleted, techEma, techKeepsBarsBlock, techRsi };
+export { computeTechnical, snapshotTechnical, techCompleted, techEma, techKeepsBarsBlock, techRsi, techScore3 };
