@@ -27,7 +27,7 @@ const MACD_OPTIONS = [
 const NONE_LABEL = 'None (no rating)';
 const macdState = (key) => (s) => (s.technical && s.technical.states && s.technical.states[key]) || null;
 
-const FIELDS = [
+const ALL_FIELDS = [
   { id: 'score', group: 'Fundamental', label: 'Fundamental score', type: 'num', unit: '/10', dp: 1, get: (s) => num(s.score) },
   { id: 'verdict', group: 'Fundamental', label: 'Verdict', type: 'enum', get: (s) => s.verdict || null,
     options: ['buy', 'mbuy', 'hold', 'avoid'].map(k => [k, verdictLabel[k], k]) },
@@ -50,8 +50,8 @@ const FIELDS = [
   { id: 'weekPct', group: 'Technical', label: 'Weekly % change', type: 'num', unit: '%', dp: 1, priceBased: true, get: (s) => num(rawOf(s).weekPctChange) },
   { id: 'monthPct', group: 'Technical', label: 'Monthly % change', type: 'num', unit: '%', dp: 1, priceBased: true, get: (s) => num(rawOf(s).monthPctChange) },
   { id: 'techScore', group: 'Technical', label: 'Technical score', type: 'num', unit: '/10', dp: 1, get: (s) => num(s.technical && s.technical.score) },
-  { id: 'techScore2', group: 'Technical', label: 'Technical score 2', type: 'num', unit: '/10', dp: 1, get: (s) => num(s.technical2 && s.technical2.score) },
-  { id: 'techScore3', group: 'Technical', label: 'Technical score 3', type: 'num', unit: '/10', dp: 1, get: (s) => num(techScore3(s.technical)) },
+  { id: 'techScore2', group: 'Technical', label: 'Technical score 2', hidden: true, type: 'num', unit: '/10', dp: 1, get: (s) => num(s.technical2 && s.technical2.score) },
+  { id: 'techScore3', group: 'Technical', label: 'Technical score 3', hidden: true, type: 'num', unit: '/10', dp: 1, get: (s) => num(techScore3(s.technical)) },
   { id: 'newsPos', group: 'News and events', label: `Positive news items (last ${NEWS_DAYS} days)`, type: 'num', unit: '', dp: 0, get: (s) => { const c = newsCounts(s); return c ? c.pos : null; } },
   { id: 'newsNeg', group: 'News and events', label: `Negative news items (last ${NEWS_DAYS} days)`, type: 'num', unit: '', dp: 0, get: (s) => { const c = newsCounts(s); return c ? c.neg : null; } },
   { id: 'newsAll', group: 'News and events', label: `All news items (last ${NEWS_DAYS} days)`, type: 'num', unit: '', dp: 0, get: (s) => { const c = newsCounts(s); return c ? c.total : null; } },
@@ -65,6 +65,8 @@ const FIELDS = [
   { id: 'pinned', group: 'Other', label: 'Pinned', type: 'enum', get: (s) => (isPinned(s) ? 'yes' : 'no'), options: [['yes', 'Pinned', 'accent'], ['no', 'Not pinned']] },
   { id: 'industry', group: 'Other', label: 'Industry', type: 'text', get: (s) => { const i = tickerIndustry(s); return i === '—' ? null : i; } }
 ];
-const FIELD_BY_ID = new Map(FIELDS.map(f => [f.id, f]));
+// Fields marked hidden (Tech 2 and Tech 3, hidden from every screen in v1.261) are not offered in the rule picker or the learning, but stay in FIELD_BY_ID so a strategy saved earlier with such a rule still reads and applies.
+const FIELDS = ALL_FIELDS.filter(f => !f.hidden);
+const FIELD_BY_ID = new Map(ALL_FIELDS.map(f => [f.id, f]));
 
 export { FIELDS, FIELD_BY_ID };

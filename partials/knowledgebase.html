@@ -127,7 +127,7 @@
             <li><code>technical.reason</code> names what was missing.</li>
           </ul>
         </li>
-        <li><b>Tech 3 (v1.258):</b> the same composite with the valuation points left out, so the MACD and RSI weights add up to 8 instead of 10 and the sum is rescaled to 0&ndash;10 over them. It is worked out when the page loads from the MACD and RSI states saved in the stock's <code>technical</code> block (<code>techScore3</code> in <code>src/engine/technical.js</code>), so nothing extra is saved and it follows every Tech score update. It has no score when no MACD or RSI state is saved.</li>
+        <li><b>Tech 3 (v1.258; hidden from every screen since v1.261, still worked out):</b> the same composite with the valuation points left out, so the MACD and RSI weights add up to 8 instead of 10 and the sum is rescaled to 0&ndash;10 over them. It is worked out when the page loads from the MACD and RSI states saved in the stock's <code>technical</code> block (<code>techScore3</code> in <code>src/engine/technical.js</code>), so nothing extra is saved and it follows every Tech score update. It has no score when no MACD or RSI state is saved.</li>
         <li><b>Left untouched:</b> a stock's existing <code>technical</code> block stays as is when it has no row in the CSV, or when <code>pillars.val</code> is missing.</li>
         <li><b>No onboarding:</b> symbols not already on the dashboard are skipped. New stocks come only from the Fundamental CSV (&sect;3).</li>
         <li><b>Price refresh:</b> each import also updates matched stocks' current price (see v1.9).</li>
@@ -223,6 +223,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.261 &middot; 2026-10-24</h3>
+            <ul>
+              <li><strong>Tech 2 and Tech 3 hidden from every screen.</strong> The two columns no longer appear in the Analysis table or its Columns panel, and the two fields (&ldquo;Technical score 2&rdquo; and &ldquo;Technical score 3&rdquo;) are no longer offered when building a strategy rule or in the strategy learning. Nothing is deleted and no maths changed: both scores are still worked out in the background (Tech 2 is still saved with each stock by Refresh all stocks), a strategy saved earlier with a rule on either score keeps working, and a saved column order that mentions them is ignored.</li>
+            </ul>
+
             <h3>v1.260 &middot; 2026-10-24</h3>
             <ul>
               <li><strong>MACD now spans the whole chart.</strong> The first 33 bars of the MACD panel, where the averages are still settling, used to be blank. They are now drawn faded and dashed on a light grey shade, labelled &ldquo;warm-up: less reliable&rdquo;, and the solid lines carry on from the 34th bar. The hover on a faded bar shows its values with a &ldquo;MACD still warming up&rdquo; note. On Monthly (about 60 bars) the faded part is about half the chart; on Weekly it is the first few months.</li>
