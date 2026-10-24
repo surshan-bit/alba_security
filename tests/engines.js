@@ -11,9 +11,9 @@ const { TV_HEADER, FUND_HEADER, tvCsv, fundCsv, fundRow, rv } = D;
 const rd = f => fs.readFileSync(path.join(root, f), 'utf8');
 
 const { load } = require('./lib/load.js');
-const F = load('src/import/fund-engine.js', 'export { AlbaFundEngine };');
+const F = load('src/import/fund-engine.js', 'export { FundEngine };');
 const P = load('src/import/csvparse.js');
-const Fe = F.AlbaFundEngine;
+const Fe = F.FundEngine;
 
 let passed = 0; const failures = [];
 const pending = [];   // async tests: awaited before the summary
@@ -173,7 +173,7 @@ test('apply: re-scores listed stocks in place, adds new ones with safe defaults,
   const stocks = [mkStock('WID0', 'Widgets'), mkStock('WID1', 'Widgets'), mkStock('GONE', 'Widgets'), mkStock(String(JSON.parse(JSON.stringify(universe[30]['BSE Code']))), 'Gammas')];
   const before = JSON.parse(JSON.stringify(stocks));
   const rows = universe.slice(0, 20).concat([universe[30]]); const csv2 = fundCsv(rows);
-  const res = F.albaApplyFundamental(csv2, stocks, '2026-10-10');
+  const res = F.applyFundamental(csv2, stocks, '2026-10-10');
   assert.strictEqual(res.csvRows, 21); assert.strictEqual(res.rescored, 3); assert.deepStrictEqual(res.dropped, ['GONE · Widgets']);
   assert.strictEqual(res.onboarded.length, 21 - 3); 
   assert.strictEqual(stocks.length, 4 + 18);                                        // appended, nothing removed
@@ -204,21 +204,21 @@ const chkStock = (i, extra) => Object.assign({ ticker: 'C' + i + ' · T', score:
 const chkList = extra => Array.from({ length: 2000 }, (_, i) => (i === 0 ? chkStock(0, extra) : chkStock(i)));
 test('integrity check: a stock with no Intrinsic Value may have no valuation anchor (pillars.val)', () => {
   const noIv = { pillars: {}, valuation: { intrinsicValue: null, currentPrice: 51.09 } };
-  const r = C.albaFiCheck(chkList(noIv), new Map()); assert.deepStrictEqual(r.hard, []);
-  const r2 = C.albaFiCheck(chkList({ pillars: {}, valuation: { currentPrice: 51.09 } }), new Map()); assert.deepStrictEqual(r2.hard, []);   // no valuation figures at all
+  const r = C.fiCheck(chkList(noIv), new Map()); assert.deepStrictEqual(r.hard, []);
+  const r2 = C.fiCheck(chkList({ pillars: {}, valuation: { currentPrice: 51.09 } }), new Map()); assert.deepStrictEqual(r2.hard, []);   // no valuation figures at all
 });
 test('integrity check: a stock that HAS a valuation but no pillars.val is still a hard failure', () => {
-  const r = C.albaFiCheck(chkList({ pillars: {} }), new Map());
+  const r = C.fiCheck(chkList({ pillars: {} }), new Map());
   assert.strictEqual(r.hard.length, 1); assert.ok(/1 stocks with a non-numeric pillars\.val: C0/.test(r.hard[0]));
-  const r2 = C.albaFiCheck(chkList({ pillars: { val: 'x' } }), new Map()); assert.ok(/non-numeric pillars\.val/.test(r2.hard[0]));
+  const r2 = C.fiCheck(chkList({ pillars: { val: 'x' } }), new Map()); assert.ok(/non-numeric pillars\.val/.test(r2.hard[0]));
 });
 test('apply + check: a new ticker with a blank Intrinsic Value is added without a valuation anchor and passes the check', () => {
   const noIv = fundRow('NOIV', 'Alpha', 'Widgets', { 'Intrinsic Value': '', Graham: '' });
   const stocks = [];
-  const res = F.albaApplyFundamental(fundCsv([noIv, ...universe.slice(0, 11)]), stocks, '2026-10-10');
+  const res = F.applyFundamental(fundCsv([noIv, ...universe.slice(0, 11)]), stocks, '2026-10-10');
   const s = stocks.find(x => x.ticker.startsWith('NOIV'));
   assert.ok(s); assert.ok(res.onboarded.includes('NOIV')); assert.deepStrictEqual(s.pillars, {}); assert.ok(!(s.valuation.intrinsicValue > 0));
-  assert.ok(!C.albaFiCheck(stocks.concat(chkList()), new Map()).hard.some(m => /pillars\.val/.test(m)));
+  assert.ok(!C.fiCheck(stocks.concat(chkList()), new Map()).hard.some(m => /pillars\.val/.test(m)));
 });
 const PM = load('src/prices/periodmove.js');
 const istMs = (y, mo, d, h, mi) => Date.UTC(y, mo - 1, d, h, mi) - 330 * 60000;   // an India-time moment as epoch ms
@@ -282,34 +282,34 @@ test('period move: nothing to report without a price or a bar before the period'
 test('apply: a stock in the file is active, one missing from it is marked inactive, and it comes back when it returns', () => {
   const stocks = [mkStock('KEEP', 'Widgets'), mkStock('GONE', 'Widgets', { active: undefined })];
   const keep = fundRow('KEEP', 'Alpha', 'Widgets');
-  const res = F.albaApplyFundamental(fundCsv([keep, ...universe.slice(0, 11)]), stocks, '2026-10-10');
+  const res = F.applyFundamental(fundCsv([keep, ...universe.slice(0, 11)]), stocks, '2026-10-10');
   assert.strictEqual(stocks[0].active, undefined); assert.strictEqual(stocks[1].active, false);
   assert.deepStrictEqual(res.inactive, [stocks[1].ticker]);
-  const again = F.albaApplyFundamental(fundCsv([keep, fundRow('GONE', 'Alpha', 'Widgets'), ...universe.slice(0, 11)]), stocks, '2026-10-11');
+  const again = F.applyFundamental(fundCsv([keep, fundRow('GONE', 'Alpha', 'Widgets'), ...universe.slice(0, 11)]), stocks, '2026-10-11');
   assert.strictEqual(stocks[1].active, undefined); assert.deepStrictEqual(again.inactive, []);
 });
 test('apply: BSE-only companies are onboarded under their BSE number and listed as such', () => {
   const stocks = []; const row = fundRow('', 'Alpha', 'Widgets', { 'NSE Code': '', 'BSE Code': '512345' });
-  const res = F.albaApplyFundamental(fundCsv([row, ...universe.slice(0, 11)]), stocks, '2026-10-10');
+  const res = F.applyFundamental(fundCsv([row, ...universe.slice(0, 11)]), stocks, '2026-10-10');
   assert.ok(res.bseOnly.includes('512345')); assert.ok(res.onboarded.includes('512345')); assert.strictEqual(stocks.find(s => s.ticker.startsWith('512345')).asof, '2026-10-10');
 });
 test('apply (known quirk): a listed company whose CSV row has no data is "re-scored" to 0.56 / avoid rather than left alone', () => {
   const bad = fundRow('BAD', 'Alpha', 'Widgets', Object.fromEntries(FUND_HEADER.filter(h => !/^(Name|BSE Code|NSE Code|ISIN Code|Industry|Industry Group)$/.test(h)).map(h => [h, ''])));
   const stocks = [mkStock('BAD', 'Widgets')];
-  const res = F.albaApplyFundamental(fundCsv([bad, ...universe.slice(0, 11)]), stocks, '2026-10-10');
+  const res = F.applyFundamental(fundCsv([bad, ...universe.slice(0, 11)]), stocks, '2026-10-10');
   assert.strictEqual(res.rescored, 1); assert.strictEqual(stocks[0].score, 0.56); assert.strictEqual(stocks[0].verdict, 'avoid');
 });
 test('apply: an unclassified industry group in the file does not overwrite the stock\'s own group', () => {
   const stocks = [mkStock('UNC', 'Widgets')]; const rows = [fundRow('UNC', '', 'Widgets', { 'Industry Group': '' }), ...universe.slice(0, 11)];
-  F.albaApplyFundamental(fundCsv(rows), stocks, '2026-10-10'); assert.strictEqual(stocks[0].industryGroup, 'OldGroup');
+  F.applyFundamental(fundCsv(rows), stocks, '2026-10-10'); assert.strictEqual(stocks[0].industryGroup, 'OldGroup');
 });
 test('apply: running the same file twice gives the same list', () => {
-  const run = () => { const s = [mkStock('WID0', 'Widgets')]; F.albaApplyFundamental(csv, s, '2026-10-10'); return s; };
+  const run = () => { const s = [mkStock('WID0', 'Widgets')]; F.applyFundamental(csv, s, '2026-10-10'); return s; };
   assert.deepStrictEqual(run(), run());
 });
 test('apply: bad files throw before anything is changed', () => {
   const stocks = [mkStock('WID0', 'Widgets')], before = JSON.parse(JSON.stringify(stocks));
-  assert.throws(() => F.albaApplyFundamental('not,a,csv\n', stocks, '2026-10-10')); assert.throws(() => F.albaApplyFundamental('', stocks, '2026-10-10'));
+  assert.throws(() => F.applyFundamental('not,a,csv\n', stocks, '2026-10-10')); assert.throws(() => F.applyFundamental('', stocks, '2026-10-10'));
   assert.deepStrictEqual(stocks, before);
 });
 
@@ -393,13 +393,13 @@ test('fix: a negative P/E gives no own-history valuation gap (same as having no 
 });
 test('fix: the technical valuation anchor is refreshed on every fundamental import, not only for new stocks', () => {
   const stocks = [mkStock('WID0', 'Widgets', { pillars: { val: 4 } })];
-  F.albaApplyFundamental(fundCsv(universe.slice(0, 14)), stocks, '2026-10-14');
+  F.applyFundamental(fundCsv(universe.slice(0, 14)), stocks, '2026-10-14');
   const dcf = stocks[0].fundamentals.factors.find(f => f.key === 'dcf');
   assert.strictEqual(stocks[0].pillars.val, Math.round(dcf.score * 10 * 10) / 10);
   // no intrinsic value in the file: the old anchor is kept rather than overwritten with 0
   const rows = universe.slice(0, 14).map(r => Object.assign({}, r)); rows[0]['Intrinsic Value'] = '';
   const s2 = [mkStock('WID0', 'Widgets', { pillars: { val: 4 } })];
-  F.albaApplyFundamental(fundCsv(rows), s2, '2026-10-14');
+  F.applyFundamental(fundCsv(rows), s2, '2026-10-14');
   assert.strictEqual(s2[0].pillars.val, 4);
 });
 {

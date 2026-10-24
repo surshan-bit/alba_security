@@ -60,7 +60,7 @@ function priceHistoryStatus(s){
                      : { has:true, needed:false, delta, text:`up to date, last bar ${lastTxt}` };
 }
 // v1.22: the old "Research this stock" / price-history tick-box / "Refresh price & technicals" controls are replaced by the
-// two Live Data Refresh buttons in js/livedata.js. singleStockResearchMessage() below stays: the Analysis screen still uses it.
+// two Live Data Refresh buttons in src/livedata/. singleStockResearchMessage() below stays: the Analysis screen still uses it.
 function renderStockResearchBar(s){
   return renderLiveDataBar(s);
 }

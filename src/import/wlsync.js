@@ -6,7 +6,7 @@ import { renderWatchlistSyncLogPanel } from '../joblogs/panels.js';
 import { TV_SERVER, tvCall, tvErrorText, tvMcp } from '../tv/connector.js';
 import { strategies } from '../strategies/state.js';
 import { qualifyingStocks, ruleReady } from '../strategies/rules.js';
-import { albaFiErr, albaFiMarkFailed, albaFiRetry, albaFiTakeLock, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
+import { fiErr, fiMarkFailed, fiRetry, fiTakeLock, getFiDb, getFiOwner, getFiRunning, setFiRunning, fiSetButtons } from './fund-import.js';
 import { setFiPfx, fiReset, fiSet, fiShowResult, getFiState } from './panel.js';
 
 // ====================================================================================================
@@ -30,7 +30,7 @@ const picked = new Set();   // ids of the strategies ticked in the picker
 
 // ---- Which stocks go where ----
 // picks = [{ name, rules }] -> { lists: { name: [symbols] }, needsLookup, unverified, notes }
-function albaWlBuild(universe, bseMap, picks){
+function wlBuild(universe, bseMap, picks){
   const alpha = Object.assign({}, bseMap || {});
   for(const k of ['version', 'updatedAt', '__version', '_version']) delete alpha[k];
   const lists = {}, needsLookup = [], unverified = [], notes = [], lookedUp = new Set();
@@ -57,7 +57,7 @@ function albaWlBuild(universe, bseMap, picks){
 // A BSE-only stock with no saved TradingView symbol: search by company name and accept ONLY a BSE stock whose
 // description equals the company name (ignoring Ltd / Limited / punctuation). Near matches are left for a person.
 const wlNorm = t => String(t || '').toLowerCase().replace(/&/g, ' and ').replace(/\b(limited|ltd|the|co|company|pvt|private)\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
-async function albaWlResolveBse(items){
+async function wlResolveBse(items){
   const found = {};
   for(const it of items.slice(0, 40)){
     try {
@@ -115,12 +115,12 @@ async function wlDeleteChecked(target, before){
   const ids = new Set(after.map(l => String(l.id)));
   const lost = keep.filter(k => !ids.has(k.id));
   if(lost.length) throw Object.assign(new Error('Safety stop: after deleting "' + target.name + '" these lists are also gone: ' + lost.map(l => l.name).join(', ') + '. Nothing more was touched.'), { fatal: true });
-  if(ids.has(String(target.id))) throw new Error('"' + target.name + '" could not be deleted' + (err ? ' (' + albaFiErr(err) + ')' : ''));
+  if(ids.has(String(target.id))) throw new Error('"' + target.name + '" could not be deleted' + (err ? ' (' + fiErr(err) + ')' : ''));
   return after;
 }
 
 // Rebuild one list. Returns { action, count, added, removed, dropped[] }.
-async function albaWlSyncOne(name, symbols, onDetail){
+async function wlSyncOne(name, symbols, onDetail){
   let lists = await wlRead();
   const customs = wlCustom(lists);
   const old = customs.filter(l => l.name === name);
@@ -191,7 +191,7 @@ function renderWlPicker(){
 }
 window.addEventListener('alba-strategies-reloaded', renderWlPicker);
 
-async function albaWlRunSync(){
+async function wlRunSync(){
   if(getFiRunning() || !getFiOwner()) return;
   const db = getFiDb();
   setFiPfx('wl_');
@@ -211,19 +211,19 @@ async function albaWlRunSync(){
   };
   const done = [];
   try {
-    stopBeat = await albaFiTakeLock(job, when => 'another sync is already running (' + when + '). Try again in a few minutes.', { startedAt }); locked = true;
+    stopBeat = await fiTakeLock(job, when => 'another sync is already running (' + when + '). Try again in a few minutes.', { startedAt }); locked = true;
     await saveLog({ startedAt, status: 'running', triggeredBy: 'manual', note: 'Running from the page.' });
 
     current = 'build'; fiSet('build', 'running', '', 0.5);
     let bse = {};
-    try { const bs = await albaFiRetry(() => db.doc('stockMeta/bseAlpha').get()); if(bs && bs.exists) bse = bs.data() || {}; } catch(e){ console.error('Could not read the BSE symbol map', e); }
-    let plan = albaWlBuild(stocks, bse, picks);
+    try { const bs = await fiRetry(() => db.doc('stockMeta/bseAlpha').get()); if(bs && bs.exists) bse = bs.data() || {}; } catch(e){ console.error('Could not read the BSE symbol map', e); }
+    let plan = wlBuild(stocks, bse, picks);
     if(plan.needsLookup.length){
       fiSet('build', 'running', 'Looking up ' + plan.needsLookup.length + ' BSE symbol(s)…', 0.5);
-      const found = await albaWlResolveBse(plan.needsLookup);
+      const found = await wlResolveBse(plan.needsLookup);
       if(Object.keys(found).length){
-        try { await albaFiRetry(() => db.doc('stockMeta/bseAlpha').update(found)); } catch(e){ console.error('Could not save the new BSE symbols', e); }
-        Object.assign(bse, found); plan = albaWlBuild(stocks, bse, picks);
+        try { await fiRetry(() => db.doc('stockMeta/bseAlpha').update(found)); } catch(e){ console.error('Could not save the new BSE symbols', e); }
+        Object.assign(bse, found); plan = wlBuild(stocks, bse, picks);
       }
     }
     fiSet('build', 'done', names.map(n => plan.lists[n].length).join(' / ') + ' symbols');
@@ -233,7 +233,7 @@ async function albaWlRunSync(){
       const name = names[i], key = 'l' + i; current = key;
       if(!plan.lists[name].length){ empty.push(name); done.push(name + ': no stock matches, list left as it is'); fiSet(key, 'done', 'no match'); continue; }
       fiSet(key, 'running', plan.lists[name].length + ' symbols', 0.1);
-      const r = await albaWlSyncOne(name, plan.lists[name], d => fiSet(key, 'running', d, 0.5));
+      const r = await wlSyncOne(name, plan.lists[name], d => fiSet(key, 'running', d, 0.5));
       added += r.added; removed += r.removed; total += r.count; r.dropped.forEach(x => dropped.push(x));
       done.push(name + ': ' + (r.action === 'unchanged' ? r.count + ' symbols, unchanged' : r.count + ' symbols (+' + r.added + ' / −' + r.removed + ')'));
       fiSet(key, 'done', r.action === 'unchanged' ? 'unchanged' : '+' + r.added + ' / −' + r.removed);
@@ -252,7 +252,7 @@ async function albaWlRunSync(){
     const partial = dropped.length > 0 || plan.needsLookup.length > 0 || empty.length > 0;
     const note = names.map(n => n + ' ' + plan.lists[n].length).join(', ') + '.' + (plan.needsLookup.length ? ' No TradingView symbol yet for ' + plan.needsLookup.length + ' BSE-only stocks.' : '');
     await saveLog({ startedAt, finishedAt: new Date().toISOString(), status: partial ? 'partial' : 'completed', triggeredBy: 'manual', qualifiedCount: total, added, removed, droppedTickers: dropped.concat(plan.needsLookup.map(x => x.code)), note });
-    await albaFiRetry(() => job.set({ status: 'done', finishedAt: new Date().toISOString(), note })); locked = false;
+    await fiRetry(() => job.set({ status: 'done', finishedAt: new Date().toISOString(), note })); locked = false;
     const lines = [{ text: partial ? 'Sync finished with gaps.' : 'Sync complete.', cls: 'fi-line fi-line-strong' }, ...done.map(t => ({ text: t })),
       { text: picks.length + ' strateg' + (picks.length === 1 ? 'y' : 'ies') + ' · ' + added + ' added · ' + removed + ' removed in total.' }];
     if(dropped.length) lines.push({ text: 'TradingView could not resolve: ' + dropped.slice(0, 15).join(', ') + (dropped.length > 15 ? ' … +' + (dropped.length - 15) : '') + '.', cls: 'fi-line fi-line-muted' });
@@ -265,10 +265,10 @@ async function albaWlRunSync(){
     const msg = e && e.code ? tvErrorText(e) : ((e && e.message) ? e.message : String(e));
     fiShowResult('err', [{ text: 'Sync stopped: ' + msg, cls: 'fi-line fi-line-strong' }].concat(done.map(t => ({ text: 'Done before the stop — ' + t, cls: 'fi-line fi-line-muted' }))), true);
     await saveLog({ startedAt, finishedAt: new Date().toISOString(), status: 'failed', triggeredBy: 'manual', error: msg.slice(0, 400), note: done.join(' | ').slice(0, 400) });
-    if(locked) await albaFiMarkFailed(job, msg);
+    if(locked) await fiMarkFailed(job, msg);
   } finally {
     stopBeat(); setFiRunning(false); fiSetButtons();
   }
 }
 
-export { albaWlRunSync, renderWlPicker };
+export { wlRunSync, renderWlPicker };

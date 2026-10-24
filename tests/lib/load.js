@@ -1,5 +1,5 @@
 // Loads a module from src/ into Node without touching it: bundles it with esbuild and runs it. `extra` is appended to the
-// source first, which is how the tests reach an engine object that the module keeps private (e.g. `export { AlbaFundEngine };`).
+// source first, which is how the tests reach an engine object that the module keeps private (e.g. `export { FundEngine };`).
 const fs = require('fs'), path = require('path'), esbuild = require('esbuild');
 const root = path.resolve(__dirname, '..', '..');
 function load(file, extra){

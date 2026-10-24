@@ -1,23 +1,23 @@
 // Fundamental Score import: the integrity checks run before anything is written (the saved check_fundamental + precheck_data scripts).
 // Pure functions with no page code, so the tests can load them directly. Shared by the Fundamental and Technical imports.
-import { tickerSymbol as albaFiSym } from '../core/util.js';
+import { tickerSymbol as fiSym } from '../core/util.js';
 // pillars.val (the valuation anchor the Technical Score uses) comes from the Margin of Safety, which needs a positive Intrinsic Value
 // and a price. A stock whose file row has no Intrinsic Value has no anchor: that is allowed, and the technical import leaves it
 // frozen. A stock that DOES have a valuation but no anchor is a real fault.
-const albaFiHasValuation = s => { const v = s.valuation; return !!v && typeof v.intrinsicValue === 'number' && v.intrinsicValue > 0 && typeof v.currentPrice === 'number'; };
-function albaFiPrevInfo(stocks){
+const fiHasValuation = s => { const v = s.valuation; return !!v && typeof v.intrinsicValue === 'number' && v.intrinsicValue > 0 && typeof v.currentPrice === 'number'; };
+function fiPrevInfo(stocks){
   const m = new Map(), n = g => g && ((g.positive || []).length + (g.negative || []).length);
-  for(const s of stocks) m.set(albaFiSym(s), { score: s.score, verdict: s.verdict, hasGlobal: !!n(s.globalFactors), hasTech: !!(s.technical && s.technical.score != null) });
+  for(const s of stocks) m.set(fiSym(s), { score: s.score, verdict: s.verdict, hasGlobal: !!n(s.globalFactors), hasTech: !!(s.technical && s.technical.score != null) });
   return m;
 }
-function albaFiCheck(stocks, prev){
+function fiCheck(stocks, prev){
   const hard = [], soft = [];
   const band = x => x >= 8 ? 'buy' : x >= 6 ? 'mbuy' : x >= 5 ? 'hold' : 'avoid';
   const list = a => a.slice(0, 5).join(', ') + (a.length > 5 ? ' …' : '');
   const seen = new Set(), dups = [], badShape = [], badNum = [], badSum = [], badVerdict = [], badPillar = [];
   if(stocks.length < 2000) hard.push('only ' + stocks.length + ' stocks in the result');
   for(const s of stocks){
-    const t = albaFiSym(s); const u = t.toUpperCase();
+    const t = fiSym(s); const u = t.toUpperCase();
     if(seen.has(u)) dups.push(t); seen.add(u);
     const f = s.fundamentals && s.fundamentals.factors;
     if(!Array.isArray(f) || f.length !== 9 || typeof s.score !== 'number'){ badShape.push(t); continue; }
@@ -25,7 +25,7 @@ function albaFiCheck(stocks, prev){
     const sum = f.reduce((a, x) => a + (typeof x.score === 'number' ? x.score : 0), 0), w = f.reduce((a, x) => a + x.weight, 0);
     if(Math.abs(sum - s.score) > 0.05 || Math.abs(w - 10) > 0.02) badSum.push(t);
     if(s.verdict !== band(s.score)) badVerdict.push(t);
-    if((!s.pillars || typeof s.pillars.val !== 'number') && albaFiHasValuation(s)) badPillar.push(t);
+    if((!s.pillars || typeof s.pillars.val !== 'number') && fiHasValuation(s)) badPillar.push(t);
   }
   if(dups.length) hard.push(dups.length + ' duplicate tickers: ' + list(dups));
   if(badShape.length) hard.push(badShape.length + ' stocks without a complete 9-factor block: ' + list(badShape));
@@ -36,7 +36,7 @@ function albaFiCheck(stocks, prev){
   let moved = 0, maxMove = 0; const lostGlobal = [], lostTech = [];
   const now = new Set();
   for(const s of stocks){
-    const t = albaFiSym(s); now.add(t);
+    const t = fiSym(s); now.add(t);
     const p = prev.get(t); if(!p) continue;
     if(typeof s.score === 'number' && typeof p.score === 'number'){ const d = Math.abs(s.score - p.score); if(d >= 1.0) moved++; if(d > maxMove) maxMove = d; }
     const n = g => g && ((g.positive || []).length + (g.negative || []).length);
@@ -51,4 +51,4 @@ function albaFiCheck(stocks, prev){
   return { hard, soft, moved, maxMove };
 }
 
-export { albaFiCheck, albaFiHasValuation, albaFiPrevInfo, albaFiSym };
+export { fiCheck, fiHasValuation, fiPrevInfo, fiSym };

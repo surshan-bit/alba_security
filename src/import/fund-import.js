@@ -4,11 +4,11 @@ import { recordAttempt, saveRecord } from './last-file.js';
 import { lockBusy, lockText, startBeat, tabId } from './joblock.js';
 import { primeStockCache } from '../boot/stockdata.js';
 import { fiAsk, fiEl, fiReset, fiSet, fiShowResult, getFiState, setFiPfx } from './panel.js';
-import { albaApplyFundamental } from './fund-engine.js';
-import { albaFiCheck, albaFiPrevInfo, albaFiSym } from './fund-check.js';
-import { albaWlRunSync } from './wlsync.js';
+import { applyFundamental } from './fund-engine.js';
+import { fiCheck, fiPrevInfo, fiSym } from './fund-check.js';
+import { wlRunSync } from './wlsync.js';
 import { registerBusy } from '../core/busy.js';
-import { sanitizeDocId as albaFiSid, sleep } from '../core/util.js';
+import { sanitizeDocId as fiSid, sleep } from '../core/util.js';
 import { paintLastRuns } from '../refresh/runlog.js';
 import { uploadsSettled } from './upload-history.js';
 import { recordScoreHistory } from '../history/scorehistory.js';
@@ -16,21 +16,21 @@ import { recordScoreHistory } from '../history/scorehistory.js';
 // ====================================================================================================
 // FUNDAMENTAL IMPORT, IN THE PAGE (added 2026-10-09; backups and Restore removed in v1.199). "Import data" no longer opens a Claude chat:
 // the uploaded CSV (kept in the asset store + fundamentalCsvUploadLog) is scored here with the same
-// v3 engine the saved scripts used, and the changed chunks are written to the database with a progress bar
+// v3 engine, and the changed chunks are written to the database with a progress bar
 // (a failed write puts the old chunks back; a finished import is corrected by importing a better file).
 // Owner only (writing stock data and the asset store need the artifact's write bit).
 // ====================================================================================================
-const ALBA_FI = { HARD: 240000, SOFT: 200000 };
-const ALBA_FI_COLUMNS = ['Name','BSE Code','NSE Code','ISIN Code','Industry Group','Industry','Current Price','Intrinsic Value','Book value','Profit growth','Profit growth 3Years','Profit growth 5Years','Sales growth 3Years','Return on invested capital','Return on capital employed','Return on equity','OPM','Price to Earning','Industry PE','PEG Ratio','Pledged percentage','Interest Coverage','Debt to equity','Change in promoter holding','Piotroski score','Quick ratio','Altman Z Score','Current ratio','Contingent liabilities','Average return on equity 7Years','Average return on equity 10Years','Median return on capital employed 10Years','Free cash flow 3years','Free cash flow 5years','Operating cash flow 3years','Operating cash flow 5years','CROIC','Graham','Change in FII holding 3Years','Change in DII holding 3Years','Historical PE 5Years','Average debtor days 3years','NCAVPS','Number of Shareholders'];
-const ALBA_FI_PUBLISHED = 'The new data had already been saved when this failed, so it is live. Check the stock list; if it looks wrong, import a corrected file.';
-const albaFiSize = o => new TextEncoder().encode(JSON.stringify(o)).length;
-const albaFiDay = iso => { try { return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); } catch(e){ return new Date().toISOString().slice(0, 10); } };
-function albaFiCanon(o){
-  if(Array.isArray(o)) return '[' + o.map(albaFiCanon).join(',') + ']';
-  if(o && typeof o === 'object') return '{' + Object.keys(o).sort().filter(k => o[k] !== undefined).map(k => JSON.stringify(k) + ':' + albaFiCanon(o[k])).join(',') + '}';
+const FI = { HARD: 240000, SOFT: 200000 };
+const FI_COLUMNS = ['Name','BSE Code','NSE Code','ISIN Code','Industry Group','Industry','Current Price','Intrinsic Value','Book value','Profit growth','Profit growth 3Years','Profit growth 5Years','Sales growth 3Years','Return on invested capital','Return on capital employed','Return on equity','OPM','Price to Earning','Industry PE','PEG Ratio','Pledged percentage','Interest Coverage','Debt to equity','Change in promoter holding','Piotroski score','Quick ratio','Altman Z Score','Current ratio','Contingent liabilities','Average return on equity 7Years','Average return on equity 10Years','Median return on capital employed 10Years','Free cash flow 3years','Free cash flow 5years','Operating cash flow 3years','Operating cash flow 5years','CROIC','Graham','Change in FII holding 3Years','Change in DII holding 3Years','Historical PE 5Years','Average debtor days 3years','NCAVPS','Number of Shareholders'];
+const FI_PUBLISHED = 'The new data had already been saved when this failed, so it is live. Check the stock list; if it looks wrong, import a corrected file.';
+const fiSize = o => new TextEncoder().encode(JSON.stringify(o)).length;
+const fiDay = iso => { try { return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); } catch(e){ return new Date().toISOString().slice(0, 10); } };
+function fiCanon(o){
+  if(Array.isArray(o)) return '[' + o.map(fiCanon).join(',') + ']';
+  if(o && typeof o === 'object') return '{' + Object.keys(o).sort().filter(k => o[k] !== undefined).map(k => JSON.stringify(k) + ':' + fiCanon(o[k])).join(',') + '}';
   return JSON.stringify(o);
 }
-async function albaFiRetry(fn){
+async function fiRetry(fn){
   let err;
   for(let a = 0; a < 5; a++){
     try { return await fn(); }
@@ -43,11 +43,11 @@ async function albaFiRetry(fn){
   }
   throw err;
 }
-function albaFiErr(e){ return (e && (e.message || e.code)) ? ((e.code ? e.code + ': ' : '') + (e.message || '')).replace(/: $/, '') : String(e); }
+function fiErr(e){ return (e && (e.message || e.code)) ? ((e.code ? e.code + ': ' : '') + (e.message || '')).replace(/: $/, '') : String(e); }
 
 // ---- Reading the current stock data exactly as stored (NOT the page's overlaid copy) ----
-async function albaFiLoadRaw(db, onProgress){
-  const ms = await albaFiRetry(() => db.doc('stockMeta/main').get());
+async function fiLoadRaw(db, onProgress){
+  const ms = await fiRetry(() => db.doc('stockMeta/main').get());
   const meta = ms && ms.exists ? JSON.parse(JSON.stringify(ms.data())) : null;
   if(!meta || !Array.isArray(meta.chunks)) throw new Error('the stock index (stockMeta/main) was not found');
   const docs = {}, oldCanon = {};
@@ -55,10 +55,10 @@ async function albaFiLoadRaw(db, onProgress){
   const worker = async () => {
     while(next < meta.chunks.length){
       const cid = meta.chunks[next++];
-      const snap = await albaFiRetry(() => db.doc('stockData/' + cid).get());
+      const snap = await fiRetry(() => db.doc('stockData/' + cid).get());
       const d = snap && snap.exists ? JSON.parse(JSON.stringify(snap.data())) : null;
       if(!d || !Array.isArray(d.stocks)) throw new Error('chunk ' + cid + ' is missing');
-      docs[cid] = d; oldCanon[cid] = albaFiCanon(d);
+      docs[cid] = d; oldCanon[cid] = fiCanon(d);
       done++; onProgress(done, meta.chunks.length);
     }
   };
@@ -69,12 +69,12 @@ async function albaFiLoadRaw(db, onProgress){
 }
 
 // ---- Packing the list back into chunk documents (the saved stockdb.py split) ----
-function albaFiSplit(stocks, meta, oldCanon){
+function fiSplit(stocks, meta, oldCanon){
   const oldIndex = meta.index || {}, ids = meta.chunks.slice();
   const buckets = {}; ids.forEach(c => { buckets[c] = []; });
   const spill = [], seen = new Set();
   for(const s of stocks){
-    const k = albaFiSid(albaFiSym(s));
+    const k = fiSid(fiSym(s));
     if(seen.has(k)) throw new Error('duplicate ticker ' + k);
     seen.add(k);
     const cid = oldIndex[k];
@@ -83,27 +83,27 @@ function albaFiSplit(stocks, meta, oldCanon){
   const mk = (cid, arr) => ({ chunk: parseInt(cid.slice(1), 10), count: arr.length, stocks: arr });
   for(const cid of ids){            // a chunk that grew too large hands its tail to the spill list
     const arr = buckets[cid];
-    while(arr.length > 1 && albaFiSize(mk(cid, arr)) >= ALBA_FI.HARD){
+    while(arr.length > 1 && fiSize(mk(cid, arr)) >= FI.HARD){
       const cut = Math.max(1, Math.ceil(arr.length * 0.1));
       spill.unshift(...arr.splice(arr.length - cut, cut));
     }
   }
   let nextNum = Math.max(...ids.map(c => parseInt(c.slice(1), 10))) + 1;
-  let cur = ids[ids.length - 1], curBytes = albaFiSize(mk(cur, buckets[cur]));
+  let cur = ids[ids.length - 1], curBytes = fiSize(mk(cur, buckets[cur]));
   for(const s of spill){
-    const b = albaFiSize(s) + 1;
-    if(curBytes + b > ALBA_FI.SOFT){
-      cur = 'c' + String(nextNum++).padStart(3, '0'); ids.push(cur); buckets[cur] = []; curBytes = albaFiSize(mk(cur, []));
+    const b = fiSize(s) + 1;
+    if(curBytes + b > FI.SOFT){
+      cur = 'c' + String(nextNum++).padStart(3, '0'); ids.push(cur); buckets[cur] = []; curBytes = fiSize(mk(cur, []));
     }
     buckets[cur].push(s); curBytes += b;
   }
   const finalIds = ids.filter(c => buckets[c].length);
   const index = {};
-  for(const c of finalIds) for(const s of buckets[c]) index[albaFiSid(albaFiSym(s))] = c;
+  for(const c of finalIds) for(const s of buckets[c]) index[fiSid(fiSym(s))] = c;
   const changed = [];
   for(const c of finalIds){
     const doc = mk(c, buckets[c]);
-    if(oldCanon[c] === undefined || albaFiCanon(doc) !== oldCanon[c]) changed.push({ cid: c, doc });
+    if(oldCanon[c] === undefined || fiCanon(doc) !== oldCanon[c]) changed.push({ cid: c, doc });
   }
   const emptied = meta.chunks.filter(c => !finalIds.includes(c));
   const newMeta = { version: (meta.version || 0) + 1, updatedAt: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'), count: stocks.length, chunks: finalIds, index };
@@ -112,49 +112,49 @@ function albaFiSplit(stocks, meta, oldCanon){
 
 // Reads an uploaded file back. The website keeps files in a private store and reads them with the signed-in person's own access
 // (assets.read); inside claude.ai the file is served at /_blob/<id>. Either way the answer is a fetch-style Response.
-function albaFiReadAsset(assets, id){
+function fiReadAsset(assets, id){
   return assets && typeof assets.read === 'function' ? assets.read(id) : fetch('/_blob/' + id);
 }
 
 // ---- Steps the Fundamental import and the watchlist sync share ----
 // Takes the job lock (importJobs/*), or stops with busyMessage(when it started) if another tab or device holds it.
 // Resolves to the function that stops the heartbeat. `fields` are saved with the lock.
-async function albaFiTakeLock(job, busyMessage, fields){
-  const lk = await albaFiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
+async function fiTakeLock(job, busyMessage, fields){
+  const lk = await fiRetry(() => job.get()); const ld = lk && lk.exists ? lk.data() : null;
   if(lockBusy(ld)) throw new Error(busyMessage(lockText(ld)));
-  await albaFiRetry(() => job.set(Object.assign({ status: 'running', startedAt: new Date().toISOString(), owner: tabId }, fields)));
+  await fiRetry(() => job.set(Object.assign({ status: 'running', startedAt: new Date().toISOString(), owner: tabId }, fields)));
   return startBeat(job);
 }
 // Frees a lock after a failure.
-async function albaFiMarkFailed(job, msg, fields){
+async function fiMarkFailed(job, msg, fields){
   try { await job.set(Object.assign({ status: 'failed', finishedAt: new Date().toISOString(), error: msg.slice(0, 500) }, fields)); } catch(x){ /* the lock runs out by itself */ }
 }
 // The newest upload still waiting to be imported, as [record, id] ([null, null] when there is none).
-function albaFiNewestUpload(log){
+function fiNewestUpload(log){
   let rec = null, recId = null;
   for(const [id, r] of log.entries()){ if(r.status === 'uploaded' && (!rec || String(r.uploadedAt) > String(rec.uploadedAt))){ rec = r; recId = id; } }
   return [rec, recId];
 }
 // The text of the stored file an upload record points at.
-async function albaFiReadUpload(assets, rec){
-  const resp = await albaFiReadAsset(assets, rec.assetId);
+async function fiReadUpload(assets, rec){
+  const resp = await fiReadAsset(assets, rec.assetId);
   if(!resp.ok) throw new Error('could not read the stored file "' + rec.filename + '" (' + resp.status + ')');
   return resp.text();
 }
 // Hard integrity failures stop the import before anything is written.
-function albaFiThrowHard(chk){
+function fiThrowHard(chk){
   if(chk.hard.length) throw new Error('integrity check failed, nothing was written:\n\u2022 ' + chk.hard.slice(0, 6).join('\n\u2022 '));
 }
 // Soft warnings are put to the person; the import goes on only if they say so.
-async function albaFiConfirmSoft(soft){
+async function fiConfirmSoft(soft){
   if(!soft.length) return;
   const go = await fiAsk(soft.join(' ') + ' Nothing has been written yet.', 'Import anyway');
   if(!go) throw Object.assign(new Error('cancelled before anything was written.'), { cancelled: true });
 }
 // What an import that stopped shows: where it stopped and whether the stored data is untouched, put back or already live.
-function albaFiShowFailure(e, current, msg){
+function fiShowFailure(e, current, msg){
   const st = getFiState(); if(st){ st.error = e; if(current && st.status[current] !== 'done') fiSet(current, 'error', ''); }
-  fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? ALBA_FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);
+  fiShowResult(e && e.cancelled ? 'warn' : 'err', [{ text: e && e.cancelled ? 'Import ' + msg : 'Import stopped: ' + msg, cls: 'fi-line fi-line-strong' }, { text: e && e.rolledBack ? 'The previous data is back in place.' : e && e.published ? FI_PUBLISHED : 'No changes were published.', cls: 'fi-line fi-line-muted' }]);
 }
 
 let fiRunning = false, fiUser = null, fiDb = null, fiAssets = null, fiOwner = false;
@@ -173,9 +173,9 @@ function fiSetButtons(){
 }
 
 // ---- The shared "write it safely" tail used by the imports ----
-// raw = current stored data (albaFiLoadRaw), stocks = the full new list, summaryExtra = text lines for the result card.
-async function albaFiPersist(db, raw, stocks, jobLabel){
-  const plan = albaFiSplit(stocks, raw.meta, raw.oldCanon);
+// raw = current stored data (fiLoadRaw), stocks = the full new list, summaryExtra = text lines for the result card.
+async function fiPersist(db, raw, stocks, jobLabel){
+  const plan = fiSplit(stocks, raw.meta, raw.oldCanon);
   const sameIndex = JSON.stringify(plan.newMeta.index) === JSON.stringify(raw.meta.index) && JSON.stringify(plan.newMeta.chunks) === JSON.stringify(raw.meta.chunks);
   if(!plan.changed.length && !plan.emptied.length && plan.newMeta.count === raw.meta.count && sameIndex) return { plan, wrote: 0, nothing: true };
   const started = new Set(); let failure = null, idx = 0, done = 0;
@@ -184,7 +184,7 @@ async function albaFiPersist(db, raw, stocks, jobLabel){
   const worker = async () => {
     while(!failure && idx < total){
       const c = plan.changed[idx++]; started.add(c.cid);
-      try { const body = JSON.parse(JSON.stringify(c.doc)); await albaFiRetry(() => db.doc('stockData/' + c.cid).set(body)); }
+      try { const body = JSON.parse(JSON.stringify(c.doc)); await fiRetry(() => db.doc('stockData/' + c.cid).set(body)); }
       catch(e){ failure = failure || e; return; }
       done++; fiSet('write', 'running', done + ' / ' + total + ' parts', done / (total + 1));
     }
@@ -194,19 +194,19 @@ async function albaFiPersist(db, raw, stocks, jobLabel){
     fiSet('write', 'running', 'Something went wrong, putting the old data back…', 0.95);
     for(const cid of started){
       try {
-        if(raw.oldCanon[cid] !== undefined) await albaFiRetry(() => db.doc('stockData/' + cid).set(JSON.parse(raw.oldCanon[cid])));
-        else await albaFiRetry(() => db.doc('stockData/' + cid).delete());
+        if(raw.oldCanon[cid] !== undefined) await fiRetry(() => db.doc('stockData/' + cid).set(JSON.parse(raw.oldCanon[cid])));
+        else await fiRetry(() => db.doc('stockData/' + cid).delete());
       } catch(e){ console.error('Rollback failed for ' + cid, e); }
     }
   };
-  if(failure){ await rollback(); const e = new Error('Could not save the stock data (' + albaFiErr(failure) + '). Your previous data was put back.'); /** @type {any} */ (e).rolledBack = true; throw e; }
+  if(failure){ await rollback(); const e = new Error('Could not save the stock data (' + fiErr(failure) + '). Your previous data was put back.'); /** @type {any} */ (e).rolledBack = true; throw e; }
   // The index document goes last, so open pages only switch over once everything else is saved.
   try {
-    const cur = await albaFiRetry(() => db.doc('stockMeta/main').get());
+    const cur = await fiRetry(() => db.doc('stockMeta/main').get());
     const cv = cur && cur.exists ? (cur.data() || {}).version : null;
     if(cv !== raw.meta.version) throw new Error('the stock data was changed by someone else while this import was running (version ' + raw.meta.version + ' → ' + cv + ')');
-    await albaFiRetry(() => db.doc('stockMeta/main').set(plan.newMeta));
-  } catch(e){ await rollback(); const err = new Error('Could not publish the new data (' + albaFiErr(e) + '). Your previous data was put back.'); /** @type {any} */ (err).rolledBack = true; throw err; }
+    await fiRetry(() => db.doc('stockMeta/main').set(plan.newMeta));
+  } catch(e){ await rollback(); const err = new Error('Could not publish the new data (' + fiErr(e) + '). Your previous data was put back.'); /** @type {any} */ (err).rolledBack = true; throw err; }
   for(const cid of plan.emptied){ try { await db.doc('stockData/' + cid).delete(); } catch(e){ /* orphan chunk is harmless */ } }
   fiSet('write', 'done', total + ' parts written');
   try {   // keep the new list in this browser too, so the reload that follows is quick
@@ -216,20 +216,20 @@ async function albaFiPersist(db, raw, stocks, jobLabel){
   // verify: index version/count, and a sample of chunks read back
   try {   // from here on the new data is live: a failing check must not be reported as "nothing was published"
   fiSet('verify', 'running', 'Reading it back…', 0.2);
-  const back = await albaFiRetry(() => db.doc('stockMeta/main').get());
+  const back = await fiRetry(() => db.doc('stockMeta/main').get());
   const bm = back && back.exists ? back.data() : null;
   if(!bm || bm.version !== plan.newMeta.version || bm.count !== plan.newMeta.count) throw new Error('read-back check failed: the index shows version ' + (bm && bm.version) + ' / count ' + (bm && bm.count));
   const sample = [plan.changed[0], plan.changed[Math.floor(plan.changed.length / 2)], plan.changed[plan.changed.length - 1]].filter(Boolean);
   for(const c of sample){
-    const s = await albaFiRetry(() => db.doc('stockData/' + c.cid).get());
-    if(!s || !s.exists || albaFiCanon(s.data()) !== albaFiCanon(c.doc)) throw new Error('read-back check failed for ' + c.cid);
+    const s = await fiRetry(() => db.doc('stockData/' + c.cid).get());
+    if(!s || !s.exists || fiCanon(s.data()) !== fiCanon(c.doc)) throw new Error('read-back check failed for ' + c.cid);
   }
   } catch(e){ e.published = true; throw e; }
   return { plan, wrote: total, nothing: false };
 }
 
 // ---- Import ----
-async function albaFiRunImport(){
+async function fiRunImport(){
   if(fiRunning || !fiOwner) return;
   const db = fiDb, assets = fiAssets;
   if(!db || !assets){ fiReset('Import data'); fiShowResult('err', [{ text: 'File storage or the database is not available in this view, so the import cannot run here.' }]); return; }
@@ -239,42 +239,42 @@ async function albaFiRunImport(){
   let rec = null, recId = null;
   try {
     // one import at a time (a job that has gone quiet for a few minutes counts as interrupted)
-    stopBeat = await albaFiTakeLock(job, when => 'another import is already running (' + when + '). It was started from another tab or device. If that one was closed, it counts as interrupted after 3 minutes without activity; then try again.'); locked = true;
+    stopBeat = await fiTakeLock(job, when => 'another import is already running (' + when + '). It was started from another tab or device. If that one was closed, it counts as interrupted after 3 minutes without activity; then try again.'); locked = true;
 
     // 1. the uploaded file (after any file still being saved, so the newest upload is the one used)
     current = 'read'; fiSet('read', 'running', '', 0.3);
     await uploadsSettled();
-    [rec, recId] = albaFiNewestUpload(fundamentalCsvUploadLog);
+    [rec, recId] = fiNewestUpload(fundamentalCsvUploadLog);
     if(!rec) throw new Error('there is no uploaded file waiting. Use "Browse CSV…" to upload the screener.in export first.');
-    const csvText = await albaFiReadUpload(assets, rec);
+    const csvText = await fiReadUpload(assets, rec);
     const header = (csvText.split(/\r?\n/, 1)[0] || '').split(',').map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
-    const missing = ALBA_FI_COLUMNS.filter(c => !header.includes(c.toLowerCase()));
+    const missing = FI_COLUMNS.filter(c => !header.includes(c.toLowerCase()));
     if(missing.length) throw new Error('the file does not match the expected 44-column screener.in layout. Missing: ' + missing.slice(0, 6).join(', ') + (missing.length > 6 ? ' … +' + (missing.length - 6) : '') + '.');
     fiSet('read', 'done', rec.filename);
 
     // 2. current data
     current = 'load'; fiSet('load', 'running', '', 0);
-    const raw = await albaFiLoadRaw(db, (d, n) => fiSet('load', 'running', d + ' / ' + n + ' parts', d / n));
+    const raw = await fiLoadRaw(db, (d, n) => fiSet('load', 'running', d + ' / ' + n + ' parts', d / n));
     fiSet('load', 'done', raw.stocks.length.toLocaleString('en-IN') + ' stocks (data v' + raw.meta.version + ')');
 
     // 3. score
     current = 'score'; fiSet('score', 'running', '', 0.3); await sleep(30);
-    const prev = albaFiPrevInfo(raw.stocks), mixBefore = {};
+    const prev = fiPrevInfo(raw.stocks), mixBefore = {};
     for(const s of raw.stocks) mixBefore[s.verdict] = (mixBefore[s.verdict] || 0) + 1;
-    const res = albaApplyFundamental(csvText, raw.stocks, albaFiDay(rec.uploadedAt));
+    const res = applyFundamental(csvText, raw.stocks, fiDay(rec.uploadedAt));
     fiSet('score', 'done', res.rescored.toLocaleString('en-IN') + ' rescored, ' + res.onboarded.length + ' new');
 
     // 5. checks
     current = 'check'; fiSet('check', 'running', '', 0.5); await sleep(30);
-    const chk = albaFiCheck(raw.stocks, prev);
+    const chk = fiCheck(raw.stocks, prev);
     if(res.rescored < 1500) chk.soft.unshift('Only ' + res.rescored.toLocaleString('en-IN') + ' of the ' + raw.stocks.length.toLocaleString('en-IN') + ' dashboard stocks are in this file (a full Screener.in export has about 2,100 or more), so every other stock keeps its old data and its old refresh date. That usually means a filtered or partial export.');
-    albaFiThrowHard(chk);
+    fiThrowHard(chk);
     fiSet('check', 'done', 'passed');
-    await albaFiConfirmSoft(chk.soft);
+    await fiConfirmSoft(chk.soft);
 
     // 6 + 7. write and verify
     current = 'write';
-    const out = await albaFiPersist(db, raw, raw.stocks, 'import');
+    const out = await fiPersist(db, raw, raw.stocks, 'import');
     current = 'verify';
     await recordScoreHistory(db, raw.stocks);   // the trend on the stock page; never fails the import
     const dataVer = out.nothing ? raw.meta.version : out.plan.newMeta.version;
@@ -284,7 +284,7 @@ async function albaFiRunImport(){
     fiSet('verify', 'running', 'Updating the upload history…', 0.7);
     const upd = { status: 'processed', processedAt: new Date().toISOString(), processedNote: note };
     const logErr = await saveRecord('fund', recId, Object.assign({}, rec, upd), db);
-    await albaFiRetry(() => job.set({ status: 'done', finishedAt: new Date().toISOString(), note })); locked = false;
+    await fiRetry(() => job.set({ status: 'done', finishedAt: new Date().toISOString(), note })); locked = false;
     fiSet('verify', 'done', 'data v' + dataVer);
     const lines = [
       { text: out.nothing ? 'Import complete: the file produced no changes to the stored data.' : 'Import complete.', cls: 'fi-line fi-line-strong' },
@@ -293,7 +293,7 @@ async function albaFiRunImport(){
       { text: chk.moved + ' stocks moved by 1.0 point or more (largest move ' + chk.maxMove.toFixed(2) + ').' }
     ];
     if(res.onboarded.length) lines.push({ text: 'New: ' + res.onboarded.slice(0, 15).join(', ') + (res.onboarded.length > 15 ? ' … +' + (res.onboarded.length - 15) : '') + '. They use the default Screener.in link and ' + (res.bseOnly.length ? 'have no TradingView chart mapping yet (BSE-only: ' + res.bseOnly.slice(0, 10).join(', ') + (res.bseOnly.length > 10 ? ' …' : '') + ').' : 'need no chart mapping.'), cls: 'fi-line fi-line-muted' });
-    const noVal = raw.stocks.filter(s => res.onboarded.includes(albaFiSym(s)) && !(s.pillars && typeof s.pillars.val === 'number')).map(albaFiSym);
+    const noVal = raw.stocks.filter(s => res.onboarded.includes(fiSym(s)) && !(s.pillars && typeof s.pillars.val === 'number')).map(fiSym);
     if(noVal.length) lines.push({ text: noVal.length + ' new stock' + (noVal.length === 1 ? ' has' : 's have') + ' no Intrinsic Value in the file, so no valuation or technical score yet: ' + noVal.slice(0, 10).join(', ') + (noVal.length > 10 ? ' … +' + (noVal.length - 10) : '') + '.', cls: 'fi-line fi-line-muted' });
     if(logErr) lines.push({ text: 'The data is saved, but the upload record could not be marked as imported (' + logErr + '), so the Last file loaded card may still say "not imported".' });
     fiShowResult('ok', lines);
@@ -301,8 +301,8 @@ async function albaFiRunImport(){
     console.error('Fundamental import failed', e);
     recordAttempt('fund', rec, recId, e, db);
     const msg = (e && e.message) ? e.message : String(e);
-    albaFiShowFailure(e, current, msg);
-    if(locked) await albaFiMarkFailed(job, msg);
+    fiShowFailure(e, current, msg);
+    if(locked) await fiMarkFailed(job, msg);
   } finally {
     stopBeat(); fiRunning = false; fiSetButtons();
   }
@@ -313,7 +313,7 @@ function init_import_fund_import(){
   // leaving the page in the middle of an import or sync interrupts it: ask first
   window.addEventListener('beforeunload', e => { if(fiRunning){ e.preventDefault(); e.returnValue = ''; } });
 
-(async function albaFiInit(){
+(async function fiInit(){
   try {
     if(!(typeof claude !== 'undefined' && claude && typeof claude.use === 'function')){ fiSetButtons(); return; }
     const [db, assets, user] = await Promise.all([claude.use('db').catch(() => null), claude.use('assets').catch(() => null), claude.use('user').catch(() => null)]);
@@ -323,9 +323,9 @@ function init_import_fund_import(){
   fiSetButtons();
   paintLastRuns(fiDb);
   const b = fiEl('importFundamentalDataBtn');
-  if(b) b.addEventListener('click', albaFiRunImport);
+  if(b) b.addEventListener('click', fiRunImport);
   const wb = document.getElementById('refreshWatchlistBtn');
-  if(wb) wb.addEventListener('click', () => (typeof albaWlRunSync === 'function' ? albaWlRunSync() : undefined));
+  if(wb) wb.addEventListener('click', () => (typeof wlRunSync === 'function' ? wlRunSync() : undefined));
 })();
 }
 
@@ -334,4 +334,4 @@ function getFiDb(){ return fiDb; }
 function getFiOwner(){ return fiOwner; }
 function setFiRunning(v){ fiRunning = v; }
 
-export { albaFiErr, albaFiMarkFailed, albaFiRetry, albaFiTakeLock, fiSetButtons, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning };
+export { fiErr, fiMarkFailed, fiRetry, fiTakeLock, fiSetButtons, getFiDb, getFiOwner, getFiRunning, init_import_fund_import, setFiRunning };

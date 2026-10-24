@@ -2,8 +2,7 @@
 import { parseCSV } from './csvparse.js';
 import { marginOfSafety } from '../core/mos.js';
 
-// ---- Fundamental Score engine v3, ported unchanged from the saved devTools script `fundamental_engine` ----
-const AlbaFundEngine = (function(){
+// ---- Fundamental Score engine v3 ----
 // ---- Generic O(n log n) percentile-rank engine ----
 function percentileRanks(entries) {
   const n = entries.length;
@@ -335,14 +334,13 @@ function scoreOne(r, pct, moatPct) {
   const valuationSubscore = score != null ? Math.round((by('dcf') / 1.0) * 10 * 100) / 100 : null;
   return { factors, score, verdict, traditionalSubscore, buffettSubscore, valuationSubscore, mosPct: marginOfSafetyPct(r) };
 }
-return { normSym, scoreCsv, scoreToVerdict };
-})();
+const FundEngine = { normSym, scoreCsv, scoreToVerdict };
 
-// ---- Applying the engine to the stock list: ported unchanged from the saved script `apply_fundamental` ----
+// ---- Applying the engine to the stock list ----
 // Mutates `stocks` in place (new tickers are appended). Returns what happened. New tickers get safe defaults:
 // no screenerConsolidated flag (the page then links to the consolidated Screener.in page) and no BSE chart mapping.
-function albaApplyFundamental(csvText, stocks, asof){
-  const E = AlbaFundEngine;
+function applyFundamental(csvText, stocks, asof){
+  const E = FundEngine;
 const n = v => v != null && Number.isFinite(v);
 const f = (v, d) => n(v) ? v.toFixed(d) : 'n/a';
 const xx = (v, d = 2) => n(v) ? v.toFixed(d) + 'x' : 'n/a';
@@ -470,4 +468,4 @@ for (const r of records) {
   return { csvRows: records.length, rescored, onboarded, bseOnly, dropped, inactive, verdictMix };
 }
 
-export { albaApplyFundamental };
+export { applyFundamental };

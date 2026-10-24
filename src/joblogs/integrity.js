@@ -1,7 +1,7 @@
 // Data integrity check run at load.
 import { stocks } from '../core/stocks.js';
 import { escapeHtml, tickerSymbol } from '../core/util.js';
-import { albaFiHasValuation } from '../import/fund-check.js';
+import { fiHasValuation } from '../import/fund-check.js';
 import { expectedScore } from '../core/fundscore.js';
 
 // One-time data-integrity sanity check, run once at load. The offline refresh/merge pipeline
@@ -18,7 +18,7 @@ function runDataIntegrityCheck(){
     let sym = '(unknown)';
     try { sym = tickerSymbol(s); } catch(e) { /* malformed ticker field — fall through with placeholder */ }
     // A stock with no Intrinsic Value has no valuation anchor by design (the import allows it, the technical import leaves it frozen).
-    if(s.pillars && (typeof s.pillars.val !== 'number' || Number.isNaN(s.pillars.val)) && albaFiHasValuation(s)){
+    if(s.pillars && (typeof s.pillars.val !== 'number' || Number.isNaN(s.pillars.val)) && fiHasValuation(s)){
       problems.push(`${sym}: pillars.val is missing/non-numeric (Technical's valuation blend depends on it)`);
     }
     if(s.fundamentals && Array.isArray(s.fundamentals.factors)){

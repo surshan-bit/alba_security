@@ -3,7 +3,7 @@ import { escapeHtml } from '../core/util.js';
 import { fundBusinessSummary, isProxyFactor } from './fundtext.js';
 
 // Strengths / Watch-outs written by Claude during Refresh Fundamental Info (stored as `summary` on the stock's research
-// document, see js/livedata.js). When present it replaces the mechanical list below, which stays as the fallback.
+// document, see src/livedata/fundamental.js). When present it replaces the mechanical list below, which stays as the fallback.
 function renderFundSummaryFromResearch(s) {
   const sm = s.__fundSummary;
   if (!sm || typeof sm !== 'object') return '';

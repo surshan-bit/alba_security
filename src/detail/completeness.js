@@ -3,7 +3,7 @@ import { FUND_METRIC_LABEL } from './fundmetrics.js';
 
 // ---- Data-completeness ("confidence") computation (added 2026-09-30) ----
 // A factor counts as complete only if none of its underlying CSV-sourced metrics were missing
-// when scored. The scoring engine (scoring_engine.js) always fills a missing metric's displayed
+// when scored. The Fundamental Score engine (src/import/fund-engine.js) always fills a missing metric's displayed
 // value with the literal string "n/a" in that factor's `metrics` array (see pushFactor()) —
 // checking for that literal is more precise than pattern-matching the human-readable `note` text
 // (which only some factors phrase as "insufficient data"), and it works identically across all
