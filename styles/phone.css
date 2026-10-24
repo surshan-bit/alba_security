@@ -5,6 +5,8 @@
 /* Phones (up to 600px wide): less side padding, a compact leaderboard header (the sort choice on its own line, the three buttons sharing the next one)
    and a tighter grid, so more of the screen is used by the stocks themselves. Loaded last so it wins over the desktop rules above. */
 @media (max-width:600px){
+/* Text sizes are in rem, so one root size makes everything on a phone about 12% larger and easier to read. */
+html{font-size:112.5%;}
 .wrap{padding:0 10px 48px;}
 /* The panel behind each screen's content carried 18px of padding and a border on each side: on a phone the grids use that width instead. */
 .app-section .analysis-panel{padding:4px 0;border-width:0;}
