@@ -27,6 +27,7 @@ function barsNeeded(have, nowS){
   return 'current';
 }
 function planHistory(list, haveOf, nowS){
+  /** @type {{ none: any[], stale: any[], current: any[], [k: string]: any[] }} */
   const plan = { none: [], stale: [], current: [] };
   for(const s of list) plan[barsNeeded(haveOf(s), nowS)].push(s);
   return plan;

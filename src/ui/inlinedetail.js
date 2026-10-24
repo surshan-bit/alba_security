@@ -11,6 +11,7 @@ import { recordView } from './viewstack.js';
 
 // Where the detail panel rests (a hidden holder in the page) when no stock is open; it is handed back here when a detail view closes.
 const detailHome = detailEl.parentNode;
+/** @type {{ section: any, host: any, scroll: any } | null} */
 let current = null;   // { section, host, scroll } while a stock is open in place
 
 // Hands the panel back to its holder and shows the page again. restoreScroll: go back to where the page was.

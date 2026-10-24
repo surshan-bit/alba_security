@@ -12,6 +12,7 @@
       "DOM.Iterable"
     ],
     "strict": true,
+    "useUnknownInCatchVariables": false,
     "noImplicitAny": false,
     "skipLibCheck": true
   },
