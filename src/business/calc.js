@@ -48,7 +48,7 @@ function newsOf(s, days, now){
 // barsFor(stock) returns that stock's weekly bars (or undefined).
 // matchSet (optional): the stocks that pass the Analysis filters. They are counted and averaged on their own and listed
 // first within the industry, but nothing is removed: the industry's own figures still cover all of its stocks.
-function industryTable(stocks, { by = 'industry', period = '1M', barsFor = /** @type {(s: any) => any} */ (() => undefined), now = Date.now(), matchSet = null } = {}){
+function industryTable(stocks, { by = 'industry', period = '1M', barsFor = /** @type {(s: any) => any} */ (() => undefined), now = Date.now(), matchSet = /** @type {Set<any> | null} */ (null) } = {}){
   const days = periodOf(period).days, groups = new Map();
   stocks.forEach(s => {
     const name = by === 'group' ? (s.industryGroup || '—') : tickerIndustry(s);
@@ -61,7 +61,7 @@ function industryTable(stocks, { by = 'industry', period = '1M', barsFor = /** @
     const known = items.filter(x => x.change !== null);
     const changes = known.map(x => x.change);
     const matchChanges = known.filter(x => x.match).map(x => x.change);
-    const news = [].concat(...members.map(s => newsOf(s, days, now))).sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0));
+    const news = members.flatMap(s => newsOf(s, days, now)).sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0));
     rows.push({
       name, count: members.length, known: known.length,
       mean: changes.length ? changes.reduce((a, b) => a + b, 0) / changes.length : null,

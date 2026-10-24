@@ -14,6 +14,7 @@ import { ldApplyLabels, ldBuildEvents, ldLabelPrompt, ldMergeEvents, ldUnlabeled
 const NEWS_MAX = 30;        // stocks per press (each takes a few seconds); pressing again continues with the next ones
 const PARALLEL = 2;
 const collected = new Set();   // stocks done this session, so the next press moves on to the others
+/** @type {any} */
 let run = null;                // { state, label, total, done, added, noFeed, failed: [], note, ctl }
 
 const errText = (e) => (e && (e.message || e.code)) || String(e);

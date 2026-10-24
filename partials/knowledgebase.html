@@ -221,6 +221,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.255 &middot; 2026-10-24</h3>
+            <ul>
+              <li><strong>Tidy-up, no change in what you see.</strong> The code checker now has 67 fewer known findings (216 down to 149). Saved-state variables that start empty are given their real types, and a few lookups of saved browser settings were written so the checker can see they handle a missing value.</li>
+            </ul>
+
             <h3>v1.254 &middot; 2026-10-24</h3>
             <ul>
               <li><strong>Tidy-up, no change in what you see.</strong> A Claude error is now recognised because the failed Claude call is marked, not by guessing from which step was running. The bar-download progress is reported by named steps instead of by reading message text.</li>

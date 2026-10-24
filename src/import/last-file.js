@@ -6,6 +6,7 @@ import { lockBusy } from './joblock.js';
 import { pruneLogCollection } from '../joblogs/panels.js';
 
 // The job record (importJobs/fundamental) as last read: tells whether an import is running or was interrupted.
+/** @type {any} */
 let jobState = null;
 
 const KINDS = {

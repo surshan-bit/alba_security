@@ -14,7 +14,7 @@ const CLAUDE_STEPS = [
 ];
 
 function readControls(){
-  try { const o = JSON.parse(localStorage.getItem(CLAUDE_CONTROLS_KEY)); return o && typeof o === 'object' ? o : {}; } catch(e){ return {}; }
+  try { const o = JSON.parse(localStorage.getItem(CLAUDE_CONTROLS_KEY) || 'null'); return o && typeof o === 'object' ? o : {}; } catch(e){ return {}; }
 }
 function claudeMasterOn(){ return readControls().all !== false; }
 function claudeStepOn(id){ const o = readControls(); return o.all !== false && o[id] !== false; }

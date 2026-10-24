@@ -78,7 +78,7 @@ function copyText(text){
       const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
       document.body.appendChild(ta); ta.select();
       const ok = document.execCommand('copy'); document.body.removeChild(ta);
-      ok ? resolve() : reject(new Error('copy failed'));
+      ok ? resolve(undefined) : reject(new Error('copy failed'));
     }catch(e){ reject(e); }
   });
 }

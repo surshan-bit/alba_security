@@ -14,6 +14,7 @@ const dbCapabilityPromise = (typeof claude !== 'undefined' && claude && typeof c
   ? claude.use('db').catch(() => null)
   : Promise.resolve(null);
 
+/** @type {{ db: any, tradeDb: any, pinned: Set<string>, tradeLog: Map<string, any> }} */
 const state = {
   db: null,                        // the shared database handle; null until the capability resolves, or when this view has none
   tradeDb: null,                   // the same handle, set only for a signed-in viewer (the Trade Log is per user)

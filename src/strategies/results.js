@@ -14,7 +14,7 @@ const resetResultsRows = () => { rowCap = ROW_STEP; };
 // The "Sort by" choices are the Analysis page's (same list, same meaning). The choice is kept in this browser.
 const SORT_KEY = 'albaDashboard.strategySort.v1', DEFAULT_SORT = 'score_desc';
 let sortBy = DEFAULT_SORT;
-try { const v = localStorage.getItem(SORT_KEY); if(ANALYSIS_SORT_KEYS.has(v)) sortBy = v; } catch(e){ /* storage unavailable: default order */ }
+try { const v = localStorage.getItem(SORT_KEY) || ''; if(ANALYSIS_SORT_KEYS.has(v)) sortBy = v; } catch(e){ /* storage unavailable: default order */ }
 function setResultsSort(v){
   sortBy = ANALYSIS_SORT_KEYS.has(v) ? v : DEFAULT_SORT;
   try { localStorage.setItem(SORT_KEY, sortBy); } catch(e){ /* optional */ }

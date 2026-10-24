@@ -6,6 +6,7 @@
 //    sort, analysis filters, trade view), data/users/<uid>/pins, data/users/<uid>/strategies, and the trade log in
 //    data/users/<uid>/portfolio/trades/<TICKER>-<date>.
 
+/** @type {{ uid: string | null, db: any }} */
 const state = {
   uid: null,   // the signed-in member's id, or null
   db: null     // the database handle used for the records above (set together with uid, null when there is none)

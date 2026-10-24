@@ -13,6 +13,7 @@ import { getIdentityDb, getUid } from '../identity/session.js';
 
 const LS_KEY = 'albaDashboard.strategyRuns.v1';
 const DAY_MS = 86400000;
+/** @type {any} */
 let runsCache = null;
 
 function runsCol(){

@@ -42,6 +42,7 @@ function addPoint(series, pt){
 // Records today's point for every stock, after an import. Never throws: the import has already succeeded, and a
 // failure here only means the trend misses one point. Returns { written, stocks, error }.
 async function recordScoreHistory(db, stockList, ymd){
+  /** @type {{ written: number, stocks: number, error: string | null }} */
   const out = { written: 0, stocks: 0, error: null };
   try {
     const today = ymd || ymdOf(new Date());
