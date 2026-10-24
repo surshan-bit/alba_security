@@ -64,7 +64,7 @@ function pulseHtml(){
   }
   const lines = p && Array.isArray(p.reading) ? p.reading : [];
   if(lines.length){
-    h += '<div class="news-why"><small>CLAUDE&rsquo;S READING OF THE NUMBERS' + (p.readingAt ? ' &middot; ' + escapeHtml(stamp(p.readingAt)) : '') + '</small>' + lines.map((l, i) => `<div>${i + 1}. ${escapeHtml(l)}</div>`).join('') + '<small>An informed guess from the numbers above, not a fact.</small></div>';
+    h += '<div class="news-why"><small>SUMMARY</small>' + lines.map((l, i) => `<div>${i + 1}. ${escapeHtml(l)}</div>`).join('') + '<small>An informed guess from the numbers above, not a fact.</small></div>';
   }
   const next = nextBigEvents((news.macro && news.macro.calendar) || [], Date.now(), 1)[0];
   if(next) h += `<div class="news-watch"><b>Watch next:</b> ${escapeHtml(next.title)}, ${escapeHtml(shortDate(next.date))}</div>`;
