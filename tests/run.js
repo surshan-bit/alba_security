@@ -103,6 +103,12 @@ store.set('data/users/u_TEST/prefs', { v: 1, theme: 'dark', tradeView: 'cards', 
   uiState: { section: 'analysis', search: 'a', scroll: 0, aSelMode: true, aColsOpen: true } });
 store.set('data/users/u_TEST/pins', { tickers: [] });
 
+// ---- seed: the News page (pulse written by the page, macro + events written from a research session) ----
+store.set('news/pulse', { at: '2026-10-09T10:00:00.000Z', tiles: [{ id: 'nifty', close: 24500.5, change: 0.42 }, { id: 'vix', close: 14.2, change: 5.1 }, { id: 'brent', close: 88.4, change: -1.2 }, { id: 'usdinr', close: 84.1, change: 0.1 }], reading: ['Brent crude fell 1.2%, which eases pressure on India.', 'India VIX rose 5.1%, so traders are a bit nervous.'], readingAt: '2026-10-09T10:01:00.000Z' });
+store.set('news/macro', { asof: '2026-10-09', calendar: [{ date: '2026-10-14T05:00:00Z', title: 'India CPI inflation', country: 'IN', importance: 1, forecast: 4, previous: 3.5, unit: '%', source: 'MoSPI', url: 'https://www.mospi.gov.in/' }, { date: '2026-10-15T12:00:00Z', title: 'Small data point', country: 'US', importance: -1 }, { date: '2026-10-01T05:00:00Z', title: 'Past event', country: 'IN', importance: 1 }],
+  briefings: [{ group: 'india', headline: 'RBI keeps the repo rate unchanged', date: '2026-10-08', impact: 'positive', why: 'Steady rates help borrowers and banks.', links: [{ label: 'RBI statement', url: 'https://www.rbi.org.in/', kind: 'official' }, { label: 'Bad link', url: 'javascript:alert(1)', kind: 'official' }] }] });
+store.set('news/events', { asof: '2026-10-09', items: [{ ticker: 'TKR05', name: 'Stock five', type: 'results', date: '2026-10-20', text: 'Q2 results', url: 'https://www.bseindia.com/', src: 'BSE' }, { ticker: 'TKR06', name: 'Stock six', type: 'dividend', date: '2026-12-30', text: 'Interim dividend', url: '', src: 'NSE' }, { ticker: 'ZZZ', name: 'Not in list', type: 'board', date: '2026-10-21', text: 'Board meeting', url: '', src: 'NSE' }] });
+
 // ---- stock data ----
 const stocks = JSON.parse(fs.readFileSync(FIXTURE, 'utf8')).stocks;
 // research for ONE stock was saved "today" (used by the up-to-date check of the Fundamental refresh below)
@@ -252,6 +258,17 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
     snap('s6x_analysis_strategy_off', { count: $('#analysisLeaderboardCount').textContent }); }
 
   for(const k of ['refreshlog', 'business', 'trackrecord', 'help', 'knowledgebase', 'settings']){ nav(k); await sleep(150); snap('s7_' + k, { sec: html$('#section-' + k) }); }
+  { // News: the pulse, briefings and calendar; then Stock events (upcoming, filters, recent)
+    nav('news'); await sleep(250);
+    snap('s7n_news_macro', { head: html$('#newsBody') });
+    click($('[data-news-tab="events"]')); await sleep(100);
+    snap('s7n_news_events_upcoming', { body: html$('#newsBody') });
+    const sel = $('[data-news-type]'); sel.value = 'results'; sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100);
+    snap('s7n_news_events_results_only', { body: html$('#newsBody') });
+    { const s2 = $('[data-news-type]'); s2.value = 'all'; s2.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100); }
+    click($('[data-news-when="recent"]')); await sleep(100);
+    snap('s7n_news_events_recent', { body: html$('#newsBody') });
+  }
   // ---- Strategies ----
   win.confirm = () => true;
   // Price history for every sample stock (a mean-reverting random walk ending at the stock's current price), used by

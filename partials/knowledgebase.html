@@ -197,6 +197,18 @@
         </li>
       </ul>
 
+      <h3>The News page</h3>
+      <ul>
+        <li>Two tabs: <b>Global &amp; Macro</b> and <b>Stock events</b>. It never changes a score.</li>
+        <li><b>Refresh News</b> (in the page) reads about 9 market quotes from TradingView and saves them in the shared database (<code>news/pulse</code>).</li>
+        <li>The same button asks Claude for three plain "why" lines from those numbers only. Switch this off in Settings (<b>Explain the market pulse</b>).</li>
+        <li>Briefings, the economic calendar and upcoming stock events are researched in a Claude chat and saved as <code>news/macro</code> and <code>news/events</code>. The page cannot browse the web itself.</li>
+        <li>Briefing links must be real official links (RBI, Fed, SEBI, ministries, official YouTube channels). Links that are not http or https are never shown.</li>
+        <li>Stock events cover your "Positive MoS" strategy (or every stock with a positive margin of safety if it does not exist).</li>
+        <li><b>Recent</b> uses the results, company events and news already saved on each stock. <b>Upcoming</b> comes from the research.</li>
+        <li>Code: <code>src/news/</code> (logic, saved data, Refresh News, screen) and <code>src/sections/news.js</code>.</li>
+      </ul>
+
       <h2 id="kb-db" data-icon="db">7. Shared database (brief)</h2>
       <p>A few collections cover what must sync across devices or survive a republish. Nothing scoring-related lives here.</p>
       <div class="help-table-wrap"><table class="help-table">
@@ -238,6 +250,14 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.263 &middot; 2026-10-24</h3>
+            <ul>
+              <li><strong>New News page</strong> with Global &amp; Macro and Stock events tabs.</li>
+              <li>Market pulse tiles and Claude's plain "why" lines from Refresh News.</li>
+              <li>Briefings with official links and an economic calendar for the next 30 days (researched in a Claude chat).</li>
+              <li>Upcoming and recent events for your Positive MoS stocks, with their scores.</li>
+            </ul>
+
             <h3>v1.262 &middot; 2026-10-24</h3>
             <ul>
               <li>Help and Knowledge Base brought up to date with the latest changes.</li>

@@ -920,6 +920,45 @@ test('trade call: history keeps one point a day and lists when the call changed'
   });
 }
 
+// =========================================================== News page logic (src/news/model.js)
+{
+  const N = load('src/news/model.js', 'export { shiftDate };');
+  test('news: tiles keep only quotes with a price, in order, and colour a rise in a "bad" tile red', () => {
+    const tiles = N.buildTiles({ 'NSE:NIFTY': { close: 24500.5, change: 0.4 }, 'NSE:INDIAVIX': { close: 14.2, change: 5 }, 'TVC:GOLD': { close: 2400, change: 1 }, 'SP:SPX': {} });
+    assert.deepStrictEqual(tiles.map(x => x.id), ['nifty', 'vix', 'gold']);
+    assert.strictEqual(N.tileView(tiles[0]).tone, 'up');
+    assert.strictEqual(N.tileView(tiles[1]).tone, 'down');
+    assert.strictEqual(N.tileView(tiles[2]).tone, '');
+    assert.strictEqual(N.tileView(tiles[0]).value, '24,501');
+    assert.strictEqual(N.tileView(tiles[1]).change, '+5.00%');
+  });
+  test('news: the reading is cut to three clean lines', () => {
+    assert.deepStrictEqual(N.cleanReading({ lines: ['<b>a</b>  b', '', 'c', 'd', 'e'] }), ['a b', 'c', 'd']);
+    assert.deepStrictEqual(N.cleanReading(null), []);
+    assert.ok(N.readingPrompt(N.buildTiles({ 'NSE:NIFTY': { close: 1, change: 1 } }), [{ date: '2026-10-28', title: 'RBI' }]).includes('2026-10-28: RBI'));
+  });
+  test('news: calendar groups by IST date, filters by importance, and finds the next big event', () => {
+    const rows = [{ date: '2026-10-29T08:00:00Z', title: 'B', importance: 0 }, { date: '2026-10-28T20:00:00Z', title: 'A', importance: 1 }, { date: '2026-10-28T09:00:00Z', title: 'C', importance: -1 }, { date: '2026-10-30T09:00:00Z', title: 'D', importance: 1 }];
+    const g = N.groupCalendar(rows, 0);
+    assert.deepStrictEqual(g.map(x => [x.date, x.rows.map(r => r.title)]), [['2026-10-29', ['A', 'B']], ['2026-10-30', ['D']]]);
+    assert.strictEqual(N.groupCalendar(rows, -1).length, 3);
+    assert.deepStrictEqual(N.nextBigEvents(rows, Date.parse('2026-10-28T10:00:00Z'), 1), [{ date: '2026-10-29', title: 'A' }]);
+    assert.strictEqual(N.shortDate('2026-10-05'), '5 Oct');
+    assert.strictEqual(N.calValue(4, '%'), '4%');
+    assert.strictEqual(N.calValue(null, '%'), '');
+  });
+  test('news: upcoming and recent stock events are selected and filtered', () => {
+    const items = [{ ticker: 'A', type: 'results', date: '2026-10-30' }, { ticker: 'B', type: 'dividend', date: '2026-12-20' }, { ticker: 'C', type: 'results', date: '2026-10-01' }, { ticker: 'D', type: 'weird', date: '2026-10-30' }, { ticker: 'E', type: 'board', date: 'soon' }];
+    const up = N.upcomingItems(items, '2026-10-24');
+    assert.deepStrictEqual(up.map(x => x.ticker), ['A', 'B']);
+    assert.deepStrictEqual(N.filterItems(up, { type: 'all', upto: 30 }, '2026-10-24').map(x => x.ticker), ['A']);
+    assert.deepStrictEqual(N.filterItems(up, { type: 'dividend', upto: 0 }, '2026-10-24').map(x => x.ticker), ['B']);
+    const rec = N.recentItems([{ ticker: 'A', name: 'Aa', events: [{ k: 'earn', d: '2026-10-20', t: 'x' }, { k: 'news', d: '2026-10-22', t: 'y' }, { k: 'earn', d: '2026-08-01', t: 'old' }, { k: 'trade', d: '2026-10-21', t: 'z' }, { k: 'corp', d: '2026-10-30', t: 'future' }] }], '2026-10-24', 30);
+    assert.deepStrictEqual(rec.map(x => [x.type, x.date]), [['news', '2026-10-22'], ['results', '2026-10-20']]);
+    assert.strictEqual(N.shiftDate('2026-03-01', -1), '2026-02-28');
+  });
+}
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
