@@ -67,6 +67,20 @@
 .pc-tip b{display:block;font-weight:600;margin-bottom:2px;}
 .pc-tip .r{display:flex;justify-content:space-between;gap:14px;}
 .pc-tip .r span:first-child{opacity:.7;}
+/* MACD band under the volume (v1.259): blue MACD line, orange signal line, the gap between them as bars (blue above zero, orange below). */
+.pc-block{--pc-macd:#3987e5;--pc-sig:#d95926;}
+:root[data-theme="indigo"] .pc-block,:root[data-theme="white"] .pc-block{--pc-macd:#2a78d6;--pc-sig:#eb6834;}
+.pc-legend i.pc-lm,.pc-legend i.pc-ls{height:3px;vertical-align:3px;}
+.pc-legend i.pc-lm{background:var(--pc-macd);}
+.pc-legend i.pc-ls{background:var(--pc-sig);}
+.pc-chart svg .pc-mline{fill:none;stroke:var(--pc-macd);stroke-width:1.5;stroke-linejoin:round;}
+.pc-chart svg .pc-msig{fill:none;stroke:var(--pc-sig);stroke-width:1.5;stroke-linejoin:round;}
+.pc-chart svg .pc-mhu{fill:var(--pc-macd);opacity:.35;}
+.pc-chart svg .pc-mhd{fill:var(--pc-sig);opacity:.35;}
+.pc-chart svg .pc-mzero{stroke:var(--muted);stroke-width:1;stroke-dasharray:4 3;opacity:.85;}
+.pc-chart svg tspan.pc-mtitle{fill:var(--text);font-weight:700;}
+.pc-chart svg tspan.pc-mlab-m{fill:var(--pc-macd);font-weight:700;}
+.pc-chart svg tspan.pc-mlab-s{fill:var(--pc-sig);font-weight:700;}
 /* ---- In-page fundamental import (v1.19) ---- */
 .detail-jump .jump-preview b{font-weight:700;}
 /* Stock detail: no divider lines inside a panel. Only the five main headings (Valuation, Global & Macro, Fundamental Score,

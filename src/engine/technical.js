@@ -4,10 +4,16 @@
 // Same rules as Knowledge Base section 4 and the Part B prompt: MACD(12,26,9) level and signal and RSI(14) on
 // weekly and monthly closes; EMAs are seeded with the first close, RSI uses Wilder smoothing seeded with a simple average.
 function techEma(x, n){ const k = 2 / (n + 1); const e = [x[0]]; for(let i = 1; i < x.length; i++) e.push(x[i] * k + e[i - 1] * (1 - k)); return e; }
-function techMacd(c){
+// MACD for every bar: { macd, signal, hist } as long as the closes, and `from`, the first bar index where the signal line has had its 9
+// values after the 26 the slow average needs (earlier values are still warming up and are not drawn). Null with fewer than 35 bars.
+function techMacdSeries(c){
   if(!c || c.length < 35) return null;   // 26 bars to seed the slow EMA plus 9 for the signal line
   const a = techEma(c, 12), b = techEma(c, 26), m = a.map((v, i) => v - b[i]), s = techEma(m, 9);
-  return { level: m[m.length - 1], signal: s[s.length - 1] };
+  return { macd: m, signal: s, hist: m.map((v, i) => v - s[i]), from: 33 };
+}
+function techMacd(c){
+  const r = techMacdSeries(c);
+  return r ? { level: r.macd[r.macd.length - 1], signal: r.signal[r.signal.length - 1] } : null;
 }
 function techRsi(c, n = 14){
   if(!c || c.length < n + 1) return null;
@@ -127,4 +133,4 @@ function techKeepsBarsBlock(t, today, days = 3){
   return techDayNo(today) - techDayNo(t.asof) <= days;
 }
 
-export { computeTechnical, snapshotTechnical, techCompleted, techEma, techKeepsBarsBlock, techRsi, techScore3 };
+export { computeTechnical, snapshotTechnical, techCompleted, techEma, techKeepsBarsBlock, techMacdSeries, techRsi, techScore3 };

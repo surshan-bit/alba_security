@@ -502,6 +502,25 @@ test('v1.258: Tech 3 leaves out a missing component and rescales; with no readin
   assert.strictEqual(TECH.techScore3({ score: 7 }), null); assert.strictEqual(TECH.techScore3(null), null);
 });
 
+// ---- v1.259: MACD for every bar, for the price charts ----
+{
+  const closes = Array.from({ length: 80 }, (_, i) => 100 + 10 * Math.sin(i / 5) + i * 0.4);
+  test('v1.259: the MACD series ends on the same figures as the saved MACD state, and needs 35 bars', () => {
+    const TECH = load('src/engine/technical.js', 'export { techMacd };');
+    const s = TECH.techMacdSeries(closes), last = TECH.techMacd(closes);
+    assert.strictEqual(s.macd.length, 80); assert.strictEqual(s.signal.length, 80); assert.strictEqual(s.from, 33);
+    assert.strictEqual(s.macd[79], last.level); assert.strictEqual(s.signal[79], last.signal);
+    assert.ok(Math.abs(s.hist[79] - (last.level - last.signal)) < 1e-12);
+    assert.strictEqual(TECH.techMacdSeries(closes.slice(0, 34)), null); assert.notStrictEqual(TECH.techMacdSeries(closes.slice(0, 35)), null);
+    assert.strictEqual(TECH.techMacdSeries(null), null);
+  });
+  test('v1.259: a bar\'s MACD does not depend on later bars (no look-ahead)', () => {
+    const TECH = load('src/engine/technical.js', 'export { techMacd };');
+    const s = TECH.techMacdSeries(closes);
+    for(const i of [34, 40, 55, 79]){ const p = TECH.techMacd(closes.slice(0, i + 1)); assert.strictEqual(s.macd[i], p.level); assert.strictEqual(s.signal[i], p.signal); }
+  });
+}
+
 // v1.187: the browser suites are skipped without Playwright on a developer machine, but a missing Playwright must FAIL in CI
 {
   const { spawnSync } = require('child_process');

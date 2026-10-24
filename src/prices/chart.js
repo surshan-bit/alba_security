@@ -3,6 +3,7 @@ import { escapeHtml } from '../core/util.js';
 import { pcTickerKey, priceHistoryByTicker } from './store.js';
 import { followPrice, periodStartSec } from './periodmove.js';
 import { EVENT_GROUPS, barReaction, eventsByBar, stockChartEvents } from './events.js';
+import { techMacdSeries } from '../engine/technical.js';
 
 var pcObserver = null;
 var pcKeyOpen = false;   // the colour key and event-tag buttons under "Price history" start hidden
@@ -20,7 +21,7 @@ function renderPriceChartMount(s, sums){
   if(!pcHasData(s)) return '';
   return `<div class="pc-block${pcKeyOpen ? ' show-key' : ''}" id="priceChartBlock">
     <div class="pc-head"><button type="button" class="pc-keytoggle" id="pcKeyToggle" aria-expanded="${pcKeyOpen}">${pcKeyOpen ? 'Hide legend' : 'Legend'}</button></div>
-    <div class="pc-legend"><span><i style="background:var(--buy)"></i>Close above open</span><span><i style="background:var(--avoid)"></i>Close below open</span><span><i class="pc-vol"></i>Volume</span></div>
+    <div class="pc-legend"><span><i style="background:var(--buy)"></i>Close above open</span><span><i style="background:var(--avoid)"></i>Close below open</span><span><i class="pc-vol"></i>Volume</span><span><i class="pc-lm"></i>MACD</span><span><i class="pc-ls"></i>MACD signal</span></div>
     ${renderEventToggles(s)}
     <div class="pc-panels"></div>
     <div class="pc-sums" hidden>${['1W', '1M'].map(k => `<div data-k="${k}">${sums && sums[k] || ''}</div>`).join('')}</div></div>`;
@@ -39,6 +40,9 @@ function initPriceChart(s){
     '1W': {title:'Weekly',  ranges:[['6M', 26], ['1Y', 52], ['All', 999]], def:2, lbl:{day:'numeric', month:'short'}, every:0}
   };
   const order = ['1W', '1M'], state = {}, hover = {}, geo = {}; const pend = {}, raf = {};
+  // MACD (12, 26, 9) of every bar, from all the bars so it does not change with the range chosen; null for a stock with too little history (no panel).
+  const macd = {};
+  order.forEach(k => { macd[k] = techMacdSeries(bars[k].map(r => r[4])); });
   // Event tags: lanes for the kinds of event this stock has; a toggle in the legend hides a kind.
   const events = stockChartEvents(s), haveGroups = EVENT_GROUPS.filter(g => events.some(e => e.group === g.id));
   const shown = new Set(haveGroups.map(g => g.id)), LANE = 14;
@@ -65,13 +69,14 @@ function initPriceChart(s){
   function draw(k){
     const c = cfg[k], el = elOf(k), svg = el.querySelector('svg');
     const lanes = haveGroups.filter(g => shown.has(g.id)), evH = lanes.length ? lanes.length * LANE + 4 : 0;
-    const W = el.querySelector('.pc-chart').clientWidth || 320, H = 250 + evH, padL = 6, padR = 44, padT = 8, padB = 22 + evH, volH = 44, gap = 8;
+    const ms = macd[k], MH = ms ? 70 : 0, MG = ms ? 22 : 0, mBlock = MH + MG;   // the MACD band sits under the volume, above the event tags
+    const W = el.querySelector('.pc-chart').clientWidth || 320, H = 250 + evH + mBlock, padL = 6, padR = 44, padT = 8, padB = 22 + evH, volH = 44, gap = 8;
     const all = bars[k], n = Math.min(all.length, c.ranges[state[k]][1]), off = all.length - n, b = all.slice(off);
-    const pw = W - padL - padR, ph = H - padT - padB - volH - gap;
+    const pw = W - padL - padR, ph = H - padT - padB - mBlock - volH - gap, vBase = H - padB - mBlock;   // vBase: the volume bars' baseline
     let lo = Math.min(...b.map(r => r[3])), hi = Math.max(...b.map(r => r[2])); const pad = (hi - lo) * .06; lo -= pad; hi += pad;
     const step = pw / n, bw = Math.max(1.2, Math.min(18, step * .64));
     const X = i => padL + step * (i + .5), Y = v => padT + (hi - v) / (hi - lo) * ph;
-    const vmax = Math.max(...b.map(r => r[5])), VY = v => H - padB - v / vmax * volH;
+    const vmax = Math.max(...b.map(r => r[5])), VY = v => vBase - v / vmax * volH;
     const ticks = (a, z, m) => { const raw = (z - a) / m, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p, st = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p, out = []; for(let v = Math.ceil(a / st) * st; v <= z; v += st) out.push(v); return out; };
     let g = '';
     ticks(lo, hi, 5).forEach(v => { g += `<line x1="${padL}" x2="${W - padR}" y1="${Y(v)}" y2="${Y(v)}" class="pc-grid"/><text x="${W - padR + 6}" y="${Y(v) + 4}">${Math.round(v)}</text>`; });
@@ -80,7 +85,7 @@ function initPriceChart(s){
     const f = v => +v.toFixed(2); let vol = '', wU = '', wD = '', bU = '', bD = '', big = '';
     b.forEach((r, i) => {
       const up = r[4] >= r[1], x = X(i), vw = Math.max(1.2, step * .6), vy = VY(r[5]);
-      vol += `M${f(x - vw / 2)} ${f(vy)}h${f(vw)}v${f(H - padB - vy)}h${f(-vw)}z`;
+      vol += `M${f(x - vw / 2)} ${f(vy)}h${f(vw)}v${f(vBase - vy)}h${f(-vw)}z`;
       const wk = `M${f(x)} ${f(Y(r[2]))}V${f(Y(r[3]))}`; if(up) wU += wk; else wD += wk;
       const y1 = Y(Math.max(r[1], r[4])), hh = Math.max(1, Math.abs(Y(r[1]) - Y(r[4])));
       if(bw >= 2){
@@ -95,7 +100,29 @@ function initPriceChart(s){
     if(bU) g += `<path d="${bU}" fill="var(--buy)"/>`;
     if(bD) g += `<path d="${bD}" fill="var(--avoid)"/>`;
     g += big;
-    const every = c.every ? (W < 520 ? c.every * 2 : c.every) : Math.max(1, Math.round(n / (W < 520 ? 4 : 8)));
+    // MACD band: histogram bars from zero, the MACD and signal lines, a dashed zero line; only bars past the warm-up (ms.from) are drawn.
+    if(ms){
+      const mTop = vBase + MG, vis = [];
+      for(let i = 0; i < n; i++) if(off + i >= ms.from) vis.push(i);
+      if(vis.length){
+        let mLo = 0, mHi = 0;
+        vis.forEach(i => { const j = off + i; mLo = Math.min(mLo, ms.macd[j], ms.signal[j], ms.hist[j]); mHi = Math.max(mHi, ms.macd[j], ms.signal[j], ms.hist[j]); });
+        if(mHi - mLo < 1e-9){ mHi += 1; mLo -= 1; }
+        const mPad = (mHi - mLo) * .08; mLo -= mPad; mHi += mPad;
+        const MY = v => mTop + (mHi - v) / (mHi - mLo) * MH;
+        g += `<text x="${padL}" y="${vBase + 14}"><tspan class="pc-mtitle">MACD (12, 26, 9)</tspan><tspan class="pc-mlab-m" dx="12">— MACD</tspan><tspan class="pc-mlab-s" dx="10">— Signal</tspan></text>`;
+        const mt = ticks(mLo, mHi, 3), mst = mt.length > 1 ? mt[1] - mt[0] : 1, mdp = mst >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(mst) - 1e-9));
+        mt.forEach(v => { if(Math.abs(v) < mst / 1e3) return; g += `<line x1="${padL}" x2="${W - padR}" y1="${f(MY(v))}" y2="${f(MY(v))}" class="pc-grid"/><text x="${W - padR + 6}" y="${f(MY(v) + 4)}">${v.toFixed(mdp)}</text>`; });
+        const y0 = MY(0), hw = Math.max(1.2, step * .6); let hu = '', hd = '', lm = '', ls = '';
+        vis.forEach((i, q) => {
+          const j = off + i, x = X(i), hv = ms.hist[j], y1 = MY(hv), rc = `M${f(x - hw / 2)} ${f(Math.min(y0, y1))}h${f(hw)}v${f(Math.max(.5, Math.abs(y1 - y0)))}h${f(-hw)}z`;
+          if(hv >= 0) hu += rc; else hd += rc;
+          lm += (q ? 'L' : 'M') + f(x) + ' ' + f(MY(ms.macd[j])); ls += (q ? 'L' : 'M') + f(x) + ' ' + f(MY(ms.signal[j]));
+        });
+        g += `<path d="${hu}" class="pc-mhu"/><path d="${hd}" class="pc-mhd"/><line x1="${padL}" x2="${W - padR}" y1="${f(y0)}" y2="${f(y0)}" class="pc-mzero"/><text x="${W - padR + 6}" y="${f(y0 + 4)}">0</text><path d="${lm}" class="pc-mline"/><path d="${ls}" class="pc-msig"/>`;
+      }
+    }
+    const every =c.every ? (W < 520 ? c.every * 2 : c.every) : Math.max(1, Math.round(n / (W < 520 ? 4 : 8)));
     b.forEach((r, i) => { if(i % every === 0) g += `<text x="${X(i)}" y="${H - 5}" text-anchor="middle">${fmtD(r[0], c.lbl)}</text>`; });
     // Event tags, one lane per kind, under the volume bars (only the bars in view).
     if(lanes.length){
@@ -124,7 +151,7 @@ function initPriceChart(s){
     const xh = el.querySelector('.pc-xh'); xh.setAttribute('x1', String(G.X(i))); xh.setAttribute('x2', String(G.X(i))); xh.setAttribute('opacity', '1');
     const prev = bars[k][G.off + i - 1], chg = (r[4] / (prev && prev[4] > 0 ? prev[4] : r[1]) - 1) * 100, tip = el.querySelector('.pc-tip');
     const label = k === '1W' ? 'Week of ' + fmtD(r[0], {day:'numeric', month:'short', year:'numeric'}) : fmtD(r[0], {month:'long', year:'numeric'});
-    tip.innerHTML = `<b>${label}</b><div class="r"><span>Open</span><span>${rs(r[1])}</span></div><div class="r"><span>High</span><span>${rs(r[2])}</span></div><div class="r"><span>Low</span><span>${rs(r[3])}</span></div><div class="r"><span>Close</span><span>${rs(r[4])}</span></div><div class="r"><span>Change</span><span>${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div><div class="r"><span>Volume</span><span>${vol(r[5])}</span></div>${eventTipHtml(byBar[k].get(G.off + i), barReaction(bars[k], G.off + i), k === '1W' ? 'week' : 'month')}`;
+    tip.innerHTML = `<b>${label}</b><div class="r"><span>Open</span><span>${rs(r[1])}</span></div><div class="r"><span>High</span><span>${rs(r[2])}</span></div><div class="r"><span>Low</span><span>${rs(r[3])}</span></div><div class="r"><span>Close</span><span>${rs(r[4])}</span></div><div class="r"><span>Change</span><span>${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div><div class="r"><span>Volume</span><span>${vol(r[5])}</span></div>${macdTipHtml(k, G.off + i)}${eventTipHtml(byBar[k].get(G.off + i), barReaction(bars[k], G.off + i), k === '1W' ? 'week' : 'month')}`;
     const tw = /** @type {HTMLElement} */ (tip).offsetWidth, xx = G.X(i) * (rect.width / G.W);
     /** @type {HTMLElement} */ (tip).style.left = Math.max(0, Math.min(rect.width - tw, xx + 14 + tw > rect.width ? xx - tw - 14 : xx + 14)) + 'px'; /** @type {HTMLElement} */ (tip).style.top = '6px'; /** @type {HTMLElement} */ (tip).style.opacity = '1';
   }
@@ -137,6 +164,12 @@ function initPriceChart(s){
     return list.length && list.every(e => e.s === 'neu') ? 'neu' : '';
   };
   const pctTxt = v => v === null ? 'n/a' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+  // MACD, signal and histogram of the hovered bar (nothing for a bar still warming up, or a stock with no MACD).
+  const macdTipHtml = (k, j) => {
+    const ms = macd[k]; if(!ms || j < ms.from) return '';
+    const row = (name, v) => `<div class="r"><span>${name}</span><span>${v.toFixed(2)}</span></div>`;
+    return row('MACD', ms.macd[j]) + row('Signal', ms.signal[j]) + row('Histogram', ms.hist[j]);
+  };
   // Events of the hovered bar, listed under its prices (newest first, at most 5).
   const eventTipHtml = (list, react, per) => {
     if(!list || !list.length) return '';
@@ -161,7 +194,7 @@ function initPriceChart(s){
     const c = cfg[k]; state[k] = c.def;
     const el = document.createElement('div'); el.className = 'pc-panel'; el.dataset.k = k;
     el.innerHTML = `<div class="pc-ph"><div class="pc-ptitle">${c.title}<small>${bars[k].length} bars</small></div><div class="pc-psum">${(root.querySelector('.pc-sums [data-k="' + k + '"]') || {}).innerHTML || ''}</div><div class="pc-pills" role="group" aria-label="${c.title} range">${c.ranges.map((r, i) => `<button type="button" class="pc-pill" data-i="${i}" aria-pressed="${i === state[k]}">${r[0]}</button>`).join('')}</div></div>
-      <div class="pc-chart"><svg role="img" aria-label="${c.title} candlestick chart with volume"></svg><div class="pc-tip"></div></div>`;
+      <div class="pc-chart"><svg role="img" aria-label="${c.title} candlestick chart with volume and MACD"></svg><div class="pc-tip"></div></div>`;
     panels.appendChild(el);
     el.querySelectorAll('.pc-pill').forEach(btn => /** @type {HTMLElement} */ (btn).onclick = () => { state[k] = +/** @type {HTMLElement} */ (btn).dataset.i; el.querySelectorAll('.pc-pill').forEach(x => x.setAttribute('aria-pressed', String(x === btn))); draw(k); });
     const ch = el.querySelector('.pc-chart');

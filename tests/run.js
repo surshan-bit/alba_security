@@ -383,6 +383,12 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
       snap('s9d_events', { stats: blk ? (blk.querySelector('.pc-evstats') || { innerHTML: 'none' }).innerHTML : 'no chart', legend: blk ? (blk.querySelector('.pc-evlegend') || { outerHTML: 'none' }).outerHTML : 'no chart', tags: q('.pc-ev'), news: q('.pc-evk-news.pc-ev'), svg: html$('#priceChartBlock .pc-panel svg') });
       const tg = blk && blk.querySelector('.pc-evtoggle[data-g="news"]'); if(tg){ click(tg); await sleep(50); }
       snap('s9e_events_hidden', { tags: q('.pc-ev'), pressed: tg ? tg.getAttribute('aria-pressed') : 'none' }); }
+    // v1.259: a MACD band under the volume of each chart. 80 weekly and 40 monthly bars, drawn from the 34th bar on (the warm-up is left out): 47 and 7 histogram bars.
+    { const dCount = (p, sel) => { const e = p.querySelector(sel); return e ? (e.getAttribute('d') || '').split('M').length - 1 : 0; };
+      snap('s9f_macd', { panels: JSON.stringify([...win.document.querySelectorAll('#priceChartBlock .pc-panel')].map(p => ({
+        title: (p.querySelector('.pc-ptitle') || { textContent: '' }).textContent, label: (p.querySelector('tspan.pc-mtitle') || { textContent: 'none' }).textContent,
+        lines: p.querySelectorAll('.pc-mline, .pc-msig').length, zero: p.querySelectorAll('.pc-mzero').length, bars: dCount(p, '.pc-mhu') + dCount(p, '.pc-mhd') }))),
+        legend: ((win.document.querySelector('#priceChartBlock .pc-legend') || { textContent: '' }).textContent).replace(/\s+/g, ' ').trim() }); }
   }
 
   // ---- Live Data Refresh (Fundamental) with a stubbed Claude and TradingView ----
