@@ -86,8 +86,8 @@ function briefingsHtml(){
     rows.forEach(b => {
       const links = (Array.isArray(b.links) ? b.links : []).map(l => link(l && l.label, l && l.url, l && l.kind === 'video' ? 'news-video' : '')).join('');
       const dot = b.impact === 'positive' || b.impact === 'negative' || b.impact === 'mixed' ? b.impact : 'none';
-      const body = (dot !== 'none' ? `<div class="news-meta">Impact: ${impactTag(dot)}</div>` : '') + (b.why ? `<p><b>Why it matters:</b> ${escapeHtml(b.why)}</p>` : '') + (links ? `<div class="news-links">${links}</div>` : '');
-      h += `<details class="news-brief" open><summary><span class="news-bdate">${b.date ? escapeHtml(shortDate(isoDay(b.date))) : ''}</span><span class="news-dot news-dot-${dot}" title="${dot === 'none' ? '' : dot}"></span><span class="news-bhead">${escapeHtml(b.headline)}</span></summary>` + (body ? `<div class="news-bbody">${body}</div>` : '') + '</details>';
+      const body = (b.why ? `<p><b>Why it matters:</b> ${escapeHtml(b.why)}</p>` : '') + (links ? `<div class="news-links">${links}</div>` : '');
+      h += `<details class="news-brief" open><summary><span class="news-bdate">${b.date ? escapeHtml(shortDate(isoDay(b.date))) : ''}</span><span class="news-bhead">${impactTag(dot)} ${escapeHtml(b.headline)}</span></summary>` + (body ? `<div class="news-bbody">${body}</div>` : '') + '</details>';
     });
   });
   return h;
@@ -104,7 +104,7 @@ function calendarHtml(){
   shown.forEach(g => g.rows.forEach((r, i) => {
     const imp = IMPORTANCE[r.importance] || '', impCls = r.importance >= 1 ? 'news-hi' : r.importance === 0 ? 'news-md' : 'news-lo';
     const bits = [r.country, r.forecast !== undefined && r.forecast !== null ? 'forecast ' + calValue(r.forecast, r.unit) : '', r.previous !== undefined && r.previous !== null ? 'previous ' + calValue(r.previous, r.unit) : '', r.actual !== undefined && r.actual !== null ? 'actual ' + calValue(r.actual, r.unit) : ''].filter(Boolean).map(escapeHtml);
-    h += `<div class="news-row"><div class="news-date">${i === 0 ? escapeHtml(shortDate(g.date)) : ''}</div><div class="news-text">${escapeHtml(r.title)} ${imp ? `<span class="news-imp ${impCls}">${escapeHtml(imp.toUpperCase())}</span>` : ''}<small>${bits.join(' &middot; ')}${r.source ? ' &middot; ' + (link(r.source, r.url) || escapeHtml(r.source)) : ''}</small></div></div>`;
+    h += `<div class="news-row"><div class="news-date">${i === 0 ? escapeHtml(shortDate(g.date)) : ''}</div><div class="news-text">${imp ? `<span class="news-imp ${impCls}">${escapeHtml(imp.toUpperCase())}</span> ` : ''}${escapeHtml(r.title)}<small>${bits.join(' &middot; ')}${r.source ? ' &middot; ' + (link(r.source, r.url) || escapeHtml(r.source)) : ''}</small></div></div>`;
   }));
   h += `<button type="button" class="news-more" data-news-cal-all>${view.calAll ? 'Show only medium and high importance' : 'Show all'}</button>`;
   return h;

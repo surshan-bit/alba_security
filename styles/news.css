@@ -94,11 +94,9 @@ a.news-stock:hover{color:var(--accent);}
 .news-brief>summary::after{content:"\2303";flex:none;color:var(--muted);margin-left:auto;transition:transform .15s;}
 .news-brief:not([open])>summary::after{transform:rotate(180deg);}
 .news-bdate{flex:0 0 58px;white-space:nowrap;font:700 .78rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--muted);padding-top:2px;}
-.news-dot{flex:none;width:10px;height:10px;border-radius:50%;margin-top:6px;background:var(--line);}
-.news-dot-positive{background:var(--buy);}
-.news-dot-negative{background:var(--avoid);}
-.news-dot-mixed{background:var(--hold);}
 .news-bhead{flex:1;min-width:0;font-weight:700;font-size:.92rem;line-height:1.4;overflow-wrap:anywhere;}
 .news-bbody{padding:0 0 12px 78px;max-width:80ch;}
 .news-bbody p{margin:0;font-size:.84rem;line-height:1.45;overflow-wrap:anywhere;}
 @media(max-width:560px){.news-bdate{flex-basis:54px}.news-bbody{padding-left:0}}
+.news-bhead .news-tag,.news-text>.news-imp{margin-right:4px;}
+.news-bhead .news-tag{vertical-align:1px;}
