@@ -485,6 +485,23 @@ test('v1.182: the reason text of a bars-based score is unchanged by the shared h
   assert.ok(/^monthly MACD bullish, above zero, weekly MACD bullish, above zero\. monthly RSI [\d.]+ \(\w+\), weekly RSI [\d.]+ \(\w+\)\. Valuation pillar reading of 6\.0\/10 \(reasonably valued\)\.$/.test(t.reason), t.reason);
 });
 
+// ---- v1.258: Technical Score 3 = the Technical Score without the valuation point ----
+test('v1.258: Tech 3 ignores the valuation pillar; the Tech score does not', () => {
+  const TECH = load('src/engine/technical.js');
+  const r = { monthMacdLevel: 5, monthMacdSignal: 3, weekMacdLevel: 5, weekMacdSignal: 3, monthRsi: 20, weekRsi: 20 };   // both MACDs bullish above zero, both RSIs oversold
+  const rich = TECH.snapshotTechnical(r, 10, '2026-10-24'), poor = TECH.snapshotTechnical(r, 0, '2026-10-24');
+  assert.strictEqual(rich.score, 6); assert.strictEqual(poor.score, 4);   // the Tech score moves with valuation: (4 + 2) / 10 and 4 / 10
+  assert.strictEqual(TECH.techScore3(rich), 5); assert.strictEqual(TECH.techScore3(poor), 5);   // 4 / 8: the same either way
+  assert.strictEqual(TECH.techScore3(Object.assign({}, rich, { states: Object.assign({}, rich.states, { valuation: null }) })), 5);
+});
+test('v1.258: Tech 3 leaves out a missing component and rescales; with no reading it has no score', () => {
+  const TECH = load('src/engine/technical.js');
+  assert.strictEqual(TECH.techScore3({ states: { weekRsi: 'strong' } }), 10);   // 2 of 2
+  assert.strictEqual(TECH.techScore3({ states: { monthMacd: 'bull_above', weekRsi: 'oversold' } }), 5.56);   // (2.5 + 0) of (2.5 + 2.0) = 5.56 out of 10
+  assert.strictEqual(TECH.techScore3({ states: { valuation: 'attractively valued' } }), null);   // a valuation label alone is no technical reading
+  assert.strictEqual(TECH.techScore3({ score: 7 }), null); assert.strictEqual(TECH.techScore3(null), null);
+});
+
 // v1.187: the browser suites are skipped without Playwright on a developer machine, but a missing Playwright must FAIL in CI
 {
   const { spawnSync } = require('child_process');

@@ -127,6 +127,7 @@
             <li><code>technical.reason</code> names what was missing.</li>
           </ul>
         </li>
+        <li><b>Tech 3 (v1.258):</b> the same composite with the valuation points left out, so the MACD and RSI weights add up to 8 instead of 10 and the sum is rescaled to 0&ndash;10 over them. It is worked out when the page loads from the MACD and RSI states saved in the stock's <code>technical</code> block (<code>techScore3</code> in <code>src/engine/technical.js</code>), so nothing extra is saved and it follows every Tech score update. It has no score when no MACD or RSI state is saved.</li>
         <li><b>Left untouched:</b> a stock's existing <code>technical</code> block stays as is when it has no row in the CSV, or when <code>pillars.val</code> is missing.</li>
         <li><b>No onboarding:</b> symbols not already on the dashboard are skipped. New stocks come only from the Fundamental CSV (&sect;3).</li>
         <li><b>Price refresh:</b> each import also updates matched stocks' current price (see v1.9).</li>
@@ -221,6 +222,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.258 &middot; 2026-10-24</h3>
+            <ul>
+              <li><strong>New Tech 3 score.</strong> A third technical score, shown as a <strong>Tech 3</strong> column beside Tech and Tech 2 in the Analysis grid, and as a &ldquo;Technical score 3&rdquo; field in Strategies. It is the Tech score with one change: the valuation point is left out. It uses the same monthly and weekly MACD and RSI readings with the same weights, and the remaining components are rescaled to a 0&ndash;10 score, so a stock&rsquo;s Tech 3 no longer moves when its valuation changes.</li>
+              <li>Tech 3 is worked out from the readings already saved with each stock, so it needs no refresh of its own. It appears for every stock that has a Tech score, and changes whenever the Tech score is next updated. The Tech and Tech 2 scores are unchanged.</li>
+            </ul>
+
             <h3>v1.257 &middot; 2026-10-24</h3>
             <ul>
               <li><strong>Larger text on phones.</strong> On screens up to 600 pixels wide, all text is about 12% bigger (stock tables, filters, menus, the Knowledge Base) so it reads more easily. Tablets and desktops are unchanged.</li>
