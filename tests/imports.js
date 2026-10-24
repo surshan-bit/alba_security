@@ -99,7 +99,7 @@ function fundFileChanged(){
 }
 // a file that turns the whole market upside down: most scores move by a point or more
 function fundFileShaken(){ const rows = rowsCopy(); rows.forEach((r, i) => { if(i % 2 === 0) Object.assign(r, { 'Return on capital employed': D.rv(1, 60, 1), 'Return on equity': D.rv(1, 60, 1), 'OPM': D.rv(1, 60, 1), 'Debt to equity': D.rv(0, 3, 2), 'Interest Coverage': D.rv(0.2, 60, 1), 'Profit growth': D.rv(-30, 90, 1), 'Piotroski score': Math.floor(D.rnd() * 10) }); }); return DS.fundCsv(rows); }
-const expectFund = (csv, rawStocks, asof) => { const list = clone(rawStocks); const res = F.albaApplyFundamental(csv, list, asof); return { list, res }; };
+const expectFund = (csv, rawStocks, asof) => { const list = clone(rawStocks); const res = F.applyFundamental(csv, list, asof); return { list, res }; };
 const symbolFor = s => symOf(s);
 // ================================================================ scenarios
 async function main(){

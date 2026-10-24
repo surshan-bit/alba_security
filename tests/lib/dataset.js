@@ -3,7 +3,7 @@
 // engine rules, split into ~190 KB chunk documents exactly as the page stores them. Nothing here is real company data.
 const { createData } = require('./data.js');
 const { load } = require('./load.js');
-const F = load('src/import/fund-engine.js', 'export { AlbaFundEngine };');
+const F = load('src/import/fund-engine.js', 'export { FundEngine };');
 const E = load('src/engine/technical.js', 'export { techComposite as composite, techMacdStateOf as macdState, techRsiState as rsiState };');
 
 const sid = id => String(id).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_') || 'x';
@@ -25,7 +25,7 @@ function buildDataset(){
   // four BSE-only companies; the first two are made to look excellent so they qualify for the watchlists
   const GREAT = { 'Return on capital employed': 60, 'Return on equity': 55, 'OPM': 60, 'Median return on capital employed 10Years': 60, 'Average return on equity 7Years': 55, 'Debt to equity': 0, 'Interest Coverage': 90, 'Quick ratio': 4, 'Current ratio': 4, 'Altman Z Score': 12, 'Piotroski score': 9, 'PEG Ratio': 0.1, 'Price to Earning': 7, 'Industry PE': 30, 'Pledged percentage': 0, 'Profit growth': 30, 'Profit growth 3Years': 29, 'Profit growth 5Years': 30, 'Sales growth 3Years': 40, 'Intrinsic Value': 2000, 'Current Price': 100, 'Free cash flow 3years': 100, 'Operating cash flow 3years': 200 };
   for(let k = 0; k < 4; k++) rows.push(D.fundRow('', 'Group00', 'Ind00a', Object.assign({ 'NSE Code': '', 'BSE Code': String(512340 + k), 'Name': 'Bse Only ' + k, 'ISIN Code': 'INE00' + (512340 + k) + '1' }, k < 2 ? GREAT : {})));
-  const apply = (rs, asof) => { const stocks = []; F.albaApplyFundamental(D.fundCsv(rs), stocks, asof); return stocks; };
+  const apply = (rs, asof) => { const stocks = []; F.applyFundamental(D.fundCsv(rs), stocks, asof); return stocks; };
   // give three of the Strong/Good companies the awkward symbol shapes the watchlist code has to handle
   let stocks = apply(rows, '2026-09-01');
   const good = stocks.map((s, i) => [s, i]).filter(([s]) => (s.verdict === 'buy' || s.verdict === 'mbuy') && !/^\d/.test(symOf(s)));

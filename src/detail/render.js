@@ -128,7 +128,7 @@ function renderDetail(idx){
   bindDetailJumpNav(detailEl);
   bindPeers(idx);
   bindDetailLinks(s);
-  bindLiveDataBar(s);   // Live Data Refresh buttons (js/livedata.js)
+  bindLiveDataBar(s);   // Live Data Refresh buttons (src/livedata/)
 }
 
 function setDetailBackTo(v){ detailBackTo = v; }
