@@ -9,6 +9,7 @@ import { news } from './store.js';
 import { getPulseRun } from './pulse.js';
 
 const BRIEFING_GROUPS = [
+  { id: 'market', label: 'Market wrap' },
   { id: 'india', label: 'India policy & RBI' },
   { id: 'data', label: 'Inflation & data' },
   { id: 'commodities', label: 'Currency, crude & commodities' },
@@ -84,8 +85,9 @@ function briefingsHtml(){
     h += `<div class="news-grp">${escapeHtml(g.label)}</div>`;
     rows.forEach(b => {
       const links = (Array.isArray(b.links) ? b.links : []).map(l => link(l && l.label, l && l.url, l && l.kind === 'video' ? 'news-video' : '')).join('');
-      h += `<div class="news-card"><h4>${escapeHtml(b.headline)} ${impactTag(b.impact)}</h4>` + (b.date ? `<div class="news-meta">${escapeHtml(shortDate(isoDay(b.date)))}</div>` : '') +
-        (b.why ? `<p><b>Why it matters:</b> ${escapeHtml(b.why)}</p>` : '') + (links ? `<div class="news-links">${links}</div>` : '') + '</div>';
+      const dot = b.impact === 'positive' || b.impact === 'negative' || b.impact === 'mixed' ? b.impact : 'none';
+      const body = (dot !== 'none' ? `<div class="news-meta">Impact: ${impactTag(dot)}</div>` : '') + (b.why ? `<p><b>Why it matters:</b> ${escapeHtml(b.why)}</p>` : '') + (links ? `<div class="news-links">${links}</div>` : '');
+      h += `<details class="news-brief" open><summary><span class="news-bdate">${b.date ? escapeHtml(shortDate(isoDay(b.date))) : ''}</span><span class="news-dot news-dot-${dot}" title="${dot === 'none' ? '' : dot}"></span><span class="news-bhead">${escapeHtml(b.headline)}</span></summary>` + (body ? `<div class="news-bbody">${body}</div>` : '') + '</details>';
     });
   });
   return h;
