@@ -6,7 +6,6 @@ import { pcTickerKey } from '../prices/store.js';
 import { tvIstDate, tvMcp } from '../tv/connector.js';
 import { setPriceJobHook, priceJobs, refreshOneNow } from '../prices/refresh.js';
 import { ldMosText, ldRupees, ldSet } from './bar.js';
-import { setLdPhase } from './claude.js';
 import { ldSymOk, ldVerifiedSymbol } from './symbols.js';
 import { getLdBatch } from './batch.js';
 
@@ -16,7 +15,6 @@ import { getLdBatch } from './batch.js';
 async function ldRunTechnical(s){
   const key = pcTickerKey(s);
   const set = (pct, msg) => ldSet(key, 'tech', { state: 'running', pct, msg });
-  setLdPhase('tv');
   set(3, 'Connecting to TradingView…');
   const db = await dbCapabilityPromise;
   if(!db) throw new Error('The database is not available in this view.');
@@ -42,16 +40,18 @@ async function ldRunTechnical(s){
   if(cur && cur.exists) await ref.update({ valuation: val }); else await ref.set({ ticker: tickerSymbol(s), valuation: val });
 
   // 2 and 3. Weekly and monthly bars (delta only when bars are stored), then MACD/RSI and the Technical Score.
-  const hook = (k, state, msg) => {
+  const STAGES = {
+    symbol: [26, 'Finding the TradingView symbol…'],
+    refetch: [50, 'Prices were adjusted, fetching the full history again…'],
+    recent: [38, 'Fetching only the new weekly and monthly bars…'],
+    history: [38, 'Fetching weekly and monthly history…'],
+    bars: [70, 'Saving the bars…'],
+    technical: [88, 'Computing MACD and RSI and saving the Technical Score…']
+  };
+  const hook = (k, state, msg, stage) => {
     if(k !== key) return;
-    const m = String(msg || '');
     if(state === 'queued') set(24, 'Preparing the bar download…');
-    else if(/finding the TradingView symbol/.test(m)) set(26, 'Finding the TradingView symbol…');
-    else if(/refetching/.test(m)) set(50, 'Prices were adjusted, fetching the full history again…');
-    else if(/fetching recent/.test(m)) set(38, 'Fetching only the new weekly and monthly bars…');
-    else if(/fetching weekly/.test(m)) set(38, 'Fetching weekly and monthly history…');
-    else if(/saving bars/.test(m)) set(70, 'Saving the bars…');
-    else if(/saving technical/.test(m)) set(88, 'Computing MACD and RSI and saving the Technical Score…');
+    else if(STAGES[stage]) set(STAGES[stage][0], STAGES[stage][1]);
   };
   stopNow();
   setPriceJobHook(key, hook);

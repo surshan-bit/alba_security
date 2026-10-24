@@ -10,17 +10,18 @@ import { tvCall, tvErrorText, tvIstDate, tvMcp, tvMergeDelta, tvResolveSymbol, t
 
 const priceJobs = new Map();   // dashboard ticker key -> { state: 'queued'|'running'|'ok'|'error', msg, at }
 const priceJobHooks = new Map();   // ticker key -> function followed by the Live Data Refresh for that stock's progress
-function priceJobSet(key, state, msg){
+// stage names the step a 'running' job is at (symbol, recent, history, refetch, bars, technical) so listeners need not read the message text.
+function priceJobSet(key, state, msg, stage){
   priceJobs.set(key, { state, msg, at: Date.now() });
   const hook = priceJobHooks.get(key);
-  if(typeof hook === 'function'){ try { hook(key, state, msg); } catch(e){ console.error('A price job listener failed', e); } }
+  if(typeof hook === 'function'){ try { hook(key, state, msg, stage); } catch(e){ console.error('A price job listener failed', e); } }
 }
 // lean: the bulk refresh asks only for the bar type that is out of date (weekly every week, monthly once a month): half the TradingView calls,
 // which matters because the connector has a daily call quota.
 async function refreshOneStock(s, db, lean){
   const key = pcTickerKey(s);
-  const set = (m) => priceJobSet(key, 'running', m);
-  set('finding the TradingView symbol…');
+  const set = (m, stage) => priceJobSet(key, 'running', m, stage);
+  set('finding the TradingView symbol…', 'symbol');
   const sym = await tvResolveSymbol(s);
   await ensurePriceBars(s);
   const have = priceHistoryByTicker[key];
@@ -38,7 +39,7 @@ async function refreshOneStock(s, db, lean){
     if(w) tvValidate(w, 'weekly'); if(m) tvValidate(m, 'monthly');
     return [w, m];
   };
-  set(delta ? 'fetching recent weekly and monthly bars…' : 'fetching weekly and monthly history…');
+  set(delta ? 'fetching recent weekly and monthly bars…' : 'fetching weekly and monthly history…', delta ? 'recent' : 'history');
   let [wp, mp] = await fetchBoth(delta ? delta.wkN : 261, delta ? delta.moN : 60, needW, needM);
   let [W, M] = rowsOf(wp, mp);
   let note = '';
@@ -48,7 +49,7 @@ async function refreshOneStock(s, db, lean){
     else {
       note = ' (prices were adjusted since the last fetch, so the full history was refetched)';
       delta = null; needW = needM = true;
-      set('refetching the full history…');
+      set('refetching the full history…', 'refetch');
       [wp, mp] = await fetchBoth(261, 60);
       [W, M] = rowsOf(wp, mp);
     }
@@ -85,8 +86,8 @@ async function persistBars(s, db, sym, W, M, o){
   const { delta, needW, needM } = o;
   let note = o.note || '';
   const key = pcTickerKey(s);
-  const set = (m) => priceJobSet(key, 'running', m);
-  set('saving bars…');
+  const set = (m, stage) => priceJobSet(key, 'running', m, stage);
+  set('saving bars…', 'bars');
   const iso = await writeBarDocs(s, db, sym, W, M, { delta, needW, needM });
   priceApply(key, { '1W': W, '1M': M }, sym, iso);
   let techMsg = '';
@@ -96,7 +97,7 @@ async function persistBars(s, db, sym, W, M, o){
     const t = computeTechnical(W, M, pv, tvIstDate());
     if(!t){ techMsg = '; not enough history for a technical score'; }
     else {
-      set('saving technical score…');
+      set('saving technical score…', 'technical');
       const id = sanitizeDocId(tickerSymbol(s));
       const ref = db.doc('stockUpdates/' + id);
       const cur = await ref.get();
