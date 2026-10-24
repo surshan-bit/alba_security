@@ -44,7 +44,7 @@ function scopeInfo(){
 function pulseHtml(){
   const p = news.pulse, run = getPulseRun();
   const tiles = p && Array.isArray(p.tiles) ? p.tiles.map(tileView).filter(Boolean) : [];
-  let h = '<div class="news-sec">Market pulse</div>';
+  let h = '<h2 class="news-h2" data-icon="trend">Market pulse</h2>';
   if(!tiles.length){
     h += '<p class="news-empty">No market quotes yet. Press <b>Refresh News</b> to load them.</p>';
   } else {
@@ -64,7 +64,7 @@ function pulseHtml(){
 
 function briefingsHtml(){
   const m = news.macro, items = m && Array.isArray(m.briefings) ? m.briefings.filter(b => b && b.headline) : [];
-  let h = '<div class="news-sec">Briefings</div>';
+  let h = '<h2 class="news-h2" data-icon="globe">Briefings</h2>';
   if(!items.length) return h + '<p class="news-empty">No briefings yet. They are researched and saved from a Claude session with official links; ask Claude to refresh the news.</p>';
   if(m.asof) h += `<div class="news-hint">Researched ${escapeHtml(shortDate(m.asof))}. Each card says why it matters; links go to official sources.</div>`;
   const known = new Set(BRIEFING_GROUPS.map(g => g.id));
@@ -83,8 +83,8 @@ function briefingsHtml(){
 
 function calendarHtml(){
   const m = news.macro, rows = m && Array.isArray(m.calendar) ? m.calendar : [];
-  let h = '<div class="news-sec">Economic calendar &middot; next 30 days</div>';
-  if(m && m.calendarAt) h += `<div class="news-hint">Updated ${escapeHtml(stamp(m.calendarAt))} from TradingView.</div>`;
+  let h = '<h2 class="news-h2" data-icon="calendar">Economic calendar</h2>';
+  h += '<div class="news-hint">Next 30 days' + (m && m.calendarAt ? ', updated ' + escapeHtml(stamp(m.calendarAt)) + ' from TradingView' : '') + '.</div>';
   if(!rows.length) return h + '<p class="news-empty">No calendar yet. It is saved from a Claude session.</p>';
   const groups = groupCalendar(rows, view.calAll ? -1 : 0), today = todayIst();
   const shown = groups.filter(g => g.date >= today);
@@ -117,7 +117,7 @@ function eventsTab(){
   const today = todayIst(), scope = scopeInfo(), inScope = new Set(scope.list.map(s => tickerSymbol(s)));
   const typeOpts = '<option value="all">All types</option>' + EVENT_TYPES.map(t => `<option value="${t.id}"${view.type === t.id ? ' selected' : ''}>${escapeHtml(t.label)}</option>`).join('');
   const rangeOpts = [[7, 'Next 7 days'], [30, 'Next 30 days'], [90, 'Next 90 days'], [0, 'Any date']].map(([v, l]) => `<option value="${v}"${view.upto === v ? ' selected' : ''}>${l}</option>`).join('');
-  let h = `<div class="news-filters"><button type="button" class="news-pill${view.when === 'upcoming' ? ' on' : ''}" data-news-when="upcoming">Upcoming</button><button type="button" class="news-pill${view.when === 'recent' ? ' on' : ''}" data-news-when="recent">Recent</button>` +
+  let h = '<h2 class="news-h2" data-icon="tag">' + (view.when === 'recent' ? 'Recent events' : 'Upcoming events') + '</h2>' + `<div class="news-filters"><button type="button" class="news-pill${view.when === 'upcoming' ? ' on' : ''}" data-news-when="upcoming">Upcoming</button><button type="button" class="news-pill${view.when === 'recent' ? ' on' : ''}" data-news-when="recent">Recent</button>` +
     `<select class="news-select" data-news-type aria-label="Event type">${typeOpts}</select>` + (view.when === 'upcoming' ? `<select class="news-select" data-news-upto aria-label="Date range">${rangeOpts}</select>` : '') + '</div>';
   h += `<div class="news-hint">Covers ${scope.list.length.toLocaleString('en-IN')} stocks ${escapeHtml(scope.label)}.</div>`;
   if(view.when === 'upcoming'){
