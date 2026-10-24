@@ -205,7 +205,7 @@
         <li>The same button asks Claude for three plain "why" lines from those numbers only. Switch this off in Settings (<b>Explain the market pulse</b>).</li>
         <li>Briefings and upcoming stock events are researched in a Claude chat and saved in <code>news/macro</code> and <code>news/events</code>. The page cannot browse the web itself.</li>
         <li>Briefing links must be real official links (RBI, Fed, SEBI, ministries, official YouTube channels). Links that are not http or https are never shown.</li>
-        <li>Stock events cover your "Positive MoS" strategy (or every stock with a positive margin of safety if it does not exist).</li>
+        <li>Stock events cover the stocks of the strategy picked in the drop-down (any published strategy, or "All stocks"). It starts with "Positive MoS" and remembers the choice in this browser.</li>
         <li><b>Recent</b> uses the results, company events and news already saved on each stock. <b>Upcoming</b> comes from the research.</li>
         <li>Code: <code>src/news/</code> (logic, saved data, Refresh News, screen) and <code>src/sections/news.js</code>.</li>
       </ul>
@@ -251,6 +251,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.266 &middot; 2026-10-24</h3>
+            <ul>
+              <li><strong>News &rsaquo; Stock events:</strong> pick which strategy's stocks you want events for, or choose All stocks.</li>
+              <li>The page remembers your choice on this device.</li>
+            </ul>
+
             <h3>v1.265 &middot; 2026-10-24</h3>
             <ul>
               <li>News page sections now have icon headings with an accent bar, like Settings, so each section stands out.</li>
