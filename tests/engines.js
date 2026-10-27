@@ -313,6 +313,31 @@ test('apply: bad files throw before anything is changed', () => {
   assert.deepStrictEqual(stocks, before);
 });
 
+// =========================================================== Analysis "Group by" (src/analysis/grouping.js)
+{
+  const G = load('src/analysis/grouping.js');
+  const mk = (tk, ind, grp, wk, mo) => ({ ticker: tk + ' · ' + ind, name: 'Co ' + tk, industryGroup: grp, technical: { raw: { weekPctChange: wk, monthPctChange: mo } } });
+  // already in ranked order: A, B, C, D, E
+  const ranked = [mk('A', 'Steel', 'Metals', 2, 10), mk('B', 'Banks', 'Financials', 1, -2), mk('C', 'Steel', 'Metals', -4, 6), mk('D', 'Aluminium', 'Metals', null, null), mk('E', 'Banks', 'Financials', 3, 4)];
+  test('grouping: groups appear in the order of their best-ranked stock and keep the ranked order inside', () => {
+    const g = G.groupRanked(ranked, 'industry');
+    assert.deepStrictEqual(g.map(x => x.name), ['Steel', 'Banks', 'Aluminium']);
+    assert.deepStrictEqual(g[0].members.map(s => s.name), ['Co A', 'Co C']);
+    assert.deepStrictEqual(g[1].members.map(s => s.name), ['Co B', 'Co E']);
+  });
+  test('grouping: averages, median and up/down use only the stocks that have a figure', () => {
+    const g = G.groupRanked(ranked, 'industry'), steel = g[0], alu = g[2];
+    near(steel.meanW, -1); near(steel.meanM, 8); near(steel.medianW, -1); assert.strictEqual(steel.up, 1); assert.strictEqual(steel.down, 1);
+    assert.strictEqual(alu.meanW, null); assert.strictEqual(alu.meanM, null); assert.strictEqual(alu.medianW, null); assert.strictEqual(alu.up + alu.down, 0); assert.strictEqual(alu.members.length, 1);
+  });
+  test('grouping: Industry Group merges industries, and a stock with no group goes under a dash', () => {
+    const g = G.groupRanked(ranked.concat([mk('F', 'Misc', undefined, 0, 0)]), 'group');
+    assert.deepStrictEqual(g.map(x => x.name), ['Metals', 'Financials', '—']);
+    assert.strictEqual(g[0].members.length, 3); near(g[0].meanW, -1);
+  });
+  test('grouping: an empty list gives no groups', () => { assert.deepStrictEqual(G.groupRanked([], 'industry'), []); });
+}
+
 // =========================================================== Business page: industry changes and news (src/business/calc.js)
 {
   const B = load('src/business/calc.js');

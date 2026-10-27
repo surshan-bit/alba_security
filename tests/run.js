@@ -229,6 +229,25 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   snap('s6l_mos', { body: html$('#analysisPanelBody') });
   { const sel = $('#analysisSortSelect'); sel.value = 'mos_desc'; sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100); }
   snap('s6m_sort', { body: html$('#analysisPanelBody') });
+  { // v1.270: "Group by" None / Industry / Industry Group (Analysis leaderboard)
+    const grp = async (v) => { const g = $('#analysisGroupSelect'); g.value = v; g.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(250); };
+    const heads = () => Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-group'));
+    const nRows = () => String(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-row').length);
+    await grp('industry');
+    snap('s6m2_group_industry', { count: $('#analysisLeaderboardCount').textContent, heads: heads().map(h => h.textContent).join('|'), rows: nRows(), allBtn: $('#analysisGroupAllBtn').textContent, hidden: String($('#analysisGroupAllBtn').hidden), body: html$('#analysisLeaderboardBody') });
+    const before = Number(nRows()), first = heads()[0]; click(first); await sleep(100);
+    snap('s6m3_group_folded', { rows: nRows(), fewer: String(Number(nRows()) < before), expanded: heads()[0].getAttribute('aria-expanded'), body: html$('#analysisLeaderboardBody') });
+    click(heads()[0]); await sleep(100);
+    snap('s6m4_group_reopened', { sameRows: String(Number(nRows()) === before) });
+    click($('#analysisGroupAllBtn')); await sleep(100);
+    snap('s6m5_group_all_folded', { rows: nRows(), allBtn: $('#analysisGroupAllBtn').textContent, heads: String(heads().length) });
+    click($('#analysisGroupAllBtn')); await sleep(100);
+    snap('s6m6_group_all_open', { sameRows: String(Number(nRows()) === before), allBtn: $('#analysisGroupAllBtn').textContent });
+    await grp('group');
+    snap('s6m7_group_industrygroup', { count: $('#analysisLeaderboardCount').textContent, heads: heads().map(h => h.textContent).join('|'), rows: nRows() });
+    await grp('none');
+    snap('s6m8_group_none', { heads: String(heads().length), sameRows: String(Number(nRows()) === before), hidden: String($('#analysisGroupAllBtn').hidden) });
+  }
   click($('.analysis-col-move[data-dir="down"]')); await sleep(150);
   snap('s6n_colmove', { body: html$('#analysisPanelBody') });
   click($('#analysisColumnsResetBtn')); await sleep(150);

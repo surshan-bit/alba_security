@@ -117,3 +117,12 @@ body.lb-full-open{overflow:hidden;}
 a.stock-link:hover .analysis-lb-name{text-decoration:underline;}
 body.biz-full-open{overflow:hidden;}
 .filter-note{margin:8px 0 0;font-size:.74rem;line-height:1.4;color:var(--muted);}
+
+/* Group by: one line above each group's stocks (name, count, average change, up/down). Click it to fold the group. */
+.strat-table > tbody > .analysis-lb-group{cursor:pointer;}
+.strat-table > tbody > .analysis-lb-group > td{padding:7px 10px;white-space:nowrap;background:color-mix(in srgb, var(--accent) 10%, var(--bg));border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.analysis-lb-group:hover > td,.analysis-lb-group:focus-visible > td{background:color-mix(in srgb, var(--accent) 18%, var(--bg));}
+.lbg-inner{position:sticky;left:0;display:inline-flex;align-items:baseline;gap:14px;font-size:.8rem;}
+.lbg-caret{width:.9em;color:var(--muted);}
+.lbg-name{font-weight:700;color:var(--text);}
+.lbg-count,.lbg-stat{color:var(--muted);font-size:.76rem;}
