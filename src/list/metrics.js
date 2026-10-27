@@ -1,11 +1,5 @@
 // Derived per-stock numbers and predicates used by Analysis, Strategies and the detail page (score band, MoS, week and month change).
 import { marginOfSafety } from '../core/mos.js';
-function weekPct(s){
-  return (s.technical && s.technical.raw) ? s.technical.raw.weekPctChange : -Infinity;
-}
-function monthPct(s){
-  return (s.technical && s.technical.raw) ? s.technical.raw.monthPctChange : -Infinity;
-}
 // Margin of safety (vs. Screener.in Intrinsic Value), as a plain number for sorting. Stocks with no Valuation Snapshot on
 // file sort to the bottom of a "highest MoS first" list rather than the top.
 function mosPct(s){
@@ -32,4 +26,4 @@ function scoreBand(v){
   return 'fs-avoid';
 }
 
-export { monthPct, mosPct, mosRatingAny, scoreBand, weekPct };
+export { mosPct, mosRatingAny, scoreBand };

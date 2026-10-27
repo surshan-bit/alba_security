@@ -9,7 +9,7 @@ import { pcTickerKey, priceLoaded } from '../prices/store.js';
 import { isPinned } from '../core/pins.js';
 import { mosPct, mosRatingAny, scoreBand } from '../list/metrics.js';
 import { techRatingInfo } from '../detail/technical.js';
-import { newsCellHtml } from '../strategies/news.js';
+import { newsCellHtml, newsCounts } from '../strategies/news.js';
 
 // Analysis leaderboard column registry (added 2026-10-06) — the table's columns used to be
 // hardcoded in both the <thead> markup and the per-row <td> template, in a fixed order. Both
@@ -18,13 +18,13 @@ import { newsCellHtml } from '../strategies/news.js';
 const ANALYSIS_LB_COLUMNS = [
   { id: 'pin', label: '' },
   { id: 'rank', label: '#', num: true },
-  { id: 'score', label: 'Fund', num: true, title: 'Fundamental score (0-10)' },
+  { id: 'score', label: 'Fund', num: true, title: 'Fundamental score (0-10)', sortName: 'Fundamental Score' },
   { id: 'techScore', label: 'Tech', num: true, title: 'Technical score (0-10): momentum from price trend and RSI' },
   // Tech 2 and Tech 3 are not shown in this grid (hidden in v1.261). They are still computed and stay available in Strategies (fields) and on each stock's page.
-  { id: 'mos', label: 'MoS', num: true },
-  { id: 'stock', label: 'Stock' },
-  { id: 'weekChg', label: 'W % chg', num: true },
-  { id: 'monthChg', label: 'M % chg', num: true },
+  { id: 'mos', label: 'MoS', num: true, sortName: 'Margin of Safety' },
+  { id: 'stock', label: 'Stock', sortName: 'Name' },
+  { id: 'weekChg', label: 'W % chg', num: true, sortName: 'Weekly % change' },
+  { id: 'monthChg', label: 'M % chg', num: true, sortName: 'Monthly % change' },
   { id: 'weekRsi', label: 'W RSI', num: true },
   { id: 'monthRsi', label: 'M RSI', num: true },
   { id: 'techW', label: 'W Tech Rating' },
@@ -141,9 +141,63 @@ function analysisRowContext(s, i, idx){
 // The columns of every other stock grid (Strategies, Explorer, a stock's peers): the Analysis "Columns" setting (its order), without the
 // pin column, which only the Analysis leaderboard has. Change the order once in Analysis and every grid follows.
 const stockGridColumnIds = () => analysisColumnOrder().filter(id => id !== 'pin');
-function columnHeaderHtml(id){
+// ---- sorting by a column header ----
+// Every grid that draws its header with columnHeaderHtml(id, sort) gets clickable headers: a click sorts by that column, a second click reverses it.
+// `sort` is { col, dir } ('asc' | 'desc'). A stock with no figure for the column always goes last, whichever way the column is sorted.
+const finiteOrNull = (v) => typeof v === 'number' && isFinite(v) ? v : null;
+const rawOf = (s, key) => finiteOrNull(s.technical && s.technical.raw ? s.technical.raw[key] : null);
+const TECH_STATE_RANK = { bull_above: 4, bull_below: 3, bear_above: 2, bear_below: 1 };
+const techRank = (s, key) => { const v = s.technical && s.technical.states ? TECH_STATE_RANK[s.technical.states[key]] : undefined; return v === undefined ? null : v; };
+// Days since research was saved or triggered, whichever is the more recent (what the "Research done" cell shows).
+function researchDoneDays(s){
+  const saved = stockResearchAgeDays(s), trig = daysSinceDate(getResearchTriggers().get(tickerSymbol(s)));
+  const days = [saved, trig].filter(v => v !== null && v !== undefined);
+  return days.length ? Math.min(...days) : null;
+}
+const SORT_VALUE = {
+  score: (s) => finiteOrNull(s.score),
+  techScore: (s) => finiteOrNull(s.technical ? s.technical.score : null),
+  mos: (s) => { const m = mosPct(s); return m === -Infinity ? null : m; },
+  stock: (s) => String(s.name || '').toLowerCase(),
+  weekChg: (s) => rawOf(s, 'weekPctChange'),
+  monthChg: (s) => rawOf(s, 'monthPctChange'),
+  weekRsi: (s) => rawOf(s, 'weekRsi'),
+  monthRsi: (s) => rawOf(s, 'monthRsi'),
+  techW: (s) => techRank(s, 'weekMacd'),
+  techM: (s) => techRank(s, 'monthMacd'),
+  news: (s) => { const c = newsCounts(s); return c ? c.pos - c.neg : null; },
+  industry: (s) => tickerIndustry(s).toLowerCase(),
+  triggered: researchDoneDays,
+  price: (s) => finiteOrNull(s.valuation ? s.valuation.currentPrice : null)
+};
+const isSortableColumn = (id) => Object.prototype.hasOwnProperty.call(SORT_VALUE, id);
+// The direction a column sorts in the first time it is clicked: words A to Z, ratings and figures best (highest) first, research done most recent first.
+const firstSortDir = (id) => (id === 'stock' || id === 'industry' || id === 'name' || id === 'triggered') ? 'asc' : 'desc';
+// A comparer that orders by `valueOf(item)` (a number, a string, or null for "no figure", which always goes last).
+function compareBy(valueOf, dir){
+  const sign = dir === 'asc' ? 1 : -1;
+  return (a, b) => {
+    const x = valueOf(a), y = valueOf(b);
+    if(x === null || y === null) return x === y ? 0 : (x === null ? 1 : -1);
+    if(typeof x === 'string') return sign * x.localeCompare(/** @type {string} */ (y));
+    return sign * (x - /** @type {number} */ (y));
+  };
+}
+const compareByColumn = (col, dir) => compareBy(SORT_VALUE[col] || (() => null), dir);
+// What a click on column `id` changes the sort to.
+const nextSort = (sort, id) => sort && sort.col === id ? { col: id, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { col: id, dir: firstSortDir(id) };
+const sortLabelOf = (sort) => { const c = ANALYSIS_LB_COLUMN_MAP.get(sort.col); return (c ? (c.sortName || c.label) : sort.col) + (sort.dir === 'asc' ? ' (low to high)' : ' (high to low)'); };
+// One sortable header cell: the label as a button (with an arrow when it is the sorted column). `extra` is the th's own attributes.
+function sortHeaderHtml(id, label, sort, extra){
+  const on = !!sort && sort.col === id;
+  return `<th${extra || ''} aria-sort="${on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><button type="button" class="th-sort${on ? ' on' : ''}" data-sort-col="${id}" title="Sort by ${escapeHtml(label)}">${escapeHtml(label)}<span class="th-arrow" aria-hidden="true">${on ? (sort.dir === 'asc' ? '&#9650;' : '&#9660;') : ''}</span></button></th>`;
+}
+function columnHeaderHtml(id, sort){
   const c = ANALYSIS_LB_COLUMN_MAP.get(id);
-  return `<th${c.num ? ' class="num"' : ''}${c.title ? ` title="${escapeHtml(c.title)}"` : ''}>${escapeHtml(c.label)}</th>`;
+  if(!c) return '';
+  const extra = (c.num ? ' class="num"' : '') + (c.title ? ` title="${escapeHtml(c.title)}"` : '');
+  if(!sort || !isSortableColumn(id)) return `<th${extra}>${escapeHtml(c.label)}</th>`;
+  return sortHeaderHtml(id, c.label, sort, extra);
 }
 
 function renderAnalysisColumnsPanel(colOrder){
@@ -168,4 +222,4 @@ function renderAnalysisColumnsPanel(colOrder){
   `;
 }
 
-export { ANALYSIS_LB_COLUMN_IDS, analysisColumnOrder, analysisLbCell, analysisRowContext, columnHeaderHtml, renderAnalysisColumnsPanel, stockGridColumnIds };
+export { ANALYSIS_LB_COLUMN_IDS, analysisColumnOrder, analysisLbCell, analysisRowContext, columnHeaderHtml, compareBy, compareByColumn, nextSort, renderAnalysisColumnsPanel, sortHeaderHtml, sortLabelOf, stockGridColumnIds };

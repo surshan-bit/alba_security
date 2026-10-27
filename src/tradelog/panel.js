@@ -8,11 +8,31 @@ import { prefSet } from '../identity/prefs.js';
 import { signalCol } from '../identity/session.js';
 import { ymdOf } from '../history/scorehistory.js';
 import { refreshIdeasBody } from './ideas.js';
+import { compareBy, nextSort, sortHeaderHtml } from '../analysis/columns.js';
 import { addSignalPoint, callChanges, factsFor, tradeSignal } from './signals.js';
 
 // Which view the panel shows: 'cards' or 'table'. Only this panel uses it, so it is kept here (the saved choice
 // is read once, when the page loads; the Cards / Table buttons change it).
 let tlView = 'cards';
+// The table view sorts by a column header (newest purchase first to begin with); the cards keep that newest-first order.
+let tlSort = { col: 'buyDate', dir: 'desc' };
+const CALL_RANK = { buy: 3, hold: 2, sell: 1 };
+const TL_SORT = {
+  name: (m) => String(m.t.name || m.t.ticker || '').toLowerCase(),
+  buyDate: (m) => m.buy.date || null,
+  status: (m) => m.isClosed ? 1 : 0,
+  entry: (m) => m.buy.snapshot && m.buy.snapshot.score != null ? m.buy.snapshot.score : null,
+  data: (m) => m.buy.snapshot && m.buy.snapshot.fundamentalFactorsTotal ? m.buy.snapshot.fundamentalFactorsComplete / m.buy.snapshot.fundamentalFactorsTotal : null,
+  ret: (m) => { const r = tradeReturnPct(m.t); return r == null ? null : r; },
+  held: (m) => m.held == null ? null : m.held,
+  exit: (m) => m.isClosed && m.sell.snapshot && m.sell.snapshot.score != null ? m.sell.snapshot.score : null,
+  call: (m) => m.sig ? (CALL_RANK[m.sig.call] || 0) : null
+};
+// A click on a table header: sort by that column, or reverse it.
+function tlSortBy(id){
+  tlSort = nextSort(tlSort, id);
+  renderTradeLogPanel();
+}
 try { const v = localStorage.getItem('albaDashboard.tradeView.v1'); if(v === 'table' || v === 'cards') tlView = v; } catch(e){ /* storage unavailable: default view */ }
 
 // ---- Track Record / Trade Log panel ----
@@ -212,11 +232,12 @@ function renderTradeLogPanel(){
     listHtml = `<div class="tl-cards">${models.map(tlCardHtml).join('')}</div>`;
   } else {
     const returnHead = models.some(m => m.isClosed) ? 'Return' : 'Unrealized';
+    const th = (id, label) => sortHeaderHtml(id, label, tlSort);
     listHtml = `
     <div class="help-table-wrap">
       <table class="help-table">
-        <thead><tr><th>Stock</th><th>Buy date / price &times; qty</th><th>Status</th><th>Entry score</th><th>Data at entry</th><th>${returnHead}</th><th>Held</th><th>Exit score</th><th>Today's call</th><th></th></tr></thead>
-        <tbody>${models.map(tlRowHtml).join('')}</tbody>
+        <thead><tr>${th('name', 'Stock')}${th('buyDate', 'Buy date / price \u00d7 qty')}${th('status', 'Status')}${th('entry', 'Entry score')}${th('data', 'Data at entry')}${th('ret', returnHead)}${th('held', 'Held')}${th('exit', 'Exit score')}${th('call', "Today's call")}<th></th></tr></thead>
+        <tbody>${models.slice().sort(compareBy(TL_SORT[tlSort.col], tlSort.dir)).map(tlRowHtml).join('')}</tbody>
       </table>
     </div>`;
   }
@@ -226,4 +247,4 @@ function renderTradeLogPanel(){
 }
 
 
-export { holdingDaysBetween, renderTradeLogPanel, tlSetView };
+export { holdingDaysBetween, renderTradeLogPanel, tlSetView, tlSortBy };

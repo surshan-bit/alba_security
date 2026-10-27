@@ -256,6 +256,22 @@ async function businessTests(browser){
   { const t = await page.locator('#businessBody').innerText(); ok(!/Macro view|1 week change is|3 months change is|Nothing is hidden/.test(t) && /Matched \d+ of \d+ stocks/.test(t) && !/^\s*Industries\s*$/m.test(t), 'business: only the "Matched N of M stocks" line is shown above the grid'); }
   await page.locator('[data-biz-by="group"]').click();
   ok(/Industry group/i.test(await page.locator('.biz-table th').first().innerText()), 'business: the grouping button switches to industry groups');
+  { // v1.273: a click on a column header sorts the industries (A to Z, then Z to A) and the stocks inside an opened industry; the clicked column shows an arrow
+    const names = () => page.$$eval('.biz-row .biz-open', bs => bs.map(b => b.textContent.trim()));
+    const asc = a => a.every((v, i) => i === 0 || a[i - 1].localeCompare(v) <= 0), desc = a => a.every((v, i) => i === 0 || a[i - 1].localeCompare(v) >= 0);
+    await page.locator('.biz-table > thead [data-sort-col="name"]').click(); await page.waitForTimeout(200);
+    ok(asc(await names()) && (await page.locator('.biz-table > thead th[aria-sort="ascending"]').count()) === 1, 'business: the first click on the Industry header lists A to Z with an arrow');
+    await page.locator('.biz-table > thead [data-sort-col="name"]').click(); await page.waitForTimeout(200);
+    ok(desc(await names()), 'business: a second click reverses it');
+    await page.locator('.biz-table > thead [data-sort-col="count"]').click(); await page.waitForTimeout(200);
+    const counts = await page.$$eval('.biz-row td:nth-child(2)', tds => tds.map(t => parseInt(t.textContent, 10)));
+    ok(counts.every((v, i) => i === 0 || counts[i - 1] >= v), 'business: the Stocks header sorts the most stocks first');
+    await page.locator('.biz-row td:nth-child(2)').first().click(); await page.waitForSelector('.biz-detail .strat-table', { timeout: 5000 });
+    await page.locator('.biz-detail [data-sort-col="stock"]').click(); await page.waitForTimeout(200);
+    const inner = await page.$$eval('.biz-detail .analysis-lb-name', es => es.map(e => e.textContent.trim()));
+    ok(inner.every((v, i) => i === 0 || inner[i - 1].localeCompare(v) <= 0), 'business: the stocks inside an opened industry sort by their own header');
+    await page.locator('.biz-table > thead [data-sort-col="mean"]').click(); await page.waitForTimeout(200);
+  }
   await page.reload(); await appReady(page); await page.waitForTimeout(300); await goto(page, 'business'); await page.waitForSelector('.biz-row', { timeout: 5000 });
   ok(/Industry group/i.test(await page.locator('.biz-table th').first().innerText()) && (await page.locator('[data-biz-period].active').innerText()) === '3M', 'business: the chosen period and grouping are remembered');
   ok(errs.length === 0, 'business: console errors: ' + errs.slice(0, 3).join(' | '));

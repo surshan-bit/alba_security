@@ -5,7 +5,7 @@ import { escapeHtml } from '../core/util.js';
 import { ensureAllPriceBars, pcTickerKey, priceHistoryByTicker } from '../prices/store.js';
 import { appSections } from '../ui/navigation.js';
 import { openIndustryInline, openStockInline } from '../ui/inlinedetail.js';
-import { analysisLbCell, analysisRowContext, columnHeaderHtml, stockGridColumnIds } from '../analysis/columns.js';
+import { analysisLbCell, analysisRowContext, columnHeaderHtml, compareBy, compareByColumn, nextSort, sortHeaderHtml, stockGridColumnIds } from '../analysis/columns.js';
 import { publishedStrategies } from '../strategies/state.js';
 import { strategyStockSet, validStrategyId } from '../strategies/pick.js';
 import { getNewsRun, planNews, startNewsCollect, stopNewsCollect } from './news.js';
@@ -46,9 +46,18 @@ const matchSet = () => {
 // "Matched" view: only the industries (and, inside them, only the stocks) that qualify for the chosen strategy. It needs a strategy; without one everything is shown.
 const matchedOnly = () => showMatched && strategyOn();
 // The industry rows as shown on the page, with the same filter the table uses.
+// The table's columns can be sorted by clicking a header (the industries; the heat map keeps its own order). Best average change first to begin with.
+const INDUSTRY_SORT = {
+  name: (r) => r.name.toLowerCase(), count: (r) => r.count, mean: (r) => r.mean, median: (r) => r.median,
+  breadth: (r) => r.known ? r.up / r.known : null, news: (r) => r.news.length, matches: (r) => r.matches,
+  matchMean: (r) => r.matches ? r.matchMean : null, vsIndustry: (r) => r.matches && r.matchMean !== null && r.mean !== null ? r.matchMean - r.mean : null
+};
+let tableSort = { col: 'mean', dir: 'desc' };   // the industries table
+let detailSort = { col: 'periodChg', dir: 'desc' };   // the stocks inside an opened industry: best change first to begin with
 function visibleRows(){
   const rows = industryTable(stocks, { by, period, barsFor, matchSet: strategyOn() ? matchSet() : null });
-  return matchedOnly() ? rows.filter(r => r.matches > 0) : rows;
+  const shown = matchedOnly() ? rows.filter(r => r.matches > 0) : rows;
+  return view === 'table' ? shown.slice().sort(compareBy(INDUSTRY_SORT[tableSort.col], tableSort.dir)) : shown;
 }
 const signedPp = (v) => v === null ? '<span class="biz-na">n/a</span>' : '<span class="' + (v > 0 ? 'chg-up' : v < 0 ? 'chg-down' : '') + '">' + (v > 0 ? '+' : '') + v.toFixed(2) + ' pts</span>';
 
@@ -112,11 +121,13 @@ function detailHtml(r, cols){
   const vis = r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock);
   kit.defineScope('biz:' + r.name, { label: r.name, source: 'biz-kit', selName: 'biz', stocks: () => vis });   // what this table's Refresh button works on
   const p = periodOf(period), colIds = stockGridColumnIds();   // the column order set in Analysis
-  const rows = r.items.filter(x => !matchedOnly() || x.match).map((x, i) => {
+  const byStock = detailSort.col === 'periodChg' ? compareBy((x) => x.change, detailSort.dir) : (() => { const c = compareByColumn(detailSort.col, detailSort.dir); return (a, b) => c(a.stock, b.stock); })();
+  const isDefaultSort = detailSort.col === 'periodChg' && detailSort.dir === 'desc';   // with a strategy chosen, its matches come first until a header is clicked
+  const rows = r.items.filter(x => !matchedOnly() || x.match).sort((a, b) => (isDefaultSort ? (b.match ? 1 : 0) - (a.match ? 1 : 0) : 0) || byStock(a, b)).map((x, i) => {
     const idx = stockIndex.get(x.stock), ctx = analysisRowContext(x.stock, i, idx);
     return '<tr class="strat-row' + (x.match ? ' biz-match' : '') + '" data-idx="' + idx + '" tabindex="0">' + colIds.map(id => analysisLbCell(id, ctx)).join('') + '<td class="num">' + pct(x.change) + '</td></tr>';
   }).join('');
-  const grid = '<div class="strat-table-wrap" style="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + colIds.map(columnHeaderHtml).join('') + '<th class="num">' + p.key + ' chg</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  const grid = '<div class="strat-table-wrap" style="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + colIds.map(id => columnHeaderHtml(id, detailSort)).join('') + sortHeaderHtml('periodChg', p.key + ' chg', detailSort, ' class="num"') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   return '<tr class="biz-detail"><td colspan="' + cols + '"><div class="biz-detail-box"><div class="biz-stocks-head"><h3>Stocks</h3>' + (strategyOn() ? '<span class="upload-hint">' + r.matches + ' of ' + r.count + ' match the strategy</span>' : '') + kit.barHtml('biz:' + r.name) + '</div>' + grid + '<div class="biz-stocks-head biz-news-bar"><h3 class="biz-news-head"><button type="button" class="biz-news-toggle" data-biz-newstoggle="' + escapeHtml(r.name) + '" aria-expanded="' + newsOpen.has(r.name) + '">' + (newsOpen.has(r.name) ? '▾' : '▸') + ' News' + (r.news.length ? ' (' + r.news.length + ')' : '') + '</button></h3>' + (newsOpen.has(r.name) ? newsRefreshBtn(r.items.map(x => x.stock), r.items.filter(x => x.match).map(x => x.stock), r.name) : '') + newsStatusFor(r.name) + '</div>' + (newsOpen.has(r.name) ? newsHtml(r) : '') + '</div></td></tr>';
 }
 function openStockFromBusiness(idx){
@@ -181,7 +192,8 @@ function draw(el){
   }
   const total = rows.reduce((a, r) => a + r.matches, 0);
   const filterNote = strategyOn() ? '<p class="upload-hint biz-showing">Matched ' + total + ' of ' + stocks.length + ' stocks</p>' : '';
-  const head = '<tr><th>' + (by === 'group' ? 'Industry group' : 'Industry') + '</th><th class="num">Stocks</th><th class="num">Average ' + p.key + '</th><th class="num">Median</th><th>Up / down</th><th class="num">News</th>' + (strategyOn() ? '<th class="num">Matching</th><th class="num">Match avg ' + p.key + '</th><th class="num">vs industry</th>' : '') + '</tr>';
+  const th = (id, label, cls) => sortHeaderHtml(id, label, tableSort, cls ? ' class="' + cls + '"' : '');
+  const head = '<tr>' + th('name', by === 'group' ? 'Industry group' : 'Industry') + th('count', 'Stocks', 'num') + th('mean', 'Average ' + p.key, 'num') + th('median', 'Median', 'num') + th('breadth', 'Up / down') + th('news', 'News', 'num') + (strategyOn() ? th('matches', 'Matching', 'num') + th('matchMean', 'Match avg ' + p.key, 'num') + th('vsIndustry', 'vs industry', 'num') : '') + '</tr>';
   const cols = strategyOn() ? 9 : 6;
   drawnRows = rows; drawnCols = cols;
   const body = rows.map(r => {
@@ -229,6 +241,12 @@ function init(){
     if(io){ openIndustryInline(appSections.business, 'Explorer', by, io.dataset.bizOpen); return; }
     const nt = closestEl(e, '[data-biz-newstoggle]');
     if(nt){ const n = nt.dataset.bizNewstoggle; if(newsOpen.has(n)) newsOpen.delete(n); else newsOpen.add(n); render(); return; }
+    const sh = closestEl(e, '[data-sort-col]');
+    if(sh){   // a column header: sort the industries, or the stocks of the industry whose grid it is in
+      const inDetail = !!sh.closest('.biz-detail');
+      if(inDetail) detailSort = nextSort(detailSort, sh.dataset.sortCol || ''); else tableSort = nextSort(tableSort, sh.dataset.sortCol || '');
+      render(); return;
+    }
     if(closestEl(e, '[data-biz-filters]')){ bizFiltersOpen = !bizFiltersOpen; rememberFiltersOpen('bFiltersOpen', bizFiltersOpen); render(); return; }
     if(closestEl(e, '[data-biz-full]')){ bizFull = !bizFull; browserFullscreen(bizFull); render(); return; }
     const sb = closestEl(e, '[data-biz-strat]');

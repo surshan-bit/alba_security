@@ -5,11 +5,11 @@ import { analysisFilters, getAnalysisShownIdx } from './state.js';
 import { createBatchRounds } from '../livedata/panel.js';
 import { getRefreshKit } from '../refresh/hook.js';
 
-// A batch place is kept per kind and starts over when the number of shown stocks, the sort or the grouping changes (not when the order itself changes:
+// A batch place is kept per kind and starts over when the number of shown stocks, the sort column, its direction or the grouping changes (not when the order itself changes:
 // a refresh moves prices and so the ranking, but the batch place must stay).
 const rounds = createBatchRounds();
 const shownStocks = () => getAnalysisShownIdx().map(i => stocks[i]).filter(Boolean);
-const planKey = () => getAnalysisShownIdx().length + ':' + analysisFilters.sortBy + ':' + analysisFilters.groupBy;
+const planKey = () => getAnalysisShownIdx().length + ':' + analysisFilters.sortCol + analysisFilters.sortDir + ':' + analysisFilters.groupBy;
 // Called when a card's button is pressed: returns that batch and moves on to the following one.
 const analysisTakeBatch = (kind) => rounds.take(kind, shownStocks(), planKey());
 

@@ -11,6 +11,7 @@ import { ensurePriceBars, pcTickerKey, priceHistoryByTicker, priceLoaded } from 
 import { tvIstDate } from '../tv/connector.js';
 import { ideaCall, rankIdeas } from './ideacall.js';
 import { swingSetup } from './swing.js';
+import { compareBy, nextSort, sortHeaderHtml } from '../analysis/columns.js';
 
 const MAX_ROWS = 50;
 function openTradeByStock(){
@@ -34,6 +35,17 @@ function ideasFor(strategyId){
 }
 
 let sid = '', filter = 'all';
+// The ideas come ranked by call (Buy first); a click on a column header sorts by that column instead, and a click on the same header again reverses it.
+let ideasSort = { col: '', dir: 'desc' };
+const CALL_ORDER = { buy: 3, hold: 2, sell: 1 };
+const IDEA_SORT = {
+  name: (x) => String(x.s.name || tickerSymbol(x.s)).toLowerCase(),
+  call: (x) => CALL_ORDER[x.c.call] || 0,
+  setup: (x) => x.c.setup == null ? null : x.c.setup,
+  chance: (x) => x.c.chance == null ? null : x.c.chance,
+  price: (x) => { const p = x.s.valuation && x.s.valuation.currentPrice; return p == null ? null : p; },
+  mos: (x) => x.c.mos == null ? null : x.c.mos
+};
 try { sid = localStorage.getItem('albaDashboard.ideasStrategy.v1') || ''; } catch(e){ /* default */ }
 // The timing check reads weekly bars, so the bars of the stocks in the chosen strategy (and only those) are loaded, a few at a
 // time. A stock is tried once per visit, so a failed read does not retry on every redraw.
@@ -80,10 +92,12 @@ function bodyHtml(){
   if(!list) return '<p class="upload-hint">That strategy is no longer available. Choose another.</p>';
   if(!list.length) return '<p class="upload-hint">No stock qualifies for this strategy today.</p>';
   const n = k => list.filter(x => x.c.call === k).length;
-  const shown = list.filter(x => filter === 'all' || x.c.call === filter);
+  const th = (id, label) => sortHeaderHtml(id, label, ideasSort);
+  const filtered = list.filter(x => filter === 'all' || x.c.call === filter);
+  const shown = ideasSort.col ? filtered.slice().sort(compareBy(IDEA_SORT[ideasSort.col], ideasSort.dir)) : filtered;
   const chip = (k, label) => `<button type="button" class="tl-view-btn${filter === k ? ' active' : ''}" data-idea-filter="${k}">${label}</button>`;
   return `<div class="tl-ideas-bar"><div class="tl-view-toggle" role="group" aria-label="Call filter">${chip('all', 'All ' + list.length)}${chip('buy', 'Buy ' + n('buy'))}${chip('hold', 'Hold ' + n('hold'))}${chip('sell', 'Sell ' + n('sell'))}</div></div>
-    <div class="help-table-wrap"><table class="help-table"><thead><tr><th>#</th><th>Stock</th><th>Today's call</th><th>Setup</th><th>Chance +5% in 2 wks</th><th>Price</th><th>Sell at +5%</th><th>MoS</th><th>Why</th></tr></thead>
+    <div class="help-table-wrap"><table class="help-table"><thead><tr><th>#</th>${th('name', 'Stock')}${th('call', "Today's call")}${th('setup', 'Setup')}${th('chance', 'Chance +5% in 2 wks')}${th('price', 'Price')}<th>Sell at +5%</th>${th('mos', 'MoS')}<th>Why</th></tr></thead>
     <tbody>${shown.slice(0, MAX_ROWS).map((x, i) => rowHtml(x, i + 1)).join('')}</tbody></table></div>
     <p class="upload-hint">${barsBusy ? 'Loading weekly price history for the timing check (' + barsDone + ' of ' + barsTotal + ')&hellip; ' : ''}<b>Setup</b> counts four timing checks (0 to 4). <b>Chance</b> is how often, in past weeks with that setup, a stock closed 5% or more higher two weeks later (about 7,200 stock-weeks from 43 stocks); an average stock does this about 25% of the time, so treat it as a guide, not a promise. Buy needs a stock worth owning and a setup of 2 or more.</p>
     ${shown.length > MAX_ROWS ? '<p class="upload-hint">Showing the top ' + MAX_ROWS + ' of ' + shown.length + '.</p>' : ''}`;
@@ -111,6 +125,8 @@ function init_ideas(){
     const el = /** @type {Element} */ (e.target);
     const f = el.closest('[data-idea-filter]');
     if(f){ filter = f.getAttribute('data-idea-filter') || 'all'; renderIdeas(); return; }
+    const sh = /** @type {HTMLElement | null} */ (el.closest('[data-sort-col]'));
+    if(sh){ ideasSort = nextSort(ideasSort, sh.dataset.sortCol || ''); renderIdeas(); return; }
     const a = el.closest('a[data-idea-open]');
     if(a){ e.preventDefault(); const idx = Number(a.getAttribute('data-idea-open')); openStockInline(appSections.trackrecord, "Trade Log", idx); }
   });

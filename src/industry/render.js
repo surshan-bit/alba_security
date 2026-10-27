@@ -7,7 +7,7 @@ import { panelIcon } from '../detail/icons.js';
 import { scoreBand } from '../list/metrics.js';
 import { ensureAllPriceBars, pcTickerKey, priceHistoryByTicker } from '../prices/store.js';
 import { EVENT_GROUPS, eventsByBar } from '../prices/events.js';
-import { analysisLbCell, analysisRowContext, columnHeaderHtml, stockGridColumnIds } from '../analysis/columns.js';
+import { analysisLbCell, analysisRowContext, columnHeaderHtml, compareByColumn, nextSort, stockGridColumnIds } from '../analysis/columns.js';
 import { industryFactors, industryGlobal, industryNews, industrySeries } from './calc.js';
 import { bindJumpSpy } from '../detail/jumpnav.js';
 import { newsItemHtml } from '../business/newsitem.js';
@@ -63,24 +63,34 @@ function newsHtml(news){
 // The stocks grid draws ROW_STEP rows at first and ROW_STEP more each time "Show more" is pressed (a big industry would otherwise be slow to draw).
 const ROW_STEP = 300;
 const stocksCols = () => stockGridColumnIds().filter(id => id !== 'industry');
-const byScore = (members) => members.slice().sort((a, b) => (b.score || 0) - (a.score || 0));
+// The stocks grid starts with the best Fundamental score first; a click on a column header sorts by that column instead.
+const START_SORT = { col: 'score', dir: 'desc' };
+const sortedBy = (members, sort) => members.slice().sort(compareByColumn(sort.col, sort.dir));
 const stockRowsHtml = (sorted, cols, from, to) => sorted.slice(from, to).map((s, k) => {
   const idx = stockIndex.get(s), ctx = analysisRowContext(s, from + k, idx);
   return `<tr class="strat-row" data-idx="${idx}" tabindex="0">${cols.map(id => analysisLbCell(id, ctx)).join('')}</tr>`;
 }).join('');
 const stocksMoreHtml = (shown, total) => total > shown ? `Showing the first ${shown} of ${total}. <button type="button" class="analysis-reset-btn" data-ind-more="1">Show ${Math.min(ROW_STEP, total - shown)} more</button>` : '';
 function stocksHtml(members){
-  const cols = stocksCols(), sorted = byScore(members);
+  const cols = stocksCols(), sorted = sortedBy(members, START_SORT);
   return `<div class="tech-panel" id="jump-ind-stocks"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('peers')}Stocks</div><span class="completeness-badge complete">${members.length}</span></div>
-    <div class="peers-scroll strat-table-wrap"><table class="strat-table peers-table"><thead><tr>${cols.map(columnHeaderHtml).join('')}</tr></thead><tbody>${stockRowsHtml(sorted, cols, 0, ROW_STEP)}</tbody></table></div>${members.length > ROW_STEP ? `<div class="strat-empty ind-stocks-more">${stocksMoreHtml(ROW_STEP, members.length)}</div>` : ''}</div>`;
+    <div class="peers-scroll strat-table-wrap"><table class="strat-table peers-table"><thead><tr>${cols.map(id => columnHeaderHtml(id, START_SORT)).join('')}</tr></thead><tbody>${stockRowsHtml(sorted, cols, 0, ROW_STEP)}</tbody></table></div>${members.length > ROW_STEP ? `<div class="strat-empty ind-stocks-more">${stocksMoreHtml(ROW_STEP, members.length)}</div>` : ''}</div>`;
 }
 // Opens a stock from a row (one listener on the panel, so rows added by "Show more" work too) and adds rows on "Show more".
 function wireStocks(members, openStock){
   const panel = detailEl.querySelector('#jump-ind-stocks'); if(!panel) return;
-  const sorted = byScore(members), cols = stocksCols(), body = panel.querySelector('tbody'), more = panel.querySelector('.ind-stocks-more');
+  let sort = START_SORT, sorted = sortedBy(members, sort);
+  const cols = stocksCols(), body = panel.querySelector('tbody'), head = panel.querySelector('thead tr'), more = panel.querySelector('.ind-stocks-more');
   let shown = Math.min(ROW_STEP, sorted.length);
   const open = (tr) => openStock(Number(/** @type {HTMLElement} */ (tr).dataset.idx));
   panel.addEventListener('click', (e) => {
+    const sh = closestEl(e, '[data-sort-col]');
+    if(sh){   // a column header: sort the whole list, show the rows drawn so far again in the new order
+      sort = nextSort(sort, sh.dataset.sortCol || ''); sorted = sortedBy(members, sort);
+      if(head) head.innerHTML = cols.map(id => columnHeaderHtml(id, sort)).join('');
+      if(body) body.innerHTML = stockRowsHtml(sorted, cols, 0, shown);
+      return;
+    }
     if(closestEl(e, '[data-ind-more]')){
       body.insertAdjacentHTML('beforeend', stockRowsHtml(sorted, cols, shown, shown + ROW_STEP));
       shown = Math.min(shown + ROW_STEP, sorted.length);
