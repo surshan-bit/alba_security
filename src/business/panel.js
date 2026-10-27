@@ -23,7 +23,7 @@ import { isRebound } from '../list/rebound.js';
 const KEY = 'albaDashboard.business.v1';
 let bizFull = false;   // the table (or the heat map) fills the whole window
 let detailAllCols = false;   // the industry's stock grid shows the short column set; "All columns" shows the whole Analysis set
-const LEAN_COLS = ['score', 'techScore', 'mos', 'stock', 'weekChg', 'monthChg', 'techW', 'news', 'price'];
+const LEAN_COLS = ['stock', 'price', 'weekChg', 'monthChg', 'mos', 'techW', 'news'];
 const newsOpen = new Set();   // industries whose News section is open (closed at first)
 let bizFiltersOpen = filtersOpenSaved('bFiltersOpen');   // the view, period, grouping and strategy controls open from one "Filters" button (phone: a sheet); closed at first, wide screens remember the choice
 let drawnRows = [], drawnCols = 6;   // what the table on the page was last drawn from, so a row can open or close without a redraw
@@ -140,15 +140,28 @@ function newsSummary(r){
 function detailHtml(r, cols){
   const vis = r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock);
   kit.defineScope('biz:' + r.name, { label: r.name, source: 'biz-kit', selName: 'biz', stocks: () => vis });   // what this table's Refresh button works on
-  const p = periodOf(period), colIds = stockGridColumnIds().filter(id => detailAllCols ? id !== 'industry' && id !== 'rank' : LEAN_COLS.includes(id));   // the column order set in Analysis (the short set unless All columns is on)
+  const p = periodOf(period);
+  // The short set: Stock, Price, 1W, 1M, MoS, weekly rating, News (All columns follows the order set in Analysis); the chosen period's own change is added when it is not 1W or 1M.
+  const colIds = detailAllCols ? stockGridColumnIds().filter(id => id !== 'industry' && id !== 'rank') : LEAN_COLS;
+  const showPeriod = detailAllCols || needsBars(period);
   const byStock = detailSort.col === 'periodChg' ? compareBy((x) => x.change, detailSort.dir) : (() => { const c = compareByColumn(detailSort.col, detailSort.dir); return (a, b) => c(a.stock, b.stock); })();
   const isDefaultSort = detailSort.col === 'periodChg' && detailSort.dir === 'desc';   // with a strategy chosen, its matches come first until a header is clicked
   const rows = r.items.filter(x => !matchedOnly() || x.match).sort((a, b) => (isDefaultSort ? (b.match ? 1 : 0) - (a.match ? 1 : 0) : 0) || byStock(a, b)).map((x, i) => {
     const idx = stockIndex.get(x.stock), ctx = analysisRowContext(x.stock, i, idx);
-    return '<tr class="strat-row' + (x.match ? ' biz-match' : '') + '" data-idx="' + idx + '" tabindex="0">' + colIds.map(id => analysisLbCell(id, ctx)).join('') + '<td class="num">' + pct(x.change) + '</td></tr>';
+    const ts = x.stock.technical && typeof x.stock.technical.score === 'number' ? x.stock.technical.score : null;
+    const scores = detailAllCols ? '' : '<span class="biz-ft">Fund ' + (ctx.scoreLabel || 'n/a') + ' · Tech ' + (ts === null ? 'n/a' : ts.toFixed(1)) + '</span>';
+    return '<tr class="strat-row' + (x.match ? ' biz-match' : '') + '" data-idx="' + idx + '" tabindex="0">' + colIds.map(id => { const c = analysisLbCell(id, ctx); return id === 'stock' && scores ? c.replace(/<\/td>$/, scores + '</td>') : c; }).join('') + (showPeriod ? '<td class="num">' + pct(x.change) + '</td>' : '') + '</tr>';
   }).join('');
-  const grid = '<div class="strat-table-wrap" style="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + colIds.map(id => columnHeaderHtml(id, detailSort)).join('') + sortHeaderHtml('periodChg', p.key + ' chg', detailSort, ' class="num"') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-  return '<tr class="biz-detail"><td colspan="' + cols + '"><div class="biz-detail-box"><div class="biz-stocks-head"><h3>Stocks</h3>' + (strategyOn() ? '<span class="upload-hint">' + r.matches + ' of ' + r.count + ' match the ' + (embed ? 'filters' : 'strategy') + '</span>' : '') + '<button type="button" class="biz-colsbtn" data-biz-cols="1" aria-pressed="' + detailAllCols + '">' + (detailAllCols ? 'Fewer columns' : 'All columns') + '</button>' + kit.barHtml('biz:' + r.name) + '</div>' + grid + '<div class="biz-stocks-head biz-news-bar"><h3 class="biz-news-head"><button type="button" class="biz-news-toggle" data-biz-newstoggle="' + escapeHtml(r.name) + '" aria-expanded="' + newsOpen.has(r.name) + '">' + (newsOpen.has(r.name) ? '▾' : '▸') + ' News</button></h3><span class="upload-hint biz-news-sum">' + newsSummary(r) + '</span>' + (newsOpen.has(r.name) ? newsRefreshBtn(r.items.map(x => x.stock), r.items.filter(x => x.match).map(x => x.stock), r.name) : '') + newsStatusFor(r.name) + '</div>' + (newsOpen.has(r.name) ? newsHtml(r) : '') + '</div></td></tr>';
+  const grid = '<div class="strat-table-wrap' + (detailAllCols ? '' : ' biz-lean') + '" style="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + colIds.map(id => columnHeaderHtml(id, detailSort)).join('') + (showPeriod ? sortHeaderHtml('periodChg', p.key + ' chg', detailSort, ' class="num"') : '') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  const card = (label, value) => '<div class="biz-kpi"><small>' + label + '</small><span>' + value + '</span></div>';
+  const vsInd = r.matches && r.matchMean !== null && r.mean !== null ? r.matchMean - r.mean : null;
+  const lastCard = strategyOn()
+    ? card('Matching avg vs industry', r.matches && r.matchMean !== null ? pct(r.matchMean) + (vsInd === null ? '' : ' · <span class="' + (vsInd > 0 ? 'chg-up' : vsInd < 0 ? 'chg-down' : '') + '">' + (vsInd > 0 ? '+' : '') + vsInd.toFixed(2) + ' pts</span>') : '<span class="biz-na">none match</span>')
+    : card('News', r.pos + ' positive · ' + r.neg + ' negative');
+  const kpis = '<div class="biz-kpis">' + card('Average ' + p.key, pct(r.mean)) + card('Median ' + p.key, pct(r.median)) + card('Up / down', r.up + ' up · ' + r.down + ' down ' + breadth(r).replace(/ \d+↑ \d+↓.*$/, '')) + lastCard + '</div>';
+  const open = newsOpen.has(r.name);
+  const note = '<p class="upload-hint biz-colsnote">' + (detailAllCols ? 'Showing every column.' : 'Fund and Tech scores sit under each stock. RSI, research and links are in') + ' <button type="button" class="biz-colsbtn" data-biz-cols="1" aria-pressed="' + detailAllCols + '">' + (detailAllCols ? 'Fewer columns' : 'Columns') + (detailAllCols ? '' : ' ▾') + '</button></p>';
+  return '<tr class="biz-detail"><td colspan="' + cols + '"><div class="biz-detail-box"><div class="biz-stocks-head"><h3 class="biz-dname">' + escapeHtml(r.name) + '</h3>' + '<span class="upload-hint">' + r.count + ' ' + (r.count === 1 ? 'stock' : 'stocks') + (strategyOn() ? ' · ' + r.matches + ' ' + (r.matches === 1 ? 'matches' : 'match') + ' your ' + (embed ? 'filters' : 'strategy') : '') + '</span>' + kit.barHtml('biz:' + r.name) + '</div>' + kpis + grid + note + '<div class="biz-stocks-head biz-news-bar"><h3 class="biz-news-head"><button type="button" class="biz-news-toggle" data-biz-newstoggle="' + escapeHtml(r.name) + '" aria-expanded="' + open + '">' + (open ? '▾' : '▸') + ' News</button></h3><span class="upload-hint biz-news-sum">' + newsSummary(r) + '</span>' + (open ? newsRefreshBtn(r.items.map(x => x.stock), r.items.filter(x => x.match).map(x => x.stock), r.name) : '') + newsStatusFor(r.name) + '</div>' + (open ? newsHtml(r) : '') + '</div></td></tr>';
 }
 const hostSection = () => embed ? embed.section : appSections.business;
 const hostLabel = () => embed ? embed.label : 'Explorer';

@@ -246,7 +246,7 @@ async function businessTests(browser){
     const lean = await page.locator('.biz-detail .strat-table thead th').count();
     await page.locator('.biz-detail [data-biz-cols]').click();
     const full = await page.locator('.biz-detail .strat-table thead th').count();
-    ok(lean < full && lean <= 10, 'industry detail: short column set (' + lean + ') and All columns shows more (' + full + ')');
+    ok(lean < full && lean <= 8, 'industry detail: short column set (' + lean + ') and All columns shows more (' + full + ')');
     await page.locator('.biz-detail [data-biz-cols]').click();
     ok(await page.locator('.biz-detail .biz-news-sum').count() === 1, 'industry detail: the News line has a summary');
     await page.locator('.biz-row').first().click();
