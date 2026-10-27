@@ -16,13 +16,13 @@ function cleanSort(col, dir, legacy, fallback){
   return l ? { col: l[0], dir: l[1] } : fallback;
 }
 
-// "Group by" for the leaderboard: no grouping, or one block of rows per industry / industry group.
-const ANALYSIS_GROUP_OPTIONS = [
-  { value: 'none', label: 'None' },
+// "View": the stocks one by one, or one row per industry / industry group (the table Explorer has).
+const ANALYSIS_VIEW_OPTIONS = [
+  { value: 'stocks', label: 'Stocks' },
   { value: 'industry', label: 'Industry' },
   { value: 'group', label: 'Industry Group' }
 ];
-const ANALYSIS_GROUP_KEYS = new Set(ANALYSIS_GROUP_OPTIONS.map(o => o.value));
+const ANALYSIS_VIEW_KEYS = new Set(ANALYSIS_VIEW_OPTIONS.map(o => o.value));
 
 const ANALYSIS_FILTERS_KEY = 'albaDashboard.analysisFilters.v1';
 function saveAnalysisFilters(filters){
@@ -35,7 +35,7 @@ const ANALYSIS_MOS_KEYS = ['green', 'orange', 'red'];
 // Tech Rating W / M filters (2026-10-07): the MACD state behind the Tech Rating badge (weekMacd / monthMacd).
 const ANALYSIS_TECH_KEYS = ['bull_above', 'bull_below', 'bear_above', 'bear_below'];
 function loadAnalysisFilters(){
-  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortCol: 'mos', sortDir: 'desc', groupBy: 'none', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', rebound: false, columnOrder: null };
+  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortCol: 'mos', sortDir: 'desc', view: 'stocks', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', rebound: false, columnOrder: null };
   try {
     const raw = localStorage.getItem(ANALYSIS_FILTERS_KEY);
     if(!raw) return fallback;
@@ -50,7 +50,8 @@ function loadAnalysisFilters(){
     let yAxis = parsed.yAxis === 'month' ? 'month' : 'week';
     if(xAxis === yAxis) yAxis = xAxis === 'week' ? 'month' : 'week'; // the two axes must show different timeframes
     const sort = cleanSort(parsed.sortCol, parsed.sortDir, parsed.sortBy, { col: fallback.sortCol, dir: fallback.sortDir });
-    const groupBy = ANALYSIS_GROUP_KEYS.has(parsed.groupBy) ? parsed.groupBy : fallback.groupBy;
+    // Saved before v1.276 as "Group by" (none / industry / group): the nearest View is the industry table of the same kind.
+    const view = ANALYSIS_VIEW_KEYS.has(parsed.view) ? parsed.view : (parsed.groupBy === 'industry' || parsed.groupBy === 'group' ? parsed.groupBy : fallback.view);
     const verdicts = Array.isArray(parsed.verdicts) ? parsed.verdicts.filter(v => ANALYSIS_VERDICT_KEYS.includes(v)) : fallback.verdicts;
     const mosRatings = Array.isArray(parsed.mosRatings) ? parsed.mosRatings.filter(v => ANALYSIS_MOS_KEYS.includes(v)) : fallback.mosRatings;
     const techW = Array.isArray(parsed.techW) ? parsed.techW.filter(v => ANALYSIS_TECH_KEYS.includes(v)) : [];
@@ -63,7 +64,7 @@ function loadAnalysisFilters(){
     return {
       weekMin: Math.min(weekMin, weekMax), weekMax: Math.max(weekMin, weekMax),
       monthMin: Math.min(monthMin, monthMax), monthMax: Math.max(monthMin, monthMax),
-      colorBy, xAxis, yAxis, sortCol: sort.col, sortDir: sort.dir, groupBy, verdicts, mosRatings, techW, techM, mosLo, mosHi, strategyId, rebound, columnOrder
+      colorBy, xAxis, yAxis, sortCol: sort.col, sortDir: sort.dir, view, verdicts, mosRatings, techW, techM, mosLo, mosHi, strategyId, rebound, columnOrder
     };
   } catch(e){ return fallback; }
 }
@@ -84,4 +85,4 @@ function getAnalysisShownIdx(){ return analysisShownIdx; }
 function setAnalysisColumnsPanelOpen(v){ analysisColumnsPanelOpen = v; }
 function setAnalysisShownIdx(v){ analysisShownIdx = v; }
 
-export { ANALYSIS_GROUP_KEYS, ANALYSIS_GROUP_OPTIONS, analysisFilters, analysisPersistUi, cleanSort, getAnalysisColumnsPanelOpen, getAnalysisShownIdx, saveAnalysisFilters, setAnalysisColumnsPanelOpen, setAnalysisShownIdx };
+export { ANALYSIS_VIEW_KEYS, ANALYSIS_VIEW_OPTIONS, analysisFilters, analysisPersistUi, cleanSort, getAnalysisColumnsPanelOpen, getAnalysisShownIdx, saveAnalysisFilters, setAnalysisColumnsPanelOpen, setAnalysisShownIdx };

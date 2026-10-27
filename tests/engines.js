@@ -329,24 +329,20 @@ test('apply: bad files throw before anything is changed', () => {
   });
 }
 
-// =========================================================== Analysis "Group by" (src/analysis/grouping.js)
+// =========================================================== Analysis "View" (src/analysis/state.js)
 {
-  const G = load('src/analysis/grouping.js');
-  const mk = (tk, ind, grp, wk, mo) => ({ ticker: tk + ' · ' + ind, name: 'Co ' + tk, industryGroup: grp, technical: { raw: { weekPctChange: wk, monthPctChange: mo } } });
-  // already in ranked order: A, B, C, D, E
-  const ranked = [mk('A', 'Steel', 'Metals', 2, 10), mk('B', 'Banks', 'Financials', 1, -2), mk('C', 'Steel', 'Metals', -4, 6), mk('D', 'Aluminium', 'Metals', null, null), mk('E', 'Banks', 'Financials', 3, 4)];
-  test('grouping: groups appear in the order of their best-ranked stock and keep the ranked order inside', () => {
-    const g = G.groupRanked(ranked, 'industry');
-    assert.deepStrictEqual(g.map(x => x.name), ['Steel', 'Banks', 'Aluminium']);
-    assert.deepStrictEqual(g[0].members.map(s => s.name), ['Co A', 'Co C']);
-    assert.deepStrictEqual(g[1].members.map(s => s.name), ['Co B', 'Co E']);
+  // What the screen starts with when the saved filters are loaded: a saved View is kept, a "Group by" saved before v1.276 becomes the same kind of industry view, anything else is Stocks.
+  const viewFor = (saved) => {
+    const had = Object.prototype.hasOwnProperty.call(global, 'localStorage'), old = global.localStorage;
+    global.localStorage = { getItem: () => saved === undefined ? null : JSON.stringify(saved), setItem(){}, removeItem(){} };
+    try { return load('src/analysis/state.js').analysisFilters.view; } finally { if(had) global.localStorage = old; else delete global.localStorage; }
+  };
+  test('view: nothing saved starts on Stocks', () => { assert.strictEqual(viewFor(undefined), 'stocks'); });
+  test('view: a saved View is kept', () => { assert.strictEqual(viewFor({ view: 'group' }), 'group'); assert.strictEqual(viewFor({ view: 'industry' }), 'industry'); });
+  test('view: a Group by saved before v1.276 becomes the matching industry view', () => {
+    assert.strictEqual(viewFor({ groupBy: 'industry' }), 'industry'); assert.strictEqual(viewFor({ groupBy: 'group' }), 'group'); assert.strictEqual(viewFor({ groupBy: 'none' }), 'stocks');
   });
-  test('grouping: Industry Group merges industries, and a stock with no group goes under a dash', () => {
-    const g = G.groupRanked(ranked.concat([mk('F', 'Misc', undefined, 0, 0)]), 'group');
-    assert.deepStrictEqual(g.map(x => x.name), ['Metals', 'Financials', '—']);
-    assert.strictEqual(g[0].members.length, 3);
-  });
-  test('grouping: an empty list gives no groups', () => { assert.deepStrictEqual(G.groupRanked([], 'industry'), []); });
+  test('view: an unknown value falls back to Stocks', () => { assert.strictEqual(viewFor({ view: 'bogus', groupBy: 'bogus' }), 'stocks'); });
 }
 
 // =========================================================== Business page: industry changes and news (src/business/calc.js)

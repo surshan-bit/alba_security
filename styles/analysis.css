@@ -118,13 +118,11 @@ a.stock-link:hover .analysis-lb-name{text-decoration:underline;}
 body.biz-full-open{overflow:hidden;}
 .filter-note{margin:8px 0 0;font-size:.74rem;line-height:1.4;color:var(--muted);}
 
-/* Group by: one line above each group's stocks (name, count, average change, up/down). Click it to fold the group. */
-.strat-table > tbody > .analysis-lb-group{cursor:pointer;}
-.strat-table > tbody > .analysis-lb-group > td{padding:7px 10px;white-space:nowrap;background:color-mix(in srgb, var(--accent) 10%, var(--bg));border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
-.analysis-lb-group:hover > td,.analysis-lb-group:focus-visible > td{background:color-mix(in srgb, var(--accent) 18%, var(--bg));}
-.lbg-inner{position:sticky;left:0;display:inline-flex;align-items:baseline;gap:14px;font-size:.8rem;}
-.lbg-caret{width:.9em;color:var(--muted);}
-.lbg-name{font-weight:700;color:var(--text);}
+/* View: Stocks / Industry / Industry Group, above whatever the view draws. The industry views reuse Explorer's table (see business/panel.js). */
+.analysis-view-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;}
+.analysis-view-bar .analysis-filter-label{margin:0;font-weight:600;}
+.biz-embedded{display:block;}
+.biz-embedded > .biz-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;}
 /* Column headers that sort: the label is a button (with an arrow on the sorted column); it looks like the plain header. */
 .th-sort{display:inline-flex;align-items:center;gap:0;padding:0;margin:0;border:0;background:transparent;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;text-align:inherit;white-space:inherit;cursor:pointer;}
 .th-sort:hover,.th-sort.on{color:var(--text);}
