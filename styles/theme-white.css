@@ -486,3 +486,5 @@
 /* The Delete button stays a visible red outlined button (it was a plain text button and hard to spot). */
 :root[data-theme="white"] #section-strategies #stratMain .strat-btn.strat-btn-danger:not(.pub):not(.on){color:#a83f38;border:1px solid #a83f38;background:#fff;}
 :root[data-theme="white"] #section-strategies #stratMain .strat-btn.strat-btn-danger:not(.pub):not(.on):hover{color:#fff;background:#a83f38;border-color:#a83f38;}
+:root[data-theme="white"] #section-strategies #stratMain #stratDup.strat-btn:not(.pub):not(.on){color:#1b1f2a;border:1px solid #c9cfdf;background:#fff;}
+:root[data-theme="white"] #section-strategies #stratMain #stratDup.strat-btn:not(.pub):not(.on):hover{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,#fff);}
