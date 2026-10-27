@@ -311,6 +311,10 @@
 /* Strategies: fewer boxes, more free flow. Fields become underlined, the setup bar and secondary buttons lose their frames, and the list actions are plain links. */
   :root[data-theme="white"] #section-strategies #stratMain :is(input:not([type=checkbox]):not([type=radio]),select,textarea){border:0;border-bottom:1px solid #c9cfdf;border-radius:0;background-color:transparent;box-shadow:none;padding-left:2px;padding-right:6px;}
   :root[data-theme="white"] #section-strategies #stratMain :is(input,select,textarea):focus{border-bottom:2px solid var(--accent);box-shadow:none;outline:none;}
+  /* v1.282: a rule row already sits between two lines, so its fields carry no underline of their own; one appears on hover and focus. */
+  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-row :is(input,select){border-bottom-color:transparent;}
+  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-row :is(input,select):hover:not(:disabled){border-bottom-color:#c9cfdf;}
+  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-row :is(input,select):focus{border-bottom-color:var(--accent);}
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{border:0;border-bottom:1px solid #e6e9f2;border-radius:0;background:transparent;padding:12px 0;}
   :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;box-shadow:none;}
   :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.on):hover{background:color-mix(in srgb,var(--accent) 8%,#fff);}
@@ -342,7 +346,7 @@
   :root[data-theme="white"] #section-refreshlog #refreshWatchlistBtn{display:flex;width:fit-content;margin-left:auto;}
 /* Strategies: a single line under the closed setup bar, and the "+ Add a rule" box lined up with the rule fields above it. */
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold:not([open]) > summary{border-bottom:0;}
-  :root[data-theme="white"] #section-strategies #stratMain .sr-add{width:260px;max-width:100%;}
+  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-foot .sr-add{width:auto;max-width:100%;border:0;border-radius:6px;background:transparent;color:var(--accent);padding:0 2px;appearance:none;-webkit-appearance:none;}
 /* Explorer industry table: cell text centred vertically in every row (a two-line name no longer pushes the # or the numbers to the bottom). */
 @media (min-width:901px){
   :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > td{vertical-align:middle;}
@@ -482,3 +486,5 @@
 /* The Delete button stays a visible red outlined button (it was a plain text button and hard to spot). */
 :root[data-theme="white"] #section-strategies #stratMain .strat-btn.strat-btn-danger:not(.pub):not(.on){color:#a83f38;border:1px solid #a83f38;background:#fff;}
 :root[data-theme="white"] #section-strategies #stratMain .strat-btn.strat-btn-danger:not(.pub):not(.on):hover{color:#fff;background:#a83f38;border-color:#a83f38;}
+:root[data-theme="white"] #section-strategies #stratMain #stratDup.strat-btn:not(.pub):not(.on){color:#1b1f2a;border:1px solid #c9cfdf;background:#fff;}
+:root[data-theme="white"] #section-strategies #stratMain #stratDup.strat-btn:not(.pub):not(.on):hover{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,#fff);}

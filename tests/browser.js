@@ -426,6 +426,27 @@ async function rowCapTests(browser){
   ok(await rows('#stratResults .strat-row') === 300, 'row cap: Strategies draws 300 rows first');
   await page.locator('[data-strat-more]').click(); await page.waitForTimeout(300);
   ok(await rows('#stratResults .strat-row') === 600, 'row cap: Show more adds 300 Strategies rows');
+  { // v1.282: the rules are a table: column headings, a clear Remove button, a total of the stocks that pass all rules, and Undo
+    await page.evaluate(() => { const d = document.querySelector('#stratMain details'); if(d) d.open = true; });
+    await page.selectOption('.sr-add', 'score'); await page.waitForTimeout(150);
+    await page.fill('.sr-row .sr-v1', '2'); await page.dispatchEvent('.sr-row .sr-v1', 'change'); await page.waitForTimeout(200);
+    ok(/pass/.test(await page.locator('.sr-total').innerText()) && (await page.locator('.sr-head').count()) === 1, 'strategy rules: a heading row and a total of the stocks passing all rules');
+    ok((await page.locator('.sr-del').first().getAttribute('aria-label')).startsWith('Remove rule: Fundamental score') && (await page.locator('.sr-del svg').count()) === 1, 'strategy rules: Remove is a labelled trash button');
+    await page.locator('.sr-del').first().click(); await page.waitForTimeout(200);
+    ok((await page.locator('.sr-row').count()) === 0 && (await page.locator('.sr-undo').count()) === 1, 'strategy rules: removing a rule offers Undo');
+    await page.locator('.sr-undo-btn').click(); await page.waitForTimeout(200);
+    ok((await page.locator('.sr-row').count()) === 1 && (await page.locator('.sr-undo').count()) === 0, 'strategy rules: Undo puts the rule back');
+    const names = () => page.evaluate(() => [...document.querySelectorAll('.sr-row .sr-field')].map(x => x.value));
+    if((await page.locator('.sr-row').count()) === 1){ await page.locator('.sr-add').selectOption({ index: 2 }); await page.waitForTimeout(150); }
+    const before = await names();
+    ok((await page.locator('.sr-row').count()) === 2 && (await page.locator('.sr-up').first().isDisabled()) && (await page.locator('.sr-down').last().isDisabled()), 'strategy rules: the first rule cannot move up and the last cannot move down');
+    await page.locator('.sr-down').first().click(); await page.waitForTimeout(200);
+    const after = await names();
+    ok(after[0] === before[1] && after[1] === before[0], `strategy rules: Move down swaps the rule with the next one ${JSON.stringify([before, after])}`);
+    await page.locator('.sr-up').last().click(); await page.waitForTimeout(200);
+    ok(JSON.stringify(await names()) === JSON.stringify(before), 'strategy rules: Move up puts it back');
+    while((await page.locator('.sr-del').count()) > 0){ await page.locator('.sr-del').first().click(); await page.waitForTimeout(150); }
+  }
   // Explorer: opening and closing an industry changes only that row (the rest of the table is not redrawn)
   await goto(page, 'business'); await page.waitForSelector('.biz-row', { timeout: 5000 });
   const tog = await page.evaluate(async () => {
