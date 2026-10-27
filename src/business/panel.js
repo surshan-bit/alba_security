@@ -18,6 +18,7 @@ import { sheetFrame, syncSheets } from '../ui/phonesheet.js';
 import { filtersOpenSaved, rememberFiltersOpen } from '../ui/filterdock.js';
 import { PERIODS, industryTable, needsBars, periodOf } from './calc.js';
 import { closestEl } from '../core/evt.js';
+import { dropMenuHtml } from '../ui/dropmenu.js';
 import { isRebound } from '../list/rebound.js';
 
 const KEY = 'albaDashboard.business.v1';
@@ -182,9 +183,10 @@ function draw(el){
   const p = periodOf(period);
   const rows = visibleRows();
   const allOpen = rows.length > 0 && rows.every(r => open.has(r.name));
-  const controls = '<div class="biz-controls"><div class="tl-view-toggle" role="group" aria-label="View"><button type="button" class="tl-view-btn' + (view === 'table' ? ' active' : '') + '" data-biz-view="table">Table</button><button type="button" class="tl-view-btn' + (view === 'heat' ? ' active' : '') + '" data-biz-view="heat">Heat map</button></div><div class="tl-view-toggle" role="group" aria-label="Period">' + PERIODS.map(x => '<button type="button" class="tl-view-btn' + (x.key === period ? ' active' : '') + '" data-biz-period="' + x.key + '">' + x.key + '</button>').join('') + '</div>'
-    + (embed ? '' : '<div class="tl-view-toggle" role="group" aria-label="Grouping"><button type="button" class="tl-view-btn' + (by === 'industry' ? ' active' : '') + '" data-biz-by="industry">Industry</button><button type="button" class="tl-view-btn' + (by === 'group' ? ' active' : '') + '" data-biz-by="group">Industry group</button></div>')
-    + (embed ? '' : strategyGroupHtml())
+  const periodSelect = '<label class="biz-field"><small>Period</small><select data-biz-period-select aria-label="Period">' + PERIODS.map(x => '<option value="' + x.key + '"' + (x.key === period ? ' selected' : '') + '>' + x.label + '</option>').join('') + '</select></label>';
+  const controls = embed ? '<div class="biz-controls">' + periodSelect + '</div>' : '<div class="biz-controls"><div class="tl-view-toggle" role="group" aria-label="View"><button type="button" class="tl-view-btn' + (view === 'table' ? ' active' : '') + '" data-biz-view="table">Table</button><button type="button" class="tl-view-btn' + (view === 'heat' ? ' active' : '') + '" data-biz-view="heat">Heat map</button></div><div class="tl-view-toggle" role="group" aria-label="Period">' + PERIODS.map(x => '<button type="button" class="tl-view-btn' + (x.key === period ? ' active' : '') + '" data-biz-period="' + x.key + '">' + x.key + '</button>').join('') + '</div>'
+    + '<div class="tl-view-toggle" role="group" aria-label="Grouping"><button type="button" class="tl-view-btn' + (by === 'industry' ? ' active' : '') + '" data-biz-by="industry">Industry</button><button type="button" class="tl-view-btn' + (by === 'group' ? ' active' : '') + '" data-biz-by="group">Industry group</button></div>'
+    + strategyGroupHtml()
     + '</div>';
   const viewToggle = '<div class="tl-view-toggle biz-match-toggle" role="group" aria-label="Show">'
     + '<button type="button" class="tl-view-btn' + (!matchedOnly() ? ' active' : '') + '" data-biz-show="all" title="Show every industry and stock">All</button>'
@@ -192,6 +194,12 @@ function draw(el){
   const sizeToggle = '<div class="tl-view-toggle biz-match-toggle biz-size-toggle" role="group" aria-label="Size the tiles by"><button type="button" class="tl-view-btn' + (heatSize === 'chg' ? ' active' : '') + '" data-biz-size="chg" title="Bigger tiles = bigger average change">% Change</button><button type="button" class="tl-view-btn' + (heatSize === 'count' ? ' active' : '') + '" data-biz-size="count" title="Bigger tiles = more stocks">No. of stocks</button></div>';
   const fullBtn = '<button type="button" class="biz-expand" data-biz-full="1" aria-pressed="' + bizFull + '" title="Show the ' + (view === 'heat' ? 'heat map' : 'table') + ' across the whole window (Esc to leave)">' + fullscreenLabel(bizFull) + '</button>';
   const expandBtn = viewToggle + '<button type="button" class="biz-expand" data-biz-all="' + (allOpen ? 'collapse' : 'expand') + '">' + (allOpen ? 'Collapse all' : 'Expand all') + '</button>' + fullBtn;
+  // Inside Analysis the table's own buttons are quieter: "Matched only" is a checkbox, and Table / Heat map, Expand all, size and Full screen sit in one "more" menu.
+  const matchedBox = '<label class="biz-matched-only"' + (strategyOn() ? ' title="Show only the industries and stocks that match the filters"' : ' title="Narrow the stocks with the filters first"') + '><input type="checkbox" data-biz-matched="1"' + (matchedOnly() ? ' checked' : '') + (strategyOn() ? '' : ' disabled') + '> Matched only</label>';
+  const moreItems = [{ attrs: 'data-biz-view="' + (view === 'heat' ? 'table' : 'heat') + '"', title: view === 'heat' ? 'Show as table' : 'Show as heat map' }]
+    .concat(view === 'heat' ? [{ attrs: 'data-biz-size="' + (heatSize === 'chg' ? 'count' : 'chg') + '"', title: heatSize === 'chg' ? 'Size tiles by number of stocks' : 'Size tiles by % change' }] : [{ attrs: 'data-biz-all="' + (allOpen ? 'collapse' : 'expand') + '"', title: allOpen ? 'Collapse all' : 'Expand all' }])
+    .concat([{ attrs: 'data-biz-full="1"', title: bizFull ? 'Leave full screen' : 'Full screen' }]);
+  const moreMenu = dropMenuHtml({ btnHtml: '<span aria-hidden="true">&#8943;</span>', label: 'More: view, expand, full screen', items: moreItems, right: true, extraClass: 'dm-more' });
   let status = '';
   if(needsBars(period)){
     if(loadState === 'loading') status = '<p class="upload-hint">Loading price history…</p>';
@@ -207,7 +215,7 @@ function draw(el){
     const isOpen = open.has(r.name);
     return '<tr class="biz-row' + (isOpen ? ' open' : '') + '" data-biz-name="' + escapeHtml(r.name) + '" tabindex="0" role="button" aria-expanded="' + isOpen + '"><td class="biz-name">' + '<button type="button" class="biz-open" data-biz-open="' + escapeHtml(r.name) + '" title="Open the industry page: factors, news and charts">' + escapeHtml(r.name) + '</button></td><td class="num">' + r.count + '</td><td class="num">' + pct(r.mean) + '</td><td class="num">' + pct(r.median) + '</td><td>' + breadth(r) + '</td><td class="num">' + (r.news.length ? r.news.length + (r.pos || r.neg ? ' <span class="news-pos">+' + r.pos + '</span> <span class="news-neg">&minus;' + r.neg + '</span>' : '') : '') + '</td>' + (strategyOn() ? '<td class="num">' + (r.matches ? '<b class="biz-matchcount">' + r.matches + '</b> of ' + r.count : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null ? pct(r.matchMean) : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null && r.mean !== null ? signedPp(r.matchMean - r.mean) : '') + '</td>' : '') + '</tr>' + (isOpen ? detailHtml(r, cols) : '');
   }).join('');
-  if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + viewToggle + sizeToggle + fullBtn + '</div></div>' + heatMap(rows, p, el)); syncSheets(); return; }
+  if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + (embed ? matchedBox + moreMenu : viewToggle + sizeToggle + fullBtn) + '</div></div>' + heatMap(rows, p, el)); syncSheets(); return; }
   kit.defineToolbar('biz', () => {
     const st = r => r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock), out = [];
     if(strategyOn()) out.push({ id: 'matched', label: 'Matched stocks', stocks: () => rows.flatMap(r => r.items.filter(x => x.match).map(x => x.stock)) });
@@ -216,7 +224,7 @@ function draw(el){
     out.push({ id: 'all', label: 'Every stock in the table', stocks: () => rows.flatMap(st) });
     return out;
   });
-  el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + expandBtn + kit.toolbarButton('biz') + '</div></div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + kit.selbarSlot('biz'));
+  el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + (embed ? matchedBox + moreMenu : expandBtn) + kit.toolbarButton('biz') + '</div></div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + kit.selbarSlot('biz'));
   syncSheets();
 }
 
@@ -290,6 +298,12 @@ function wire(el){
     const sr = closestEl(e, '.strat-row');
     if(sr){ openStockFromBusiness(Number(sr.dataset.idx)); return; }
     const row = closestEl(e, '.biz-row'); if(row) toggleRow(row);
+  });
+  el.addEventListener('change', (e) => {
+    const t = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (e.target);
+    if(!t || !t.matches) return;
+    if(t.matches('[data-biz-period-select]')){ const k = PERIODS.find(x => x.key === t.value); if(k){ period = k.key; save(); open.clear(); render(); ensureData(); } return; }
+    if(t.matches('[data-biz-matched]')){ showMatched = /** @type {HTMLInputElement} */ (t).checked; save(); render(); }
   });
   el.addEventListener('keydown', (e) => {
     if(e.key === 'Enter'){ const sr = closestEl(e, '.strat-row'); if(sr){ openStockFromBusiness(Number(sr.dataset.idx)); return; } }
