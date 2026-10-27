@@ -159,7 +159,7 @@ body.biz-full-open{overflow:hidden;}
   #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-controls{display:contents;}
   #analysisPanelBody:has(> .analysis-industry) .analysis-view-bar{order:1;}
   #analysisPanelBody:has(> .analysis-industry) .analysis-filters-panel .filters-toggle{order:2;}
-  #analysisPanelBody:has(> .analysis-industry) .biz-field{order:3;}
+  #analysisPanelBody:has(> .analysis-industry) .biz-controls > .dm{order:3;}
   #analysisPanelBody:has(> .analysis-industry) .biz-showing{order:4;margin:0;white-space:nowrap;}
   #analysisPanelBody:has(> .analysis-industry) .biz-actions{order:5;margin-left:auto;}
   #analysisPanelBody:has(> .analysis-industry) .analysis-toolbar .filter-groups{order:50;}
@@ -215,3 +215,8 @@ body.biz-full-open{overflow:hidden;}
 #analysisIndustryBody .biz-showing,#analysisLeaderboardCount,.analysis-toolbar .rk-headline{display:inline-flex;align-items:center;min-height:36px;}
 #analysisPanelBody{display:flow-root;}   /* the first block's top margin stays inside, so Stocks and Industry start at the same height */
 @media (min-width:901px){#analysisPanelBody:has(> .analysis-industry){display:flex;}}
+/* v1.281: Period and Show are drop-downs like View (the current choice is on the button and marked in the list). */
+.dm-btn small{margin-right:2px;}
+.dm-caret{font-size:.7rem;color:var(--muted);margin-left:2px;}
+.dm-item[disabled]{opacity:.5;cursor:default;}
+.dm-item.current .dm-t::after{content:" \2713";color:var(--accent);}

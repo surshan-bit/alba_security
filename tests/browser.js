@@ -324,9 +324,15 @@ async function layoutTests(browser){
       ok(!(await page.locator('.analysis-view-bar .dm-pop').isVisible()), `${w}px analysis: Esc closes the View menu`);
       await page.click('.analysis-view-bar .dm-btn'); await page.locator('.analysis-view-bar [data-analysis-view="industry"]').click(); await page.waitForTimeout(600);
       ok((await page.locator('.analysis-view-bar .dm-btn b').innerText()) === 'Industry', `${w}px analysis: choosing Industry in the menu shows it on the button`);
-      await page.locator('[data-biz-period-select]').selectOption('3M'); await page.waitForTimeout(500);
+      await page.locator('.dm-period .dm-btn').click(); ok((await page.locator('.dm-period .dm-item.current').innerText()).trim().startsWith('1 month'), `${w}px analysis: the Period list marks the current choice`); await page.locator('.dm-period [data-biz-period="3M"]').click(); await page.waitForTimeout(500);
       ok(/Average 3M/i.test(await page.locator('#analysisIndustryBody .biz-table thead').innerText()), `${w}px analysis: the Period menu changes the table's period`);
-      await page.locator('[data-biz-period-select]').selectOption('1M'); await page.waitForTimeout(300);
+      ok((await page.locator('.dm-period .dm-btn b').innerText()) === '3 months', `${w}px analysis: the Period button shows the chosen period`);
+      await page.locator('.dm-period .dm-btn').click(); await page.locator('.dm-period [data-biz-period="1M"]').click(); await page.waitForTimeout(300);
+      await page.locator('.dm-show .dm-btn').click(); ok(await page.locator('.dm-show .dm-pop').isVisible() && (await page.locator('.dm-show .dm-item').count()) === 2, `${w}px analysis: Show is a drop-down with All and Matched only`); await page.keyboard.press('Escape');
+      await page.locator('.analysis-industry .dm-more .dm-btn').click(); await page.locator('[data-biz-view="heat"]').click(); await page.waitForTimeout(500);
+      const hm = await page.evaluate(() => { const wrap = document.querySelector('#analysisIndustryBody .hm-wrap'), pb = document.getElementById('analysisPanelBody'); return { w: wrap ? wrap.clientWidth : 0, pw: pb.clientWidth, chg: document.querySelectorAll('#analysisIndustryBody .hm-chg').length, tiles: document.querySelectorAll('#analysisIndustryBody .hm-tile').length }; });
+      ok(hm.tiles > 0 && hm.chg > 0 && hm.w >= hm.pw - 4, `${w}px analysis: the heat map fills the panel and its big tiles show the % change ${JSON.stringify(hm)}`);
+      await page.locator('.analysis-industry .dm-more .dm-btn').click(); await page.locator('[data-biz-view="table"]').click(); await page.waitForTimeout(400);
       await setView('stocks'); await page.waitForTimeout(300);
     }
     const toolbarTops = () => page.evaluate(() => ['#analysisFiltersToggle', '.analysis-view-bar', '#analysisLeaderboardCount, #analysisIndustryBody .biz-showing', '.analysis-actions button, #analysisIndustryBody .biz-actions button'].map(sel => { const e = [...document.querySelectorAll(sel)].find(x => x.getBoundingClientRect().width > 0); return e ? Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2) : null; }));
