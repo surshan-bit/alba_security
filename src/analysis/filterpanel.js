@@ -217,12 +217,13 @@ function analysisFiltersHtml(){
   `;
 }
 
-// Docks the panel into the toolbar row, in front of the View selector, so the "Filters" chip and the View selector share one line. The panel
+// Docks the panel into the toolbar row, after the View menu, so the View menu and the "Filters" chip share one line. The panel
 // itself takes no box (stylesheet: display:contents): its chip becomes a toolbar item and its filter groups wrap onto the line below.
 // Without a toolbar (the section is not drawn yet) the panel stays in its own container.
 function dockFiltersPanel(){
   const bar = document.querySelector('.analysis-toolbar'), panel = document.getElementById('analysisFilterPanel');
-  if(bar && panel && panel.parentElement !== bar) bar.prepend(panel);
+  const viewBar = bar && bar.querySelector('.analysis-view-bar');
+  if(bar && panel && panel.parentElement !== bar){ if(viewBar) viewBar.after(panel); else bar.prepend(panel); }
 }
 
 // ---- wiring ----

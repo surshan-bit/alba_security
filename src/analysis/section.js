@@ -16,6 +16,7 @@ import { isPinned } from '../core/pins.js';
 import { mosPct } from '../list/metrics.js';
 import { ANALYSIS_VIEW_KEYS, ANALYSIS_VIEW_OPTIONS, analysisFilters, saveAnalysisFilters } from './state.js';
 import { escapeHtml } from '../core/util.js';
+import { dropMenuHtml } from '../ui/dropmenu.js';
 import { closestEl } from '../core/evt.js';
 import { appSections } from '../ui/navigation.js';
 import { openStockInline } from '../ui/inlinedetail.js';
@@ -70,9 +71,11 @@ function chartHtml(geo){
 }
 
 // View: the stocks one by one, or one row per Industry / Industry Group (the industry table Explorer has, drawn here from the stocks the filters let through).
+const VIEW_HINTS = { stocks: 'Every stock, one row each', industry: 'One row per industry', group: 'One row per broader industry group' };
 function viewBarHtml(){
-  const cur = analysisFilters.view;
-  return `<div class="analysis-view-bar"><div class="tl-view-toggle" role="group" aria-label="View">${ANALYSIS_VIEW_OPTIONS.map(o => `<button type="button" class="tl-view-btn${cur === o.value ? ' active' : ''}" data-analysis-view="${o.value}" aria-pressed="${cur === o.value}">${escapeHtml(o.label)}</button>`).join('')}</div></div>`;
+  const cur = analysisFilters.view, now = ANALYSIS_VIEW_OPTIONS.find(o => o.value === cur) || ANALYSIS_VIEW_OPTIONS[0];
+  const items = ANALYSIS_VIEW_OPTIONS.map(o => ({ attrs: `data-analysis-view="${o.value}"`, title: o.label, desc: VIEW_HINTS[o.value] || '', current: o.value === now.value }));
+  return `<div class="analysis-view-bar">${dropMenuHtml({ btnHtml: `<small>View</small><b>${escapeHtml(now.label)}</b><span class="dm-caret" aria-hidden="true">&#9662;</span>`, label: 'View: ' + now.label, items })}</div>`;
 }
 const toolbarOnlyHtml = () => `<div class="analysis-toolbar">${viewBarHtml()}</div>`;
 function wireViewBar(body){

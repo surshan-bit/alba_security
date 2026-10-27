@@ -317,6 +317,18 @@ async function layoutTests(browser){
       d = await startsAt(); ok(d.length > 0 && d.every(v => v < 1.5), `analysis: the headings stay lined up after a sort ${JSON.stringify(d.map(v => Math.round(v)))}`);
     }
     const setView = v => page.evaluate(v => { document.querySelector('[data-analysis-view="' + v + '"]').click(); }, v);
+    { // v1.279: the View choice is a drop-down: it opens on a click, closes with Esc, and the industry views' period is a drop-down too
+      await page.click('.analysis-view-bar .dm-btn');
+      ok(await page.locator('.analysis-view-bar .dm-pop').isVisible(), `${w}px analysis: the View menu opens`);
+      await page.keyboard.press('Escape');
+      ok(!(await page.locator('.analysis-view-bar .dm-pop').isVisible()), `${w}px analysis: Esc closes the View menu`);
+      await page.click('.analysis-view-bar .dm-btn'); await page.locator('.analysis-view-bar [data-analysis-view="industry"]').click(); await page.waitForTimeout(600);
+      ok((await page.locator('.analysis-view-bar .dm-btn b').innerText()) === 'Industry', `${w}px analysis: choosing Industry in the menu shows it on the button`);
+      await page.locator('[data-biz-period-select]').selectOption('3M'); await page.waitForTimeout(500);
+      ok(/Average 3M/i.test(await page.locator('#analysisIndustryBody .biz-table thead').innerText()), `${w}px analysis: the Period menu changes the table's period`);
+      await page.locator('[data-biz-period-select]').selectOption('1M'); await page.waitForTimeout(300);
+      await setView('stocks'); await page.waitForTimeout(300);
+    }
     const toolbarTops = () => page.evaluate(() => ['#analysisFiltersToggle', '.analysis-view-bar', '#analysisLeaderboardCount, #analysisIndustryBody .biz-showing', '.analysis-actions button, #analysisIndustryBody .biz-actions button'].map(sel => { const e = [...document.querySelectorAll(sel)].find(x => x.getBoundingClientRect().width > 0); return e ? Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2) : null; }));
     if(w >= 1000){ // v1.277: the Filters chip, View selector, count and grid buttons share one line, and the grid buttons are icons
       const t = await toolbarTops();

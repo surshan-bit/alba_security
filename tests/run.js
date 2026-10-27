@@ -248,13 +248,13 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
     const firstHead = () => ($('#analysisIndustryBody .biz-table thead th') || {}).textContent;
     const before = stockRows();
     await view('industry');
-    snap('s6m2_view_industry', { noGroupBy: String(!win.document.getElementById('analysisGroupSelect')), noLeaderboard: String(!win.document.getElementById('analysisLeaderboardBody')), active: $('.analysis-view-bar .tl-view-btn.active').textContent, head: firstHead(), rows: industryRows(), showing: ($('#analysisIndustryBody .biz-showing') || { textContent: '' }).textContent, saved: JSON.parse(win.localStorage.getItem('albaDashboard.analysisFilters.v1')).view });
+    snap('s6m2_view_industry', { noGroupBy: String(!win.document.getElementById('analysisGroupSelect')), noLeaderboard: String(!win.document.getElementById('analysisLeaderboardBody')), active: $('.analysis-view-bar .dm-btn b').textContent, head: firstHead(), rows: industryRows(), showing: ($('#analysisIndustryBody .biz-showing') || { textContent: '' }).textContent, saved: JSON.parse(win.localStorage.getItem('albaDashboard.analysisFilters.v1')).view });
     click($('#analysisIndustryBody .biz-row')); await sleep(150);
     snap('s6m3_view_industry_open', { stocks: String(win.document.querySelectorAll('#analysisIndustryBody .biz-detail .strat-row').length > 0), opened: $('#analysisIndustryBody .biz-row').getAttribute('aria-expanded') });
     await view('group');
-    snap('s6m4_view_group', { active: $('.analysis-view-bar .tl-view-btn.active').textContent, head: firstHead(), rows: industryRows() });
+    snap('s6m4_view_group', { active: $('.analysis-view-bar .dm-btn b').textContent, head: firstHead(), rows: industryRows() });
     await view('stocks');
-    snap('s6m5_view_stocks', { sameRows: String(stockRows() === before), noIndustryTable: String(!win.document.getElementById('analysisIndustryBody')), active: $('.analysis-view-bar .tl-view-btn.active').textContent });
+    snap('s6m5_view_stocks', { sameRows: String(stockRows() === before), noIndustryTable: String(!win.document.getElementById('analysisIndustryBody')), active: $('.analysis-view-bar .dm-btn b').textContent });
   }
   click($('.analysis-col-move[data-dir="down"]')); await sleep(150);
   snap('s6n_colmove', { body: html$('#analysisPanelBody') });
