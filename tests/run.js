@@ -326,7 +326,7 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   }
   nav('strategies'); await sleep(150);
   snap('s7b_strategies_open', { list: html$('#stratList'), main: html$('#stratMain') });
-  click($('#stratList .strat-card:nth-child(6)')); await sleep(100);
+  click(win.document.querySelectorAll('#stratList [data-strat-pick]')[5]); await sleep(100);
   snap('s7c_strategies_second', { main: html$('#stratMain'), rows: Array.from(win.document.querySelectorAll('#stratResults .strat-row')).map(e => e.dataset.idx).join(',') });
   { // v1.273: the qualifying stocks sort by a column header (same columns as the Analysis leaderboard); there is no Sort by menu any more
     const order = () => Array.from(win.document.querySelectorAll('#stratResults .strat-row')).map(e => e.dataset.idx);
@@ -375,7 +375,7 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   click($('#stratRestore')); await sleep(50);
   snap('s7j_strategies_end', { list: html$('#stratList') });
   // goal, learned rules, tracking
-  click($('#stratList .strat-card:nth-child(3)')); await sleep(200);   // Turning up early (has the older tracked list)
+  click(win.document.querySelectorAll('#stratList [data-strat-pick]')[2]); await sleep(200);   // Turning up early (has the older tracked list)
   click($('#stratTrack .trk-toggle, #stratTrackBody .trk-toggle')); await sleep(100);
   snap('s7k_strategies_tracked_old', { body: html$('#stratTrackBody') });
   chg($('#goalTarget'), '4'); chg($('#goalDays'), '21'); await sleep(100);

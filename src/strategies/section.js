@@ -1,4 +1,4 @@
-// The Strategies section: your list of strategies on the left; on the right the selected strategy's rules, the
+// The Strategies section: a strategy drop-down above the selected strategy's rules, the
 // stocks that qualify today, and a lookup that explains why a given stock does or does not qualify.
 // Drawn on demand (from showSection). Edits are saved straight away and redraw the right-hand side.
 import { escapeHtml, tickerSymbol } from '../core/util.js';
@@ -10,6 +10,7 @@ import { addStrategy, deleteStrategy, duplicateStrategy, restoreStarters, saveSt
 import { rulesEditorHtml, wireRulesEditor } from './editor.js';
 import { orderedPicks, resetResultsRows, resultsHtml, showMoreResults, sortResultsBy, whyDatalist, whyHtml } from './results.js';
 import { sheetFrame } from '../ui/phonesheet.js';
+import { dropMenuHtml } from '../ui/dropmenu.js';
 import { filtersOpenSaved, rememberFiltersOpen } from '../ui/filterdock.js';
 import { cleanGoal } from './goal.js';
 import { pcTickerKey } from '../prices/store.js';
@@ -63,16 +64,17 @@ function onSaveStatus(){
 }
 function paintSaveNote(){ const el = document.getElementById('stratSaveNote'); if(el) el.innerHTML = saveNote(); }
 function listHtml(sel){
-  const cards = strategies.map(st => {
-    const n = qualifyingStocks(stocks, st.rules).length;
-    return `<button type="button" class="strat-card${sel && st.id === sel.id ? ' active' : ''}" data-id="${escapeHtml(st.id)}">
-        <span class="strat-card-name"><span class="strat-dot ${st.published ? 'on' : 'off'}" role="img" aria-label="${st.published ? 'Published' : 'Unpublished'}" title="${st.published ? 'Published' : 'Unpublished'}"></span>${escapeHtml(st.name)}</span>
-        <span class="strat-card-n" title="Stocks that qualify now">${n}</span>
-      </button>`;
-  }).join('');
-  return `${cards || '<div class="strat-empty">No strategies yet.</div>'}
-    <button type="button" class="strat-new" id="stratNew">+ New strategy</button>
-    <button type="button" class="strat-restore" id="stratRestore" title="Bring back the starter strategies, keeping your own">Restore starter strategies</button>`;
+  const count = st => qualifyingStocks(stocks, st.rules).length;
+  /** @type {{ attrs: string, title: string, desc?: string, current?: boolean }[]} */
+  const items = strategies.map(st => {
+    const n = count(st);
+    return { attrs: `data-strat-pick="${escapeHtml(st.id)}"`, title: st.name, desc: `${n} ${n === 1 ? 'stock' : 'stocks'} qualify now \u00b7 ${st.published ? 'Published' : 'Not published'}`, current: !!sel && st.id === sel.id };
+  });
+  items.push({ attrs: 'id="stratNew"', title: '+ New strategy' }, { attrs: 'id="stratRestore"', title: 'Restore starter strategies', desc: 'Bring back the starters, keeping your own' });
+  const btn = sel
+    ? `<small>Strategy</small> <b>${escapeHtml(sel.name)}</b> <small class="strat-pick-n" title="Stocks that qualify now">${count(sel)}</small> <span class="dm-caret" aria-hidden="true">&#9662;</span>`
+    : `<small>Strategy</small> <b>None yet</b> <span class="dm-caret" aria-hidden="true">&#9662;</span>`;
+  return dropMenuHtml({ btnHtml: btn, label: 'Choose a strategy, or create a new one', items, extraClass: 'dm-strat' });
 }
 
 function mainHtml(st){
@@ -160,8 +162,8 @@ function init_strategies_section(){
   }, true);
   sec.addEventListener('click', (e) => {
     if(closestEl(e, '[data-strat-filters]')){ stratFiltersOpen = !stratFiltersOpen; rememberFiltersOpen('sFiltersOpen', stratFiltersOpen); renderStrategiesSection(); return; }
-    const card = closestEl(e, '.strat-card');
-    if(card){ selectStrategy(card.dataset.id); resetResultsRows(); renderStrategiesSection(); return; }
+    const card = closestEl(e, '[data-strat-pick]');
+    if(card){ selectStrategy(card.dataset.stratPick); resetResultsRows(); renderStrategiesSection(); return; }
     if(closestEl(e, '#stratNew')){ addStrategy(); renderStrategiesSection(); return; }
     if(closestEl(e, '#stratRestore')){ restoreStarters(); renderStrategiesSection(); return; }
     const st = selectedStrategy();
