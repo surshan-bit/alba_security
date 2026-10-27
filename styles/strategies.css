@@ -17,7 +17,8 @@
 .strat-actions{display:flex;gap:6px;}
 .strat-btn{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 12px;font-size:.8rem;cursor:pointer;}
 .strat-btn:hover{background:var(--panel2);}
-.strat-btn-danger{color:var(--avoid);}
+.strat-btn-danger{color:var(--avoid);border-color:var(--avoid);font-weight:600;}
+.strat-btn-danger:hover{background:var(--avoid);color:#fff;}
 .strat-sub{margin-bottom:8px;}
 .sr-rules{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
 /* Strategies rules: the rows have no outline any more, so they take no side padding and line up with the heading and the + Add a rule box. */
