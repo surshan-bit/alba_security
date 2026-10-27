@@ -305,6 +305,16 @@ async function layoutTests(browser){
     }
     // Analysis grouped by industry: the group lines fit the screen and nothing sticks out
     await goto(page, 'analysis'); await page.waitForTimeout(300);
+    { // v1.275: each heading starts where its column's text starts, sorted or not (the sort arrow follows the name and never pushes it)
+      const startsAt = () => page.evaluate(() => {
+        const t = document.querySelector('.analysis-leaderboard table');
+        const left = (el) => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().left; };
+        return [...t.querySelectorAll('thead th')].map((th, i) => { const b = th.querySelector('.th-sort'); return b ? Math.abs(left(b.firstChild) - (th.getBoundingClientRect().left + parseFloat(getComputedStyle(th).paddingLeft))) : 0; }).filter(Number.isFinite);
+      });
+      let d = await startsAt(); ok(d.length > 0 && d.every(v => v < 1.5), `analysis: every sortable heading starts at its cell edge ${JSON.stringify(d.map(v => Math.round(v)))}`);
+      await page.locator('.analysis-leaderboard thead [data-sort-col]:visible').nth(2).click(); await page.waitForTimeout(250);
+      d = await startsAt(); ok(d.length > 0 && d.every(v => v < 1.5), `analysis: the headings stay lined up after a sort ${JSON.stringify(d.map(v => Math.round(v)))}`);
+    }
     const setGroup = v => page.evaluate(v => { const g = document.getElementById('analysisGroupSelect'); g.value = v; g.dispatchEvent(new Event('change', { bubbles: true })); }, v);
     await setGroup('industry'); await page.waitForTimeout(400);
     ok((await page.evaluate(() => document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-group').length)) > 0, `${w}px analysis grouped: group lines are drawn`);
