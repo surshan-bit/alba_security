@@ -15,6 +15,7 @@ import { kit } from '../refresh/kit.js';
 import { heatmapHtml } from './heatmap.js';
 import { newsItemHtml } from './newsitem.js';
 import { sheetFrame, syncSheets } from '../ui/phonesheet.js';
+import { filtersOpenSaved, rememberFiltersOpen } from '../ui/filterdock.js';
 import { PERIODS, industryTable, needsBars, periodOf } from './calc.js';
 import { closestEl } from '../core/evt.js';
 import { isRebound } from '../list/rebound.js';
@@ -22,7 +23,7 @@ import { isRebound } from '../list/rebound.js';
 const KEY = 'albaDashboard.business.v1';
 let bizFull = false;   // the table (or the heat map) fills the whole window
 const newsOpen = new Set();   // industries whose News section is open (closed at first)
-let bizFiltersOpen = false;   // phones: the view, period, grouping and strategy controls fold into one "Filters" line, closed at first
+let bizFiltersOpen = filtersOpenSaved('bFiltersOpen');   // the view, period, grouping and strategy controls open from one "Filters" button (phone: a sheet); closed at first, wide screens remember the choice
 let drawnRows = [], drawnCols = 6;   // what the table on the page was last drawn from, so a row can open or close without a redraw
 let period = '1M', by = 'industry', view = 'table', heatSize = 'chg', strategyId = '', showMatched = false, rebound = false, loadState = 'idle';   // loadState: 'idle' | 'loading' | 'failed' (price bars for long periods)
 const open = new Set();                                    // industries whose detail is open
@@ -228,7 +229,7 @@ function init(){
     if(io){ openIndustryInline(appSections.business, 'Explorer', by, io.dataset.bizOpen); return; }
     const nt = closestEl(e, '[data-biz-newstoggle]');
     if(nt){ const n = nt.dataset.bizNewstoggle; if(newsOpen.has(n)) newsOpen.delete(n); else newsOpen.add(n); render(); return; }
-    if(closestEl(e, '[data-biz-filters]')){ bizFiltersOpen = !bizFiltersOpen; render(); return; }
+    if(closestEl(e, '[data-biz-filters]')){ bizFiltersOpen = !bizFiltersOpen; rememberFiltersOpen('bFiltersOpen', bizFiltersOpen); render(); return; }
     if(closestEl(e, '[data-biz-full]')){ bizFull = !bizFull; browserFullscreen(bizFull); render(); return; }
     const sb = closestEl(e, '[data-biz-strat]');
     if(sb){ strategyId = sb.dataset.bizStrat; save(); render(); return; }

@@ -10,6 +10,7 @@ import { addStrategy, deleteStrategy, duplicateStrategy, restoreStarters, saveSt
 import { rulesEditorHtml, wireRulesEditor } from './editor.js';
 import { orderedPicks, resetResultsRows, resultsHtml, setResultsSort, showMoreResults, sortLabel, sortSelectHtml, whyDatalist, whyHtml } from './results.js';
 import { sheetFrame } from '../ui/phonesheet.js';
+import { filtersOpenSaved, rememberFiltersOpen } from '../ui/filterdock.js';
 import { cleanGoal } from './goal.js';
 import { pcTickerKey } from '../prices/store.js';
 import { kit } from '../refresh/kit.js';
@@ -28,7 +29,7 @@ function openStockFromStrategies(idx){
 
 const readyRules = (st) => st.rules.filter(ruleReady);
 
-let stratFiltersOpen = false;   // phones: the sort and the buttons above the picks sit in the Filters pop-up, closed at first
+let stratFiltersOpen = filtersOpenSaved('sFiltersOpen');   // the sort and the buttons above the picks open from the Filters button (phone: a pop-up); closed at first, wide screens remember the choice
 const folds = new Set();   // which collapsible blocks are open (kept across redraws)
 // The picks in the order the table shows them: what a refresh works through.
 const refreshList = (st) => orderedPicks(qualifyingStocks(stocks, st.rules));
@@ -158,7 +159,7 @@ function init_strategies_section(){
     if(d){ if(/** @type {HTMLDetailsElement} */ (d).open) folds.add(d.dataset.fold); else folds.delete(d.dataset.fold); }
   }, true);
   sec.addEventListener('click', (e) => {
-    if(closestEl(e, '[data-strat-filters]')){ stratFiltersOpen = !stratFiltersOpen; renderStrategiesSection(); return; }
+    if(closestEl(e, '[data-strat-filters]')){ stratFiltersOpen = !stratFiltersOpen; rememberFiltersOpen('sFiltersOpen', stratFiltersOpen); renderStrategiesSection(); return; }
     const card = closestEl(e, '.strat-card');
     if(card){ selectStrategy(card.dataset.id); resetResultsRows(); renderStrategiesSection(); return; }
     if(closestEl(e, '#stratNew')){ addStrategy(); renderStrategiesSection(); return; }

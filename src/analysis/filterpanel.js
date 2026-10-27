@@ -11,6 +11,7 @@ import { publishedStrategies } from '../strategies/state.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { strategyStockSet } from '../strategies/pick.js';
 import { sheetFrame } from '../ui/phonesheet.js';
+import { filtersOpenSaved, rememberFiltersOpen } from '../ui/filterdock.js';
 import { escapeHtml } from '../core/util.js';
 import { isRebound } from '../list/rebound.js';
 import { ensureAllPriceBars } from '../prices/store.js';
@@ -196,7 +197,8 @@ function hiddenNote(){
 }
 
 // Phones: the filters fold into one "Filters" line that lists what is selected (closed to start with).
-var analysisFiltersOpen = false;
+// Wide screens: the same button shows or hides the filter column, and the choice is remembered (src/ui/filterdock.js).
+var analysisFiltersOpen = filtersOpenSaved('aFiltersOpen');
 function analysisFiltersHtml(){
   const facetCount = facetCounts();
   return `
@@ -242,6 +244,7 @@ function renderAnalysisFilterPanel(rerender){
     toggle.addEventListener('click', () => {
       analysisFiltersOpen = panel.classList.toggle('filters-collapsed') === false;
       toggle.setAttribute('aria-expanded', String(analysisFiltersOpen));
+      rememberFiltersOpen('aFiltersOpen', analysisFiltersOpen);
     });
   }
   document.querySelectorAll('#analysisStrategyFilter .filter-btn').forEach(btn => btn.addEventListener('click', () => {

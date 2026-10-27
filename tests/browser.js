@@ -140,6 +140,16 @@ async function businessTests(browser){
   const ctx = await browser.newContext({ viewport: process.env.SHOT ? { width: 400, height: 800 } : { width: 1280, height: 900 } });
   const { page, errs } = await openPage(ctx, {}, 'business'); await appReady(page); await page.waitForTimeout(400);
   await goto(page, 'business'); await page.waitForSelector('#businessBody .biz-row', { timeout: 5000 });
+  { // wide screens: Filters starts closed (table full width), opens as a side column from the button, and the choice is remembered
+    const geo = () => page.evaluate(() => { const t = document.querySelector('.biz-filters-toggle'), c = document.querySelector('.biz-controls'), m = document.querySelector('.biz-main'); return { toggle: !!t && t.getBoundingClientRect().width > 0, controls: !!c && c.getBoundingClientRect().height > 0, main: m.getBoundingClientRect().width, expanded: t.getAttribute('aria-expanded') }; });
+    const closed = await geo();
+    ok(closed.toggle && !closed.controls && closed.expanded === 'false' && closed.main > 1100, 'business desktop: Filters starts closed and the table has the full width ' + JSON.stringify(closed));
+    await page.locator('.biz-filters-toggle').click(); await page.waitForTimeout(300);
+    const open = await geo();
+    ok(open.controls && open.expanded === 'true' && open.main < closed.main - 200, 'business desktop: the Filters button opens the side column ' + JSON.stringify(open));
+    await page.waitForTimeout(600);
+    ok(await page.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => /uiState/i.test(k)) || '') || '{}').bFiltersOpen === true), 'business desktop: the open choice is remembered');
+  }
   const rows = await page.locator('.biz-row').count();
   ok(rows > 3, 'business: industries are listed (' + rows + ')');
   const means = await page.$$eval('.biz-row', trs => trs.map(tr => tr.children[2].textContent.trim()));
