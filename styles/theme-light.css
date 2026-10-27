@@ -103,6 +103,8 @@
 :root[data-theme="white"] :is(.upload-hint,.analysis-panel-sub,.settings-row-sub,.sub){color:#4a5163;}
 :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.sort-select,.detail-back,.lm-tab):not(.tl-btn-primary):not(.on){background:#fff;border-color:#c9cfdf;}
 :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.lm-tab):not(.tl-btn-primary):not(.on):hover{background:color-mix(in srgb,var(--accent) 6%,#fff);}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .strat-btn.strat-btn-danger:not(.tl-btn-primary):not(.on){color:#a83f38;border-color:#a83f38;font-weight:600;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .strat-btn.strat-btn-danger:not(.tl-btn-primary):not(.on):hover{color:#fff;background:#a83f38;border-color:#a83f38;}
 :root[data-theme="white"] .select-mode-btn.active{background:color-mix(in srgb,var(--accent) 10%,#fff);}
 :root[data-theme="white"] :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){background:#fff;border-color:#c9cfdf;}
 :root[data-theme="white"] :is(input,select,textarea)::placeholder{color:#5b6274;}
