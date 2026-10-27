@@ -63,6 +63,7 @@
 @media (min-width:901px){
 :root[data-theme="white"] .strat-table,:root[data-theme="white"] .biz-table{font-size:1rem;}
 :root[data-theme="white"] .strat-table:not(.peers-table) td{font-size:.98rem;padding:13px 6px;}
+:root[data-theme="white"] .strat-table:not(.peers-table) th{padding-left:6px;padding-right:6px;}   /* the same side padding as the cells, so a heading starts above its column's text */
 :root[data-theme="white"] .strat-table th,:root[data-theme="white"] .biz-table > thead > tr > th,:root[data-theme="white"] .strat-table:not(.peers-table) th{font-size:.92rem;}
 }
 @media (min-width:901px){:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,.browse-btn,.tl-btn-primary,.alba-confirm-ok){font-size:.82rem;}}

@@ -89,16 +89,23 @@ function wireViewBar(body){
     renderAnalysisSection();
   });
 }
-// The industry views: the table's code loads the first time one is opened.
+// The industry views: the table's code (business/panel.js) is fetched once and kept. It is requested in the background as soon as the Stocks view is drawn, so
+// switching View normally draws the table in the same step as the toolbar, with no "Loading…" frame in between (which looked like a flicker).
+let industryMod = null;
+const loadIndustryMod = () => industryMod ? Promise.resolve(industryMod) : import('../business/panel.js').then((m) => (industryMod = m));
+function paintIndustryView(m, el){
+  m.showIn({ el, by: analysisFilters.view === 'group' ? 'group' : 'industry', section: appSections.analysis, label: 'Analysis', stocksNow: () => new Set(stocksInRange(analysisBucket())) });
+  syncSheets();
+}
 function drawIndustryView(body){
-  body.innerHTML = toolbarOnlyHtml() + '<div id="analysisIndustryBody" class="analysis-industry"><p class="upload-hint">Loading…</p></div>';
+  body.innerHTML = toolbarOnlyHtml() + `<div id="analysisIndustryBody" class="analysis-industry">${industryMod ? '' : '<p class="upload-hint">Loading…</p>'}</div>`;
   wireViewBar(body);
   const el = document.getElementById('analysisIndustryBody');
   if(!el) return;
-  import('../business/panel.js').then((m) => {
+  if(industryMod){ paintIndustryView(industryMod, el); return; }
+  loadIndustryMod().then((m) => {
     if(!el.isConnected || analysisFilters.view === 'stocks') return;
-    m.showIn({ el, by: analysisFilters.view === 'group' ? 'group' : 'industry', section: appSections.analysis, label: 'Analysis', stocksNow: () => new Set(stocksInRange(analysisBucket())) });
-    syncSheets();
+    paintIndustryView(m, el);
   }).catch((e) => { el.innerHTML = '<p class="upload-hint">Could not load this view. Please try again.</p>'; console.error('Could not load the industry view', e); });
   syncSheets();
 }
@@ -179,6 +186,7 @@ function drawAnalysisSection(){
 
   updateAnalysisChart();
   syncSheets();
+  if(!industryMod) setTimeout(() => { loadIndustryMod().catch(() => { /* fetched again when the viewer opens an industry view */ }); }, 400);
 }
 
 // Redraw the chart when the window is resized, so it keeps filling the available width.

@@ -341,6 +341,14 @@ async function layoutTests(browser){
       if(w >= 1000){ const t = await toolbarTops(); ok(t.every(x => x !== null) && Math.abs(t[0] - t[1]) <= 6 && Math.abs(t[2] - t[3]) <= 6, `${w}px analysis ${v} view: the Filters chip and View selector share a line, and the table's count and buttons share the next ${JSON.stringify(t)}`); }
       const og = await sticksOut(page); ok(!og.scrolls && og.out.length === 0, `${w}px analysis ${v} view: overflow ${og.out.join('; ')}`);
     }
+    if(w >= 1000){ // v1.280: switching View does not move the toolbar or the grid, and every toolbar control is the same height
+      const geo = () => page.evaluate(() => { const top = s => { const e = document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().top) : null; }; return { bar: top('.analysis-view-bar'), th: top('#analysisPanelBody table thead th'), hs: [...document.querySelectorAll('#analysisPanelBody :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle)')].filter(e => e.getBoundingClientRect().width > 0).map(e => Math.round(e.getBoundingClientRect().height)) }; });
+      await setView('stocks'); await page.waitForTimeout(400); const g1 = await geo();
+      await setView('industry'); await page.waitForTimeout(400); const g2 = await geo();
+      await setView('stocks'); await page.waitForTimeout(400);
+      ok(g1.bar === g2.bar && g1.th === g2.th, `${w}px analysis: Stocks and Industry start at the same heights ${JSON.stringify([g1.bar, g1.th, g2.bar, g2.th])}`);
+      ok(g1.hs.every(h => h === 36) && g2.hs.every(h => h === 36), `${w}px analysis: every toolbar control is 36px tall ${JSON.stringify([g1.hs, g2.hs])}`);
+    }
     await setView('stocks'); await page.waitForTimeout(300);
     // a stock's page
     await goto(page, 'analysis'); await page.waitForTimeout(400);
