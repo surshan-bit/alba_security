@@ -54,7 +54,7 @@
 .sr-head{display:none;padding:0 0 6px;border-bottom:1px solid var(--line);font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
 .sr-head span:nth-child(4){text-align:right;}
 @media (min-width:1000px){.sr-head{display:grid;}}
-@media (min-width:1000px){.sr-rules{gap:0;}.sr-row{padding:8px 0;}.sr-row + .sr-row{border-top:1px solid var(--line);}}
+@media (min-width:1000px){.sr-rules{gap:0;}.sr-row{padding:8px 0;}.sr-row + .sr-row{border-top:1px solid var(--line);}.sr-row:last-child{border-bottom:1px solid var(--line);}}
 .sr-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;}
 .sr-total{font-size:.86rem;color:var(--muted);}
 .sr-total b{color:var(--text);font-weight:700;}
@@ -238,3 +238,9 @@
 .strat-group > .strat-section{margin-top:10px;}
 .strat-section-title{font-size:.72rem;}
 }
+
+/* v1.282: "+ Add a rule" is a dashed-outline button (no underline), as wide as the Field column so its arrow lines up with the arrows above. */
+.sr-foot .sr-add{background:transparent;border:1px dashed var(--line);border-radius:6px;color:var(--accent);font-weight:600;cursor:pointer;height:34px;padding:0 8px;box-sizing:border-box;}
+.sr-foot .sr-add:hover,.sr-foot .sr-add:focus-visible{border-color:var(--accent);}
+.sr-foot .sr-add option,.sr-foot .sr-add optgroup{color:var(--text);font-weight:400;}
+@media (min-width:1000px){.sr-foot .sr-add{width:340px;}}

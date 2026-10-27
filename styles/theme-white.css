@@ -346,7 +346,8 @@
   :root[data-theme="white"] #section-refreshlog #refreshWatchlistBtn{display:flex;width:fit-content;margin-left:auto;}
 /* Strategies: a single line under the closed setup bar, and the "+ Add a rule" box lined up with the rule fields above it. */
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold:not([open]) > summary{border-bottom:0;}
-  :root[data-theme="white"] #section-strategies #stratMain .sr-add{width:260px;max-width:100%;}
+  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-foot .sr-add{width:340px;max-width:100%;border:1px dashed #c9cfdf;border-radius:6px;background:transparent;color:var(--accent);padding-left:8px;padding-right:8px;}
+  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-foot .sr-add:hover,:root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-foot .sr-add:focus{border-color:var(--accent);}
 /* Explorer industry table: cell text centred vertically in every row (a two-line name no longer pushes the # or the numbers to the bottom). */
 @media (min-width:901px){
   :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > td{vertical-align:middle;}
