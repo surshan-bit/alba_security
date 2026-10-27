@@ -132,7 +132,7 @@ body.biz-full-open{overflow:hidden;}
 .analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle:hover{border-color:var(--accent);}
 .analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle .ft-summary{flex:0 1 auto;max-width:200px;}
 .analysis-view-bar{display:flex;align-items:center;flex:0 0 auto;margin:0;}
-.analysis-toolbar .rk-headline{min-width:0;}
+.analysis-toolbar .rk-headline{min-width:0;margin-bottom:0;}
 .analysis-toolbar .biz-showing{white-space:nowrap;}
 .analysis-actions{display:flex;align-items:center;gap:8px;margin-left:auto;}
 /* The grid buttons are icons (their name is the tooltip); the text label only shows when the buttons sit in the phone filter sheet. */
@@ -150,7 +150,7 @@ body.biz-full-open{overflow:hidden;}
 /* Wide screens, an industry view: the View menu, the Filters chip, the Period menu, the count and the buttons share one line. The wrappers between them take
    no box (display:contents), so each control becomes an item of the line that #analysisPanelBody draws; everything else (the filter groups, the table) takes a full line. */
 @media (min-width:901px){
-  #analysisPanelBody:has(> .analysis-industry){display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;}
+  #analysisPanelBody:has(> .analysis-industry){display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-top:4px;}   /* the same top and row gap as the Stocks view's toolbar, so the grid does not move when View changes */
   #analysisPanelBody:has(> .analysis-industry) > .analysis-toolbar,
   #analysisPanelBody:has(> .analysis-industry) > .analysis-industry,
   #analysisPanelBody:has(> .analysis-industry) .biz-embedded,
@@ -197,3 +197,21 @@ body.biz-full-open{overflow:hidden;}
 .biz-matched-only:has(input:disabled){opacity:.55;cursor:default;}
 .analysis-view-bar{position:relative;z-index:30;}
 .biz-embedded .biz-actions{display:flex;align-items:center;gap:12px;}
+
+/* The industry table inside Analysis: the "#" slot of the first column has a fixed width (not em, which differs between the heading and the cells), so the
+   heading "Industry" starts exactly above the names; every cell is centred vertically so a long name that wraps does not push the number or the figures to the bottom. */
+#analysisIndustryBody .biz-table{--bn:2.6rem;}
+#analysisIndustryBody .biz-table > thead > tr > th:first-child,#analysisIndustryBody .biz-table > tbody > .biz-row > .biz-name{padding-left:calc(8px + var(--bn));text-indent:calc(-1 * var(--bn));}
+#analysisIndustryBody .biz-table > thead > tr > th:first-child::before,#analysisIndustryBody .biz-table > tbody > .biz-row > .biz-name::before{width:calc(var(--bn) - 6px);margin-right:6px;text-indent:0;vertical-align:middle;}
+#analysisIndustryBody .biz-table > tbody > .biz-row > td,#analysisIndustryBody .biz-table > tbody > .biz-row > .biz-name .biz-open{vertical-align:middle;}
+/* v1.280: every control on the Analysis toolbar (View, Filters, Period, Matched only, ⋯, icon buttons, Refresh) shares one height, border, radius and type in all three themes, in the Stocks and Industry views alike. */
+#analysisPanelBody :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){height:36px;min-height:36px;box-sizing:border-box;border-radius:6px;}
+:root[data-theme="white"] #analysisPanelBody :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){border:1px solid #c9cfdf;background:#fff;}
+:root[data-theme="white"] #analysisPanelBody :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle):hover,
+:root[data-theme="white"] #analysisPanelBody :is(.dm-btn,.analysis-icon-btn)[aria-expanded="true"]{border-color:var(--accent);}
+:root[data-theme="white"] #analysisPanelBody .biz-field select{border:0;background:transparent;}
+:root[data-theme="white"] body #analysisPanelBody#analysisPanelBody :is(.rk-toolbtn,.rk-main,.rk-barbtn){display:inline-flex;align-items:center;justify-content:center;height:36px;min-height:36px;padding:0 14px;font-size:var(--t-md) !important;font-weight:500 !important;letter-spacing:normal;text-transform:none;color:#1b1f2a;}
+:root[data-theme="white"] #analysisPanelBody :is(.rk-toolbtn,.rk-main):hover:not(:disabled){color:var(--accent);}
+#analysisIndustryBody .biz-showing,#analysisLeaderboardCount,.analysis-toolbar .rk-headline{display:inline-flex;align-items:center;min-height:36px;}
+#analysisPanelBody{display:flow-root;}   /* the first block's top margin stays inside, so Stocks and Industry start at the same height */
+@media (min-width:901px){#analysisPanelBody:has(> .analysis-industry){display:flex;}}
