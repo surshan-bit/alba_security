@@ -39,6 +39,14 @@ function analysisSortComparator(sortBy){
   return opt ? opt.cmp : ANALYSIS_SORT_OPTIONS[0].cmp;
 }
 
+// "Group by" for the leaderboard: no grouping, or one block of rows per industry / industry group.
+const ANALYSIS_GROUP_OPTIONS = [
+  { value: 'none', label: 'None' },
+  { value: 'industry', label: 'Industry' },
+  { value: 'group', label: 'Industry Group' }
+];
+const ANALYSIS_GROUP_KEYS = new Set(ANALYSIS_GROUP_OPTIONS.map(o => o.value));
+
 const ANALYSIS_FILTERS_KEY = 'albaDashboard.analysisFilters.v1';
 function saveAnalysisFilters(filters){
   prefSet(ANALYSIS_FILTERS_KEY, JSON.stringify(filters));
@@ -50,7 +58,7 @@ const ANALYSIS_MOS_KEYS = ['green', 'orange', 'red'];
 // Tech Rating W / M filters (2026-10-07): the MACD state behind the Tech Rating badge (weekMacd / monthMacd).
 const ANALYSIS_TECH_KEYS = ['bull_above', 'bull_below', 'bear_above', 'bear_below'];
 function loadAnalysisFilters(){
-  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortBy: 'mos_desc', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', rebound: false, columnOrder: null };
+  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortBy: 'mos_desc', groupBy: 'none', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', rebound: false, columnOrder: null };
   try {
     const raw = localStorage.getItem(ANALYSIS_FILTERS_KEY);
     if(!raw) return fallback;
@@ -65,6 +73,7 @@ function loadAnalysisFilters(){
     let yAxis = parsed.yAxis === 'month' ? 'month' : 'week';
     if(xAxis === yAxis) yAxis = xAxis === 'week' ? 'month' : 'week'; // the two axes must show different timeframes
     const sortBy = ANALYSIS_SORT_KEYS.has(parsed.sortBy) ? parsed.sortBy : fallback.sortBy;
+    const groupBy = ANALYSIS_GROUP_KEYS.has(parsed.groupBy) ? parsed.groupBy : fallback.groupBy;
     const verdicts = Array.isArray(parsed.verdicts) ? parsed.verdicts.filter(v => ANALYSIS_VERDICT_KEYS.includes(v)) : fallback.verdicts;
     const mosRatings = Array.isArray(parsed.mosRatings) ? parsed.mosRatings.filter(v => ANALYSIS_MOS_KEYS.includes(v)) : fallback.mosRatings;
     const techW = Array.isArray(parsed.techW) ? parsed.techW.filter(v => ANALYSIS_TECH_KEYS.includes(v)) : [];
@@ -77,7 +86,7 @@ function loadAnalysisFilters(){
     return {
       weekMin: Math.min(weekMin, weekMax), weekMax: Math.max(weekMin, weekMax),
       monthMin: Math.min(monthMin, monthMax), monthMax: Math.max(monthMin, monthMax),
-      colorBy, xAxis, yAxis, sortBy, verdicts, mosRatings, techW, techM, mosLo, mosHi, strategyId, rebound, columnOrder
+      colorBy, xAxis, yAxis, sortBy, groupBy, verdicts, mosRatings, techW, techM, mosLo, mosHi, strategyId, rebound, columnOrder
     };
   } catch(e){ return fallback; }
 }
@@ -98,4 +107,4 @@ function getAnalysisShownIdx(){ return analysisShownIdx; }
 function setAnalysisColumnsPanelOpen(v){ analysisColumnsPanelOpen = v; }
 function setAnalysisShownIdx(v){ analysisShownIdx = v; }
 
-export { ANALYSIS_SORT_KEYS, ANALYSIS_SORT_OPTIONS, analysisFilters, analysisPersistUi, analysisSortComparator, getAnalysisColumnsPanelOpen, getAnalysisShownIdx, saveAnalysisFilters, setAnalysisColumnsPanelOpen, setAnalysisShownIdx };
+export { ANALYSIS_GROUP_KEYS, ANALYSIS_GROUP_OPTIONS, ANALYSIS_SORT_KEYS, ANALYSIS_SORT_OPTIONS, analysisFilters, analysisPersistUi, analysisSortComparator, getAnalysisColumnsPanelOpen, getAnalysisShownIdx, saveAnalysisFilters, setAnalysisColumnsPanelOpen, setAnalysisShownIdx };

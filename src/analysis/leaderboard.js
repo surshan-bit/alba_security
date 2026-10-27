@@ -1,8 +1,9 @@
 // The Analysis leaderboard table: ranking, header and rows, and its click handling.
 import { stockIndex, stocks } from '../core/stocks.js';
 import { isPinned, togglePin } from '../core/pins.js';
-import { escapeHtml } from '../core/util.js';
-import { ANALYSIS_SORT_KEYS, ANALYSIS_SORT_OPTIONS, getAnalysisColumnsPanelOpen, setAnalysisColumnsPanelOpen, analysisFilters, analysisPersistUi, setAnalysisShownIdx, analysisSortComparator, saveAnalysisFilters } from './state.js';
+import { escapeHtml, pctChangeSpan } from '../core/util.js';
+import { ANALYSIS_GROUP_KEYS, ANALYSIS_GROUP_OPTIONS, ANALYSIS_SORT_KEYS, ANALYSIS_SORT_OPTIONS, getAnalysisColumnsPanelOpen, setAnalysisColumnsPanelOpen, analysisFilters, analysisPersistUi, setAnalysisShownIdx, analysisSortComparator, saveAnalysisFilters } from './state.js';
+import { groupRanked } from './grouping.js';
 import { analysisTakeBatch, defineAnalysisScope, updateAnalysisRefresh } from './selectbar.js';
 import { ANALYSIS_LB_COLUMN_IDS, analysisColumnOrder, analysisLbCell, analysisRowContext, columnHeaderHtml, renderAnalysisColumnsPanel } from './columns.js';
 import { ldOpenPermissions } from '../livedata/bar.js';
@@ -14,6 +15,15 @@ import { closestEl } from '../core/evt.js';
 // Rows drawn at first and added by each "Show more": a table of thousands of rows is slow to lay out.
 const LB_STEP = 300;
 let lbRows = LB_STEP;
+
+// ---- grouping ----
+// Names of the groups that are folded shut (everything is open at first and again whenever "Group by" changes), and the groups as last drawn,
+// so "Collapse all" knows their names.
+const collapsedGroups = new Set();
+let drawnGroups = [];
+const groupingOn = () => analysisFilters.groupBy !== 'none';
+// " in 12 industries" / " in 1 industry group": added to the "Showing N of M stocks" line while grouped.
+const groupCountNote = (n) => ' in ' + n + ' ' + (analysisFilters.groupBy === 'group' ? (n === 1 ? 'industry group' : 'industry groups') : (n === 1 ? 'industry' : 'industries'));
 
 // ---- full screen ----
 // The leaderboard can fill the whole window. The state lives here so a redraw of the section keeps it. Esc and the browser's own full screen are handled in ui/fullscreen.js.
@@ -46,6 +56,12 @@ function leaderboardHtml(chartBlock){
               ${ANALYSIS_SORT_OPTIONS.map(o => `<option value="${o.value}"${analysisFilters.sortBy === o.value ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
             </select>
           </label>
+          <label class="analysis-filter-label" style="display:flex;align-items:center;gap:6px;">Group by:
+            <select class="sort-select" id="analysisGroupSelect">
+              ${ANALYSIS_GROUP_OPTIONS.map(o => `<option value="${o.value}"${analysisFilters.groupBy === o.value ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
+            </select>
+          </label>
+          <button type="button" class="analysis-reset-btn" id="analysisGroupAllBtn"${groupingOn() ? '' : ' hidden'}>Collapse all</button>
           <button type="button" class="analysis-reset-btn" id="analysisColumnsBtn">Columns</button>
           <button type="button" class="analysis-reset-btn" id="analysisChartToggle" aria-expanded="false">Show chart</button>
           <button type="button" class="analysis-reset-btn" id="analysisFullscreenBtn" aria-pressed="${lbFull}" title="Show the leaderboard across the whole window (Esc to leave)">${fullscreenLabel(lbFull)}</button>
@@ -88,22 +104,62 @@ function leaderboardRowHtml(s, i, colOrder){
           `;
 }
 
+// One line above each group's stocks: its name, how many stocks it has, their average weekly and monthly change and how many are up or down this week.
+function groupHeaderHtml(g, colSpan){
+  const folded = collapsedGroups.has(g.name);
+  const avg = (label, v, tip) => `<span class="lbg-stat"${tip ? ` title="${tip}"` : ''}>${label} ${v === null ? '–' : pctChangeSpan(v)}</span>`;
+  const medianTip = g.medianW === null ? '' : `Average weekly change of these stocks. Median: ${g.medianW > 0 ? '+' : ''}${g.medianW.toFixed(2)}%`;
+  const breadth = g.up + g.down ? `<span class="lbg-stat" title="Stocks up and down this week">${g.up}&uarr; ${g.down}&darr;</span>` : '';
+  return `<tr class="analysis-lb-group${folded ? ' folded' : ''}" data-group="${escapeHtml(g.name)}" tabindex="0" role="button" aria-expanded="${!folded}"><td colspan="${colSpan}"><div class="lbg-inner"><span class="lbg-caret" aria-hidden="true">${folded ? '&#9656;' : '&#9662;'}</span><span class="lbg-name">${escapeHtml(g.name)}</span><span class="lbg-count">${g.members.length} stock${g.members.length === 1 ? '' : 's'}</span>${avg('W avg', g.meanW, medianTip)}${avg('M avg', g.meanM)}${breadth}</div></td></tr>`;
+}
+
+// The rows of a grouped leaderboard. Folded groups show only their line; the rows drawn stop at the "Show more" limit like the flat table.
+// Returns the markup and how many stock rows could be drawn in all (so "Show more" knows whether anything is left).
+function groupedRowsHtml(groups, colOrder, colSpan){
+  let html = '', drawn = 0, drawable = 0;
+  groups.forEach(g => {
+    const folded = collapsedGroups.has(g.name);
+    if(!folded) drawable += g.members.length;
+    if(drawn >= lbRows && drawable > drawn) return;
+    html += groupHeaderHtml(g, colSpan);
+    if(folded) return;
+    g.members.slice(0, lbRows - drawn).forEach((s, i) => { html += leaderboardRowHtml(s, i, colOrder); drawn++; });
+  });
+  return { html, drawn, drawable };
+}
+
+// "Collapse all" turns into "Expand all" once every group is folded.
+function paintGroupAllBtn(){
+  const btn = document.getElementById('analysisGroupAllBtn');
+  if(!btn) return;
+  btn.hidden = !groupingOn();
+  const allFolded = drawnGroups.length > 0 && drawnGroups.every(g => collapsedGroups.has(g.name));
+  btn.textContent = allFolded ? 'Expand all' : 'Collapse all';
+  btn.dataset.groupAll = allFolded ? 'expand' : 'collapse';
+}
+
 // Fills the count and the table body for the stocks currently in the chart's range.
 function renderLeaderboardRows(filtered){
   const ranked = rankStocks(filtered);
+  const groups = groupingOn() ? groupRanked(ranked, analysisFilters.groupBy) : [];
+  drawnGroups = groups;
   const lbCountEl = document.getElementById('analysisLeaderboardCount');
-  if(lbCountEl) lbCountEl.textContent = `Showing ${ranked.length} of ${stocks.length} stocks`;
+  if(lbCountEl) lbCountEl.textContent = `Showing ${ranked.length} of ${stocks.length} stocks` + (groupingOn() && ranked.length ? groupCountNote(groups.length) : '');
   const lbBody = document.getElementById('analysisLeaderboardBody');
-  const colOrder = analysisColumnOrder();
-  lbBody.innerHTML = ranked.length === 0
-    ? `<tr><td colspan="${colOrder.length + (getRefreshKit() ? 1 : 0)}" class="analysis-lb-empty">No stocks in the current RSI range.</td></tr>`
-    : ranked.slice(0, lbRows).map((s, i) => leaderboardRowHtml(s, i, colOrder)).join('');
+  const colOrder = analysisColumnOrder(), colSpan = colOrder.length + (getRefreshKit() ? 1 : 0);
+  let drawn = Math.min(ranked.length, lbRows), drawable = ranked.length, rowsHtml;
+  if(ranked.length === 0) rowsHtml = `<tr><td colspan="${colSpan}" class="analysis-lb-empty">No stocks in the current RSI range.</td></tr>`;
+  else if(groupingOn()){ const g = groupedRowsHtml(groups, colOrder, colSpan); rowsHtml = g.html; drawn = g.drawn; drawable = g.drawable; }
+  else rowsHtml = ranked.slice(0, lbRows).map((s, i) => leaderboardRowHtml(s, i, colOrder)).join('');
+  if(lbBody) lbBody.innerHTML = rowsHtml;
   const moreEl = document.getElementById('analysisLeaderboardMore');
   if(moreEl){
-    moreEl.hidden = ranked.length <= lbRows;
-    moreEl.innerHTML = moreEl.hidden ? '' : `Showing the first ${lbRows} rows. <button type="button" class="analysis-reset-btn" data-lb-more="1">Show ${Math.min(LB_STEP, ranked.length - lbRows)} more</button>`;
+    moreEl.hidden = drawable <= drawn;
+    moreEl.innerHTML = moreEl.hidden ? '' : `Showing the first ${drawn} rows. <button type="button" class="analysis-reset-btn" data-lb-more="1">Show ${Math.min(LB_STEP, drawable - drawn)} more</button>`;
   }
-  setAnalysisShownIdx(ranked.map(s => stockIndex.get(s)));
+  paintGroupAllBtn();
+  // The refresh buttons work through the shown stocks in the order they are listed, so a grouped list is handed over group by group.
+  setAnalysisShownIdx((groupingOn() ? groups.flatMap(g => g.members) : ranked).map(s => stockIndex.get(s)));
   updateAnalysisRefresh();
 }
 
@@ -112,7 +168,10 @@ function renderLeaderboardRows(filtered){
 // changes); `openStock(idx)` opens the stock's detail page; `hideTooltip` closes the chart tooltip.
 function wireLeaderboard({ update, rerender, openStock, hideTooltip }){
   // Delegated: the table body persists across redraws, so one listener replaces rebinding every row and pin button.
+  const toggleGroup = (name) => { if(collapsedGroups.has(name)) collapsedGroups.delete(name); else collapsedGroups.add(name); update(); };
   document.getElementById('analysisLeaderboardBody').addEventListener('click', (evt) => {
+    const groupRow = closestEl(evt, '.analysis-lb-group');
+    if(groupRow){ toggleGroup(groupRow.dataset.group); return; }
     const pinBtn = closestEl(evt, '.pin-btn');
     if(pinBtn){
       evt.stopPropagation();
@@ -126,8 +185,34 @@ function wireLeaderboard({ update, rerender, openStock, hideTooltip }){
     openStock(Number(row.dataset.idx));
   });
 
+  const bodyEl = document.getElementById('analysisLeaderboardBody');
+  if(bodyEl) bodyEl.addEventListener('keydown', (evt) => {   // a group line is a button: Enter or Space folds it
+    if(evt.key !== 'Enter' && evt.key !== ' ') return;
+    const groupRow = closestEl(evt, '.analysis-lb-group');
+    if(groupRow){ evt.preventDefault(); toggleGroup(groupRow.dataset.group); }
+  });
+
   const moreEl = document.getElementById('analysisLeaderboardMore');
   if(moreEl) moreEl.addEventListener('click', (evt) => { if(closestEl(evt, '[data-lb-more]')){ lbRows += LB_STEP; update(); } });
+
+  // "Group by" changes the table's shape (the button beside it appears or goes), so it redraws the whole section; every group starts open.
+  const groupSelect = /** @type {HTMLInputElement} */ (document.getElementById('analysisGroupSelect'));
+  if(groupSelect){
+    groupSelect.addEventListener('change', () => {
+      analysisFilters.groupBy = ANALYSIS_GROUP_KEYS.has(groupSelect.value) ? groupSelect.value : 'none';
+      saveAnalysisFilters(analysisFilters);
+      collapsedGroups.clear();
+      rerender();
+    });
+  }
+  const groupAllBtn = document.getElementById('analysisGroupAllBtn');
+  if(groupAllBtn){
+    groupAllBtn.addEventListener('click', () => {
+      if(groupAllBtn.dataset.groupAll === 'expand') collapsedGroups.clear();
+      else drawnGroups.forEach(g => collapsedGroups.add(g.name));
+      update();
+    });
+  }
 
   // "Sort by" only reorders the rows, so it needs update(), not a full render.
   const sortSelect = /** @type {HTMLInputElement} */ (document.getElementById('analysisSortSelect'));
