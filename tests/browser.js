@@ -316,9 +316,16 @@ async function layoutTests(browser){
       d = await startsAt(); ok(d.length > 0 && d.every(v => v < 1.5), `analysis: the headings stay lined up after a sort ${JSON.stringify(d.map(v => Math.round(v)))}`);
     }
     const setView = v => page.evaluate(v => { document.querySelector('[data-analysis-view="' + v + '"]').click(); }, v);
+    const toolbarTops = () => page.evaluate(() => ['#analysisFiltersToggle', '.analysis-view-bar', '#analysisLeaderboardCount, #analysisIndustryBody .biz-showing', '.analysis-actions button, #analysisIndustryBody .biz-actions button'].map(sel => { const e = [...document.querySelectorAll(sel)].find(x => x.getBoundingClientRect().width > 0); return e ? Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2) : null; }));
+    if(w >= 1000){ // v1.277: the Filters chip, View selector, count and grid buttons share one line, and the grid buttons are icons
+      const t = await toolbarTops();
+      ok(t.slice(0, 2).every(v => v !== null) && Math.max(...t.filter(v => v !== null)) - Math.min(...t.filter(v => v !== null)) <= 6, `${w}px analysis stocks view: the toolbar items share one line ${JSON.stringify(t)}`);
+      ok(await page.evaluate(() => [...document.querySelectorAll('.analysis-actions .analysis-icon-btn')].filter(b => !b.closest('.analysis-btn-label')).every(b => b.getBoundingClientRect().width <= 40 && !!b.title)), `${w}px analysis: the grid buttons are icon buttons with a tooltip`);
+    }
     for(const v of ['industry', 'group']){   // the industry views: the table fits the screen, nothing sticks out, and the view bar stays on top
       await setView(v); await page.waitForTimeout(600);
       ok((await page.evaluate(() => document.querySelectorAll('#analysisIndustryBody .biz-row').length)) > 0, `${w}px analysis ${v} view: industry rows are drawn`);
+      if(w >= 1000){ const t = await toolbarTops(); ok(t.every(x => x !== null) && Math.abs(t[0] - t[1]) <= 6 && Math.abs(t[2] - t[3]) <= 6, `${w}px analysis ${v} view: the Filters chip and View selector share a line, and the table's count and buttons share the next ${JSON.stringify(t)}`); }
       const og = await sticksOut(page); ok(!og.scrolls && og.out.length === 0, `${w}px analysis ${v} view: overflow ${og.out.join('; ')}`);
     }
     await setView('stocks'); await page.waitForTimeout(300);

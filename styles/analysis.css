@@ -118,10 +118,44 @@ a.stock-link:hover .analysis-lb-name{text-decoration:underline;}
 body.biz-full-open{overflow:hidden;}
 .filter-note{margin:8px 0 0;font-size:.74rem;line-height:1.4;color:var(--muted);}
 
-/* View: Stocks / Industry / Industry Group, above whatever the view draws. The industry views reuse Explorer's table (see business/panel.js). */
-.analysis-view-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;}
-.analysis-view-bar .analysis-filter-label{margin:0;font-weight:600;}
+/* The Analysis toolbar: one row with the Filters chip, the View selector (Stocks / Industry / Industry Group), the count and the grid buttons.
+   The filter panel is docked into it (filterpanel.js) and takes no box of its own: its chip is a toolbar item and its filter groups wrap onto the next line.
+   The industry views reuse Explorer's table (see business/panel.js). */
+/* The filters no longer have a column of their own, so the page is always one column wide (the empty host keeps no room). */
+#section-analysis .analysis-layout{grid-template-columns:minmax(0,1fr);gap:0;}
+#analysisGlobalFilters:empty{display:none;}
+.analysis-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;margin:0 0 12px;}
+.analysis-leaderboard-head.analysis-toolbar{margin:0 0 8px;}
+.analysis-toolbar > .analysis-filters-panel{display:contents;}
+.analysis-toolbar .filter-groups{order:50;flex:1 1 100%;min-width:0;}
+.analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle{width:auto;max-width:min(100%,300px);flex:0 1 auto;height:36px;box-sizing:border-box;padding:0 12px;margin:0;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;cursor:pointer;}
+.analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle:hover{border-color:var(--accent);}
+.analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle .ft-summary{flex:0 1 auto;max-width:200px;}
+.analysis-view-bar{display:flex;align-items:center;flex:0 0 auto;margin:0;}
+.analysis-toolbar .rk-headline{min-width:0;}
+.analysis-toolbar .biz-showing{white-space:nowrap;}
+.analysis-actions{display:flex;align-items:center;gap:8px;margin-left:auto;}
+/* The grid buttons are icons (their name is the tooltip); the text label only shows when the buttons sit in the phone filter sheet. */
+.analysis-icon-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:36px;height:36px;box-sizing:border-box;padding:0;flex:0 0 auto;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);cursor:pointer;}
+.analysis-icon-btn:hover,.analysis-icon-btn[aria-pressed="true"],.analysis-icon-btn[aria-expanded="true"]{border-color:var(--accent);color:var(--accent);}
+.analysis-btn-label{display:none;}
+.sheet-slot .analysis-icon-btn{width:auto;padding:0 12px;font-size:.78rem;}
+.sheet-slot .analysis-btn-label{display:inline;}
+.analysis-leaderboard.lb-full :is(.analysis-view-bar,.analysis-filters-panel){display:none;}
+@media (max-width:900px){
+  .analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle{flex:1 1 100%;max-width:none;}
+  .analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle .ft-summary{flex:1;max-width:none;}
+}
 .biz-embedded{display:block;}
+/* Wide screens: the table's controls (Table / Heat map, period), its count and its buttons share one line; the grid below takes the full width. */
+@media (min-width:901px){
+  .biz-embedded{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;}
+  .biz-embedded > .biz-main:not(.biz-full),.biz-embedded > .biz-main:not(.biz-full) > .biz-toolbar{display:contents;}
+  .biz-embedded > .biz-main:not(.biz-full) > :not(.biz-toolbar){flex:1 1 100%;min-width:0;}
+  #analysisIndustryBody .biz-embedded > .biz-controls{margin:0;}
+  .biz-embedded .biz-toolbar .biz-actions{margin-left:auto;}
+  .biz-embedded > .biz-main:not(.biz-full) > .biz-scroll{margin-top:2px;}
+}
 .biz-embedded > .biz-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;}
 /* Column headers that sort: the label is a button (with an arrow on the sorted column); it looks like the plain header. */
 .th-sort{display:inline-flex;align-items:center;gap:0;padding:0;margin:0;border:0;background:transparent;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;text-align:inherit;white-space:inherit;cursor:pointer;}

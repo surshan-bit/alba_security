@@ -72,9 +72,11 @@ function chartHtml(geo){
 // View: the stocks one by one, or one row per Industry / Industry Group (the industry table Explorer has, drawn here from the stocks the filters let through).
 function viewBarHtml(){
   const cur = analysisFilters.view;
-  return `<div class="analysis-view-bar"><span class="analysis-filter-label">View:</span><div class="tl-view-toggle" role="group" aria-label="View">${ANALYSIS_VIEW_OPTIONS.map(o => `<button type="button" class="tl-view-btn${cur === o.value ? ' active' : ''}" data-analysis-view="${o.value}" aria-pressed="${cur === o.value}">${escapeHtml(o.label)}</button>`).join('')}</div></div>`;
+  return `<div class="analysis-view-bar"><div class="tl-view-toggle" role="group" aria-label="View">${ANALYSIS_VIEW_OPTIONS.map(o => `<button type="button" class="tl-view-btn${cur === o.value ? ' active' : ''}" data-analysis-view="${o.value}" aria-pressed="${cur === o.value}">${escapeHtml(o.label)}</button>`).join('')}</div></div>`;
 }
+const toolbarOnlyHtml = () => `<div class="analysis-toolbar">${viewBarHtml()}</div>`;
 function wireViewBar(body){
+  renderAnalysisFilterPanel(renderAnalysisSection);   // drawn once the toolbar exists: the panel docks into it (and the body redraw above removed the old one)
   const bar = body.querySelector('.analysis-view-bar');
   if(bar) bar.addEventListener('click', (e) => {
     const b = closestEl(e, '[data-analysis-view]'), v = (b && b.dataset.analysisView) || '';
@@ -86,7 +88,7 @@ function wireViewBar(body){
 }
 // The industry views: the table's code loads the first time one is opened.
 function drawIndustryView(body){
-  body.innerHTML = viewBarHtml() + '<div id="analysisIndustryBody" class="analysis-industry"><p class="upload-hint">Loading…</p></div>';
+  body.innerHTML = toolbarOnlyHtml() + '<div id="analysisIndustryBody" class="analysis-industry"><p class="upload-hint">Loading…</p></div>';
   wireViewBar(body);
   const el = document.getElementById('analysisIndustryBody');
   if(!el) return;
@@ -106,7 +108,9 @@ function wireChartToggle(){
   if(!btn || !box) return;
   const apply = (hidden) => {
     box.classList.toggle('chart-hidden', hidden);
-    btn.textContent = hidden ? 'Show chart' : 'Hide chart';
+    const label = hidden ? 'Show chart' : 'Hide chart';
+    btn.title = label; btn.setAttribute('aria-label', label);
+    const text = btn.querySelector('.analysis-btn-label'); if(text) text.textContent = label;
     btn.setAttribute('aria-expanded', String(!hidden));
   };
   apply(chartHiddenSaved());
@@ -129,11 +133,9 @@ function drawAnalysisSection(){
   const bucket = analysisBucket();
   const plottable = bucket.filter(hasBothRsi);
 
-  renderAnalysisFilterPanel(renderAnalysisSection);
-
   if(analysisFilters.view !== 'stocks'){ drawIndustryView(body); return; }
   if(bucket.length === 0){
-    body.innerHTML = viewBarHtml() + `<p class="analysis-panel-sub">No stocks match the current filters, so there's nothing to plot.</p>`;
+    body.innerHTML = toolbarOnlyHtml() + `<p class="analysis-panel-sub">No stocks match the current filters, so there's nothing to plot.</p>`;
     wireViewBar(body);
     return;
   }
@@ -142,11 +144,10 @@ function drawAnalysisSection(){
 
   // The RSI Quadrant (its sliders, axis choices and the scatter plot) sits inside the leaderboard, opened by its "Show chart" button.
   body.innerHTML = `
-    ${viewBarHtml()}
     ${leaderboardHtml(`<div class="analysis-chart-block">
       ${analysisControlsHtml(geo.mosBoundLo, geo.mosBoundHi)}
       ${chartHtml(geo)}
-    </div>`)}
+    </div>`, viewBarHtml())}
     ${TOOLTIP_HTML}
   `;
 
