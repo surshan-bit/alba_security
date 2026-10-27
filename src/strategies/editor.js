@@ -68,7 +68,7 @@ function rulesEditorHtml(strategy){
     ? `<div class="sr-undo" role="status"><span>Removed &ldquo;${escapeHtml(ruleReady(undo.rule) ? describeRule(undo.rule) : (FIELD_BY_ID.get(undo.rule.field)?.label || 'rule'))}&rdquo;</span><button type="button" class="sr-undo-btn">Undo</button></div>` : '';
   const head = strategy.rules.length ? '<div class="sr-head" aria-hidden="true"><span>Field</span><span>Condition</span><span>Value</span><span title="Stocks that pass this rule on its own">Passing</span><span>Order</span><span></span></div>' : '';
   return `${head}<div class="sr-rules">${rows}</div>
-    <div class="sr-foot"><select class="sr-add" aria-label="Add a rule"><option value="">+ Add a rule&hellip;</option>${fieldOptions('')}</select><span class="sr-total">${total}</span></div>${undoLine}`;
+    <div class="sr-foot"><select class="sr-add" aria-label="Add a rule"><option value="">Add a rule</option>${fieldOptions('')}</select><span class="sr-total">${total}</span></div>${undoLine}`;
 }
 
 // One set of listeners on the section, using whichever strategy is selected at the time.
