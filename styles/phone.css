@@ -85,12 +85,6 @@ html{font-size:112.5%;}
 .strat-total .strat-sort{font-size:.78rem;flex:1 1 0;min-width:0;justify-content:flex-end;}
 .strat-total .strat-sort select{flex:1 1 0;min-width:0;font-size:.82rem;max-width:100%;}
 /* Strategies: the list of strategies becomes one scrolling row of chips and the editor header shrinks, so the rules and results are what you see. */
-#stratList{display:flex;flex-direction:row;flex-wrap:nowrap;gap:var(--ph-space);overflow-x:auto;padding:4px 0 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
-#stratList::-webkit-scrollbar{display:none;}
-#stratList .strat-card{flex:0 0 auto;width:auto;gap:8px;padding:8px 12px;font-size:.82rem;white-space:nowrap;border:1px solid var(--line);}
-#stratList .strat-card.active{border-color:var(--muted);}
-#stratList .strat-card-n{padding:0 7px;font-size:.7rem;}
-#stratList .strat-new,#stratList .strat-restore{flex:0 0 auto;padding:8px 12px;font-size:.76rem;white-space:nowrap;}
 .strat-layout{gap:10px;}
 .strat-name{padding:8px 10px;font-size:.95rem;min-width:0;flex:1 1 100%;}
 .strat-head{margin-bottom:10px;gap:8px;}

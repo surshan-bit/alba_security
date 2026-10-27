@@ -30,7 +30,7 @@
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea):focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent);}
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(input,select,textarea)::placeholder{color:#4a515b;opacity:1;}
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .search-suggest{box-shadow:0 10px 28px rgba(25,55,100,.18);}
-:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.sg-item.active,.sg-item:hover,.filter-btn:hover,.filter-btn.active,.strat-card:hover,.strat-card.active){background:color-mix(in srgb,var(--accent) 8%,var(--panel));}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.sg-item.active,.sg-item:hover,.filter-btn:hover,.filter-btn.active){background:color-mix(in srgb,var(--accent) 8%,var(--panel));}
 /* Segmented switches (theme, Cards / Table, Weekly / Monthly): the selected side is the purple pill with white text. */
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.theme-toggle,.tl-view-toggle,.analysis-color-toggle-btns){background:#e3edf8;border-color:#c3d3e6;}
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(.theme-toggle-btn,.tl-view-btn,.analysis-color-btn){color:#4b515a;}

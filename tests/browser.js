@@ -426,6 +426,16 @@ async function rowCapTests(browser){
   ok(await rows('#stratResults .strat-row') === 300, 'row cap: Strategies draws 300 rows first');
   await page.locator('[data-strat-more]').click(); await page.waitForTimeout(300);
   ok(await rows('#stratResults .strat-row') === 600, 'row cap: Show more adds 300 Strategies rows');
+  { // v1.283: the strategies are one Strategy drop-down (current ticked, New and Restore at the bottom); the setup uses the full width
+    await page.locator('#stratList .dm-btn').click();
+    ok(await page.locator('#stratList [data-strat-pick]').count() >= 3 && await page.locator('#stratList [data-strat-pick].current').count() === 1, 'strategy menu: lists the strategies and ticks the current one');
+    ok(await page.locator('#stratList #stratNew').isVisible() && await page.locator('#stratList #stratRestore').isVisible(), 'strategy menu: New strategy and Restore starters are in the list');
+    const w = await page.evaluate(() => ({ main: document.getElementById('stratMain').getBoundingClientRect().width, sec: document.getElementById('section-strategies').getBoundingClientRect().width, h: document.querySelector('#stratList .dm-btn').getBoundingClientRect().height }));
+    ok(w.main > w.sec * 0.85 && w.h === 36, 'strategy menu: full-width layout and a 36px button');
+    await page.locator('#stratList [data-strat-pick]').nth(1).click(); await page.waitForTimeout(200);
+    ok(await page.locator('#stratList .dm-pop').isHidden(), 'strategy menu: picking a strategy closes the menu');
+    await page.locator('#stratList .dm-btn').click(); await page.locator('#stratList [data-strat-pick]').last().click(); await page.waitForTimeout(200);   // back to the new strategy for the checks below
+  }
   { // v1.282: the rules are a table: column headings, a clear Remove button, a total of the stocks that pass all rules, and Undo
     await page.evaluate(() => { const d = document.querySelector('#stratMain details'); if(d) d.open = true; });
     await page.selectOption('.sr-add', 'score'); await page.waitForTimeout(150);
