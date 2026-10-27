@@ -1,7 +1,7 @@
 // The Analysis leaderboard table: ranking, header and rows, and its click handling.
 import { stockIndex, stocks } from '../core/stocks.js';
 import { isPinned, togglePin } from '../core/pins.js';
-import { escapeHtml, pctChangeSpan } from '../core/util.js';
+import { escapeHtml } from '../core/util.js';
 import { ANALYSIS_GROUP_KEYS, ANALYSIS_GROUP_OPTIONS, ANALYSIS_SORT_KEYS, ANALYSIS_SORT_OPTIONS, getAnalysisColumnsPanelOpen, setAnalysisColumnsPanelOpen, analysisFilters, analysisPersistUi, setAnalysisShownIdx, analysisSortComparator, saveAnalysisFilters } from './state.js';
 import { groupRanked } from './grouping.js';
 import { analysisTakeBatch, defineAnalysisScope, updateAnalysisRefresh } from './selectbar.js';
@@ -104,13 +104,10 @@ function leaderboardRowHtml(s, i, colOrder){
           `;
 }
 
-// One line above each group's stocks: its name, how many stocks it has, their average weekly and monthly change and how many are up or down this week.
+// One line above each group's stocks: just its name (click it to fold or open the group).
 function groupHeaderHtml(g, colSpan){
   const folded = collapsedGroups.has(g.name);
-  const avg = (label, v, tip) => `<span class="lbg-stat"${tip ? ` title="${tip}"` : ''}>${label} ${v === null ? '–' : pctChangeSpan(v)}</span>`;
-  const medianTip = g.medianW === null ? '' : `Average weekly change of these stocks. Median: ${g.medianW > 0 ? '+' : ''}${g.medianW.toFixed(2)}%`;
-  const breadth = g.up + g.down ? `<span class="lbg-stat" title="Stocks up and down this week">${g.up}&uarr; ${g.down}&darr;</span>` : '';
-  return `<tr class="analysis-lb-group${folded ? ' folded' : ''}" data-group="${escapeHtml(g.name)}" tabindex="0" role="button" aria-expanded="${!folded}"><td colspan="${colSpan}"><div class="lbg-inner"><span class="lbg-caret" aria-hidden="true">${folded ? '&#9656;' : '&#9662;'}</span><span class="lbg-name">${escapeHtml(g.name)}</span><span class="lbg-count">${g.members.length} stock${g.members.length === 1 ? '' : 's'}</span>${avg('W avg', g.meanW, medianTip)}${avg('M avg', g.meanM)}${breadth}</div></td></tr>`;
+  return `<tr class="analysis-lb-group${folded ? ' folded' : ''}" data-group="${escapeHtml(g.name)}" tabindex="0" role="button" aria-expanded="${!folded}"><td colspan="${colSpan}"><div class="lbg-inner"><span class="lbg-caret" aria-hidden="true">${folded ? '&#9656;' : '&#9662;'}</span><span class="lbg-name">${escapeHtml(g.name)}</span></div></td></tr>`;
 }
 
 // The rows of a grouped leaderboard. Folded groups show only their line; the rows drawn stop at the "Show more" limit like the flat table.
