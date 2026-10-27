@@ -35,7 +35,8 @@ function syncSheets(){ SHEETS.forEach(([p, a]) => syncSheet(p, a)); }
 
 function closeSheet(from){
   const host = from.closest('.biz-side, .analysis-filters-panel, .strat-filters-panel');
-  const toggle = host && host.querySelector('.biz-filters-toggle, .filters-toggle');
+  // Analysis docks its Filters chip into the toolbar row, outside the panel that holds the sheet.
+  const toggle = (host && host.querySelector('.biz-filters-toggle, .filters-toggle')) || (host && host.classList.contains('analysis-filters-panel') ? document.getElementById('analysisFiltersToggle') : null);
   savedScroll = 0;
   if(toggle) /** @type {HTMLElement} */ (toggle).click();
 }

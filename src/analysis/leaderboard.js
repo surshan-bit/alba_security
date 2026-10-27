@@ -21,7 +21,11 @@ function paintFullscreen(){
   const box = document.querySelector('.analysis-leaderboard'), btn = document.getElementById('analysisFullscreenBtn');
   if(box) box.classList.toggle('lb-full', lbFull);
   document.body.classList.toggle('lb-full-open', lbFull);
-  if(btn){ btn.textContent = fullscreenLabel(lbFull); btn.setAttribute('aria-pressed', lbFull ? 'true' : 'false'); }
+  if(btn){
+    const label = fullscreenLabel(lbFull) + ' (Esc to leave)';
+    btn.innerHTML = iconBtnInner(lbFull ? 'shrink' : 'expand', fullscreenLabel(lbFull));
+    btn.title = label; btn.setAttribute('aria-label', label); btn.setAttribute('aria-pressed', lbFull ? 'true' : 'false');
+  }
 }
 function setLbFull(on){
   lbFull = !!on;
@@ -33,16 +37,28 @@ function init_leaderboard_fullscreen(){
 }
 
 // ---- markup ----
-// Count, the Columns, Show chart and Full screen buttons, the RSI Quadrant block (`chartBlock`, hidden until opened), the columns panel, the table shell and, below the table, the Live Data Refresh panel.
-function leaderboardHtml(chartBlock){
+// One toolbar row: the Filters chip (docked here by filterpanel.js), the View selector (`viewHtml`), the count, and the Columns, Chart and Full screen
+// icon buttons with Refresh. Below it: the RSI Quadrant block (`chartBlock`, hidden until opened), the columns panel, the table shell and the Live Data Refresh panel.
+const ICONS = {
+  columns: '<rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/>',
+  chart: '<polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/>',
+  expand: '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
+  shrink: '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>'
+};
+const iconSvg = (name) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+// The text label is hidden on a wide screen (the icon and its tooltip say it) and shown when the buttons sit in the phone filter sheet.
+const iconBtnInner = (name, text) => `${iconSvg(name)}<span class="analysis-btn-label">${text}</span>`;
+const iconBtn = (id, name, text, tip, state) => `<button type="button" class="analysis-icon-btn" id="${id}" title="${tip}" aria-label="${tip}"${state}>${iconBtnInner(name, text)}</button>`;
+function leaderboardHtml(chartBlock, viewHtml){
   const headerColOrder = analysisColumnOrder(), kit = getRefreshKit();
   return `<div class="analysis-leaderboard${lbFull ? ' lb-full' : ''}">
-      <div class="analysis-leaderboard-head" style="margin-top:0;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div class="analysis-leaderboard-head analysis-toolbar">
+        ${viewHtml}
         <div class="rk-headline"><p class="upload-hint biz-showing" style="margin:0"><span id="analysisLeaderboardCount"></span></p>${(defineAnalysisScope(), '')}</div>
-        <div class="analysis-actions" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button type="button" class="analysis-reset-btn" id="analysisColumnsBtn">Columns</button>
-          <button type="button" class="analysis-reset-btn" id="analysisChartToggle" aria-expanded="false">Show chart</button>
-          <button type="button" class="analysis-reset-btn" id="analysisFullscreenBtn" aria-pressed="${lbFull}" title="Show the leaderboard across the whole window (Esc to leave)">${fullscreenLabel(lbFull)}</button>
+        <div class="analysis-actions">
+          ${iconBtn('analysisColumnsBtn', 'columns', 'Columns', 'Columns: choose and reorder the grid columns', ` aria-pressed="${getAnalysisColumnsPanelOpen()}"`)}
+          ${iconBtn('analysisChartToggle', 'chart', 'Show chart', 'Show chart', ' aria-expanded="false"')}
+          ${iconBtn('analysisFullscreenBtn', lbFull ? 'shrink' : 'expand', fullscreenLabel(lbFull), fullscreenLabel(lbFull) + ' (Esc to leave)', ` aria-pressed="${lbFull}"`)}
           ${kit ? kit.barHtml('analysis') : ''}
         </div>
       </div>

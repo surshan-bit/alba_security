@@ -1,7 +1,7 @@
 // The Analysis filter panel: which stocks qualify (Fundamental Score, MoS Rating, Tech Rating W / M),
 // the count shown on each button, and the button wiring.
 // Two multiselect groups of buttons. It is drawn into
-// #analysisGlobalFilters, outside the chart body, so picking filters down to zero results never strands
+// #analysisGlobalFilters (then docked into the toolbar row, outside the chart body), so picking filters down to zero results never strands
 // the viewer with no way back.
 import { stocks } from '../core/stocks.js';
 import { mosRatingAny } from '../list/metrics.js';
@@ -217,6 +217,14 @@ function analysisFiltersHtml(){
   `;
 }
 
+// Docks the panel into the toolbar row, in front of the View selector, so the "Filters" chip and the View selector share one line. The panel
+// itself takes no box (stylesheet: display:contents): its chip becomes a toolbar item and its filter groups wrap onto the line below.
+// Without a toolbar (the section is not drawn yet) the panel stays in its own container.
+function dockFiltersPanel(){
+  const bar = document.querySelector('.analysis-toolbar'), panel = document.getElementById('analysisFilterPanel');
+  if(bar && panel && panel.parentElement !== bar) bar.prepend(panel);
+}
+
 // ---- wiring ----
 // [group id, data attribute, which analysisFilters list it edits]
 const GROUPS = [
@@ -234,6 +242,8 @@ function renderAnalysisFilterPanel(rerender){
     ensureAllPriceBars().then(ok => { if(ok) rerender(); else barsAsked = false; });
   }
   const host = document.getElementById('analysisGlobalFilters');
+  const old = document.getElementById('analysisFilterPanel');
+  if(old) old.remove();   // the panel docked in the toolbar is the one being replaced
   if(host) host.innerHTML = analysisFiltersHtml();
   const panel = document.getElementById('analysisFilterPanel'), toggle = document.getElementById('analysisFiltersToggle'), summary = document.getElementById('analysisFiltersSummary');
   if(panel && toggle && summary){
@@ -247,6 +257,7 @@ function renderAnalysisFilterPanel(rerender){
       rememberFiltersOpen('aFiltersOpen', analysisFiltersOpen);
     });
   }
+  dockFiltersPanel();
   document.querySelectorAll('#analysisStrategyFilter .filter-btn').forEach(btn => btn.addEventListener('click', () => {
     const id = /** @type {HTMLElement} */ (btn).dataset.astrat === 'all' ? '' : /** @type {HTMLElement} */ (btn).dataset.astrat;
     analysisFilters.strategyId = (id && id === analysisFilters.strategyId) ? '' : id;   // clicking the chosen one again goes back to All
