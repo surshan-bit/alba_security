@@ -303,7 +303,7 @@ async function layoutTests(browser){
       }
       const o = await sticksOut(page); ok(!o.scrolls && o.out.length === 0, `${w}px ${sec}: overflow ${o.out.join('; ')}`);
     }
-    // Analysis grouped by industry: the group lines fit the screen and nothing sticks out
+    // Analysis: the Stocks table's headings line up, and the industry views fit the screen
     await goto(page, 'analysis'); await page.waitForTimeout(300);
     { // v1.275: each heading starts where its column's text starts, sorted or not (the sort arrow follows the name and never pushes it)
       const startsAt = () => page.evaluate(() => {
@@ -315,11 +315,13 @@ async function layoutTests(browser){
       await page.locator('.analysis-leaderboard thead [data-sort-col]:visible').nth(2).click(); await page.waitForTimeout(250);
       d = await startsAt(); ok(d.length > 0 && d.every(v => v < 1.5), `analysis: the headings stay lined up after a sort ${JSON.stringify(d.map(v => Math.round(v)))}`);
     }
-    const setGroup = v => page.evaluate(v => { const g = document.getElementById('analysisGroupSelect'); g.value = v; g.dispatchEvent(new Event('change', { bubbles: true })); }, v);
-    await setGroup('industry'); await page.waitForTimeout(400);
-    ok((await page.evaluate(() => document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-group').length)) > 0, `${w}px analysis grouped: group lines are drawn`);
-    { const og = await sticksOut(page); ok(!og.scrolls && og.out.length === 0, `${w}px analysis grouped: overflow ${og.out.join('; ')}`); }
-    await setGroup('none'); await page.waitForTimeout(300);
+    const setView = v => page.evaluate(v => { document.querySelector('[data-analysis-view="' + v + '"]').click(); }, v);
+    for(const v of ['industry', 'group']){   // the industry views: the table fits the screen, nothing sticks out, and the view bar stays on top
+      await setView(v); await page.waitForTimeout(600);
+      ok((await page.evaluate(() => document.querySelectorAll('#analysisIndustryBody .biz-row').length)) > 0, `${w}px analysis ${v} view: industry rows are drawn`);
+      const og = await sticksOut(page); ok(!og.scrolls && og.out.length === 0, `${w}px analysis ${v} view: overflow ${og.out.join('; ')}`);
+    }
+    await setView('stocks'); await page.waitForTimeout(300);
     // a stock's page
     await goto(page, 'analysis'); await page.waitForTimeout(400);
     await page.fill('#globalSearch', FIXTURE[0].name); await page.waitForTimeout(250); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(500);
@@ -376,17 +378,12 @@ async function rowCapTests(browser){
   const total = await page.evaluate(() => (document.getElementById('analysisLeaderboardCount').textContent.match(/Showing (\d+)/) || [])[1]);
   ok(Number(total) > 300, 'row cap: the test list should put more than 300 stocks in the Analysis range, got ' + total);
   ok(await rows('#analysisLeaderboardBody tr') === 300, 'row cap: Analysis draws 300 rows first');
-  { // grouped by industry: the cap counts stocks, not group lines; folding every group leaves only the lines; then back to a flat list
-    const grouped = v => page.evaluate(v => { const g = document.getElementById('analysisGroupSelect'); g.value = v; g.dispatchEvent(new Event('change', { bubbles: true })); }, v);
-    await grouped('industry'); await page.waitForTimeout(600);
-    ok(await rows('#analysisLeaderboardBody .analysis-lb-row') === 300 && await rows('#analysisLeaderboardBody .analysis-lb-group') > 1, 'row cap: grouped, Analysis still draws 300 stocks first (group lines are not counted)');
-    ok(await rows('[data-lb-more]') === 1, 'row cap: grouped, Show more is offered');
-    await page.evaluate(() => document.getElementById('analysisGroupAllBtn').click()); await page.waitForTimeout(300);
-    ok(await rows('#analysisLeaderboardBody .analysis-lb-row') === 0 && await rows('#analysisLeaderboardBody .analysis-lb-group') > 1 && (await page.locator('#analysisGroupAllBtn').innerText()) === 'Expand all', 'row cap: Collapse all leaves only the group lines');
-    await page.evaluate(() => document.getElementById('analysisGroupAllBtn').click()); await page.waitForTimeout(300);
-    ok(await rows('#analysisLeaderboardBody .analysis-lb-row') === 300, 'row cap: Expand all brings the rows back');
-    await grouped('none'); await page.waitForTimeout(600);
-    ok(await rows('#analysisLeaderboardBody tr') === 300 && await rows('#analysisLeaderboardBody .analysis-lb-group') === 0, 'row cap: Group by None returns to the flat list');
+  { // the industry view lists industries, not stocks (no 300-row cap on stocks); back to Stocks the flat list is drawn again
+    const setView = v => page.evaluate(v => { document.querySelector('[data-analysis-view="' + v + '"]').click(); }, v);
+    await setView('industry'); await page.waitForTimeout(800);
+    ok(await rows('#analysisLeaderboardBody tr') === 0 && await rows('#analysisIndustryBody .biz-row') > 1, 'row cap: the Industry view shows industry rows instead of the stock table');
+    await setView('stocks'); await page.waitForTimeout(600);
+    ok(await rows('#analysisLeaderboardBody tr') === 300 && await rows('#analysisIndustryBody') === 0, 'row cap: View Stocks returns to the flat list');
   }
   await page.locator('[data-lb-more]').click(); await page.waitForTimeout(300);
   ok(await rows('#analysisLeaderboardBody tr') === Math.min(600, Number(total)), 'row cap: Show more adds 300 Analysis rows');

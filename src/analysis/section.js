@@ -14,7 +14,9 @@
 import { stockIndex } from '../core/stocks.js';
 import { isPinned } from '../core/pins.js';
 import { mosPct } from '../list/metrics.js';
-import { analysisFilters } from './state.js';
+import { ANALYSIS_VIEW_KEYS, ANALYSIS_VIEW_OPTIONS, analysisFilters, saveAnalysisFilters } from './state.js';
+import { escapeHtml } from '../core/util.js';
+import { closestEl } from '../core/evt.js';
 import { appSections } from '../ui/navigation.js';
 import { openStockInline } from '../ui/inlinedetail.js';
 import { analysisBucket, renderAnalysisFilterPanel } from './filterpanel.js';
@@ -67,6 +69,35 @@ function chartHtml(geo){
     </div>`;
 }
 
+// View: the stocks one by one, or one row per Industry / Industry Group (the industry table Explorer has, drawn here from the stocks the filters let through).
+function viewBarHtml(){
+  const cur = analysisFilters.view;
+  return `<div class="analysis-view-bar"><span class="analysis-filter-label">View:</span><div class="tl-view-toggle" role="group" aria-label="View">${ANALYSIS_VIEW_OPTIONS.map(o => `<button type="button" class="tl-view-btn${cur === o.value ? ' active' : ''}" data-analysis-view="${o.value}" aria-pressed="${cur === o.value}">${escapeHtml(o.label)}</button>`).join('')}</div></div>`;
+}
+function wireViewBar(body){
+  const bar = body.querySelector('.analysis-view-bar');
+  if(bar) bar.addEventListener('click', (e) => {
+    const b = closestEl(e, '[data-analysis-view]'), v = (b && b.dataset.analysisView) || '';
+    if(!b || !ANALYSIS_VIEW_KEYS.has(v) || v === analysisFilters.view) return;
+    analysisFilters.view = v;
+    saveAnalysisFilters(analysisFilters);
+    renderAnalysisSection();
+  });
+}
+// The industry views: the table's code loads the first time one is opened.
+function drawIndustryView(body){
+  body.innerHTML = viewBarHtml() + '<div id="analysisIndustryBody" class="analysis-industry"><p class="upload-hint">Loading…</p></div>';
+  wireViewBar(body);
+  const el = document.getElementById('analysisIndustryBody');
+  if(!el) return;
+  import('../business/panel.js').then((m) => {
+    if(!el.isConnected || analysisFilters.view === 'stocks') return;
+    m.showIn({ el, by: analysisFilters.view === 'group' ? 'group' : 'industry', section: appSections.analysis, label: 'Analysis', stocksNow: () => new Set(stocksInRange(analysisBucket())) });
+    syncSheets();
+  }).catch((e) => { el.innerHTML = '<p class="upload-hint">Could not load this view. Please try again.</p>'; console.error('Could not load the industry view', e); });
+  syncSheets();
+}
+
 // Hide / show the RSI Quadrant with its sliders (remembered on this device; hidden until first opened). The leaderboard stays.
 const CHART_HIDDEN_KEY = 'albaAnalysisChartHidden';
 function chartHiddenSaved(){ try { return localStorage.getItem(CHART_HIDDEN_KEY) !== '0'; } catch(e){ return true; } }
@@ -100,8 +131,10 @@ function drawAnalysisSection(){
 
   renderAnalysisFilterPanel(renderAnalysisSection);
 
+  if(analysisFilters.view !== 'stocks'){ drawIndustryView(body); return; }
   if(bucket.length === 0){
-    body.innerHTML = `<p class="analysis-panel-sub">No stocks match the current filters, so there's nothing to plot.</p>`;
+    body.innerHTML = viewBarHtml() + `<p class="analysis-panel-sub">No stocks match the current filters, so there's nothing to plot.</p>`;
+    wireViewBar(body);
     return;
   }
 
@@ -109,6 +142,7 @@ function drawAnalysisSection(){
 
   // The RSI Quadrant (its sliders, axis choices and the scatter plot) sits inside the leaderboard, opened by its "Show chart" button.
   body.innerHTML = `
+    ${viewBarHtml()}
     ${leaderboardHtml(`<div class="analysis-chart-block">
       ${analysisControlsHtml(geo.mosBoundLo, geo.mosBoundHi)}
       ${chartHtml(geo)}
@@ -132,6 +166,7 @@ function drawAnalysisSection(){
     updateRaf = requestAnimationFrame(() => { updateRaf = null; updateAnalysisChart(); });
   }
 
+  wireViewBar(body);
   wireChartToggle();
   const tooltip = createAnalysisTooltip();
   wireDotEvents(document.getElementById('analysisDots'), tooltip, openStockFromAnalysis);

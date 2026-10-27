@@ -27,19 +27,23 @@ let bizFiltersOpen = filtersOpenSaved('bFiltersOpen');   // the view, period, gr
 let drawnRows = [], drawnCols = 6;   // what the table on the page was last drawn from, so a row can open or close without a redraw
 let period = '1M', by = 'industry', view = 'table', heatSize = 'chg', strategyId = '', showMatched = false, rebound = false, loadState = 'idle';   // loadState: 'idle' | 'loading' | 'failed' (price bars for long periods)
 const open = new Set();                                    // industries whose detail is open
+// Shown inside Analysis (View: Industry / Industry Group) instead of on its own page: { el, by, set, on, section, label } or null. The industries then follow the Analysis filters (`set` = the stocks that pass them, `on` = whether they narrow the list).
+let embed = null;
+const curBy = () => embed ? embed.by : by;
 try { const v = JSON.parse(localStorage.getItem(KEY) || '{}'); if(PERIODS.some(p => p.key === v.period)) period = v.period; if(v.by === 'group') by = 'group'; if(v.view === 'heat') view = 'heat'; if(v.heatSize === 'count') heatSize = 'count'; if(typeof v.strategy === 'string') strategyId = v.strategy; if(v.matched === true) showMatched = true; if(v.rebound === true) rebound = true; } catch(e){ /* storage unavailable: defaults */ }
 // Saved to this person's preferences (and mirrored in the browser).
 const save = () => { prefSet(KEY, JSON.stringify({ period, by, view, heatSize, strategy: strategyId, matched: showMatched, rebound })); };
 
 const barsFor = (s) => { const d = priceHistoryByTicker[pcTickerKey(s)]; return d ? d['1W'] : undefined; };
 const pct = (v) => v === null ? '<span class="biz-na">n/a</span>' : '<span class="' + (v > 0 ? 'chg-up' : v < 0 ? 'chg-down' : '') + '">' + (v > 0 ? '+' : '') + v.toFixed(2) + '%</span>';
-const bodyEl = () => document.getElementById('businessBody');
+const bodyEl = () => embed ? embed.el : document.getElementById('businessBody');
 
 // The stocks that qualify for the strategy chosen here (none chosen: no highlighting, no extra columns).
 const chosenStrategy = () => validStrategyId(strategyId);
 // "Strategy" below also covers the Rebound button (down last week, up this week): the stocks that pass whichever of the two are on.
-const strategyOn = () => !!chosenStrategy() || rebound;
+const strategyOn = () => embed ? embed.on : !!chosenStrategy() || rebound;
 const matchSet = () => {
+  if(embed) return embed.set;
   const set = chosenStrategy() ? strategyStockSet(chosenStrategy()) || new Set() : new Set(stocks);
   return rebound ? new Set(Array.from(set).filter(isRebound)) : set;
 };
@@ -55,7 +59,7 @@ const INDUSTRY_SORT = {
 let tableSort = { col: 'mean', dir: 'desc' };   // the industries table
 let detailSort = { col: 'periodChg', dir: 'desc' };   // the stocks inside an opened industry: best change first to begin with
 function visibleRows(){
-  const rows = industryTable(stocks, { by, period, barsFor, matchSet: strategyOn() ? matchSet() : null });
+  const rows = industryTable(stocks, { by: curBy(), period, barsFor, matchSet: strategyOn() ? matchSet() : null });
   const shown = matchedOnly() ? rows.filter(r => r.matches > 0) : rows;
   return view === 'table' ? shown.slice().sort(compareBy(INDUSTRY_SORT[tableSort.col], tableSort.dir)) : shown;
 }
@@ -98,7 +102,7 @@ function newsRefreshBtn(members, matched, key){
 function runNews(spec){
   const [key, mode] = spec.split('|'), matched = matchSet();
   let all, label;
-  const row = industryTable(stocks, { by, period, barsFor, matchSet: strategyOn() ? matched : null }).find(x => x.name === key);
+  const row = industryTable(stocks, { by: curBy(), period, barsFor, matchSet: strategyOn() ? matched : null }).find(x => x.name === key);
   if(!row) return;
   all = row.items.map(x => x.stock); label = key;
   let members = all;
@@ -128,10 +132,12 @@ function detailHtml(r, cols){
     return '<tr class="strat-row' + (x.match ? ' biz-match' : '') + '" data-idx="' + idx + '" tabindex="0">' + colIds.map(id => analysisLbCell(id, ctx)).join('') + '<td class="num">' + pct(x.change) + '</td></tr>';
   }).join('');
   const grid = '<div class="strat-table-wrap" style="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + colIds.map(id => columnHeaderHtml(id, detailSort)).join('') + sortHeaderHtml('periodChg', p.key + ' chg', detailSort, ' class="num"') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-  return '<tr class="biz-detail"><td colspan="' + cols + '"><div class="biz-detail-box"><div class="biz-stocks-head"><h3>Stocks</h3>' + (strategyOn() ? '<span class="upload-hint">' + r.matches + ' of ' + r.count + ' match the strategy</span>' : '') + kit.barHtml('biz:' + r.name) + '</div>' + grid + '<div class="biz-stocks-head biz-news-bar"><h3 class="biz-news-head"><button type="button" class="biz-news-toggle" data-biz-newstoggle="' + escapeHtml(r.name) + '" aria-expanded="' + newsOpen.has(r.name) + '">' + (newsOpen.has(r.name) ? '▾' : '▸') + ' News' + (r.news.length ? ' (' + r.news.length + ')' : '') + '</button></h3>' + (newsOpen.has(r.name) ? newsRefreshBtn(r.items.map(x => x.stock), r.items.filter(x => x.match).map(x => x.stock), r.name) : '') + newsStatusFor(r.name) + '</div>' + (newsOpen.has(r.name) ? newsHtml(r) : '') + '</div></td></tr>';
+  return '<tr class="biz-detail"><td colspan="' + cols + '"><div class="biz-detail-box"><div class="biz-stocks-head"><h3>Stocks</h3>' + (strategyOn() ? '<span class="upload-hint">' + r.matches + ' of ' + r.count + ' match the ' + (embed ? 'filters' : 'strategy') + '</span>' : '') + kit.barHtml('biz:' + r.name) + '</div>' + grid + '<div class="biz-stocks-head biz-news-bar"><h3 class="biz-news-head"><button type="button" class="biz-news-toggle" data-biz-newstoggle="' + escapeHtml(r.name) + '" aria-expanded="' + newsOpen.has(r.name) + '">' + (newsOpen.has(r.name) ? '▾' : '▸') + ' News' + (r.news.length ? ' (' + r.news.length + ')' : '') + '</button></h3>' + (newsOpen.has(r.name) ? newsRefreshBtn(r.items.map(x => x.stock), r.items.filter(x => x.match).map(x => x.stock), r.name) : '') + newsStatusFor(r.name) + '</div>' + (newsOpen.has(r.name) ? newsHtml(r) : '') + '</div></td></tr>';
 }
+const hostSection = () => embed ? embed.section : appSections.business;
+const hostLabel = () => embed ? embed.label : 'Explorer';
 function openStockFromBusiness(idx){
-  openStockInline(appSections.business, 'Explorer', idx);
+  openStockInline(hostSection(), hostLabel(), idx);
 }
 function breadth(r){
   if(!r.known) return '';
@@ -157,16 +163,17 @@ function filtersToggleHtml(){
   const summary = [view === 'heat' ? 'Heat map' : 'Table', periodOf(period).key, by === 'group' ? 'Industry group' : 'Industry', (x ? x.name : 'All') + (rebound ? ' + Rebound' : '')].join(' \u00b7 ');
   return '<button type="button" class="biz-filters-toggle" data-biz-filters="1" aria-expanded="' + bizFiltersOpen + '"><span class="ft-label" aria-label="Filters"></span><span class="ft-summary">' + escapeHtml(summary) + '</span><span class="ft-caret" aria-hidden="true">\u25be</span></button>';
 }
-const layoutHtml = (controls, main) => '<div class="biz-layout"><aside class="biz-side' + (bizFiltersOpen ? '' : ' filters-collapsed') + '">' + filtersToggleHtml() + sheetFrame(controls) + '</aside><div class="biz-main' + (bizFull ? ' biz-full' : '') + '">' + main + '</div></div>';
+const layoutHtml = (controls, main) => embed ? '<div class="biz-embedded">' + controls + '<div class="biz-main' + (bizFull ? ' biz-full' : '') + '">' + main + '</div></div>' : '<div class="biz-layout"><aside class="biz-side' + (bizFiltersOpen ? '' : ' filters-collapsed') + '">' + filtersToggleHtml() + sheetFrame(controls) + '</aside><div class="biz-main' + (bizFull ? ' biz-full' : '') + '">' + main + '</div></div>';
 
 // Redraws the page but keeps the scroll of each stocks grid, so a redraw during a refresh does not jump the view.
 function render(){
   const el = bodyEl(); if(!el) return;
+  if(embed){ embed.set = embed.stocksNow(); embed.on = embed.set.size < stocks.length; }   // the Analysis filters may have changed what passes (a refresh, a pin)
   keepScroll(el, () => draw(el));
 }
 // The heat map: beside the filters it is as wide as the page leaves room for; in full screen it takes the whole window, with a height that fits it.
 function heatMap(rows, p, el){
-  if(!bizFull) return heatmapHtml(rows, period, Math.max(300, el.clientWidth - 280), heatSize);
+  if(!bizFull) return heatmapHtml(rows, period, Math.max(300, el.clientWidth - (embed ? 0 : 280)), heatSize);
   const w = Math.max(300, window.innerWidth - 40), ratio = Math.min(.95, Math.max(.45, (window.innerHeight - 140) / w));
   return heatmapHtml(rows, period, w, heatSize, ratio);
 }
@@ -176,12 +183,12 @@ function draw(el){
   const rows = visibleRows();
   const allOpen = rows.length > 0 && rows.every(r => open.has(r.name));
   const controls = '<div class="biz-controls"><div class="tl-view-toggle" role="group" aria-label="View"><button type="button" class="tl-view-btn' + (view === 'table' ? ' active' : '') + '" data-biz-view="table">Table</button><button type="button" class="tl-view-btn' + (view === 'heat' ? ' active' : '') + '" data-biz-view="heat">Heat map</button></div><div class="tl-view-toggle" role="group" aria-label="Period">' + PERIODS.map(x => '<button type="button" class="tl-view-btn' + (x.key === period ? ' active' : '') + '" data-biz-period="' + x.key + '">' + x.key + '</button>').join('') + '</div>'
-    + '<div class="tl-view-toggle" role="group" aria-label="Grouping"><button type="button" class="tl-view-btn' + (by === 'industry' ? ' active' : '') + '" data-biz-by="industry">Industry</button><button type="button" class="tl-view-btn' + (by === 'group' ? ' active' : '') + '" data-biz-by="group">Industry group</button></div>'
-    + strategyGroupHtml()
+    + (embed ? '' : '<div class="tl-view-toggle" role="group" aria-label="Grouping"><button type="button" class="tl-view-btn' + (by === 'industry' ? ' active' : '') + '" data-biz-by="industry">Industry</button><button type="button" class="tl-view-btn' + (by === 'group' ? ' active' : '') + '" data-biz-by="group">Industry group</button></div>')
+    + (embed ? '' : strategyGroupHtml())
     + '</div>';
   const viewToggle = '<div class="tl-view-toggle biz-match-toggle" role="group" aria-label="Show">'
     + '<button type="button" class="tl-view-btn' + (!matchedOnly() ? ' active' : '') + '" data-biz-show="all" title="Show every industry and stock">All</button>'
-    + '<button type="button" class="tl-view-btn' + (matchedOnly() ? ' active' : '') + '" data-biz-show="matched"' + (strategyOn() ? ' title="Show only the industries and stocks that match the chosen strategy"' : ' disabled title="Choose a strategy or Rebound first"') + '>Matched</button></div>';
+    + '<button type="button" class="tl-view-btn' + (matchedOnly() ? ' active' : '') + '" data-biz-show="matched"' + (strategyOn() ? ' title="Show only the industries and stocks that match the ' + (embed ? 'filters' : 'chosen strategy') + '"' : ' disabled title="' + (embed ? 'Narrow the stocks with the filters first' : 'Choose a strategy or Rebound first') + '"') + '>Matched</button></div>';
   const sizeToggle = '<div class="tl-view-toggle biz-match-toggle biz-size-toggle" role="group" aria-label="Size the tiles by"><button type="button" class="tl-view-btn' + (heatSize === 'chg' ? ' active' : '') + '" data-biz-size="chg" title="Bigger tiles = bigger average change">% Change</button><button type="button" class="tl-view-btn' + (heatSize === 'count' ? ' active' : '') + '" data-biz-size="count" title="Bigger tiles = more stocks">No. of stocks</button></div>';
   const fullBtn = '<button type="button" class="biz-expand" data-biz-full="1" aria-pressed="' + bizFull + '" title="Show the ' + (view === 'heat' ? 'heat map' : 'table') + ' across the whole window (Esc to leave)">' + fullscreenLabel(bizFull) + '</button>';
   const expandBtn = viewToggle + '<button type="button" class="biz-expand" data-biz-all="' + (allOpen ? 'collapse' : 'expand') + '">' + (allOpen ? 'Collapse all' : 'Expand all') + '</button>' + fullBtn;
@@ -193,7 +200,7 @@ function draw(el){
   const total = rows.reduce((a, r) => a + r.matches, 0);
   const filterNote = strategyOn() ? '<p class="upload-hint biz-showing">Matched ' + total + ' of ' + stocks.length + ' stocks</p>' : '';
   const th = (id, label, cls) => sortHeaderHtml(id, label, tableSort, cls ? ' class="' + cls + '"' : '');
-  const head = '<tr>' + th('name', by === 'group' ? 'Industry group' : 'Industry') + th('count', 'Stocks', 'num') + th('mean', 'Average ' + p.key, 'num') + th('median', 'Median', 'num') + th('breadth', 'Up / down') + th('news', 'News', 'num') + (strategyOn() ? th('matches', 'Matching', 'num') + th('matchMean', 'Match avg ' + p.key, 'num') + th('vsIndustry', 'vs industry', 'num') : '') + '</tr>';
+  const head = '<tr>' + th('name', curBy() === 'group' ? 'Industry group' : 'Industry') + th('count', 'Stocks', 'num') + th('mean', 'Average ' + p.key, 'num') + th('median', 'Median', 'num') + th('breadth', 'Up / down') + th('news', 'News', 'num') + (strategyOn() ? th('matches', 'Matching', 'num') + th('matchMean', 'Match avg ' + p.key, 'num') + th('vsIndustry', 'vs industry', 'num') : '') + '</tr>';
   const cols = strategyOn() ? 9 : 6;
   drawnRows = rows; drawnCols = cols;
   const body = rows.map(r => {
@@ -214,7 +221,7 @@ function draw(el){
 }
 
 function ensureData(){
-  if(!(needsBars(period) || rebound) || loadState === 'loading') return;
+  if(!(needsBars(period) || (!embed && rebound)) || loadState === 'loading') return;
   loadState = 'loading'; render();
   ensureAllPriceBars().then(ok => { loadState = ok ? 'idle' : 'failed'; render(); });
 }
@@ -234,11 +241,15 @@ function toggleRow(row){
 }
 
 function init(){
-  const el = bodyEl(); if(!el) return;
+  const el = document.getElementById('businessBody'); if(!el) return;
   watchFullscreenExit(() => bizFull, () => { bizFull = false; render(); });
+  wire(el);
+}
+// The clicks and keys of one table (Explorer's own, or the one inside Analysis).
+function wire(el){
   el.addEventListener('click', (e) => {
     const io = closestEl(e, '[data-biz-open]');
-    if(io){ openIndustryInline(appSections.business, 'Explorer', by, io.dataset.bizOpen); return; }
+    if(io){ openIndustryInline(hostSection(), hostLabel(), curBy(), io.dataset.bizOpen); return; }
     const nt = closestEl(e, '[data-biz-newstoggle]');
     if(nt){ const n = nt.dataset.bizNewstoggle; if(newsOpen.has(n)) newsOpen.delete(n); else newsOpen.add(n); render(); return; }
     const sh = closestEl(e, '[data-sort-col]');
@@ -287,11 +298,24 @@ function init(){
   });
 }
 
+// Whether the page showing this view (Explorer, or Analysis when it is embedded there) is the one on screen.
+const hostActive = () => { const s = hostSection(); return !!s && s.classList.contains('active') && (!embed || embed.el.isConnected); };
 // After a refresh started here has saved its stocks, redraw so the grid shows the new numbers.
-document.addEventListener('alba-batch-done', (e) => { const sec = appSections.business; if(/** @type {CustomEvent} */ (e).detail && /^biz-/.test(/** @type {CustomEvent} */ (e).detail.source) && sec && sec.classList.contains('active')) render(); });
-function show(){ render(); ensureData(); }
+document.addEventListener('alba-batch-done', (e) => { if(/** @type {CustomEvent} */ (e).detail && /^biz-/.test(/** @type {CustomEvent} */ (e).detail.source) && hostActive()) render(); });
+function show(){
+  if(embed && embed.el.isConnected) embed.el.innerHTML = '';   // Analysis is not on screen now; its copy of the table must not clash with this page's
+  embed = null; render(); ensureData();
+}
+// The same table inside Analysis: `cfg` = { el (where to draw), by ('industry' | 'group'), section, label, stocksNow() (the stocks that pass the Analysis filters) }. Wired once per element.
+function showIn(cfg){
+  const own = document.getElementById('businessBody'); if(own) own.innerHTML = '';   // Explorer's own copy (hidden) would share element ids with this one
+  if(!embed || embed.by !== cfg.by) open.clear();
+  if(!cfg.el.dataset.bizWired){ cfg.el.dataset.bizWired = '1'; wire(cfg.el); }
+  embed = Object.assign({ set: new Set(), on: false }, cfg);
+  render(); ensureData();
+}
 // The tiles' text depends on the width, so redraw the heat map when the window is resized.
 let resizeT = null;
-window.addEventListener('resize', () => { if(view !== 'heat') return; clearTimeout(resizeT); resizeT = setTimeout(() => { const s = appSections.business; if(s && s.classList.contains('active')) render(); }, 200); });
+window.addEventListener('resize', () => { if(view !== 'heat') return; clearTimeout(resizeT); resizeT = setTimeout(() => { if(hostActive()) render(); }, 200); });
 
-export { init, show };
+export { init, show, showIn };
