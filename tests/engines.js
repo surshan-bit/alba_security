@@ -325,15 +325,10 @@ test('apply: bad files throw before anything is changed', () => {
     assert.deepStrictEqual(g[0].members.map(s => s.name), ['Co A', 'Co C']);
     assert.deepStrictEqual(g[1].members.map(s => s.name), ['Co B', 'Co E']);
   });
-  test('grouping: averages, median and up/down use only the stocks that have a figure', () => {
-    const g = G.groupRanked(ranked, 'industry'), steel = g[0], alu = g[2];
-    near(steel.meanW, -1); near(steel.meanM, 8); near(steel.medianW, -1); assert.strictEqual(steel.up, 1); assert.strictEqual(steel.down, 1);
-    assert.strictEqual(alu.meanW, null); assert.strictEqual(alu.meanM, null); assert.strictEqual(alu.medianW, null); assert.strictEqual(alu.up + alu.down, 0); assert.strictEqual(alu.members.length, 1);
-  });
   test('grouping: Industry Group merges industries, and a stock with no group goes under a dash', () => {
     const g = G.groupRanked(ranked.concat([mk('F', 'Misc', undefined, 0, 0)]), 'group');
     assert.deepStrictEqual(g.map(x => x.name), ['Metals', 'Financials', '—']);
-    assert.strictEqual(g[0].members.length, 3); near(g[0].meanW, -1);
+    assert.strictEqual(g[0].members.length, 3);
   });
   test('grouping: an empty list gives no groups', () => { assert.deepStrictEqual(G.groupRanked([], 'industry'), []); });
 }

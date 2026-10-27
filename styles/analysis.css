@@ -125,4 +125,3 @@ body.biz-full-open{overflow:hidden;}
 .lbg-inner{position:sticky;left:0;display:inline-flex;align-items:baseline;gap:14px;font-size:.8rem;}
 .lbg-caret{width:.9em;color:var(--muted);}
 .lbg-name{font-weight:700;color:var(--text);}
-.lbg-count,.lbg-stat{color:var(--muted);font-size:.76rem;}
