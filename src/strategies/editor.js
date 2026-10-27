@@ -1,9 +1,10 @@
-// The rule editor: one row per rule (field, operator, value) plus an "add a rule" picker. Rows show how many stocks
-// pass that rule on its own, which makes it easy to see which rule is doing the filtering.
+// The rule editor: a table with one row per rule (field, condition, value, stocks passing, remove), column headings, an "add a rule" picker and
+// a total of the stocks that pass all the rules together. Rows show how many stocks pass that rule on its own, which makes it easy to see which
+// rule is doing the filtering. Removing a rule can be undone from the line under the table until the next change.
 import { escapeHtml } from '../core/util.js';
 import { stocks } from '../core/stocks.js';
 import { FIELDS, FIELD_BY_ID } from './fields.js';
-import { OPS, defaultRule, isNum, ruleReady, testRule, withOp } from './rules.js';
+import { OPS, defaultRule, describeRule, isNum, qualifyingStocks, ruleReady, testRule, withOp } from './rules.js';
 import { saveStrategies } from './state.js';
 
 function fieldOptions(selected){
@@ -30,6 +31,10 @@ function valueHtml(rule, f){
   return `<input type="number" step="any" class="sr-v1" value="${numVal(rule.value)}" aria-label="Value">${unit}`;
 }
 
+const TRASH = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+// The last rule removed, so "Undo" can put it back: { st, rule, i } (a later change of any kind clears it).
+let undo = null;
+
 function ruleRowHtml(rule, i){
   const f = FIELD_BY_ID.get(rule.field);
   const ops = OPS[f.type];
@@ -44,7 +49,7 @@ function ruleRowHtml(rule, i){
       <select class="sr-op" aria-label="Condition"${ops.length === 1 ? ' disabled' : ''}>${ops.map(([v, label]) => `<option value="${v}"${v === rule.op ? ' selected' : ''}>${label}</option>`).join('')}</select>
       <span class="sr-val">${valueHtml(rule, f)}</span>
       ${tail}
-      <button type="button" class="sr-del" aria-label="Remove this rule" title="Remove this rule">&times;</button>
+      <button type="button" class="sr-del" aria-label="Remove rule: ${escapeHtml(ruleReady(rule) ? describeRule(rule) : FIELD_BY_ID.get(rule.field)?.label || "")}" title="Remove this rule">${TRASH}</button>
     </div>`;
 }
 
@@ -52,13 +57,21 @@ function rulesEditorHtml(strategy){
   const rows = strategy.rules.length
     ? strategy.rules.map(ruleRowHtml).join('')
     : `<div class="strat-empty">No rules yet, so every stock qualifies. Add a rule below.</div>`;
-  return `<div class="sr-rules">${rows}</div>
-    <select class="sr-add" aria-label="Add a rule"><option value="">+ Add a rule&hellip;</option>${fieldOptions('')}</select>`;
+  const ready = strategy.rules.filter(ruleReady).length;
+  const n = ready ? qualifyingStocks(stocks, strategy.rules).length : 0;
+  const total = ready
+    ? `${ready === strategy.rules.length ? 'All ' : ''}${ready} rule${ready === 1 ? '' : 's'}${ready === strategy.rules.length ? ' together' : ' applied'}: <b>${n} stock${n === 1 ? '' : 's'} pass</b>`
+    : 'No rule applied yet, so every stock qualifies';
+  const undoLine = undo && undo.st === strategy
+    ? `<div class="sr-undo" role="status"><span>Removed &ldquo;${escapeHtml(ruleReady(undo.rule) ? describeRule(undo.rule) : (FIELD_BY_ID.get(undo.rule.field)?.label || 'rule'))}&rdquo;</span><button type="button" class="sr-undo-btn">Undo</button></div>` : '';
+  const head = strategy.rules.length ? '<div class="sr-head" aria-hidden="true"><span>Field</span><span>Condition</span><span>Value</span><span title="Stocks that pass this rule on its own">Passing</span><span></span></div>' : '';
+  return `${head}<div class="sr-rules">${rows}</div>
+    <div class="sr-foot"><select class="sr-add" aria-label="Add a rule"><option value="">+ Add a rule&hellip;</option>${fieldOptions('')}</select><span class="sr-total">${total}</span></div>${undoLine}`;
 }
 
 // One set of listeners on the section, using whichever strategy is selected at the time.
 function wireRulesEditor(root, getStrategy, onChange){
-  const commit = () => { const st = getStrategy(); if(st) st.learned = ''; saveStrategies(); onChange(); };
+  const commit = (keepUndo) => { const st = getStrategy(); if(st) st.learned = ''; if(!keepUndo) undo = null; saveStrategies(); onChange(); };
   const rowOf = (el) => { const row = el.closest('.sr-row'); return row ? Number(row.dataset.i) : -1; };
   root.addEventListener('change', (e) => {
     const st = getStrategy(); if(!st) return;
@@ -84,8 +97,9 @@ function wireRulesEditor(root, getStrategy, onChange){
   });
   root.addEventListener('click', (e) => {
     const st = getStrategy(); if(!st) return;
+    if(e.target.closest('.sr-undo-btn')){ if(undo && undo.st === st){ st.rules.splice(Math.min(undo.i, st.rules.length), 0, undo.rule); undo = null; commit(); } return; }
     const del = e.target.closest('.sr-del');
-    if(del){ const i = rowOf(del); if(i >= 0){ st.rules.splice(i, 1); commit(); } return; }
+    if(del){ const i = rowOf(del); if(i >= 0){ undo = { st, rule: st.rules[i], i }; st.rules.splice(i, 1); commit(true); } return; }
     const opt = e.target.closest('.sr-opt');
     if(opt){
       const i = rowOf(opt); if(i < 0) return;

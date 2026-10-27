@@ -311,6 +311,10 @@
 /* Strategies: fewer boxes, more free flow. Fields become underlined, the setup bar and secondary buttons lose their frames, and the list actions are plain links. */
   :root[data-theme="white"] #section-strategies #stratMain :is(input:not([type=checkbox]):not([type=radio]),select,textarea){border:0;border-bottom:1px solid #c9cfdf;border-radius:0;background-color:transparent;box-shadow:none;padding-left:2px;padding-right:6px;}
   :root[data-theme="white"] #section-strategies #stratMain :is(input,select,textarea):focus{border-bottom:2px solid var(--accent);box-shadow:none;outline:none;}
+  /* v1.282: a rule row already sits between two lines, so its fields carry no underline of their own; one appears on hover and focus. */
+  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-row :is(input,select){border-bottom-color:transparent;}
+  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-row :is(input,select):hover:not(:disabled){border-bottom-color:#c9cfdf;}
+  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-row :is(input,select):focus{border-bottom-color:var(--accent);}
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{border:0;border-bottom:1px solid #e6e9f2;border-radius:0;background:transparent;padding:12px 0;}
   :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;box-shadow:none;}
   :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.on):hover{background:color-mix(in srgb,var(--accent) 8%,#fff);}
