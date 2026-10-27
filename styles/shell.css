@@ -30,6 +30,7 @@ h1{margin:0 0 6px;font-size:1.55rem;font-weight:600;letter-spacing:.2px;}
 .sidebar-nav{display:flex;flex-direction:column;gap:2px;}
 .nav-section-label{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;padding:0 12px;margin:10px 0 4px;}
 .nav-item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:none;color:var(--text);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.92rem;padding:10px 12px;border-radius:8px;}
+.nav-item[hidden]{display:none !important;}   /* Explorer is out of the menu (its table now lives in Analysis > View); the page itself still opens from a stock search or a link */
 .nav-item:hover{background:var(--panel2);}
 .nav-item.active{background:var(--panel2);font-weight:600;}
 .nav-icon{width:18px;height:18px;flex-shrink:0;color:var(--muted);display:flex;align-items:center;justify-content:center;}

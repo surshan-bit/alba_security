@@ -139,6 +139,7 @@ async function markupNameTests(browser){
 async function businessTests(browser){
   const ctx = await browser.newContext({ viewport: process.env.SHOT ? { width: 400, height: 800 } : { width: 1280, height: 900 } });
   const { page, errs } = await openPage(ctx, {}, 'business'); await appReady(page); await page.waitForTimeout(400);
+  ok(await page.evaluate(() => { const b = document.querySelector('.nav-item[data-section="business"]'); return !!b && b.getBoundingClientRect().width === 0; }), 'v1.278: Explorer is not shown in the menu');
   await goto(page, 'business'); await page.waitForSelector('#businessBody .biz-row', { timeout: 5000 });
   { // wide screens: Filters starts closed (table full width), opens as a side column from the button, and the choice is remembered
     const geo = () => page.evaluate(() => { const t = document.querySelector('.biz-filters-toggle'), c = document.querySelector('.biz-controls'), m = document.querySelector('.biz-main'); return { toggle: !!t && t.getBoundingClientRect().width > 0, controls: !!c && c.getBoundingClientRect().height > 0, main: m.getBoundingClientRect().width, expanded: t.getAttribute('aria-expanded') }; });
