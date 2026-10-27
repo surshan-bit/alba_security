@@ -3,6 +3,7 @@ import { panelIcon } from './icons.js';
 import { stocks } from '../core/stocks.js';
 import { escapeHtml, tickerIndustry } from '../core/util.js';
 import { analysisLbCell, analysisRowContext, columnHeaderHtml, stockGridColumnIds } from '../analysis/columns.js';
+import { NO_SORT } from '../ui/gridsort.js';
 
 // Industry Peers — the stocks the Fundamental Score ranked this one against (added 2026-10-06).
 // Peer group = `industryGroup` (the fundamentals CSV's "Industry Group" column, set on every stock
@@ -67,8 +68,8 @@ function renderPeersPanel(s, selfIdx){
       </div>
       <p class="peers-sub">${lead} ${basis}</p>
       <div class="peers-scroll strat-table-wrap">
-        <table class="strat-table peers-table">
-          <thead><tr>${cols.map(columnHeaderHtml).join('')}</tr></thead>
+        <table class="strat-table peers-table" data-cols="${cols.join(',')}">
+          <thead><tr>${cols.map(id => columnHeaderHtml(id, NO_SORT)).join('')}</tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>

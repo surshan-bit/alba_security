@@ -313,6 +313,22 @@ test('apply: bad files throw before anything is changed', () => {
   assert.deepStrictEqual(stocks, before);
 });
 
+// =========================================================== Analysis column sort (src/analysis/state.js)
+{
+  const S = load('src/analysis/state.js');
+  test('sort: a saved column and direction are kept; an unknown column or direction falls back', () => {
+    assert.deepStrictEqual(S.cleanSort('weekRsi', 'asc', null, { col: 'mos', dir: 'desc' }), { col: 'weekRsi', dir: 'asc' });
+    assert.deepStrictEqual(S.cleanSort('weekRsi', 'sideways', null, { col: 'mos', dir: 'desc' }), { col: 'weekRsi', dir: 'desc' });
+    assert.deepStrictEqual(S.cleanSort('nope', 'asc', null, { col: 'mos', dir: 'desc' }), { col: 'mos', dir: 'desc' });
+    assert.deepStrictEqual(S.cleanSort(undefined, undefined, undefined, { col: 'mos', dir: 'desc' }), { col: 'mos', dir: 'desc' });
+  });
+  test('sort: every reading of the old Sort by menu maps to a column and direction', () => {
+    const old = { mos_desc: ['mos', 'desc'], mos_asc: ['mos', 'asc'], score_desc: ['score', 'desc'], weekRsi_desc: ['weekRsi', 'desc'], weekRsi_asc: ['weekRsi', 'asc'], monthRsi_desc: ['monthRsi', 'desc'], monthRsi_asc: ['monthRsi', 'asc'], weekChg_desc: ['weekChg', 'desc'], monthChg_desc: ['monthChg', 'desc'], price_desc: ['price', 'desc'], research_old: ['triggered', 'desc'], research_new: ['triggered', 'asc'], name_asc: ['stock', 'asc'] };
+    Object.keys(old).forEach(k => assert.deepStrictEqual(S.cleanSort(undefined, undefined, k, null), { col: old[k][0], dir: old[k][1] }, k));
+    assert.strictEqual(S.cleanSort(undefined, undefined, 'bogus_desc', null), null);
+  });
+}
+
 // =========================================================== Analysis "Group by" (src/analysis/grouping.js)
 {
   const G = load('src/analysis/grouping.js');

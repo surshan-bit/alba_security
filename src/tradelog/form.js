@@ -5,7 +5,7 @@ import { escapeHtml, formatDate, sanitizeDocId, tickerSymbol } from '../core/uti
 import { marginOfSafety } from '../core/mos.js';
 import { fundamentalCompleteness, technicalCompleteness } from '../detail/completeness.js';
 import { buildSuggestions, sgMark } from '../ui/suggest.js';
-import { holdingDaysBetween, tlSetView } from './panel.js';
+import { holdingDaysBetween, tlSetView, tlSortBy } from './panel.js';
 import { tradeCol } from '../identity/session.js';
 import { tellUser } from '../ui/confirm.js';
 import { appSections } from '../ui/navigation.js';
@@ -239,6 +239,8 @@ function init_tradelog_form(){
         if(idx >= 0) openStockInline(appSections.trackrecord, 'Trade Log', idx);
         return;
       }
+      const sh = closestEl(e, '[data-sort-col]');
+      if(sh){ tlSortBy(sh.dataset.sortCol || ''); return; }
       const b = closestEl(e, 'button'); if(!b) return;
       if(b.hasAttribute('data-tl-sell')) tlOpenSellForm(b.getAttribute('data-tl-sell'));
       else if(b.hasAttribute('data-tl-remove')){

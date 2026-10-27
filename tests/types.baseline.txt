@@ -1,7 +1,3 @@
-src/analysis/columns.js: error TS18048: 'c' is possibly 'undefined'.
-src/analysis/columns.js: error TS18048: 'c' is possibly 'undefined'.
-src/analysis/columns.js: error TS18048: 'c' is possibly 'undefined'.
-src/analysis/columns.js: error TS18048: 'c' is possibly 'undefined'.
 src/analysis/columns.js: error TS18048: 'col' is possibly 'undefined'.
 src/analysis/controls.js: error TS18047: 'b' is possibly 'null'.
 src/analysis/controls.js: error TS18047: 'btn' is possibly 'null'.
@@ -17,7 +13,6 @@ src/analysis/filterpanel.js: error TS18047: 'c.textContent' is possibly 'null'.
 src/analysis/filterpanel.js: error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
 src/analysis/filterpanel.js: error TS2532: Object is possibly 'undefined'.
 src/analysis/filterpanel.js: error TS2532: Object is possibly 'undefined'.
-src/analysis/leaderboard.js: error TS18047: 'lbBody' is possibly 'null'.
 src/analysis/leaderboard.js: error TS18047: 'row' is possibly 'null'.
 src/analysis/leaderboard.js: error TS18047: 'row' is possibly 'null'.
 src/analysis/leaderboard.js: error TS18047: 'row' is possibly 'null'.
@@ -100,7 +95,6 @@ src/strategies/editor.js: error TS2532: Object is possibly 'undefined'.
 src/strategies/learnpanel.js: error TS2322: Type 'string | undefined' is not assignable to type 'string'.
 src/strategies/practice.js: error TS18048: 'f.options' is possibly 'undefined'.
 src/strategies/results.js: error TS18048: 'f' is possibly 'undefined'.
-src/strategies/results.js: error TS2532: Object is possibly 'undefined'.
 src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
 src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
 src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.

@@ -217,18 +217,30 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   { const rows = Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-row'));
     const blankMos = rows.filter(r => /mos-none/.test(r.innerHTML)).length;
     snap('s6j3b_every_stock', { all: $('#analysisStrategyFilter [data-astrat="all"] .filter-n').textContent, fund: $('#analysisVerdictFilters [data-averdict="all"] .filter-n').textContent, mosAll: $('#analysisMosFilters [data-amos="all"] .filter-n').textContent, count: $('#analysisLeaderboardCount').textContent, note: String(!!$('#analysisHiddenNote')), blankMosRows: String(blankMos) }); }
-  for(const dir of ['mos_desc', 'mos_asc']){ const sel = $('#analysisSortSelect'); sel.value = dir; sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100);
+  const lbSort = async (col) => { click($('.analysis-leaderboard thead [data-sort-col="' + col + '"]')); await sleep(100); };   // v1.273: a click on a column header sorts by it (again: reverses it)
+  for(const dir of ['mos_desc', 'mos_asc']){ await lbSort('mos');   // first click: highest first; second: lowest first
     const rows = Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-row:not(.pinned)')); const flags = rows.map(r => /mos-none/.test(r.innerHTML) ? 1 : 0).join('');   // pinned stocks always come first
     snap('s6j3c_blank_mos_last_' + dir, { lastBlankRun: String(/^0*1*$/.test(flags)), flags }); }
-  { const sel = $('#analysisSortSelect'); sel.value = 'monthRsi_asc'; sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100); }
+  await lbSort('monthRsi'); await lbSort('monthRsi');   // first click: highest first; second: lowest first
   snap('s6j4_blank_sorted_last', { rows: Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-ticker')).map(e => e.textContent).join(',') });
   typeInto($('#weekRsiMinInput'), '55'); await sleep(700);
   typeInto($('#monthRsiMaxInput'), '90'); await sleep(100);
   snap('s6k_sliders', { body: html$('#analysisPanelBody') });
   { const mi = $('#mosMinInput'); typeInto(mi, String(Math.round((Number(mi.min) + Number(mi.max)) / 2))); await sleep(100); }
   snap('s6l_mos', { body: html$('#analysisPanelBody') });
-  { const sel = $('#analysisSortSelect'); sel.value = 'mos_desc'; sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100); }
+  await lbSort('mos');
   snap('s6m_sort', { body: html$('#analysisPanelBody') });
+  { // v1.273: header sort: first click on a text column is A to Z, again is Z to A; a figure column goes highest first; the arrow and aria-sort follow; no Sort by menu
+    const names = () => Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-row:not(.pinned) .analysis-lb-name')).map(e => e.textContent);
+    const th = (col) => $('.analysis-leaderboard thead [data-sort-col="' + col + '"]').closest('th');
+    await lbSort('stock'); const az = names(), aria1 = th('stock').getAttribute('aria-sort'), arrow1 = th('stock').textContent.trim();
+    await lbSort('stock'); const za = names(), aria2 = th('stock').getAttribute('aria-sort');
+    const sorted = (a, dir) => a.every((v, i) => i === 0 || (dir > 0 ? a[i - 1].localeCompare(v) <= 0 : a[i - 1].localeCompare(v) >= 0));
+    await lbSort('weekChg');
+    const wk = Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-row:not(.pinned) td[data-live="weekChg"]')).map(e => parseFloat(e.textContent)).filter(n => !isNaN(n));
+    snap('s6m2b_header_sort', { noMenu: String(!win.document.getElementById('analysisSortSelect')), az: String(sorted(az, 1)), za: String(sorted(za, -1)), aria: aria1 + '/' + aria2, arrow: arrow1, weekHighFirst: String(wk.every((v, i) => i === 0 || wk[i - 1] >= v)), saved: String(JSON.parse(win.localStorage.getItem('albaDashboard.analysisFilters.v1')).sortCol) });
+    await lbSort('mos');
+  }
   { // v1.270: "Group by" None / Industry / Industry Group (Analysis leaderboard)
     const grp = async (v) => { const g = $('#analysisGroupSelect'); g.value = v; g.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(250); };
     const heads = () => Array.from(win.document.querySelectorAll('#analysisLeaderboardBody .analysis-lb-group'));
@@ -320,13 +332,15 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   snap('s7b_strategies_open', { list: html$('#stratList'), main: html$('#stratMain') });
   click($('#stratList .strat-card:nth-child(6)')); await sleep(100);
   snap('s7c_strategies_second', { main: html$('#stratMain'), rows: Array.from(win.document.querySelectorAll('#stratResults .strat-row')).map(e => e.dataset.idx).join(',') });
-  { // "Sort by" above the qualifying stocks (same choices as the Analysis leaderboard)
+  { // v1.273: the qualifying stocks sort by a column header (same columns as the Analysis leaderboard); there is no Sort by menu any more
     const order = () => Array.from(win.document.querySelectorAll('#stratResults .strat-row')).map(e => e.dataset.idx);
-    const base = order(), opts = Array.from(win.document.querySelectorAll('#stratSort option')).map(o => o.value);
-    chg($('#stratSort'), 'name_asc'); await sleep(50); const byName = order();
-    chg($('#stratSort'), 'monthRsi_desc'); await sleep(50); const byRsi = order();
-    chg($('#stratSort'), 'score_desc'); await sleep(50); const back = order();
-    snap('s7b2_strategies_sort', { opts: opts.join(','), same: String(base.slice().sort().join() === byName.slice().sort().join() && base.length === byRsi.length), reordered: String(byName.join() !== base.join() || base.length < 2), restored: String(back.join() === base.join()), saved: String(win.localStorage.getItem('albaDashboard.strategySort.v1')) }); }
+    const heads = () => Array.from(win.document.querySelectorAll('#stratResults thead [data-sort-col]')).map(b => b.dataset.sortCol);
+    const hit = async (col) => { click($('#stratResults thead [data-sort-col="' + col + '"]')); await sleep(50); };
+    const base = order(), cols = heads();
+    await hit('stock'); const byName = order();
+    await hit('monthRsi'); const byRsi = order();
+    await hit('score'); const back = order();
+    snap('s7b2_strategies_sort', { noMenu: String(!win.document.getElementById('stratSort')), heads: cols.join(','), same: String(base.slice().sort().join() === byName.slice().sort().join() && base.length === byRsi.length), reordered: String(byName.join() !== base.join() || base.length < 2), restored: String(back.join() === base.join()), saved: String(win.localStorage.getItem('albaDashboard.strategySort.v1')) }); }
   click($('#stratNew')); await sleep(100);
   chg($('#stratName'), 'My test strategy');
   chg($('.sr-add'), 'score'); await sleep(50);

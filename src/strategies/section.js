@@ -8,7 +8,7 @@ import { openStockInline } from '../ui/inlinedetail.js';
 import { qualifyingStocks, ruleReady } from './rules.js';
 import { addStrategy, deleteStrategy, duplicateStrategy, restoreStarters, saveStrategies, selectStrategy, selectedStrategy, strategies } from './state.js';
 import { rulesEditorHtml, wireRulesEditor } from './editor.js';
-import { orderedPicks, resetResultsRows, resultsHtml, setResultsSort, showMoreResults, sortLabel, sortSelectHtml, whyDatalist, whyHtml } from './results.js';
+import { orderedPicks, resetResultsRows, resultsHtml, showMoreResults, sortResultsBy, whyDatalist, whyHtml } from './results.js';
 import { sheetFrame } from '../ui/phonesheet.js';
 import { filtersOpenSaved, rememberFiltersOpen } from '../ui/filterdock.js';
 import { cleanGoal } from './goal.js';
@@ -106,9 +106,9 @@ function mainHtml(st){
     </div>
     <div class="analysis-panel strat-panel">
       <div class="strat-result-head strat-filters-panel${stratFiltersOpen ? '' : ' filters-collapsed'}">
-        <button type="button" class="biz-filters-toggle" data-strat-filters="1" aria-expanded="${stratFiltersOpen}"><span class="ft-label" aria-label="Filters"></span><span class="ft-summary">${escapeHtml('Sort: ' + sortLabel())}</span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
+        <button type="button" class="biz-filters-toggle" data-strat-filters="1" aria-expanded="${stratFiltersOpen}"><span class="ft-label" aria-label="Filters"></span><span class="ft-summary">Track and refresh</span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
         <div class="strat-result-title"><span class="strat-count" aria-label="Qualifying stocks">Showing <b id="stratCount">${matches.length}</b> of ${stocks.length} stocks${ignored ? ` &middot; ${ignored} rule${ignored === 1 ? '' : 's'} not applied yet` : ''}</span></div>
-        ${sheetFrame(`<div class="strat-total">${sortSelectHtml()}<button type="button" class="strat-btn" id="stratTrackBtn"${matches.length ? '' : ' disabled'} title="Save the ticked picks (or all of today's list when none is ticked) with their prices and judge them against the goal later">${trackLabel(matches)}</button>${(kit.defineScope('strat', { label: 'picks', source: 'strat', selName: 'strat', stocks: () => refreshList(st) }), kit.barHtml('strat'))}</div>`)}
+        ${sheetFrame(`<div class="strat-total"><button type="button" class="strat-btn" id="stratTrackBtn"${matches.length ? '' : ' disabled'} title="Save the ticked picks (or all of today's list when none is ticked) with their prices and judge them against the goal later">${trackLabel(matches)}</button>${(kit.defineScope('strat', { label: 'picks', source: 'strat', selName: 'strat', stocks: () => refreshList(st) }), kit.barHtml('strat'))}</div>`)}
       </div>
       <div id="stratResults">${resultsHtml(matches, selected)}</div>
       ${kit.selbarSlot('strat')}
@@ -166,6 +166,8 @@ function init_strategies_section(){
     if(closestEl(e, '#stratRestore')){ restoreStarters(); renderStrategiesSection(); return; }
     const st = selectedStrategy();
     if(closestEl(e, '[data-strat-more]') && st){ showMoreResults(); redrawResults(st); return; }
+    const head = closestEl(e, '#stratResults [data-sort-col]');
+    if(head && st){ sortResultsBy(head.dataset.sortCol || ''); redrawResults(st); return; }
     const tick = closestEl(e, '.strat-sel');
     if(tick){   // (a click on a tick box must not open the stock)
       const sym = tick.dataset.sym;
@@ -198,9 +200,6 @@ function init_strategies_section(){
     else if((targetEl(e).id === 'goalTarget' || targetEl(e).id === 'goalDays') && st){
       st.goal = cleanGoal({ target: Number(/** @type {HTMLInputElement} */ (document.getElementById('goalTarget')).value), days: Number(/** @type {HTMLInputElement} */ (document.getElementById('goalDays')).value) });
       forgetLearned(st.id); saveStrategies(); renderStrategiesSection();
-    }
-    else if(targetEl(e).id === 'stratSort' && st){
-      setResultsSort(targetEl(e).value); redrawResults(st);
     }
     else if(targetEl(e).id === 'stratNote' && st){ st.note = targetEl(e).value.trim(); saveStrategies(); }
     else if(targetEl(e).id === 'stratWhy' && st){

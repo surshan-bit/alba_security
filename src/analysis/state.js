@@ -1,42 +1,19 @@
-// Analysis screen state: sort options, saved filters and persistence.
-import { monthPct, mosPct, weekPct } from '../list/metrics.js';
-import { stockResearchAgeDays } from '../research/status.js';
+// Analysis screen state: the sorted column, saved filters and persistence.
 import { prefSet, uiStateSet } from '../identity/prefs.js';
 
-// A stock with no RSI reading yet is listed (while that RSI range is left at 0-100) and always sorts last.
-const rsiVal = (s, key) => { const v = s.technical && s.technical.raw ? s.technical.raw[key] : null; return typeof v === 'number' && isFinite(v) ? v : null; };
-const rsiCmp = (key, dir) => (a, b) => {
-  const x = rsiVal(a, key), y = rsiVal(b, key);
-  if(x === null || y === null) return x === y ? 0 : (x === null ? 1 : -1);
-  return dir * (x - y);
+// Sorting is by a column header (see columns.js): { col, dir }. These are the columns that can be sorted, and the readings of the old "Sort by" menu
+// (saved before v1.273) mapped to the column and direction they meant, so a saved choice still applies.
+const SORTABLE_COLUMNS = new Set(['score', 'techScore', 'mos', 'stock', 'weekChg', 'monthChg', 'weekRsi', 'monthRsi', 'techW', 'techM', 'news', 'industry', 'triggered', 'price']);
+const LEGACY_SORT = {
+  mos_desc: ['mos', 'desc'], mos_asc: ['mos', 'asc'], score_desc: ['score', 'desc'], weekRsi_desc: ['weekRsi', 'desc'], weekRsi_asc: ['weekRsi', 'asc'],
+  monthRsi_desc: ['monthRsi', 'desc'], monthRsi_asc: ['monthRsi', 'asc'], weekChg_desc: ['weekChg', 'desc'], monthChg_desc: ['monthChg', 'desc'],
+  price_desc: ['price', 'desc'], research_old: ['triggered', 'desc'], research_new: ['triggered', 'asc'], name_asc: ['stock', 'asc']
 };
-
-// A stock with no margin of safety (no Intrinsic Value) always sorts last, whichever way the list is sorted.
-const mosCmp = (dir) => (a, b) => {
-  const x = mosPct(a), y = mosPct(b);
-  if(x === -Infinity || y === -Infinity) return x === y ? 0 : (x === -Infinity ? 1 : -1);
-  return dir * (x - y);
-};
-
-const ANALYSIS_SORT_OPTIONS = [
-  { value: 'mos_desc', label: 'Margin of Safety (high to low)', cmp: mosCmp(-1) },
-  { value: 'mos_asc', label: 'Margin of Safety (low to high)', cmp: mosCmp(1) },
-  { value: 'score_desc', label: 'Fundamental Score (high to low)', cmp: (a, b) => (b.score || 0) - (a.score || 0) },
-  { value: 'weekRsi_desc', label: 'W RSI (high to low)', cmp: rsiCmp('weekRsi', -1) },
-  { value: 'weekRsi_asc', label: 'W RSI (low to high)', cmp: rsiCmp('weekRsi', 1) },
-  { value: 'monthRsi_desc', label: 'M RSI (high to low)', cmp: rsiCmp('monthRsi', -1) },
-  { value: 'monthRsi_asc', label: 'M RSI (low to high)', cmp: rsiCmp('monthRsi', 1) },
-  { value: 'weekChg_desc', label: 'Weekly % change (high to low)', cmp: (a, b) => (weekPct(b)) - (weekPct(a)) },
-  { value: 'monthChg_desc', label: 'Monthly % change (high to low)', cmp: (a, b) => (monthPct(b)) - (monthPct(a)) },
-  { value: 'price_desc', label: 'Price (high to low)', cmp: (a, b) => (b.valuation && b.valuation.currentPrice || 0) - (a.valuation && a.valuation.currentPrice || 0) },
-  { value: 'research_old', label: 'Research age (never / oldest first)', cmp: (a, b) => { const x = stockResearchAgeDays(a), y = stockResearchAgeDays(b); return (y === null ? Infinity : y) === (x === null ? Infinity : x) ? 0 : (x === null ? Infinity : x) > (y === null ? Infinity : y) ? -1 : 1; } },
-  { value: 'research_new', label: 'Research age (most recent first)', cmp: (a, b) => { const x = stockResearchAgeDays(a), y = stockResearchAgeDays(b); return (x === null ? Infinity : x) === (y === null ? Infinity : y) ? 0 : (x === null ? Infinity : x) < (y === null ? Infinity : y) ? -1 : 1; } },
-  { value: 'name_asc', label: 'Name (A to Z)', cmp: (a, b) => a.name.localeCompare(b.name) }
-];
-const ANALYSIS_SORT_KEYS = new Set(ANALYSIS_SORT_OPTIONS.map(o => o.value));
-function analysisSortComparator(sortBy){
-  const opt = ANALYSIS_SORT_OPTIONS.find(o => o.value === sortBy);
-  return opt ? opt.cmp : ANALYSIS_SORT_OPTIONS[0].cmp;
+// A saved sort ({ col, dir } or the legacy key) made safe: an unknown column or direction falls back to `fallback`.
+function cleanSort(col, dir, legacy, fallback){
+  if(typeof col === 'string' && SORTABLE_COLUMNS.has(col)) return { col, dir: dir === 'asc' ? 'asc' : 'desc' };
+  const l = typeof legacy === 'string' ? LEGACY_SORT[legacy] : null;
+  return l ? { col: l[0], dir: l[1] } : fallback;
 }
 
 // "Group by" for the leaderboard: no grouping, or one block of rows per industry / industry group.
@@ -58,7 +35,7 @@ const ANALYSIS_MOS_KEYS = ['green', 'orange', 'red'];
 // Tech Rating W / M filters (2026-10-07): the MACD state behind the Tech Rating badge (weekMacd / monthMacd).
 const ANALYSIS_TECH_KEYS = ['bull_above', 'bull_below', 'bear_above', 'bear_below'];
 function loadAnalysisFilters(){
-  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortBy: 'mos_desc', groupBy: 'none', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', rebound: false, columnOrder: null };
+  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortCol: 'mos', sortDir: 'desc', groupBy: 'none', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', rebound: false, columnOrder: null };
   try {
     const raw = localStorage.getItem(ANALYSIS_FILTERS_KEY);
     if(!raw) return fallback;
@@ -72,7 +49,7 @@ function loadAnalysisFilters(){
     let xAxis = parsed.xAxis === 'month' ? 'month' : 'week';
     let yAxis = parsed.yAxis === 'month' ? 'month' : 'week';
     if(xAxis === yAxis) yAxis = xAxis === 'week' ? 'month' : 'week'; // the two axes must show different timeframes
-    const sortBy = ANALYSIS_SORT_KEYS.has(parsed.sortBy) ? parsed.sortBy : fallback.sortBy;
+    const sort = cleanSort(parsed.sortCol, parsed.sortDir, parsed.sortBy, { col: fallback.sortCol, dir: fallback.sortDir });
     const groupBy = ANALYSIS_GROUP_KEYS.has(parsed.groupBy) ? parsed.groupBy : fallback.groupBy;
     const verdicts = Array.isArray(parsed.verdicts) ? parsed.verdicts.filter(v => ANALYSIS_VERDICT_KEYS.includes(v)) : fallback.verdicts;
     const mosRatings = Array.isArray(parsed.mosRatings) ? parsed.mosRatings.filter(v => ANALYSIS_MOS_KEYS.includes(v)) : fallback.mosRatings;
@@ -86,7 +63,7 @@ function loadAnalysisFilters(){
     return {
       weekMin: Math.min(weekMin, weekMax), weekMax: Math.max(weekMin, weekMax),
       monthMin: Math.min(monthMin, monthMax), monthMax: Math.max(monthMin, monthMax),
-      colorBy, xAxis, yAxis, sortBy, groupBy, verdicts, mosRatings, techW, techM, mosLo, mosHi, strategyId, rebound, columnOrder
+      colorBy, xAxis, yAxis, sortCol: sort.col, sortDir: sort.dir, groupBy, verdicts, mosRatings, techW, techM, mosLo, mosHi, strategyId, rebound, columnOrder
     };
   } catch(e){ return fallback; }
 }
@@ -107,4 +84,4 @@ function getAnalysisShownIdx(){ return analysisShownIdx; }
 function setAnalysisColumnsPanelOpen(v){ analysisColumnsPanelOpen = v; }
 function setAnalysisShownIdx(v){ analysisShownIdx = v; }
 
-export { ANALYSIS_GROUP_KEYS, ANALYSIS_GROUP_OPTIONS, ANALYSIS_SORT_KEYS, ANALYSIS_SORT_OPTIONS, analysisFilters, analysisPersistUi, analysisSortComparator, getAnalysisColumnsPanelOpen, getAnalysisShownIdx, saveAnalysisFilters, setAnalysisColumnsPanelOpen, setAnalysisShownIdx };
+export { ANALYSIS_GROUP_KEYS, ANALYSIS_GROUP_OPTIONS, analysisFilters, analysisPersistUi, cleanSort, getAnalysisColumnsPanelOpen, getAnalysisShownIdx, saveAnalysisFilters, setAnalysisColumnsPanelOpen, setAnalysisShownIdx };

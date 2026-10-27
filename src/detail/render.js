@@ -12,6 +12,7 @@ import { renderTechPanel } from './technical.js';
 import { renderStockResearchBar } from './pending.js';
 import { renderGlobalFactorsPanel } from './globalfactors.js';
 import { renderPeersPanel } from './peers.js';
+import { wireStockGridSort } from '../ui/gridsort.js';
 import { bindDetailJumpNav, renderDetailJumpNav } from './jumpnav.js';
 import { loadPriceBarsFor } from '../prices/store.js';
 import { initPriceChart } from '../prices/chart.js';
@@ -77,6 +78,8 @@ function bindPeers(idx){
         if(i !== idx){ renderDetail(i); syncStockHash(stocks[i]); }
       });
     });
+    const peersTable = peersPanel.querySelector('table[data-cols]');
+    if(peersTable) wireStockGridSort(/** @type {HTMLElement} */ (peersTable));
     const scroller = peersPanel.querySelector('.peers-scroll');
     const selfRow = /** @type {HTMLElement} */ (peersPanel.querySelector('tr.peers-self'));
     if(scroller && selfRow){

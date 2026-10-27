@@ -2,10 +2,10 @@
 import { stockIndex, stocks } from '../core/stocks.js';
 import { isPinned, togglePin } from '../core/pins.js';
 import { escapeHtml } from '../core/util.js';
-import { ANALYSIS_GROUP_KEYS, ANALYSIS_GROUP_OPTIONS, ANALYSIS_SORT_KEYS, ANALYSIS_SORT_OPTIONS, getAnalysisColumnsPanelOpen, setAnalysisColumnsPanelOpen, analysisFilters, analysisPersistUi, setAnalysisShownIdx, analysisSortComparator, saveAnalysisFilters } from './state.js';
+import { ANALYSIS_GROUP_KEYS, ANALYSIS_GROUP_OPTIONS, getAnalysisColumnsPanelOpen, setAnalysisColumnsPanelOpen, analysisFilters, analysisPersistUi, setAnalysisShownIdx, saveAnalysisFilters } from './state.js';
 import { groupRanked } from './grouping.js';
 import { analysisTakeBatch, defineAnalysisScope, updateAnalysisRefresh } from './selectbar.js';
-import { ANALYSIS_LB_COLUMN_IDS, analysisColumnOrder, analysisLbCell, analysisRowContext, columnHeaderHtml, renderAnalysisColumnsPanel } from './columns.js';
+import { ANALYSIS_LB_COLUMN_IDS, analysisColumnOrder, analysisLbCell, analysisRowContext, columnHeaderHtml, compareByColumn, nextSort, renderAnalysisColumnsPanel } from './columns.js';
 import { ldOpenPermissions } from '../livedata/bar.js';
 import { ldBatchStart, ldBatchStop } from '../livedata/batch.js';
 import { browserFullscreen, fullscreenLabel, watchFullscreenExit } from '../ui/fullscreen.js';
@@ -44,18 +44,13 @@ function init_leaderboard_fullscreen(){
 }
 
 // ---- markup ----
-// Title, "Sort by", the Columns, Show chart and Full screen buttons, the RSI Quadrant block (`chartBlock`, hidden until opened), the columns panel, the table shell and, below the table, the Live Data Refresh panel.
+// Title, "Group by", the Columns, Show chart and Full screen buttons, the RSI Quadrant block (`chartBlock`, hidden until opened), the columns panel, the table shell and, below the table, the Live Data Refresh panel.
 function leaderboardHtml(chartBlock){
   const headerColOrder = analysisColumnOrder(), kit = getRefreshKit();
   return `<div class="analysis-leaderboard${lbFull ? ' lb-full' : ''}">
       <div class="analysis-leaderboard-head" style="margin-top:0;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div class="rk-headline"><p class="upload-hint biz-showing" style="margin:0"><span id="analysisLeaderboardCount"></span></p>${(defineAnalysisScope(), '')}</div>
         <div class="analysis-actions" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <label class="analysis-filter-label" style="display:flex;align-items:center;gap:6px;">Sort by:
-            <select class="sort-select" id="analysisSortSelect">
-              ${ANALYSIS_SORT_OPTIONS.map(o => `<option value="${o.value}"${analysisFilters.sortBy === o.value ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
-            </select>
-          </label>
           <label class="analysis-filter-label" style="display:flex;align-items:center;gap:6px;">Group by:
             <select class="sort-select" id="analysisGroupSelect">
               ${ANALYSIS_GROUP_OPTIONS.map(o => `<option value="${o.value}"${analysisFilters.groupBy === o.value ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
@@ -72,7 +67,7 @@ function leaderboardHtml(chartBlock){
       ${renderAnalysisColumnsPanel(headerColOrder)}
       <div class="strat-table-wrap">
         <table class="strat-table">
-          <thead><tr>${headerColOrder.map(columnHeaderHtml).join('')}</tr></thead>
+          <thead><tr>${headerColOrder.map(id => columnHeaderHtml(id, analysisSort())).join('')}</tr></thead>
           <tbody id="analysisLeaderboardBody"></tbody>
         </table>
       </div>
@@ -83,9 +78,10 @@ function leaderboardHtml(chartBlock){
 
 // ---- rows ----
 // Pinned stocks (the same pin as the detail panel) always sort to the top; within each
-// group the order follows the "Sort by" dropdown (default: Margin of Safety).
+// group the order follows the column header that was clicked (default: Margin of Safety, highest first).
+const analysisSort = () => ({ col: analysisFilters.sortCol, dir: analysisFilters.sortDir });
 function rankStocks(filtered){
-  const sortCmp = analysisSortComparator(analysisFilters.sortBy);
+  const sortCmp = compareByColumn(analysisFilters.sortCol, analysisFilters.sortDir);
   return filtered.slice().sort((a, b) => {
     const pa = isPinned(a) ? 1 : 0, pb = isPinned(b) ? 1 : 0;
     if(pa !== pb) return pb - pa;
@@ -211,13 +207,16 @@ function wireLeaderboard({ update, rerender, openStock, hideTooltip }){
     });
   }
 
-  // "Sort by" only reorders the rows, so it needs update(), not a full render.
-  const sortSelect = /** @type {HTMLInputElement} */ (document.getElementById('analysisSortSelect'));
-  if(sortSelect){
-    sortSelect.addEventListener('change', () => {
-      analysisFilters.sortBy = ANALYSIS_SORT_KEYS.has(sortSelect.value) ? sortSelect.value : 'mos_desc';
+  // A click on a column header sorts by it (again: reverses it). Only the order changes, so the rows are redrawn, not the whole section.
+  const lbTable = document.querySelector('.analysis-leaderboard .strat-table thead');
+  if(lbTable){
+    lbTable.addEventListener('click', (e) => {
+      const btn = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest('[data-sort-col]'));
+      if(!btn) return;
+      const next = nextSort(analysisSort(), btn.dataset.sortCol || '');
+      analysisFilters.sortCol = next.col; analysisFilters.sortDir = next.dir;
       saveAnalysisFilters(analysisFilters);
-      update();
+      rerender();
     });
   }
 
