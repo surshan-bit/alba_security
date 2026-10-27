@@ -22,5 +22,6 @@
   .strat-filters-panel > .biz-filters-toggle .ft-caret{color:var(--muted);transition:transform .15s;}
   .strat-filters-panel > .biz-filters-toggle[aria-expanded="true"] .ft-caret{transform:rotate(180deg);}
   .strat-filters-panel.filters-collapsed > .biz-filters-toggle .ft-caret{transform:rotate(-90deg);}
-  .strat-filters-panel.filters-collapsed .sheet-panel{display:none;}
+  .strat-filters-panel > .biz-filters-toggle{display:none;}   /* wide screens: the Track and Refresh buttons are always shown, so there is no "Track and refresh" toggle (a phone still opens them from it) */
+  .strat-filters-panel.filters-collapsed .sheet-panel{display:contents;}
 }
