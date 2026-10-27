@@ -171,8 +171,10 @@ async function businessTests(browser){
   if(process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   ok((await page.locator('.biz-detail').count()) === 1 && (await page.locator('.biz-detail .strat-row').count()) >= 1, 'business: clicking an industry opens its stocks and news');
   // (the grids of opened industries are skipped by the browser until the next frame, see styles/business.css, so their text reads empty for an instant after the click: wait for it)
+  await page.locator('.biz-detail [data-biz-cols]').click();   // v1.284: the short column set is the default; All columns is the Analysis set
   await page.waitForFunction(() => /M RSI/i.test((document.querySelector('.biz-detail .strat-table thead') || {}).innerText || ''), null, { timeout: 5000 });
   ok(/M RSI/i.test(await page.locator('.biz-detail .strat-table thead').innerText()) && /M Tech Rating/i.test(await page.locator('.biz-detail .strat-table thead').innerText()), 'business: the stocks use the same grid columns as Analysis and Strategies');
+  await page.locator('.biz-detail [data-biz-cols]').click();
   await page.locator('.biz-detail .strat-row').first().click(); await page.waitForTimeout(300);
   ok(await page.evaluate(() => { const b = document.getElementById('section-business'); return b.classList.contains('active') && b.contains(document.getElementById('detail')) && !!document.querySelector('#detail .detail-name'); }) && /Back to Explorer/.test(await page.locator('#detailBackBtn').innerText()), 'business: clicking a stock opens its detail right there with a way back');
   { // the stock page: its links keep their styling, and the Back button stays in view under the top bar while scrolling
@@ -237,6 +239,16 @@ async function businessTests(browser){
     await page.locator('.biz-row').first().click();
     const opened = await widths();
     ok(JSON.stringify(closed) === JSON.stringify(opened), 'business: columns keep their widths when an opened industry does not change them ' + JSON.stringify(closed) + ' vs ' + JSON.stringify(opened));
+    await page.locator('.biz-row').first().click();
+  }
+  { // v1.284: an opened industry shows the short column set (All columns shows the rest) and a news summary line; news rows are one line each
+    await page.locator('.biz-row').first().click();
+    const lean = await page.locator('.biz-detail .strat-table thead th').count();
+    await page.locator('.biz-detail [data-biz-cols]').click();
+    const full = await page.locator('.biz-detail .strat-table thead th').count();
+    ok(lean < full && lean <= 8, 'industry detail: short column set (' + lean + ') and All columns shows more (' + full + ')');
+    await page.locator('.biz-detail [data-biz-cols]').click();
+    ok(await page.locator('.biz-detail .biz-news-sum').count() === 1, 'industry detail: the News line has a summary');
     await page.locator('.biz-row').first().click();
   }
   { // collecting news on demand: runs, reports, and never breaks the page (the stand-in feed has no headlines)

@@ -13,7 +13,6 @@ import { prefSet } from '../identity/prefs.js';
 import { browserFullscreen, fullscreenLabel, watchFullscreenExit } from '../ui/fullscreen.js';
 import { kit } from '../refresh/kit.js';
 import { heatmapHtml } from './heatmap.js';
-import { newsItemHtml } from './newsitem.js';
 import { sheetFrame, syncSheets } from '../ui/phonesheet.js';
 import { filtersOpenSaved, rememberFiltersOpen } from '../ui/filterdock.js';
 import { PERIODS, industryTable, needsBars, periodOf } from './calc.js';
@@ -23,6 +22,8 @@ import { isRebound } from '../list/rebound.js';
 
 const KEY = 'albaDashboard.business.v1';
 let bizFull = false;   // the table (or the heat map) fills the whole window
+let detailAllCols = false;   // the industry's stock grid shows the short column set; "All columns" shows the whole Analysis set
+const LEAN_COLS = ['stock', 'price', 'weekChg', 'monthChg', 'mos', 'techW', 'news'];
 const newsOpen = new Set();   // industries whose News section is open (closed at first)
 let bizFiltersOpen = filtersOpenSaved('bFiltersOpen');   // the view, period, grouping and strategy controls open from one "Filters" button (phone: a sheet); closed at first, wide screens remember the choice
 let drawnRows = [], drawnCols = 6;   // what the table on the page was last drawn from, so a row can open or close without a redraw
@@ -116,24 +117,51 @@ function paintNewsStatus(){
   document.querySelectorAll('.biz-newsbtn').forEach(b => { /** @type {HTMLButtonElement} */ (b).disabled = true; });
 }
 
+function newsRowHtml(n){
+  const dot = n.s === 'pos' ? '<span class="biz-nd pos" title="Positive" aria-label="Positive"></span>' : n.s === 'neg' ? '<span class="biz-nd neg" title="Negative" aria-label="Negative"></span>' : '<span class="biz-nd"></span>';
+  const title = /^https?:\/\//i.test(n.url) ? '<a href="' + escapeHtml(n.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(n.t) + '</a>' : escapeHtml(n.t);
+  const d = new Date(n.d + 'T00:00:00'), day = isNaN(d.getTime()) ? escapeHtml(n.d) : d.getDate() + ' ' + d.toLocaleString('en-GB', { month: 'short' });
+  return '<li class="biz-nrow"><span class="biz-news-date">' + day + '</span>' + dot + '<span class="biz-nt">' + title + '</span><span class="biz-news-meta">' + escapeHtml(n.stock) + (n.src ? ' · ' + escapeHtml(n.src) : '') + '</span></li>';
+}
 function newsHtml(r){
   if(!r.news.length) return '<p class="upload-hint">No news saved for these stocks in this period. Headlines come from Refresh Fundamental Info, so stocks that have not been refreshed recently have none.</p>';
-  return '<ul class="biz-news">' + r.news.slice(0, 15).map(n => newsItemHtml(n)).join('') + '</ul>' + (r.news.length > 15 ? '<p class="upload-hint">Showing the newest 15 of ' + r.news.length + '.</p>' : '');
+  return '<ul class="biz-news">' + r.news.slice(0, 15).map(newsRowHtml).join('') + '</ul>' + (r.news.length > 15 ? '<p class="upload-hint">Showing the newest 15 of ' + r.news.length + '.</p>' : '');
+}
+function newsSummary(r){
+  if(!r.news.length) return 'none in this period';
+  const latest = new Date(r.news[0].d + 'T00:00:00'), bits = [];
+  if(r.pos) bits.push(r.pos + ' positive'); if(r.neg) bits.push(r.neg + ' negative');
+  if(!bits.length) bits.push(r.news.length + ' items');
+  if(!isNaN(latest.getTime())) bits.push('latest ' + latest.getDate() + ' ' + latest.toLocaleString('en-GB', { month: 'short' }));
+  return bits.join(' \u00b7 ');
 }
 // The industry's stocks in the same grid as the Analysis leaderboard and the Strategies results (best change first),
 // with the period's own change as the last column.
 function detailHtml(r, cols){
   const vis = r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock);
   kit.defineScope('biz:' + r.name, { label: r.name, source: 'biz-kit', selName: 'biz', stocks: () => vis });   // what this table's Refresh button works on
-  const p = periodOf(period), colIds = stockGridColumnIds();   // the column order set in Analysis
+  const p = periodOf(period);
+  // The short set: Stock, Price, 1W, 1M, MoS, weekly rating, News (All columns follows the order set in Analysis); the chosen period's own change is added when it is not 1W or 1M.
+  const colIds = detailAllCols ? stockGridColumnIds().filter(id => id !== 'industry' && id !== 'rank') : LEAN_COLS;
+  const showPeriod = detailAllCols || needsBars(period);
   const byStock = detailSort.col === 'periodChg' ? compareBy((x) => x.change, detailSort.dir) : (() => { const c = compareByColumn(detailSort.col, detailSort.dir); return (a, b) => c(a.stock, b.stock); })();
   const isDefaultSort = detailSort.col === 'periodChg' && detailSort.dir === 'desc';   // with a strategy chosen, its matches come first until a header is clicked
   const rows = r.items.filter(x => !matchedOnly() || x.match).sort((a, b) => (isDefaultSort ? (b.match ? 1 : 0) - (a.match ? 1 : 0) : 0) || byStock(a, b)).map((x, i) => {
     const idx = stockIndex.get(x.stock), ctx = analysisRowContext(x.stock, i, idx);
-    return '<tr class="strat-row' + (x.match ? ' biz-match' : '') + '" data-idx="' + idx + '" tabindex="0">' + colIds.map(id => analysisLbCell(id, ctx)).join('') + '<td class="num">' + pct(x.change) + '</td></tr>';
+    const ts = x.stock.technical && typeof x.stock.technical.score === 'number' ? x.stock.technical.score : null;
+    const scores = detailAllCols ? '' : '<span class="biz-ft">Fund ' + (ctx.scoreLabel || 'n/a') + ' · Tech ' + (ts === null ? 'n/a' : ts.toFixed(1)) + '</span>';
+    return '<tr class="strat-row' + (x.match ? ' biz-match' : '') + '" data-idx="' + idx + '" tabindex="0">' + colIds.map(id => { const c = analysisLbCell(id, ctx); return id === 'stock' && scores ? c.replace(/<\/td>$/, scores + '</td>') : c; }).join('') + (showPeriod ? '<td class="num">' + pct(x.change) + '</td>' : '') + '</tr>';
   }).join('');
-  const grid = '<div class="strat-table-wrap" style="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + colIds.map(id => columnHeaderHtml(id, detailSort)).join('') + sortHeaderHtml('periodChg', p.key + ' chg', detailSort, ' class="num"') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-  return '<tr class="biz-detail"><td colspan="' + cols + '"><div class="biz-detail-box"><div class="biz-stocks-head"><h3>Stocks</h3>' + (strategyOn() ? '<span class="upload-hint">' + r.matches + ' of ' + r.count + ' match the ' + (embed ? 'filters' : 'strategy') + '</span>' : '') + kit.barHtml('biz:' + r.name) + '</div>' + grid + '<div class="biz-stocks-head biz-news-bar"><h3 class="biz-news-head"><button type="button" class="biz-news-toggle" data-biz-newstoggle="' + escapeHtml(r.name) + '" aria-expanded="' + newsOpen.has(r.name) + '">' + (newsOpen.has(r.name) ? '▾' : '▸') + ' News' + (r.news.length ? ' (' + r.news.length + ')' : '') + '</button></h3>' + (newsOpen.has(r.name) ? newsRefreshBtn(r.items.map(x => x.stock), r.items.filter(x => x.match).map(x => x.stock), r.name) : '') + newsStatusFor(r.name) + '</div>' + (newsOpen.has(r.name) ? newsHtml(r) : '') + '</div></td></tr>';
+  const grid = '<div class="strat-table-wrap' + (detailAllCols ? '' : ' biz-lean') + '" style="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + colIds.map(id => columnHeaderHtml(id, detailSort)).join('') + (showPeriod ? sortHeaderHtml('periodChg', p.key + ' chg', detailSort, ' class="num"') : '') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  const card = (label, value) => '<div class="biz-kpi"><small>' + label + '</small><span>' + value + '</span></div>';
+  const vsInd = r.matches && r.matchMean !== null && r.mean !== null ? r.matchMean - r.mean : null;
+  const lastCard = strategyOn()
+    ? card('Matching avg vs industry', r.matches && r.matchMean !== null ? pct(r.matchMean) + (vsInd === null ? '' : ' · <span class="' + (vsInd > 0 ? 'chg-up' : vsInd < 0 ? 'chg-down' : '') + '">' + (vsInd > 0 ? '+' : '') + vsInd.toFixed(2) + ' pts</span>') : '<span class="biz-na">none match</span>')
+    : card('News', r.pos + ' positive · ' + r.neg + ' negative');
+  const kpis = '<div class="biz-kpis">' + card('Average ' + p.key, pct(r.mean)) + card('Median ' + p.key, pct(r.median)) + card('Up / down', r.up + ' up · ' + r.down + ' down ' + breadth(r).replace(/ \d+↑ \d+↓.*$/, '')) + lastCard + '</div>';
+  const open = newsOpen.has(r.name);
+  const note = '<p class="upload-hint biz-colsnote">' + (detailAllCols ? 'Showing every column.' : 'Fund and Tech scores sit under each stock. RSI, research and links are in') + ' <button type="button" class="biz-colsbtn" data-biz-cols="1" aria-pressed="' + detailAllCols + '">' + (detailAllCols ? 'Fewer columns' : 'Columns') + (detailAllCols ? '' : ' ▾') + '</button></p>';
+  return '<tr class="biz-detail"><td colspan="' + cols + '"><div class="biz-detail-box"><div class="biz-stocks-head"><h3 class="biz-dname">' + escapeHtml(r.name) + '</h3>' + '<span class="upload-hint">' + r.count + ' ' + (r.count === 1 ? 'stock' : 'stocks') + (strategyOn() ? ' · ' + r.matches + ' ' + (r.matches === 1 ? 'matches' : 'match') + ' your ' + (embed ? 'filters' : 'strategy') : '') + '</span>' + kit.barHtml('biz:' + r.name) + '</div>' + kpis + grid + note + '<div class="biz-stocks-head biz-news-bar"><h3 class="biz-news-head"><button type="button" class="biz-news-toggle" data-biz-newstoggle="' + escapeHtml(r.name) + '" aria-expanded="' + open + '">' + (open ? '▾' : '▸') + ' News</button></h3><span class="upload-hint biz-news-sum">' + newsSummary(r) + '</span>' + (open ? newsRefreshBtn(r.items.map(x => x.stock), r.items.filter(x => x.match).map(x => x.stock), r.name) : '') + newsStatusFor(r.name) + '</div>' + (open ? newsHtml(r) : '') + '</div></td></tr>';
 }
 const hostSection = () => embed ? embed.section : appSections.business;
 const hostLabel = () => embed ? embed.label : 'Explorer';
@@ -259,6 +287,7 @@ function wire(el){
   el.addEventListener('click', (e) => {
     const io = closestEl(e, '[data-biz-open]');
     if(io){ openIndustryInline(hostSection(), hostLabel(), curBy(), io.dataset.bizOpen); return; }
+    if(closestEl(e, '[data-biz-cols]')){ detailAllCols = !detailAllCols; render(); return; }
     const nt = closestEl(e, '[data-biz-newstoggle]');
     if(nt){ const n = nt.dataset.bizNewstoggle; if(newsOpen.has(n)) newsOpen.delete(n); else newsOpen.add(n); render(); return; }
     const sh = closestEl(e, '[data-sort-col]');
