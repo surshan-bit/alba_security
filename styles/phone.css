@@ -68,11 +68,12 @@ html{font-size:112.5%;}
 .strat-fold>summary{font-size:.8rem;margin-bottom:2px;padding:8px 0;gap:8px;}
 .strat-fold-sum{font-size:.74rem;}
 .strat-fold{margin-bottom:4px;}
-.sr-count{font-size:.8rem;grid-column:1 / 4;grid-row:3;margin:-2px 0 0;text-align:left;white-space:nowrap;}
+.sr-count{font-size:.8rem;grid-column:1 / 3;grid-row:3;margin:-2px 0 0;text-align:left;white-space:nowrap;}
 .sr-row select{width:100%;min-width:0;box-sizing:border-box;}
 .sr-field{grid-column:1;grid-row:1;}
 .sr-op{grid-column:2;grid-row:1;}
 .sr-del{grid-column:3;grid-row:1;padding:0;text-align:center;}
+.sr-move{grid-column:3;grid-row:3;justify-self:end;}
 .sr-val{grid-column:1 / 4;grid-row:2;min-width:0;}
 .sr-val:has(.sr-opts){grid-column:1 / 4;}
 .sr-add{width:100%;box-sizing:border-box;margin-top:14px;}

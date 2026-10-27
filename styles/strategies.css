@@ -23,7 +23,7 @@
 .sr-rules{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
 /* Strategies rules: the rows have no outline any more, so they take no side padding and line up with the heading and the + Add a rule box. */
 .sr-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:0;border-radius:0;padding:6px 0;background:transparent;}
-@media (min-width:1000px){.sr-row,.sr-head{display:grid;grid-template-columns:340px 120px minmax(0,1fr) 110px 34px;column-gap:10px;}.sr-row select{width:100%;}.sr-count{margin-left:0;text-align:right;}}
+@media (min-width:1000px){.sr-row,.sr-head{display:grid;grid-template-columns:340px 120px minmax(0,1fr) 110px 56px 34px;column-gap:10px;}.sr-row select{width:100%;}.sr-count{margin-left:0;text-align:right;}}
 .sr-row select,.sr-add,.sr-row input,.strat-why-input{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:.84rem;}
 .sr-row select{color:var(--text);}
 .sr-add{color:var(--text);}
@@ -53,6 +53,7 @@
 .sr-del:hover,.sr-del:focus-visible{background:var(--avoid);border-color:var(--avoid);color:#fff;}
 .sr-head{display:none;padding:0 0 6px;border-bottom:1px solid var(--line);font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
 .sr-head span:nth-child(4){text-align:right;}
+.sr-head span:nth-child(5){text-align:center;}
 @media (min-width:1000px){.sr-head{display:grid;}}
 @media (min-width:1000px){.sr-rules{gap:0;}.sr-row{padding:8px 0;}.sr-row + .sr-row{border-top:1px solid var(--line);}.sr-row:last-child{border-bottom:1px solid var(--line);}}
 .sr-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;}
@@ -244,3 +245,9 @@
 .sr-foot .sr-add:hover,.sr-foot .sr-add:focus-visible{border-color:var(--accent);}
 .sr-foot .sr-add option,.sr-foot .sr-add optgroup{color:var(--text);font-weight:400;}
 @media (min-width:1000px){.sr-foot .sr-add{width:340px;}}
+
+/* v1.282: move a rule up or down (the order is only for reading; all rules must pass). */
+.sr-move{display:inline-flex;gap:2px;justify-content:center;}
+.sr-move button{display:inline-flex;align-items:center;justify-content:center;width:26px;height:34px;padding:0;background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--text);cursor:pointer;}
+.sr-move button:hover:not(:disabled),.sr-move button:focus-visible{border-color:var(--accent);color:var(--accent);}
+.sr-move button:disabled{opacity:.3;cursor:default;}

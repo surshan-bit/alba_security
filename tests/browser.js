@@ -436,7 +436,16 @@ async function rowCapTests(browser){
     ok((await page.locator('.sr-row').count()) === 0 && (await page.locator('.sr-undo').count()) === 1, 'strategy rules: removing a rule offers Undo');
     await page.locator('.sr-undo-btn').click(); await page.waitForTimeout(200);
     ok((await page.locator('.sr-row').count()) === 1 && (await page.locator('.sr-undo').count()) === 0, 'strategy rules: Undo puts the rule back');
-    await page.locator('.sr-del').first().click(); await page.waitForTimeout(200);
+    const names = () => page.evaluate(() => [...document.querySelectorAll('.sr-row .sr-field')].map(x => x.value));
+    if((await page.locator('.sr-row').count()) === 1){ await page.locator('.sr-add').selectOption({ index: 2 }); await page.waitForTimeout(150); }
+    const before = await names();
+    ok((await page.locator('.sr-row').count()) === 2 && (await page.locator('.sr-up').first().isDisabled()) && (await page.locator('.sr-down').last().isDisabled()), 'strategy rules: the first rule cannot move up and the last cannot move down');
+    await page.locator('.sr-down').first().click(); await page.waitForTimeout(200);
+    const after = await names();
+    ok(after[0] === before[1] && after[1] === before[0], `strategy rules: Move down swaps the rule with the next one ${JSON.stringify([before, after])}`);
+    await page.locator('.sr-up').last().click(); await page.waitForTimeout(200);
+    ok(JSON.stringify(await names()) === JSON.stringify(before), 'strategy rules: Move up puts it back');
+    while((await page.locator('.sr-del').count()) > 0){ await page.locator('.sr-del').first().click(); await page.waitForTimeout(150); }
   }
   // Explorer: opening and closing an industry changes only that row (the rest of the table is not redrawn)
   await goto(page, 'business'); await page.waitForSelector('.biz-row', { timeout: 5000 });
