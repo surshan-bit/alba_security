@@ -251,6 +251,15 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.287 &middot; 2026-10-28</h3>
+            <ul>
+              <li><strong>Buy / Sell ideas now look at next week:</strong> for a stock you do not hold, a Buy is now <b>held back (shown as Wait)</b> when its <b>weekly or monthly MACD is below its signal line</b>, or when its <b>results are due within 7 days</b> (an earnings gap decides the week whatever the chart says). The reason is shown in the row, for example &ldquo;held back: results due in 2 days&rdquo;.</li>
+              <li><strong>Points on the setup:</strong> very thin trading (average daily traded value under &#8377;50 lakh) and clearly negative recent news (two or more negative items and more negative than positive in 14 days) take one point off the setup of 4; clearly positive news adds one. The Buy call needs a setup of 2 or more after these. The setup column and the &ldquo;chance&rdquo; figure still show the chart setup alone.</li>
+              <li><strong>Size class:</strong> each row now shows Large, Mid or Small cap next to the ticker, once the stock has a market cap.</li>
+              <li><strong>Not penalised on purpose:</strong> a stretched RSI. Replayed over about ten years of weekly bars, stocks with both MACDs bullish did no worse above a weekly RSI of 75 than below it, so it is left out. Thin trading did worse, which is why it counts.</li>
+              <li><strong>Needs a refresh:</strong> the results date is read from TradingView with the price, so these checks apply to a stock after your next <i>Refresh all stocks</i>; until then a missing figure never holds a Buy back and never scores. Stocks you hold keep their trade call. Strategies also gained a rule, <i>Days until next results</i>, under News and events.</li>
+            </ul>
+
             <h3>v1.286 &middot; 2026-10-28</h3>
             <ul>
               <li><strong>Market cap in Strategies:</strong> a new <b>Size (market capitalisation)</b> group offers two rule choices, <i>Market cap (&#8377; crore)</i> and <i>Cap class (Large, Mid, Small)</i>. Use them to keep a strategy to the size of company you want, for example only Mid and Large, or only Small. Classes follow the SEBI / AMFI rule: Large is the 100 biggest companies (&#8377;1,04,000 crore or more), Mid is the next 150 (&#8377;36,000 crore up to that), Small is the rest. The cut-offs are the October 2026 values and AMFI republishes them every six months.</li>
