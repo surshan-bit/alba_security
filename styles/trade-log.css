@@ -65,6 +65,5 @@
 .tl-top5 ol{list-style:none;margin:0;padding:0;display:grid;gap:10px;}
 .tl-top5 li{display:flex;gap:10px;align-items:flex-start;}
 .tl-top5-rank{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(60,180,110,.18);border:1px solid rgba(60,180,110,.5);font-size:.75rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
-.tl-top5-tag{margin-left:8px;font-size:.68rem;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;}
 .tl-top5-meta{font-size:.8rem;margin:2px 0;}
 .tl-top5 .tl-idea-why{min-width:0;}

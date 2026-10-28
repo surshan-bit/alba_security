@@ -9,9 +9,9 @@ import { appSections } from '../ui/navigation.js';
 import { openStockInline } from '../ui/inlinedetail.js';
 import { ensurePriceBars, pcTickerKey, priceHistoryByTicker, priceLoaded } from '../prices/store.js';
 import { tvIstDate } from '../tv/connector.js';
-import { HOLD_SETUP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys } from './ideacall.js';
+import { AVOID_BOTTOM, BUY_TOP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys } from './ideacall.js';
 import { CAP_NAME } from '../core/capclass.js';
-import { swingSetup } from './swing.js';
+import { BASE_UP, nextWeekRead, rankReads } from './nextweek.js';
 import { compareBy, nextSort, sortHeaderHtml } from '../analysis/columns.js';
 
 const MAX_ROWS = 50, TOP_N = 5;
@@ -29,10 +29,9 @@ function ideasFor(strategyId){
   if(!st) return null;
   const held = openTradeByStock();
   const today = tvIstDate();
-  return rankIdeas(qualifyingStocks(stocks, st.rules).map(s => {
-    const bars = priceHistoryByTicker[pcTickerKey(s)];
-    return { s, c: ideaCall(s, held.get(s) || null, swingSetup(s, bars && bars['1W'], today), today) };
-  }));
+  const list = qualifyingStocks(stocks, st.rules);
+  const reads = rankReads(list.map(s => { const bars = priceHistoryByTicker[pcTickerKey(s)]; return bars && bars['1W'] ? nextWeekRead(bars['1W'], today) : null; }));
+  return rankIdeas(list.map((s, i) => ({ s, c: ideaCall(s, held.get(s) || null, reads[i], today) })));
 }
 
 let sid = '', filter = 'all';
@@ -42,8 +41,8 @@ const CALL_ORDER = { buy: 3, hold: 2, sell: 1 };
 const IDEA_SORT = {
   name: (x) => String(x.s.name || tickerSymbol(x.s)).toLowerCase(),
   call: (x) => CALL_ORDER[x.c.call] || 0,
-  setup: (x) => x.c.setup == null ? null : x.c.setup,
-  chance: (x) => x.c.chance == null ? null : x.c.chance,
+  score: (x) => x.c.p == null ? null : x.c.p,
+  chance: (x) => x.c.up == null ? null : x.c.up,
   price: (x) => { const p = x.s.valuation && x.s.valuation.currentPrice; return p == null ? null : p; },
   mos: (x) => x.c.mos == null ? null : x.c.mos
 };
@@ -79,24 +78,23 @@ function rowHtml(x, rank){
     <td class="num">${rank}</td>
     <td><a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(s.name || tickerSymbol(s))}</a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}${c.cap ? ' &middot; ' + CAP_NAME[c.cap] : ''}${c.held ? ' &middot; held' : ''}</span></td>
     <td><span class="tl-signal-badge tl-idea-${c.call}">${escapeHtml(c.label)}</span></td>
-    <td class="num" title="Timing checks passed: near the 52-week high, weekly MACD bullish above zero, enough weekly movement, firm RSI">${c.setup != null ? c.setup + '/' + c.of : '&mdash;'}</td>
-    <td class="num" title="${c.chance != null ? 'In past weeks with this setup, the stock closed 5% or more higher two weeks later ' + c.chance + '% of the time, and touched +5% within the two weeks ' + c.touch + '% of the time.' : ''}">${c.chance != null ? '~' + c.chance + '%' : '&mdash;'}</td>
+    <td class="num" title="Where its next-week score ranks among the stocks of this strategy today">${c.topPct != null ? 'Top ' + c.topPct + '%' : '&mdash;'}</td>
+    <td class="num" title="${c.up != null ? 'In the five-year tests, stocks that ranked like this each week closed higher in ' + c.up + '% of weeks, and beat the median stock in ' + c.beat + '% of weeks. All stocks closed higher in ' + BASE_UP + '% of weeks.' : ''}">${c.up != null ? '~' + Math.round(c.up) + '%' : '&mdash;'}</td>
     <td class="num">${price != null ? '&#8377;' + Number(price).toLocaleString('en-IN') : '&mdash;'}</td>
-    <td class="num">${price != null && !c.held ? '&#8377;' + (Math.round(price * 105) / 100).toLocaleString('en-IN') : '&mdash;'}</td>
     <td class="num">${c.mos != null ? (c.mos >= 0 ? '+' : '') + c.mos.toFixed(1) + '%' : '&mdash;'}</td>
     <td class="tl-idea-why">${escapeHtml(c.reasons.join('; '))}</td></tr>`;
 }
 // The five best Buy calls among the stocks you do not hold, above the full list. A Buy that rests on a Hold verdict plus a strong chart is labelled as such.
 function topHtml(list){
   const top = topBuys(list, TOP_N);
-  if(!top.length) return '<div class="tl-top5"><div class="tl-top5-title">Top ' + TOP_N + ' to buy</div><p class="upload-hint">No stock in this strategy is a Buy today.</p></div>';
+  if(!top.length) return '<div class="tl-top5"><div class="tl-top5-title">Top ' + TOP_N + ' likely to rise next week</div><p class="upload-hint">No stock in this strategy is a Buy today.</p></div>';
   const item = (x, i) => {
     const { s, c } = x, idx = stocks.indexOf(s), price = s.valuation && s.valuation.currentPrice;
-    return `<li><span class="tl-top5-rank">${i + 1}</span><div><a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(s.name || tickerSymbol(s))}</a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}${c.cap ? ' &middot; ' + CAP_NAME[c.cap] : ''}</span>${c.viaHold ? '<span class="tl-top5-tag" title="Its Fundamental verdict is Hold; it is a Buy here only because the margin of safety, score and chart all clear their bars.">Hold verdict, strong chart</span>' : ''}
-      <div class="tl-top5-meta">Setup ${c.setup}/${c.of}${c.chance != null ? ' &middot; ~' + c.chance + '% chance of +5% in 2 wks' : ''}${c.mos != null ? ' &middot; MoS ' + (c.mos >= 0 ? '+' : '') + c.mos.toFixed(1) + '%' : ''}${price != null ? ' &middot; &#8377;' + Number(price).toLocaleString('en-IN') + ' &rarr; &#8377;' + (Math.round(price * 105) / 100).toLocaleString('en-IN') : ''}</div>
+    return `<li><span class="tl-top5-rank">${i + 1}</span><div><a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(s.name || tickerSymbol(s))}</a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}${c.cap ? ' &middot; ' + CAP_NAME[c.cap] : ''}</span>
+      <div class="tl-top5-meta">Top ${c.topPct}% next-week score &middot; rose ~${Math.round(c.up)}% of weeks in tests${c.mos != null ? ' &middot; MoS ' + (c.mos >= 0 ? '+' : '') + c.mos.toFixed(1) + '%' : ''}${price != null ? ' &middot; &#8377;' + Number(price).toLocaleString('en-IN') : ''}</div>
       <div class="tl-idea-why">${escapeHtml(c.reasons.join('; '))}</div></div></li>`;
   };
-  return `<div class="tl-top5"><div class="tl-top5-title">Top ${TOP_N} to buy</div><ol>${top.map(item).join('')}</ol></div>`;
+  return `<div class="tl-top5"><div class="tl-top5-title">Top ${TOP_N} likely to rise next week</div><ol>${top.map(item).join('')}</ol></div>`;
 }
 function bodyHtml(){
   if(sid) loadBars();
@@ -110,9 +108,9 @@ function bodyHtml(){
   const shown = ideasSort.col ? filtered.slice().sort(compareBy(IDEA_SORT[ideasSort.col], ideasSort.dir)) : filtered;
   const chip = (k, label) => `<button type="button" class="tl-view-btn${filter === k ? ' active' : ''}" data-idea-filter="${k}">${label}</button>`;
   return `${topHtml(list)}<div class="tl-ideas-bar"><div class="tl-view-toggle" role="group" aria-label="Call filter">${chip('all', 'All ' + list.length)}${chip('buy', 'Buy ' + n('buy'))}${chip('hold', 'Hold ' + n('hold'))}${chip('sell', 'Sell ' + n('sell'))}</div></div>
-    <div class="help-table-wrap"><table class="help-table"><thead><tr><th>#</th>${th('name', 'Stock')}${th('call', "Today's call")}${th('setup', 'Setup')}${th('chance', 'Chance +5% in 2 wks')}${th('price', 'Price')}<th>Sell at +5%</th>${th('mos', 'MoS')}<th>Why</th></tr></thead>
+    <div class="help-table-wrap"><table class="help-table"><thead><tr><th>#</th>${th('name', 'Stock')}${th('call', "Today's call")}${th('score', 'Next-week score')}${th('chance', 'Rose in tests')}${th('price', 'Price')}${th('mos', 'MoS')}<th>Why</th></tr></thead>
     <tbody>${shown.slice(0, MAX_ROWS).map((x, i) => rowHtml(x, i + 1)).join('')}</tbody></table></div>
-    <p class="upload-hint">${barsBusy ? 'Loading weekly price history for the timing check (' + barsDone + ' of ' + barsTotal + ')&hellip; ' : ''}<b>Setup</b> counts four timing checks (0 to 4). <b>Chance</b> is how often, in past weeks with that setup, a stock closed 5% or more higher two weeks later (about 7,200 stock-weeks from 43 stocks); an average stock does this about 25% of the time, so treat it as a guide, not a promise. Buy needs a stock worth owning (a Strong or Good verdict, or a Hold verdict with a margin of safety of 10%+, a score of 5+, a setup of ${HOLD_SETUP}+ and both MACDs bullish) and a setup of 2 or more, and is held back (Wait) when the weekly or monthly MACD is below its signal line or results are due within ${RESULTS_DAYS} days. Very thin trading (under &#8377;${THIN_LAKH} lakh a day) and clearly negative recent news take a point off the setup; clearly positive news adds one. These checks need the latest Refresh all stocks.</p>
+    <p class="upload-hint">${barsBusy ? 'Loading weekly price history for the timing check (' + barsDone + ' of ' + barsTotal + ')&hellip; ' : ''}The score comes from a model trained and tested week by week on five years of weekly prices (about 297,000 stock-weeks): it rates how likely a stock is to beat the median stock next week. <b>Next-week score</b> shows where a stock ranks among this strategy&rsquo;s stocks today (the raw score moves with the whole market, the ranking does not). <b>Rose in tests</b> is how often stocks that ranked like this each week closed higher in a week in those tests; all stocks did so ${BASE_UP}% of the time. Buy is a stock in the top ${BUY_TOP}% of scores; Avoid is the bottom ${AVOID_BOTTOM}%. A Buy is held back (Wait) when results are due within ${RESULTS_DAYS} days, when trading is very thin (under &#8377;${THIN_LAKH} lakh a day) or when recent news clearly leans negative. The edge is real but modest (the best five each week rose about 55% of the time in the tests, against 48% for all), and it cannot see the market: in a week when most stocks fall, the best of them usually falls too. A guide, not a promise. Held positions keep their Trade Log call. The results-date and news checks need the latest Refresh all stocks.</p>
     ${shown.length > MAX_ROWS ? '<p class="upload-hint">Showing the top ' + MAX_ROWS + ' of ' + shown.length + '.</p>' : ''}`;
 }
 // Only the table: used when trades or prices change, so the strategy list is not rebuilt under an open dropdown.
