@@ -9,7 +9,8 @@ import { appSections } from '../ui/navigation.js';
 import { openStockInline } from '../ui/inlinedetail.js';
 import { ensurePriceBars, pcTickerKey, priceHistoryByTicker, priceLoaded } from '../prices/store.js';
 import { tvIstDate } from '../tv/connector.js';
-import { ideaCall, rankIdeas } from './ideacall.js';
+import { RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas } from './ideacall.js';
+import { CAP_NAME } from '../core/capclass.js';
 import { swingSetup } from './swing.js';
 import { compareBy, nextSort, sortHeaderHtml } from '../analysis/columns.js';
 
@@ -30,7 +31,7 @@ function ideasFor(strategyId){
   const today = tvIstDate();
   return rankIdeas(qualifyingStocks(stocks, st.rules).map(s => {
     const bars = priceHistoryByTicker[pcTickerKey(s)];
-    return { s, c: ideaCall(s, held.get(s) || null, swingSetup(s, bars && bars['1W'], today)) };
+    return { s, c: ideaCall(s, held.get(s) || null, swingSetup(s, bars && bars['1W'], today), today) };
   }));
 }
 
@@ -76,7 +77,7 @@ function rowHtml(x, rank){
   const { s, c } = x, idx = stocks.indexOf(s), price = s.valuation && s.valuation.currentPrice;
   return `<tr>
     <td class="num">${rank}</td>
-    <td><a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(s.name || tickerSymbol(s))}</a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}${c.held ? ' &middot; held' : ''}</span></td>
+    <td><a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(s.name || tickerSymbol(s))}</a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}${c.cap ? ' &middot; ' + CAP_NAME[c.cap] : ''}${c.held ? ' &middot; held' : ''}</span></td>
     <td><span class="tl-signal-badge tl-idea-${c.call}">${escapeHtml(c.label)}</span></td>
     <td class="num" title="Timing checks passed: near the 52-week high, weekly MACD bullish above zero, enough weekly movement, firm RSI">${c.setup != null ? c.setup + '/' + c.of : '&mdash;'}</td>
     <td class="num" title="${c.chance != null ? 'In past weeks with this setup, the stock closed 5% or more higher two weeks later ' + c.chance + '% of the time, and touched +5% within the two weeks ' + c.touch + '% of the time.' : ''}">${c.chance != null ? '~' + c.chance + '%' : '&mdash;'}</td>
@@ -99,7 +100,7 @@ function bodyHtml(){
   return `<div class="tl-ideas-bar"><div class="tl-view-toggle" role="group" aria-label="Call filter">${chip('all', 'All ' + list.length)}${chip('buy', 'Buy ' + n('buy'))}${chip('hold', 'Hold ' + n('hold'))}${chip('sell', 'Sell ' + n('sell'))}</div></div>
     <div class="help-table-wrap"><table class="help-table"><thead><tr><th>#</th>${th('name', 'Stock')}${th('call', "Today's call")}${th('setup', 'Setup')}${th('chance', 'Chance +5% in 2 wks')}${th('price', 'Price')}<th>Sell at +5%</th>${th('mos', 'MoS')}<th>Why</th></tr></thead>
     <tbody>${shown.slice(0, MAX_ROWS).map((x, i) => rowHtml(x, i + 1)).join('')}</tbody></table></div>
-    <p class="upload-hint">${barsBusy ? 'Loading weekly price history for the timing check (' + barsDone + ' of ' + barsTotal + ')&hellip; ' : ''}<b>Setup</b> counts four timing checks (0 to 4). <b>Chance</b> is how often, in past weeks with that setup, a stock closed 5% or more higher two weeks later (about 7,200 stock-weeks from 43 stocks); an average stock does this about 25% of the time, so treat it as a guide, not a promise. Buy needs a stock worth owning and a setup of 2 or more.</p>
+    <p class="upload-hint">${barsBusy ? 'Loading weekly price history for the timing check (' + barsDone + ' of ' + barsTotal + ')&hellip; ' : ''}<b>Setup</b> counts four timing checks (0 to 4). <b>Chance</b> is how often, in past weeks with that setup, a stock closed 5% or more higher two weeks later (about 7,200 stock-weeks from 43 stocks); an average stock does this about 25% of the time, so treat it as a guide, not a promise. Buy needs a stock worth owning and a setup of 2 or more, and is held back (Wait) when the weekly or monthly MACD is below its signal line or results are due within ${RESULTS_DAYS} days. Very thin trading (under &#8377;${THIN_LAKH} lakh a day) and clearly negative recent news take a point off the setup; clearly positive news adds one. These checks need the latest Refresh all stocks.</p>
     ${shown.length > MAX_ROWS ? '<p class="upload-hint">Showing the top ' + MAX_ROWS + ' of ' + shown.length + '.</p>' : ''}`;
 }
 // Only the table: used when trades or prices change, so the strategy list is not rebuilt under an open dropdown.

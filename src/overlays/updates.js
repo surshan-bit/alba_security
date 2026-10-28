@@ -60,7 +60,8 @@ function applyUpdatesDoc(s, doc){
   const lq = doc && doc.liquidity;
   if(lq && typeof lq === 'object'){
     const av = typeof lq.avgVolume === 'number' && lq.avgVolume >= 0 ? lq.avgVolume : null, mc = typeof lq.marketCap === 'number' && lq.marketCap > 0 ? lq.marketCap : null;
-    if(av != null || mc != null) s.liquidity = { avgVolume: av, marketCap: mc, asof: lq.asof || null };   // marketCap in ₹ crore (v1.286)
+    const nr = typeof lq.nextResults === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lq.nextResults) ? lq.nextResults : null;
+    if(av != null || mc != null || nr != null) s.liquidity = { avgVolume: av, marketCap: mc, nextResults: nr, asof: lq.asof || null };   // marketCap in ₹ crore (v1.286); nextResults the date of the next results (v1.287)
   }
   const t = doc && doc.technical;
   if(t && typeof t === 'object'){

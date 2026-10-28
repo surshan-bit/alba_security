@@ -71,7 +71,7 @@ fs.mkdirSync(path.join(WORK, 'docs'), { recursive: true });
 const writes = [], report = { updated: 0, scored: 0, kept: 0, noPrice: [], noValuation: 0, noIndicators: 0, missingVersion: [] };
 for(let [sym, row] of Object.entries(rows)){
   const s = bySym.get(sym); if(!s) continue;
-  if(Array.isArray(row)){ const c = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M', 'average_volume_30d_calc', 'market_cap_basic']; row = Object.fromEntries(c.map((k, i) => [k, row[i]])); }
+  if(Array.isArray(row)){ const c = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M', 'average_volume_30d_calc', 'market_cap_basic', 'earnings_release_next_date']; row = Object.fromEntries(c.map((k, i) => [k, row[i]])); }
   const id = docIdOf(s);
   const px = row && typeof row.close === 'number' && row.close > 0 ? row.close : null;
   if(px == null){ report.noPrice.push(sym); continue; }
@@ -79,6 +79,7 @@ for(let [sym, row] of Object.entries(rows)){
   const lqv = {};
   if(typeof row['average_volume_30d_calc'] === 'number' && row['average_volume_30d_calc'] >= 0) lqv.avgVolume = Math.round(row['average_volume_30d_calc']);
   if(typeof row['market_cap_basic'] === 'number' && row['market_cap_basic'] > 0) lqv.marketCap = Math.round(row['market_cap_basic'] / 1e7);
+  if(typeof row['earnings_release_next_date'] === 'number' && row['earnings_release_next_date'] > 0) lqv.nextResults = new Date((row['earnings_release_next_date'] + 19800) * 1000).toISOString().slice(0, 10);
   if(Object.keys(lqv).length) doc.liquidity = Object.assign(lqv, { asof: today });
   const pv = s.pillars && typeof s.pillars.val === 'number' ? s.pillars.val : null;
   // the technical block in force: the saved update when it is at least as new as the stock's own, else the stock's own

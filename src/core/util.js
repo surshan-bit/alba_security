@@ -89,4 +89,14 @@ function screenerUrl(s){
   return `https://www.screener.in/company/${encodeURIComponent(sym)}/${suffix}`;
 }
 
-export { daysSinceDate, escapeHtml, fixedOrNull, formatDate, formatDeepRefreshTimestamp, formatUploadTimestamp, pctChangeSpan, round2OrNull, safeText, sanitizeDocId, screenerUrl, sleep, tickerIndustry, tickerKey, tickerSymbol };
+// Days from `today` (YYYY-MM-DD; this device's date when omitted) until the date `str` (YYYY-MM-DD): 0 for today, null when `str` is missing, unreadable or already past.
+function daysUntil(str, today){
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(str || '')), n = today ? /^(\d{4})-(\d{2})-(\d{2})/.exec(String(today)) : null;
+  if(!m) return null;
+  const now = new Date();
+  const b = n ? Date.UTC(+n[1], +n[2] - 1, +n[3]) : Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const d = Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - b) / 86400000);
+  return d >= 0 ? d : null;
+}
+
+export { daysSinceDate, daysUntil, escapeHtml, fixedOrNull, formatDate, formatDeepRefreshTimestamp, formatUploadTimestamp, pctChangeSpan, round2OrNull, safeText, sanitizeDocId, screenerUrl, sleep, tickerIndustry, tickerKey, tickerSymbol };

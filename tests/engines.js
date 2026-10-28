@@ -704,6 +704,44 @@ test('ideas: a stretched weekly RSI no longer blocks a Buy (replayed history sho
   const s = { pts: 2, of: 4, chance: 25, touch: 56, hits: ['x'], misses: [], fromHigh: -3, move: 6 };
   assert.strictEqual(I.ideaCall(idea({ technical: { states: { weekMacd: 'bull_above' }, raw: { weekRsi: 82, monthRsi: 60 } } }), null, s).call, 'buy');
 });
+test('ideas (v1.287): a weekly or monthly MACD below its signal line, or results due within 7 days, hold back a Buy; a figure that is not there never does', () => {
+  const s3 = { pts: 3, of: 4, chance: 28, touch: 58, hits: ['x'], misses: [], fromHigh: -3, move: 6 };
+  const tech = (raw) => ({ states: { weekMacd: 'bull_above' }, raw: Object.assign({ weekRsi: 65, monthRsi: 60 }, raw) });
+  const up = { weekMacdLevel: 2, weekMacdSignal: 1, monthMacdLevel: 3, monthMacdSignal: 1 }, TODAY = '2026-10-28';
+  assert.strictEqual(I.ideaCall(idea({ technical: tech(up) }), null, s3, TODAY).call, 'buy', 'both MACDs above their signal lines');
+  const wk = I.ideaCall(idea({ technical: tech(Object.assign({}, up, { weekMacdLevel: 0.5 })) }), null, s3, TODAY);
+  assert.strictEqual(wk.call, 'hold'); assert.ok(wk.reasons.includes('held back: weekly MACD is below its signal line'));
+  const mo = I.ideaCall(idea({ technical: tech(Object.assign({}, up, { monthMacdLevel: 0.5 })) }), null, s3, TODAY);
+  assert.strictEqual(mo.call, 'hold'); assert.ok(mo.reasons.includes('held back: monthly MACD is below its signal line'));
+  assert.strictEqual(I.ideaCall(idea({}), null, s3, TODAY).call, 'buy', 'no MACD levels saved yet: nothing to hold it back');
+  const due = (d, today) => I.ideaCall(idea({ technical: tech(up), liquidity: { nextResults: d } }), null, s3, today);
+  const r2 = due('2026-10-30', TODAY);
+  assert.strictEqual(r2.call, 'hold'); assert.ok(r2.reasons.some(x => /held back: results due in 2 days \(2026-10-30\)/.test(x)));
+  assert.ok(due('2026-10-28', TODAY).reasons.some(x => /results due today/.test(x)));
+  assert.strictEqual(due('2026-11-04', TODAY).call, 'hold', 'seven days is still inside the window');
+  assert.strictEqual(due('2026-11-05', TODAY).call, 'buy', 'eight days out is not');
+  assert.strictEqual(due('2026-10-20', TODAY).call, 'buy', 'a date already past is ignored');
+  assert.strictEqual(due('2026-10-30', undefined).call, 'buy', 'without today the date check is skipped');
+  const held = I.ideaCall(idea({ liquidity: { nextResults: '2026-10-30' } }), { qty: 10, buy: { price: 100 }, ticker: 'X' }, null, TODAY);
+  assert.ok(!held.reasons.some(x => /held back/.test(x)), 'a stock you hold keeps its trade call and is not gated');
+});
+test('ideas (v1.287): thin trading and negative news take a setup point off; positive news adds one; the size class is shown', () => {
+  const s = (pts) => ({ pts, of: 4, chance: 25, touch: 56, hits: ['x'], misses: [], fromHigh: -3, move: 6 });
+  const thin = { avgVolume: 10000 };   // 10,000 shares at 100 = 10 lakh a day
+  assert.strictEqual(I.ideaCall(idea({ liquidity: thin }), null, s(2), '2026-10-28').call, 'hold', 'a setup of 2 less 1 for thin trading is 1');
+  assert.strictEqual(I.ideaCall(idea({ liquidity: thin }), null, s(3), '2026-10-28').call, 'buy');
+  assert.strictEqual(I.ideaCall(idea({ liquidity: { avgVolume: 100000 } }), null, s(2), '2026-10-28').call, 'buy', '1 crore a day is not thin');
+  const day = new Date().toISOString().slice(0, 10), ev = (...ss) => ss.map((x, i) => ({ k: 'news', d: day, t: 'n' + i, s: x }));
+  assert.strictEqual(I.ideaCall(idea({ __events: ev('pos', 'pos') }), null, s(1), '2026-10-28').call, 'buy', 'two positive items lift 1 to 2');
+  assert.strictEqual(I.ideaCall(idea({ __events: ev('pos') }), null, s(1), '2026-10-28').call, 'hold', 'one item is not enough');
+  assert.strictEqual(I.ideaCall(idea({ __events: ev('neg', 'neg', 'pos') }), null, s(2), '2026-10-28').call, 'hold', 'negative news leans against it');
+  assert.strictEqual(I.ideaCall(idea({ __events: ev('neg', 'neg', 'pos', 'pos') }), null, s(2), '2026-10-28').call, 'buy', 'level news counts for nothing');
+  const cap = (cr) => I.ideaCall(idea({ liquidity: { marketCap: cr } }), null, s(3), '2026-10-28');
+  assert.strictEqual(cap(150000).cap, 'large'); assert.strictEqual(cap(50000).cap, 'mid'); assert.strictEqual(cap(14000).cap, 'small');
+  assert.ok(cap(14000).reasons.includes('Small cap')); assert.strictEqual(I.ideaCall(idea({}), null, s(3), '2026-10-28').cap, null);
+  const r = I.rankIdeas([{ s: { name: 'a' }, c: { call: 'buy', setup: 3, rankSetup: 2, pts: 3 } }, { s: { name: 'b' }, c: { call: 'buy', setup: 2, rankSetup: 3, pts: 3 } }]).map(x => x.s.name).join('');
+  assert.strictEqual(r, 'ba', 'the ranking uses the setup after the adjustments');
+});
 test('ideas: a stock you hold gets its trade call (add is Buy, trim and review are Sell)', () => {
   const tr = { buy: { price: 100, snapshot: { score: 7.2 } } };
   assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 102, intrinsicValue: 160 }, technical: { raw: { weekRsi: 55, monthRsi: 60 } } }), tr, null).label, 'Add more');
@@ -754,6 +792,11 @@ test('trade call: history keeps one point a day and lists when the call changed'
     assert.strictEqual(L.mergedDoc(stock, undefined, row({ market_cap_basic: 0 })).liquidity, undefined, 'no cap and no volume gives nothing');
     assert.deepStrictEqual(L.mergedDoc(stock, undefined, row({ market_cap_basic: 20000000 })).liquidity, { marketCap: 2, asof: '2026-10-14' }, 'a cap alone is kept');
     assert.strictEqual(L.mergedDoc(stock, undefined, snap()).liquidity.marketCap, undefined, 'a row saved before v1.286 has no market cap');
+  });
+  test('live snapshot: the next results date comes back as an India-time date (v1.287)', () => {
+    const d = L.mergedDoc(stock, undefined, { row: { k: 'ABC', y: 'NSE:ABC', c: L.packValues(Object.assign({}, tv, { earnings_release_next_date: 1793361600 })) }, asof: '2026-10-14', at: '2026-10-14T10:00:00.000Z' });
+    assert.strictEqual(d.liquidity.nextResults, '2026-10-30');
+    assert.strictEqual(L.mergedDoc(stock, undefined, snap()).liquidity.nextResults, undefined, 'a row without it has none');
   });
   test('live snapshot: nothing to merge, or a row without a price, leaves the stock record as it is', () => {
     const real = { ticker: 'ABC', globalFactors: { positive: ['x'] } };

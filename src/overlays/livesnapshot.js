@@ -10,7 +10,7 @@
 import { snapshotTechnical, techKeepsBarsBlock } from '../engine/technical.js';
 
 // The columns asked of TradingView, in the order they are packed into a row.
-const COLS = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M', 'average_volume_30d_calc', 'market_cap_basic'];
+const COLS = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M', 'average_volume_30d_calc', 'market_cap_basic', 'earnings_release_next_date'];
 
 // A row's values as TradingView returned them, packed in COLS order (null for a missing or non-numeric value).
 const packValues = (tv) => COLS.map(k => (tv && typeof tv[k] === 'number' && isFinite(tv[k])) ? tv[k] : null);
@@ -21,14 +21,16 @@ function unpackValues(c){
   return tv;
 }
 
-// The size and trading block of a stock from its TradingView row: average daily volume (shares) and market cap (₹ crore, v1.286).
-// Null when the row has neither. Market cap comes from TradingView in rupees; a stock's size is kept in crore, as the Strategies rules show it.
+// The size and trading block of a stock from its TradingView row: average daily volume (shares), market cap (₹ crore, v1.286) and the
+// date of its next results (YYYY-MM-DD, India time, v1.287; TradingView sends it as unix seconds). Null when the row has none of them. Market cap comes from TradingView in rupees; a stock's size is kept in crore, as the Strategies rules show it.
 function liquidityOf(row, today){
   const v = row && row['average_volume_30d_calc'], m = row && row['market_cap_basic'];
   const out = {};
   if(typeof v === 'number' && v >= 0) out.avgVolume = Math.round(v);
   if(typeof m === 'number' && isFinite(m) && m > 0) out.marketCap = Math.round(m / 1e7);
-  if(out.avgVolume == null && out.marketCap == null) return null;
+  const r = row && row['earnings_release_next_date'];
+  if(typeof r === 'number' && isFinite(r) && r > 0) out.nextResults = new Date((r + 19800) * 1000).toISOString().slice(0, 10);
+  if(out.avgVolume == null && out.marketCap == null && out.nextResults == null) return null;
   out.asof = today;
   return out;
 }

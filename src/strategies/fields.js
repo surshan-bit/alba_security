@@ -8,12 +8,10 @@ import { tickerIndustry } from '../core/util.js';
 import { mosPct, mosRatingAny } from '../list/metrics.js';
 import { stockResearchAgeDays } from '../research/status.js';
 import { NEWS_DAYS, daysSinceEvent, newsCounts } from './news.js';
+import { MCAP_LARGE_CR, MCAP_MID_CR, capClass } from '../core/capclass.js';
+import { daysUntil } from '../core/util.js';
 
 const rawOf = (s) => (s.technical && s.technical.raw) || {};
-// Size classes by market cap in ₹ crore, following the SEBI/AMFI rule (Large = the 100 biggest companies, Mid = the next 150, Small = the rest).
-// AMFI republishes the cut-offs every six months; these are the October 2026 values and are the only place to change.
-const MCAP_LARGE_CR = 104000, MCAP_MID_CR = 36000;
-const capClass = (cr) => (cr == null ? null : cr >= MCAP_LARGE_CR ? 'large' : cr >= MCAP_MID_CR ? 'mid' : 'small');
 const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
 const factorScore = (key) => (s) => {
   const f = s.fundamentals && s.fundamentals.factors ? s.fundamentals.factors.find(x => x.key === key) : null;
@@ -66,6 +64,7 @@ const ALL_FIELDS = [
   { id: 'newsNeg', group: 'News and events', label: `Negative news items (last ${NEWS_DAYS} days)`, type: 'num', unit: '', dp: 0, get: (s) => { const c = newsCounts(s); return c ? c.neg : null; } },
   { id: 'newsAll', group: 'News and events', label: `All news items (last ${NEWS_DAYS} days)`, type: 'num', unit: '', dp: 0, get: (s) => { const c = newsCounts(s); return c ? c.total : null; } },
   { id: 'resultsAge', group: 'News and events', label: 'Days since latest results', type: 'num', unit: ' days', dp: 0, get: (s) => daysSinceEvent(s, 'earn') },
+  { id: 'resultsIn', group: 'News and events', label: 'Days until next results (TradingView date)', type: 'num', unit: ' days', dp: 0, get: (s) => daysUntil(s.liquidity && s.liquidity.nextResults) },
   { id: 'corpAge', group: 'News and events', label: 'Days since latest company event', type: 'num', unit: ' days', dp: 0, get: (s) => daysSinceEvent(s, 'corp') },
   { id: 'avgTraded', group: 'Liquidity (risk of low trading)', label: 'Average daily traded value (30 days, ₹ lakh)', type: 'num', unit: ' lakh', dp: 1,
     get: (s) => { const v = s.liquidity && num(s.liquidity.avgVolume), p = num(s.valuation && s.valuation.currentPrice); return v != null && p != null ? (v * p) / 100000 : null; } },
