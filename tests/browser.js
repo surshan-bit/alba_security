@@ -450,7 +450,7 @@ async function rowCapTests(browser){
   }
   { // v1.285: the rule picker offers the Holdings and returns fields
     const labels = await page.evaluate(() => { const o = document.querySelector('select.sr-add'); return o ? [...o.querySelectorAll('optgroup')].map(g => g.label + ':' + g.querySelectorAll('option').length) : []; });
-    ok(labels.some(l => /^Holdings and returns:6$/.test(l)), 'strategy rules: Holdings and returns group is offered (' + labels.join(', ') + ')');
+    ok(labels.some(l => /^Holdings and returns:7$/.test(l)), 'strategy rules: Holdings and returns group is offered (' + labels.join(', ') + ')');
   }
   { // v1.286: the rule picker offers the market cap fields
     const labels = await page.evaluate(() => { const o = document.querySelector('select.sr-add'); return o ? [...o.querySelectorAll('optgroup')].map(g => g.label + ':' + g.querySelectorAll('option').length) : []; });
