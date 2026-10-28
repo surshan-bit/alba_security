@@ -10,6 +10,10 @@ import { stockResearchAgeDays } from '../research/status.js';
 import { NEWS_DAYS, daysSinceEvent, newsCounts } from './news.js';
 
 const rawOf = (s) => (s.technical && s.technical.raw) || {};
+// Size classes by market cap in ₹ crore, following the SEBI/AMFI rule (Large = the 100 biggest companies, Mid = the next 150, Small = the rest).
+// AMFI republishes the cut-offs every six months; these are the October 2026 values and are the only place to change.
+const MCAP_LARGE_CR = 104000, MCAP_MID_CR = 36000;
+const capClass = (cr) => (cr == null ? null : cr >= MCAP_LARGE_CR ? 'large' : cr >= MCAP_MID_CR ? 'mid' : 'small');
 const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
 const factorScore = (key) => (s) => {
   const f = s.fundamentals && s.fundamentals.factors ? s.fundamentals.factors.find(x => x.key === key) : null;
@@ -66,6 +70,9 @@ const ALL_FIELDS = [
   { id: 'avgTraded', group: 'Liquidity (risk of low trading)', label: 'Average daily traded value (30 days, ₹ lakh)', type: 'num', unit: ' lakh', dp: 1,
     get: (s) => { const v = s.liquidity && num(s.liquidity.avgVolume), p = num(s.valuation && s.valuation.currentPrice); return v != null && p != null ? (v * p) / 100000 : null; } },
   { id: 'avgVolume', group: 'Liquidity (risk of low trading)', label: 'Average daily volume (30 days, shares)', type: 'num', unit: ' shares', dp: 0, get: (s) => num(s.liquidity && s.liquidity.avgVolume) },
+  { id: 'marketCap', group: 'Size (market capitalisation)', label: 'Market cap (₹ crore)', type: 'num', unit: ' Cr', dp: 0, get: (s) => num(s.liquidity && s.liquidity.marketCap) },
+  { id: 'capClass', group: 'Size (market capitalisation)', label: 'Cap class (Large, Mid, Small)', type: 'enum', get: (s) => capClass(num(s.liquidity && s.liquidity.marketCap)),
+    options: [['large', `Large cap (₹${MCAP_LARGE_CR.toLocaleString('en-IN')} Cr or more)`, 'buy'], ['mid', `Mid cap (₹${MCAP_MID_CR.toLocaleString('en-IN')} to ${MCAP_LARGE_CR.toLocaleString('en-IN')} Cr)`, 'accent'], ['small', `Small cap (below ₹${MCAP_MID_CR.toLocaleString('en-IN')} Cr)`, 'orange']] },
   { id: 'price', group: 'Other', label: 'Price', type: 'num', unit: '', dp: 2, priceBased: true, get: (s) => num(s.valuation && s.valuation.currentPrice) },
   { id: 'researchAge', group: 'Other', label: 'Days since Fundamental refresh', type: 'num', unit: ' days', dp: 0, get: (s) => stockResearchAgeDays(s) },
   { id: 'pinned', group: 'Other', label: 'Pinned', type: 'enum', get: (s) => (isPinned(s) ? 'yes' : 'no'), options: [['yes', 'Pinned', 'accent'], ['no', 'Not pinned']] },
