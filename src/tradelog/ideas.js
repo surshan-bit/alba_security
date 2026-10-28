@@ -1,4 +1,5 @@
-// Buy / Sell ideas panel (Trade Log): pick a strategy, see the stocks that qualify today ranked by Buy / Hold / Sell call (rules in ideacall.js).
+// Buy / Sell ideas panel (Trade Log): pick a strategy and press Process; once the weekly prices of its stocks are read, the two Top 5 lists (Upward trend and
+// Downward trend, rules in ideacall.js) are shown. Nothing is worked out until Process is pressed, and the panel says so while it runs.
 import { keepScroll } from '../ui/scrollkeep.js';
 import { stockByTickerSymbolAny, stocks } from '../core/stocks.js';
 import { allTrades } from '../core/store.js';
@@ -9,12 +10,11 @@ import { appSections } from '../ui/navigation.js';
 import { openStockInline } from '../ui/inlinedetail.js';
 import { ensurePriceBars, pcTickerKey, priceHistoryByTicker, priceLoaded } from '../prices/store.js';
 import { tvIstDate } from '../tv/connector.js';
-import { AVOID_BOTTOM, BUY_TOP, RESULTS_DAYS, THIN_LAKH, TREND_NAME, ideaCall, rankIdeas, topBuys, trendOf } from './ideacall.js';
+import { BUY_TOP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys, trendOf } from './ideacall.js';
 import { CAP_NAME } from '../core/capclass.js';
 import { nextWeekRead, rankReads } from './nextweek.js';
-import { compareBy, nextSort, sortHeaderHtml } from '../analysis/columns.js';
 
-const MAX_ROWS = 50, TOP_N = 5;
+const TOP_N = 5;
 function openTradeByStock(){
   const m = new Map();
   for(const t of allTrades()){
@@ -34,59 +34,53 @@ function ideasFor(strategyId){
   return rankIdeas(list.map((s, i) => ({ s, c: ideaCall(s, held.get(s) || null, reads[i], today) })));
 }
 
-let sid = '', filter = 'all';
-// The ideas come ranked by call (Buy first); a click on a column header sorts by that column instead, and a click on the same header again reverses it.
-let ideasSort = { col: '', dir: 'desc' };
-const CALL_ORDER = { buy: 3, hold: 2, sell: 1 };
-const IDEA_SORT = {
-  name: (x) => String(x.s.name || tickerSymbol(x.s)).toLowerCase(),
-  call: (x) => CALL_ORDER[x.c.call] || 0,
-  score: (x) => x.c.p == null ? null : x.c.p,
-  chance: (x) => x.c.up == null ? null : x.c.up,
-  price: (x) => { const p = x.s.valuation && x.s.valuation.currentPrice; return p == null ? null : p; },
-  mos: (x) => x.c.mos == null ? null : x.c.mos
-};
+let sid = '';
+// What the panel is doing: 'idle' (a strategy is chosen but Process has not been pressed), 'running' (reading weekly prices) or 'done' (results shown for `sid`).
+let phase = 'idle';
 try { sid = localStorage.getItem('albaDashboard.ideasStrategy.v1') || ''; } catch(e){ /* default */ }
-// The timing check reads weekly bars, so the bars of the stocks in the chosen strategy (and only those) are loaded, a few at a
-// time. A stock is tried once per visit, so a failed read does not retry on every redraw.
+// The two-week reading uses weekly bars, so the bars of the stocks in the chosen strategy (and only those) are loaded, a few at a time, when Process is pressed.
+// Every stock is tried again on each press, so a read that failed before gets another chance.
 const BARS_PARALLEL = 6;
-const barsTried = new Set();
-let barsBusy = false, barsDone = 0, barsTotal = 0;
-function loadBars(){
-  if(barsBusy) return;
+// stage: 'read' (reading weekly prices, barsDone of barsTotal stocks), then 'rank' (working out the trends and calls).
+let barsDone = 0, barsTotal = 0, stage = 'read';
+async function runIdeas(){
+  if(phase === 'running') return;
   const st = publishedStrategies().find(x => x.id === sid);
   if(!st) return;
-  const need = qualifyingStocks(stocks, st.rules).filter(s => !priceLoaded.has(pcTickerKey(s)) && !barsTried.has(pcTickerKey(s)));
-  if(!need.length) return;
-  barsBusy = true; barsDone = 0; barsTotal = need.length;
+  const all = qualifyingStocks(stocks, st.rules), need = all.filter(s => !priceLoaded.has(pcTickerKey(s)));
+  phase = 'running'; stage = 'read'; barsTotal = all.length; barsDone = all.length - need.length;
+  refreshIdeasBody();
   let next = 0;
   const worker = async () => {
     while(next < need.length){
-      const s = need[next++]; barsTried.add(pcTickerKey(s));
+      const s = need[next++];
       try { await ensurePriceBars(s); } catch(e){ console.error('Price history unavailable', e); }
       barsDone++;
-      if(barsDone % 10 === 0 && barsDone < barsTotal) refreshIdeasBody();
+      if(barsDone % 5 === 0 && barsDone < barsTotal) refreshIdeasBody();
     }
   };
-  Promise.all(Array.from({ length: Math.min(BARS_PARALLEL, need.length) }, worker)).then(() => { barsBusy = false; refreshIdeasBody(); });
+  try { await Promise.all(Array.from({ length: Math.min(BARS_PARALLEL, need.length) }, worker)); }
+  catch(e){ console.error('Processing the ideas failed', e); }
+  stage = 'rank'; refreshIdeasBody();
+  await new Promise(r => setTimeout(r, 60));   // lets the bar show the last step before the lists are worked out
+  phase = 'done'; refreshIdeasBody();
+}
+// The progress shown while it runs, in the same form as the Data Refresh screen: a bar with a percentage and the steps with a mark each.
+function progressHtml(st){
+  const n = barsTotal, reading = stage === 'read';
+  const pct = !n ? 100 : reading ? Math.round(90 * barsDone / n) : 95;
+  const step = (state, label, detail) => `<li class="fi-step fi-${state}"><span class="fi-mark" aria-hidden="true">${state === 'done' ? '&#10003;' : state === 'running' ? '&#9679;' : '&#9675;'}</span><span>${label}</span><span class="fi-detail">${detail}</span></li>`;
+  return `<div class="tl-ideas-progress" role="status"><div class="fi-head"><b>Processing &ldquo;${escapeHtml(st.name)}&rdquo;</b><span class="fi-pct">${pct}%</span></div>
+    <div class="fi-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><div class="fi-bar-fill" style="width:${pct}%"></div></div>
+    <ul class="fi-steps">${step('done', 'Find the stocks that qualify', n + ' stocks')}
+    ${step(reading ? 'running' : 'done', 'Read their weekly prices', barsDone + ' of ' + n)}
+    ${step(reading ? 'pending' : 'running', 'Work out each trend, rank and apply the checks', reading ? '' : 'almost done')}</ul></div>`;
 }
 const remember = () => { try { localStorage.setItem('albaDashboard.ideasStrategy.v1', sid); } catch(e){ /* kept for this visit */ } };
 
-function rowHtml(x, rank){
-  const { s, c } = x, idx = stocks.indexOf(s), price = s.valuation && s.valuation.currentPrice;
-  return `<tr>
-    <td class="num">${rank}</td>
-    <td><a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(s.name || tickerSymbol(s))}</a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}${c.cap ? ' &middot; ' + CAP_NAME[c.cap] : ''}${c.trend ? ' &middot; ' + TREND_NAME[c.trend] : ''}${c.held ? ' &middot; held' : ''}</span></td>
-    <td><span class="tl-signal-badge tl-idea-${c.call}">${escapeHtml(c.label)}</span></td>
-    <td class="num" title="Where its two-week score ranks among the stocks of this strategy with the same trend today">${c.topPct != null ? 'Top ' + c.topPct + '%' : '&mdash;'}</td>
-    <td class="num" title="${c.up != null ? 'In the five-year tests, stocks that ranked like this each week were higher two weeks later ' + c.up + '% of the time, and beat the median stock ' + c.beat + '% of the time. All stocks of this trend were higher ' + c.base + '% of the time.' : ''}">${c.up != null ? '~' + Math.round(c.up) + '%' : '&mdash;'}</td>
-    <td class="num">${price != null ? '&#8377;' + Number(price).toLocaleString('en-IN') : '&mdash;'}</td>
-    <td class="num">${c.mos != null ? (c.mos >= 0 ? '+' : '') + c.mos.toFixed(1) + '%' : '&mdash;'}</td>
-    <td class="tl-idea-why">${escapeHtml(c.reasons.join('; '))}</td></tr>`;
-}
-// The five best Buy calls of each trend among the stocks you do not hold, above the full list: Upward trend (positive move) and Downward trend (bounce back).
-const TOP_LISTS = [['up', 'Upward trend \u2013 positive move', 'Stocks whose weekly and monthly trends are both up, ranked by two-week score.'],
-  ['down', 'Downward trend \u2013 bounce back', 'Stocks whose weekly and monthly trends are both down: a bet on a rebound, so the hit rate is lower and the risk higher.']];
+// The five best Buy calls of each trend among the stocks you do not hold: Upward trend (positive move) and Downward trend (bounce back).
+const TOP_LISTS = [['up', 'Upward trend – positive move', 'Stocks whose weekly and monthly trends are both up, ranked by two-week score.'],
+  ['down', 'Downward trend – bounce back', 'Stocks whose weekly and monthly trends are both down: a bet on a rebound, so the hit rate is lower and the risk higher.']];
 function topHtml(list){
   const item = (x, i) => {
     const { s, c } = x, idx = stocks.indexOf(s), price = s.valuation && s.valuation.currentPrice;
@@ -100,48 +94,47 @@ function topHtml(list){
   }).join('');
 }
 function bodyHtml(){
-  if(sid) loadBars();
-  const list = sid ? ideasFor(sid) : null;
-  if(!sid) return '<p class="upload-hint">Choose a strategy to see the stocks that qualify today, ranked by Buy or Sell call.</p>';
+  if(!sid) return '<p class="upload-hint">Choose a strategy, then press Process to rank its stocks.</p>';
+  const st = publishedStrategies().find(x => x.id === sid);
+  if(!st) return '<p class="upload-hint">That strategy is no longer available. Choose another.</p>';
+  if(phase === 'running') return progressHtml(st);
+  if(phase !== 'done') return '<p class="upload-hint">Press <b>Process</b> to read the weekly prices of this strategy&rsquo;s stocks and rank them. Nothing is worked out until you do.</p>';
+  const list = ideasFor(sid);
   if(!list) return '<p class="upload-hint">That strategy is no longer available. Choose another.</p>';
   if(!list.length) return '<p class="upload-hint">No stock qualifies for this strategy today.</p>';
-  const n = k => list.filter(x => x.c.call === k).length;
-  const th = (id, label) => sortHeaderHtml(id, label, ideasSort);
-  const filtered = list.filter(x => filter === 'all' || x.c.call === filter);
-  const shown = ideasSort.col ? filtered.slice().sort(compareBy(IDEA_SORT[ideasSort.col], ideasSort.dir)) : filtered;
-  const chip = (k, label) => `<button type="button" class="tl-view-btn${filter === k ? ' active' : ''}" data-idea-filter="${k}">${label}</button>`;
-  return `${topHtml(list)}<div class="tl-ideas-bar"><div class="tl-view-toggle" role="group" aria-label="Call filter">${chip('all', 'All ' + list.length)}${chip('buy', 'Buy ' + n('buy'))}${chip('hold', 'Hold ' + n('hold'))}${chip('sell', 'Sell ' + n('sell'))}</div></div>
-    <div class="help-table-wrap"><table class="help-table"><thead><tr><th>#</th>${th('name', 'Stock')}${th('call', "Today's call")}${th('score', 'Two-week score')}${th('chance', 'Higher after 2 wks (tests)')}${th('price', 'Price')}${th('mos', 'MoS')}<th>Why</th></tr></thead>
-    <tbody>${shown.slice(0, MAX_ROWS).map((x, i) => rowHtml(x, i + 1)).join('')}</tbody></table></div>
-    <p class="upload-hint">${barsBusy ? 'Loading weekly price history for the timing check (' + barsDone + ' of ' + barsTotal + ')&hellip; ' : ''}The two-week score comes from a model trained and tested week by week on five years of weekly prices (about 294,000 stock-weeks, return two weeks later): it rates how likely a stock is to beat the median stock over the next two weeks. It shows where a stock ranks among this strategy&rsquo;s stocks today (the raw score moves with the whole market, the ranking does not). <b>Higher after 2 wks</b> is how often stocks of that trend that ranked like this each week were higher two weeks later in those tests. Stocks are split by trend (weekly and monthly MACD both above their signal lines is Upward, both below is Downward; a mix is neither list) and ranked within their own trend, because the two behave differently: in the tests the best five Upward stocks each week were higher after two weeks about 54% of the time (all Upward stocks 51%), the best five Downward ones about 51% (all Downward 45%), so a bounce-back is the weaker bet. Buy is a stock in the top ${BUY_TOP}% of its trend; Avoid is the bottom ${AVOID_BOTTOM}%. A Buy is held back (Wait) when its margin of safety is zero or below, its Fundamental verdict is Avoid, results are due within ${RESULTS_DAYS} days, trading is very thin (under &#8377;${THIN_LAKH} lakh a day) or recent news clearly leans negative. The edge is real but modest (so expect nearly half to lose), and it cannot see the market: when most stocks fall, the best of them usually falls too. Run it on Friday after the close for the cleanest reading; on Thursday or Friday before the close it uses the week so far. Held positions keep their Trade Log call. The results-date and news checks need the latest Refresh all stocks.</p>
-    ${shown.length > MAX_ROWS ? '<p class="upload-hint">Showing the top ' + MAX_ROWS + ' of ' + shown.length + '.</p>' : ''}`;
+  const nt = k => list.filter(x => x.c.trend === k).length, other = list.length - nt('up') - nt('down') - nt('mixed');
+  return `<p class="upload-hint tl-ideas-done">Processed ${list.length} stocks: ${nt('up')} in an upward trend, ${nt('down')} downward, ${nt('mixed')} mixed (in neither list)${other ? ', ' + other + ' without a trend or enough price history' : ''}. As of today&rsquo;s prices (${tvIstDate()}), counting this week so far.</p>${topHtml(list)}
+    <p class="upload-hint">The two-week score comes from a model trained and tested week by week on five years of weekly prices (about 294,000 stock-weeks, return two weeks later): it rates how likely a stock is to beat the median stock over the next two weeks. Stocks are split by trend (weekly and monthly MACD both above their signal lines is Upward, both below is Downward; a mix is neither list) and ranked within their own trend, because the two behave differently: in the tests the best five Upward stocks each week were higher after two weeks about 54% of the time (all Upward stocks 51%), the best five Downward ones about 51% (all Downward 45%), so a bounce-back is the weaker bet. <b>Higher after 2 weeks</b> is how often stocks of that trend that ranked like this each week were higher two weeks later in those tests. A stock is a Buy when it is in the top ${BUY_TOP}% of its trend, and is held back when its margin of safety is zero or below, its Fundamental verdict is Avoid, results are due within ${RESULTS_DAYS} days, trading is very thin (under &#8377;${THIN_LAKH} lakh a day) or recent news clearly leans negative. The edge is real but modest (so expect nearly half to lose), and it cannot see the market: when most stocks fall, the best of them usually falls too. It always uses today&rsquo;s prices, counting this week so far; the model was trained on whole weeks, so a Friday-after-the-close run is the cleanest reading and an early-week run rests on fewer days of this week&rsquo;s move. Positions you hold are in the Trade Log above. The results-date and news checks need the latest Refresh all stocks.</p>`;
 }
-// Only the table: used when trades or prices change, so the strategy list is not rebuilt under an open dropdown.
+// The Process button and the strategy picker: both wait while the weekly prices are being read.
+function syncControls(){
+  const btn = /** @type {HTMLButtonElement | null} */ (document.getElementById('tradeIdeasRun')), sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('tradeIdeasStrategy'));
+  if(btn){ btn.disabled = !sid || phase === 'running'; btn.textContent = phase === 'running' ? 'Processing…' : phase === 'done' ? 'Process again' : 'Process'; }
+  if(sel) sel.disabled = phase === 'running';
+}
+// Only the body: used when trades or prices change, so the strategy list is not rebuilt under an open dropdown.
 function refreshIdeasBody(){
   const host = document.getElementById('tradeIdeasBody');
-  if(host) keepScroll(host, () => { host.innerHTML = bodyHtml(); });
+  if(host) keepScroll(host, () => { host.innerHTML = bodyHtml(); host.setAttribute('aria-busy', phase === 'running' ? 'true' : 'false'); });
+  syncControls();
 }
 function renderIdeas(){
   const host = document.getElementById('tradeIdeasBody');
   if(!host) return;
   const strategies = publishedStrategies();
-  if(sid && !strategies.some(x => x.id === sid)) sid = '';
+  if(sid && !strategies.some(x => x.id === sid)){ sid = ''; phase = 'idle'; }
   const sel = document.getElementById('tradeIdeasStrategy');
   if(sel){
     sel.innerHTML = '<option value="">Choose a strategy&hellip;</option>' + strategies.map(x => `<option value="${escapeHtml(x.id)}"${x.id === sid ? ' selected' : ''}>${escapeHtml(x.name)}</option>`).join('');
   }
-  keepScroll(host, () => { host.innerHTML = bodyHtml(); });
+  refreshIdeasBody();
 }
 function init_ideas(){
-  const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('tradeIdeasStrategy')), host = document.getElementById('tradeIdeasBody');
-  if(sel) sel.addEventListener('change', () => { sid = sel.value; filter = 'all'; remember(); renderIdeas(); });
+  const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('tradeIdeasStrategy')), host = document.getElementById('tradeIdeasBody'), run = document.getElementById('tradeIdeasRun');
+  if(sel) sel.addEventListener('change', () => { sid = sel.value; phase = 'idle'; remember(); renderIdeas(); });
+  if(run) run.addEventListener('click', runIdeas);
   if(host) host.addEventListener('click', (e) => {
-    const el = /** @type {Element} */ (e.target);
-    const f = el.closest('[data-idea-filter]');
-    if(f){ filter = f.getAttribute('data-idea-filter') || 'all'; renderIdeas(); return; }
-    const sh = /** @type {HTMLElement | null} */ (el.closest('[data-sort-col]'));
-    if(sh){ ideasSort = nextSort(ideasSort, sh.dataset.sortCol || ''); renderIdeas(); return; }
-    const a = el.closest('a[data-idea-open]');
+    const a = /** @type {Element} */ (e.target).closest('a[data-idea-open]');
     if(a){ e.preventDefault(); const idx = Number(a.getAttribute('data-idea-open')); openStockInline(appSections.trackrecord, "Trade Log", idx); }
   });
 }

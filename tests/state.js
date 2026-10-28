@@ -168,21 +168,29 @@ async function tradeScenarios(){
     await goto(page, 'trackrecord');
     await until(page, () => !!document.querySelector('#tradeIdeasStrategy') && document.querySelectorAll('#tradeIdeasStrategy option').length > 1, null, 'the strategy picker lists the strategies');
     await until(page, () => /Choose a strategy/.test((document.getElementById('tradeIdeasBody') || {}).textContent || ''), null, 'it asks for a strategy first');
+    ok(await page.evaluate(() => document.getElementById('tradeIdeasRun').disabled), 'Process waits for a strategy');
     await page.selectOption('#tradeIdeasStrategy', 'starter-deep-value');
-    await until(page, () => !!document.querySelector('#tradeIdeasBody table, #tradeIdeasBody .upload-hint'), null, 'choosing a strategy shows its stocks or says none qualify');
-    const n = await page.evaluate(() => document.querySelectorAll('#tradeIdeasBody tbody tr').length);
+    await until(page, () => !document.getElementById('tradeIdeasRun').disabled && /Press Process/.test((document.getElementById('tradeIdeasBody') || {}).textContent || ''), null, 'choosing a strategy enables Process and asks for it, without working anything out');
+    ok(await page.evaluate(() => !(window.__filteredGets || []).some(x => /^priceHistory /.test(x)) && !document.querySelector('#tradeIdeasBody .tl-top5')), 'nothing is read or listed before Process is pressed');
+    // v1.290: Process reads the weekly prices (the panel says it is working), then shows the results
+    await page.evaluate(() => { window.__sawBar = null; new MutationObserver(() => { const b = document.querySelector('#tradeIdeasBody .fi-bar[role="progressbar"]'); if(b && !window.__sawBar) window.__sawBar = { steps: document.querySelectorAll('#tradeIdeasBody .fi-step').length, pct: document.querySelector('#tradeIdeasBody .fi-pct').textContent }; }).observe(document.getElementById('tradeIdeasBody'), { childList: true, subtree: true }); });
+    await page.evaluate(() => document.getElementById('tradeIdeasRun').click());
+    await until(page, () => /Processed \d+ stocks|No stock qualifies|no longer available/.test((document.getElementById('tradeIdeasBody') || {}).textContent || '') || /Processing/.test(document.getElementById('tradeIdeasRun').textContent), null, 'pressing Process shows that it is working, then the result');
+    await until(page, () => /Processed \d+ stocks|No stock qualifies/.test((document.getElementById('tradeIdeasBody') || {}).textContent || ''), null, 'the results appear when processing is done');
+    ok(await page.evaluate(() => document.getElementById('tradeIdeasBody').getAttribute('aria-busy') === 'false' && document.getElementById('tradeIdeasRun').textContent === 'Process again' && !document.getElementById('tradeIdeasRun').disabled), 'when done the button offers Process again');
+    const saw = await page.evaluate(() => window.__sawBar);
+    ok(saw && saw.steps === 3 && /^\d+%$/.test(saw.pct), 'while it runs a progress bar with three steps and a percentage is shown, got ' + JSON.stringify(saw));
+    ok(await page.evaluate(() => !document.querySelector('#tradeIdeasBody table')), 'there is no table of every stock under the lists');
+    const n = await page.evaluate(() => Number(((document.getElementById('tradeIdeasBody').textContent || '').match(/Processed (\d+) stocks/) || [0, 0])[1]));
     // v1.190: the timing check reads each listed stock's bars with its own filtered read, never the whole priceHistory collection
-    await page.waitForTimeout(400);
     ok(await page.evaluate(() => !(window.__colGets || []).includes('priceHistory')), 'the whole price-history collection is not read for the ideas');
     ok(await page.evaluate(n => (window.__filteredGets || []).filter(x => /^priceHistory /.test(x)).length >= Math.min(n, 1), n), 'each listed stock\'s bars are read with a filtered read');
     if(n > 0){
-      const calls = await page.evaluate(() => Array.from(document.querySelectorAll('#tradeIdeasBody tbody .tl-signal-badge')).map(b => b.textContent));
-      ok(calls.every(c => ['Buy', 'Wait', 'Avoid', 'Add more', 'Hold', 'Trim', 'Review'].includes(c)), 'every listed stock has a call, got ' + JSON.stringify(calls.slice(0, 5)));
-      // v1.288: two Top 5 blocks (Upward, Downward) sit above the list; each holds at most five stocks and every one is a Buy
-      const top = await page.evaluate(() => ({ has: !!document.querySelector('#tradeIdeasBody .tl-top5'), n: document.querySelectorAll('#tradeIdeasBody .tl-top5 li').length, blocks: document.querySelectorAll('#tradeIdeasBody .tl-top5').length, over: Array.from(document.querySelectorAll('#tradeIdeasBody .tl-top5')).some(b => b.querySelectorAll('li').length > 5), buys: Array.from(document.querySelectorAll('#tradeIdeasBody tbody tr')).filter(r => /^Buy$/.test((r.querySelector('.tl-signal-badge') || {}).textContent || '')).length }));
-      ok(top.has && top.blocks === 2 && !top.over && top.n <= top.buys, 'the two Top 5 blocks list at most five Buys each, got ' + JSON.stringify(top));
-      await domClick(page, '#tradeIdeasBody a[data-idea-open]');
-      await until(page, () => document.getElementById('section-trackrecord').classList.contains('inline-detail-open'), null, 'a stock name in the ideas opens its page');
+      // v1.290: two Top 5 lists (Upward, Downward); each holds at most five stocks
+      const top = await page.evaluate(() => ({ blocks: document.querySelectorAll('#tradeIdeasBody .tl-top5').length, over: Array.from(document.querySelectorAll('#tradeIdeasBody .tl-top5')).some(b => b.querySelectorAll('li').length > 5), first: document.querySelector('#tradeIdeasBody .tl-top5 a[data-idea-open]') ? true : false }));
+      ok(top.blocks === 2 && !top.over, 'the two Top 5 lists hold at most five stocks each, got ' + JSON.stringify(top));
+      await page.selectOption('#tradeIdeasStrategy', '');
+      await until(page, () => /Choose a strategy/.test((document.getElementById('tradeIdeasBody') || {}).textContent || '') && !document.querySelector('#tradeIdeasBody .tl-top5'), null, 'changing the strategy clears the lists until Process is pressed again');
     } else ok(true, 'no stock qualifies in the fixtures for this strategy');
   });
 

@@ -65,10 +65,10 @@ function modelProb(x){
 // rally), so what counts is where a stock ranks among the others: rankReads adds that.
 function nextWeekRead(weekBars, today){
   const bars = Array.isArray(weekBars) ? weekBars : [];
-  // The model reads finished weeks. From Thursday the week in progress is nearly finished, so it is used as the week's bar (partial: true) for a run made before
-  // Friday's close; from Saturday the week is finished and counts as it is.
-  const done = techCompleted(bars, 'week', today), dow = today ? new Date(today + 'T00:00:00Z').getUTCDay() : -1;
-  const partial = done.length < bars.length && (dow === 4 || dow === 5), use = partial ? bars : done;
+  // The reading is as of today (v1.290): the week in progress is used as this week's bar (partial: true) on any weekday, so the latest prices count; once the week
+  // is finished (from Saturday) it counts as it is. The model was trained on whole weeks, so early in the week the reading rests on fewer days of this week's move.
+  const done = techCompleted(bars, 'week', today);
+  const partial = done.length < bars.length, use = partial ? bars : done;
   const w = weekFeatures(use);
   if(!w) return null;
   const p = modelProb(w.x), f = w.byName;

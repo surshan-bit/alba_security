@@ -115,4 +115,4 @@ function rankIdeas(items){
 // The best Buy calls of one trend ('up' or 'down') for stocks you do not hold, in ranked order (rankIdeas has already put the Buys first).
 function topBuys(ranked, trend, n = 5){ return ranked.filter(x => x.c.call === 'buy' && !x.c.held && x.c.trend === trend).slice(0, n); }
 
-export { AVOID_BOTTOM, BUY_TOP, RESULTS_DAYS, THIN_LAKH, TREND_NAME, ideaCall, rankIdeas, topBuys, trendOf };
+export { BUY_TOP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys, trendOf };
