@@ -1,107 +1,118 @@
-// The call for one stock in the Buy / Sell ideas, aimed at gaining about 5% within 1 to 4 weeks.
-// A stock you hold gets the same call as its Trade Log card (add, hold, trim or review). A stock you do not hold gets two
-// separate readings: QUALITY (is it worth owning: verdict, margin of safety, Fundamental score) and SETUP (does the chart look
-// like one that moves 5% soon: swing.js). Buy needs both; the Buy list is ranked by setup, then quality. Fixed rules on
-// the dashboard's own numbers, so the same data always gives the same answer. A reference for your own decision, not an order.
+// The call for one stock in the Buy / Sell ideas, built around one question: which stock is likely to be higher two weeks from now? (rewritten in v1.289)
+// A stock you hold gets the same call as its Trade Log card (add, hold, trim or review). A stock you do not hold gets the TWO-WEEK reading from
+// nextweek.js (a model trained and tested week by week on five years of weekly prices) and then plain checks:
+//   Buy    the stock is in the top BUY_TOP percent of two-week scores and none of the checks holds it back;
+//   Avoid  it is in the bottom AVOID_BOTTOM percent (stocks like that lagged the market in the tests);
+//   Wait   anything else, including a Buy held back by a check (the reason is shown in the row).
+// The checks are not part of the model: quality (a margin of safety above zero and a Fundamental verdict that is not Avoid), results due within RESULTS_DAYS days
+// (an earnings gap decides the fortnight), very thin trading (average daily traded value under THIN_LAKH lakh rupees, hard to enter and leave) and clearly
+// negative recent news. Fixed rules on the dashboard's own numbers, so the
+// same data always gives the same answer. A reference for your own decision, not an order, and it cannot see the market: when every stock falls together,
+// the best of them usually falls too.
 import { daysUntil, fixedOrNull } from '../core/util.js';
 import { CAP_NAME, capClass } from '../core/capclass.js';
 import { newsCounts } from '../strategies/news.js';
 import { marginOfSafety } from '../core/mos.js';
 import { factsFor, tradeSignal } from './signals.js';
 
-const BUY_SETUP = 2, AVOID_AT = -2, MOS_MIN = 10, SCORE_MIN = 5;
-// Next-week checks (v1.287). Two are gates that stop a Buy outright: a weekly or monthly MACD below its signal line, and results due within RESULTS_DAYS
-// days (an earnings gap decides the week, whatever the chart says). Two add or take away a setup point: very thin trading (average daily traded value
-// under THIN_LAKH lakh rupees) and the stock's own recent news. A stretched RSI is deliberately NOT penalised: replayed over 10 years of weekly bars, stocks
-// with both MACDs bullish did no worse above RSI 75 than below it. Thin stocks did worse (51% beat the middle stock, against 49% when thin).
-const RESULTS_DAYS = 7, THIN_LAKH = 50, NEWS_MIN = 2;
-const VERDICT_PTS = { buy: 2, mbuy: 1, hold: -1, avoid: -2 };
-const VERDICT_NAME = { buy: 'Strong', mbuy: 'Good', hold: 'Hold', avoid: 'Avoid' };
-
-// Quality points and the reasons for them, from the facts factsFor returns.
-function qualityOf(f){
-  let pts = 0;
-  const why = [];
-  const add = (n, text) => { pts += n; why.push(text); };
-  if(f.verdict && VERDICT_PTS[f.verdict] != null) add(VERDICT_PTS[f.verdict], 'Verdict ' + VERDICT_NAME[f.verdict]);
-  const mos = marginOfSafety(f.intrinsic, f.price);
-  if(mos != null){
-    if(mos >= 30) add(2, 'margin of safety ' + fixedOrNull(mos) + '%');
-    else if(mos >= 10) add(1, 'margin of safety ' + fixedOrNull(mos) + '%');
-    else if(mos < 0) add(-2, 'above fair value (' + fixedOrNull(mos) + '%)');
-  }
-  if(f.score != null){
-    if(f.score >= 7) add(1, 'Fundamental score ' + fixedOrNull(f.score, 2));
-    else if(f.score < SCORE_MIN) add(-1, 'Fundamental score only ' + fixedOrNull(f.score, 2));
-  }
-  // Worth owning at all: a Strong or Good verdict, at least a 10% cushion, and a Fundamental score of 5 or more.
-  const worth = !!f.verdict && (f.verdict === 'buy' || f.verdict === 'mbuy') && mos != null && mos >= MOS_MIN && f.score != null && f.score >= SCORE_MIN;
-  return { pts, why, mos, worth };
+const TREND_NAME = { up: 'Upward trend', down: 'Downward trend', mixed: 'Mixed trend' };
+// The stock's trend from its weekly and monthly MACD against their signal lines (the dashboard's own technical figures): 'up' when both are above, 'down' when
+// both are below, 'mixed' when they disagree, null when either is missing. The same definition the two-week tests were split by.
+function trendOf(stock){
+  const r = (stock && stock.technical && stock.technical.raw) || {};
+  const v = [r.weekMacdLevel, r.weekMacdSignal, r.monthMacdLevel, r.monthMacdSignal];
+  if(v.some(x => typeof x !== 'number' || !isFinite(x))) return null;
+  const w = r.weekMacdLevel > r.weekMacdSignal, m = r.monthMacdLevel > r.monthMacdSignal;
+  return w && m ? 'up' : !w && !m && r.weekMacdLevel < r.weekMacdSignal && r.monthMacdLevel < r.monthMacdSignal ? 'down' : 'mixed';
 }
 
-// Trend, event and trading checks for a stock you do not hold: { blocks: [reasons a Buy is held back], adj: setup points added or taken away,
-// notes: reasons for the points, cap: 'large' | 'mid' | 'small' | null, resultsIn: days until results or null }. `today` is YYYY-MM-DD in India.
-// A figure the stock has not been refreshed for yet (MACD levels, results date, market cap, news) never blocks and never scores.
-function outlookOf(stock, today){
-  const raw = (stock && stock.technical && stock.technical.raw) || {};
+// FII selling or buying last quarter, from the Screener columns (FII holding, its change over the last quarter, and its change over 3 years): a note, never a
+// block, because no link to the next two weeks could be found and there is no history to test one. The change must be at least FII_MIN points AND at least
+// FII_REL of what the funds held before, so a 1-point cut means something for a stock they own 55% of and a 0.5-point cut means something for one they own 3% of.
+// Returns the sentence, or null. The figures are as of the last quarter end, so they cannot explain moves since.
+const FII_MIN = 0.5, FII_REL = 0.1;
+function fiiNote(stock){
+  const v = (stock && stock.valuation) || {}, c = v.fiiChange, h = v.fiiHolding;
+  if(typeof c !== 'number' || typeof h !== 'number' || !isFinite(c) || !isFinite(h)) return null;
+  const prev = h - c;
+  if(!(prev > 0) || Math.abs(c) < FII_MIN || Math.abs(c) / prev < FII_REL) return null;
+  const w = fixedOrNull(prev, 1) + '% to ' + fixedOrNull(h, 1) + '%', long = typeof v.fiiChange3 === 'number' && (c < 0 ? v.fiiChange3 < 0 : v.fiiChange3 > 0);
+  return c < 0 ? 'FII selling: holding down ' + fixedOrNull(-c, 1) + ' points last quarter (' + w + ')' + (long ? ', down over 3 years too' : '') + ', as of the last quarter end'
+    : 'FII buying: holding up ' + fixedOrNull(c, 1) + ' points last quarter (' + w + ')' + (long ? ', up over 3 years too' : '') + ', as of the last quarter end';
+}
+
+const BUY_TOP = 10, AVOID_BOTTOM = 10, RESULTS_DAYS = 7, THIN_LAKH = 50, NEWS_MIN = 2;
+
+// Risk checks for a stock you do not hold: { blocks: reasons a Buy is held back, notes: other news worth saying, cap, resultsIn }. `today` is YYYY-MM-DD in India.
+// A figure the stock has not been refreshed for yet (results date, volume, market cap, news) never blocks.
+function risksOf(stock, today, f, mos){
   const blocks = [], notes = [];
-  let adj = 0;
-  const below = (lvl, sig) => (typeof lvl === 'number' && typeof sig === 'number' ? lvl < sig : null);
-  if(below(raw.weekMacdLevel, raw.weekMacdSignal)) blocks.push('weekly MACD is below its signal line');
-  if(below(raw.monthMacdLevel, raw.monthMacdSignal)) blocks.push('monthly MACD is below its signal line');
+  if(f && f.verdict === 'avoid') blocks.push('its Fundamental verdict is Avoid');
+  if(mos != null && mos <= 0) blocks.push('it trades at or above fair value (margin of safety ' + fixedOrNull(mos) + '%)');
   const lq = (stock && stock.liquidity) || {};
   const resultsIn = today ? daysUntil(lq.nextResults, today) : null;
   if(resultsIn != null && resultsIn <= RESULTS_DAYS) blocks.push('results due ' + (resultsIn === 0 ? 'today' : 'in ' + resultsIn + ' day' + (resultsIn === 1 ? '' : 's')) + ' (' + lq.nextResults + ')');
   const px = stock && stock.valuation && stock.valuation.currentPrice;
-  if(typeof lq.avgVolume === 'number' && typeof px === 'number' && (lq.avgVolume * px) / 100000 < THIN_LAKH){ adj -= 1; notes.push('thin trading (under \u20b9' + THIN_LAKH + ' lakh a day)'); }
+  if(typeof lq.avgVolume === 'number' && typeof px === 'number' && (lq.avgVolume * px) / 100000 < THIN_LAKH) blocks.push('very thin trading (under ₹' + THIN_LAKH + ' lakh a day)');
   const n = stock ? newsCounts(stock) : null;
-  if(n && n.neg >= NEWS_MIN && n.neg > n.pos){ adj -= 1; notes.push('recent news leans negative (' + n.neg + ' negative, ' + n.pos + ' positive)'); }
-  else if(n && n.pos >= NEWS_MIN && n.pos > n.neg){ adj += 1; notes.push('recent news leans positive (' + n.pos + ' positive, ' + n.neg + ' negative)'); }
-  return { blocks, adj, notes, cap: capClass(lq.marketCap), resultsIn };
+  if(n && n.neg >= NEWS_MIN && n.neg > n.pos) blocks.push('recent news leans negative (' + n.neg + ' negative, ' + n.pos + ' positive)');
+  else if(n && n.pos >= NEWS_MIN && n.pos > n.neg) notes.push('recent news leans positive (' + n.pos + ' positive, ' + n.neg + ' negative)');
+  const fn = fiiNote(stock); if(fn) notes.push(fn);
+  return { blocks, notes, cap: capClass(lq.marketCap), resultsIn };
 }
 
-// The call for one stock. `trade` is the open trade in it, or null; `setup` is swingSetup's reading for the stock (null without weekly bars).
-function ideaCall(stock, trade, setup, today){
+const sign = (x) => (x >= 0 ? '+' : '') + fixedOrNull(x, 1) + '%';
+// The sentence that says what the next-week score means, with the numbers from the tests.
+function scoreLine(r){
+  return 'two-week score in the top ' + r.topPct + '% of this strategy\'s ' + (TREND_NAME[r.trend] || '').toLowerCase() + ' stocks today; in five years of tests stocks that ranked like this within their trend each week were higher two weeks later ' + fixedOrNull(r.up, 1) + '% of the time (all ' + (TREND_NAME[r.trend] || '').toLowerCase() + ' stocks ' + fixedOrNull(r.base, 1) + '%) and beat the median stock ' + fixedOrNull(r.beat, 1) + '% of the time';
+}
+function factsLine(r){
+  const f = r.facts;
+  return 'last week ' + sign(f.week) + ', 4 weeks ' + sign(f.month) + ', 26 weeks ' + sign(f.half) + ', ' + fixedOrNull(-f.fromHigh, 0) + '% below its 52-week high';
+}
+
+// The call for one stock. `trade` is the open trade in it, or null; `read` is nextWeekRead's reading for the stock (null without enough weekly history).
+function ideaCall(stock, trade, read, today){
   const f = factsFor(trade || {}, stock);
-  const q = qualityOf(f);
-  const s = setup || null;
-  const o = outlookOf(stock, today), adj = trade ? 0 : o.adj;   // a stock you hold keeps its trade call: the checks only judge a new Buy
-  const base = { pts: q.pts, mos: q.mos, adj, cap: o.cap, rankSetup: s ? s.pts + adj : null, setup: s ? s.pts : null, of: s ? s.of : null, chance: s ? s.chance : null, touch: s ? s.touch : null, fromHigh: s ? s.fromHigh : null };
+  const mos = marginOfSafety(f.intrinsic, f.price);
+  const r = read || null, o = risksOf(stock, today, f, mos);
+  const base = { trend: r ? r.trend || null : null, base: r ? r.base : null, mos, cap: o.cap, resultsIn: o.resultsIn, p: r ? r.p : null, pct: r ? r.pct : null, topPct: r ? r.topPct : null, up: r ? r.up : null, beat: r ? r.beat : null };
   if(trade){
     const sig = tradeSignal(f);
     const call = sig.call === 'add' ? 'buy' : sig.call === 'hold' ? 'hold' : 'sell';
     const label = { add: 'Add more', hold: 'Hold', trim: 'Trim', review: 'Review' }[sig.call];
     return { ...base, call, label, held: true, reasons: sig.reasons };
   }
-  const weekMacd = stock && stock.technical && stock.technical.states && stock.technical.states.weekMacd;
+  const reasons = [];
   let call = 'hold';
-  const reasons = q.why.slice();
-  if(q.pts <= AVOID_AT) call = 'sell';
-  else if(q.worth && s && s.pts + o.adj >= BUY_SETUP && weekMacd !== 'bear_below' && !o.blocks.length) call = 'buy';
-  if(call !== 'sell'){
-    if(!q.worth) reasons.push('not yet worth owning (needs a Strong or Good verdict, margin of safety ' + MOS_MIN + '%+, Fundamental score ' + SCORE_MIN + '+)');
-    if(s) reasons.push('setup ' + s.pts + '/' + s.of + ': ' + (s.hits.length ? s.hits.join(', ') : 'no timing signal') + (call === 'buy' ? '' : (s.misses.length ? '; missing: ' + s.misses.join(', ') : '')));
-    else if(q.worth) reasons.push('no weekly price history yet, so the timing cannot be judged');
-    if(q.worth && s && s.pts >= BUY_SETUP && weekMacd === 'bear_below') reasons.push('weekly MACD is bearish below zero');
-    if(q.worth && s && s.pts + o.adj >= BUY_SETUP && weekMacd !== 'bear_below') o.blocks.forEach(b => reasons.push('held back: ' + b));
+  if(!r) reasons.push('no weekly price history yet (80 weeks are needed), so the next two weeks cannot be judged');
+  else if(!r.trend || r.trend === 'mixed') reasons.push(r.trend ? 'weekly and monthly trends disagree, so it is in neither the Upward nor the Downward list' : 'no MACD figures saved for this stock yet, so its trend is unknown (Refresh all stocks)', factsLine(r));
+  else {
+    if(r.trend === 'down') o.notes.push('a bounce-back pick: the weekly and monthly trends are both down, so this is a bet on a rebound, not on strength');
+    if(r.pct >= 100 - BUY_TOP) { if(o.blocks.length) o.blocks.forEach(b => reasons.push('held back: ' + b)); else call = 'buy'; }
+    else if(r.pct <= AVOID_BOTTOM) call = 'sell';
+    reasons.unshift(scoreLine(r));
+    reasons.push(factsLine(r));
+    if(r.thin && !o.blocks.some(b => /thin trading/.test(b))) reasons.push('weekly traded value is below what the model was trained on, so treat the score with care');
   }
   if(call !== 'sell') o.notes.forEach(x => reasons.push(x));
   if(o.cap) reasons.push(CAP_NAME[o.cap]);
   return { ...base, call, label: { buy: 'Buy', hold: 'Wait', sell: 'Avoid' }[call], held: false, reasons };
 }
 
-// Buy first, then Hold, then Sell. Buy and Wait lead with the best setup, then quality, then the stock nearest its high;
-// Sell leads with the weakest quality so the most urgent is on top.
+// Buy first, then Wait, then Avoid. Buy and Wait lead with the highest two-week score; Avoid leads with the lowest. A stock without a score goes last in its group.
 const GROUP = { buy: 0, hold: 1, sell: 2 };
 function rankIdeas(items){
   const n = (v) => (typeof v === 'number' ? v : -Infinity);
   return items.slice().sort((a, b) => {
     const A = a.c, B = b.c;
     if(GROUP[A.call] !== GROUP[B.call]) return GROUP[A.call] - GROUP[B.call];
-    if(A.call === 'sell') return A.pts - B.pts || (a.s.name || '').localeCompare(b.s.name || '');
-    const ra = typeof A.rankSetup === 'number' ? A.rankSetup : n(A.setup), rb = typeof B.rankSetup === 'number' ? B.rankSetup : n(B.setup);
-    return rb - ra || n(B.setup) - n(A.setup) || B.pts - A.pts || n(B.fromHigh) - n(A.fromHigh) || (a.s.name || '').localeCompare(b.s.name || '');
+    if(A.call === 'sell'){ const lo = (v) => (typeof v === 'number' ? v : Infinity); return lo(A.p) - lo(B.p) || (a.s.name || '').localeCompare(b.s.name || ''); }
+    return n(B.p) - n(A.p) || (a.s.name || '').localeCompare(b.s.name || '');
   });
 }
 
-export { RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas };
+// The best Buy calls of one trend ('up' or 'down') for stocks you do not hold, in ranked order (rankIdeas has already put the Buys first).
+function topBuys(ranked, trend, n = 5){ return ranked.filter(x => x.c.call === 'buy' && !x.c.held && x.c.trend === trend).slice(0, n); }
+
+export { AVOID_BOTTOM, BUY_TOP, RESULTS_DAYS, THIN_LAKH, TREND_NAME, ideaCall, rankIdeas, topBuys, trendOf };

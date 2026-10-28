@@ -84,15 +84,16 @@ test('fund columns: similar headers are not confused (TTM vs 3/5-year growth, cu
   assert.strictEqual(r.nseCode, 'WID0'); assert.strictEqual(r.industryGroup, 'Alpha');
 });
 test('fund columns: FII holding and the 1, 3 and 5 year returns are read when present, and an older file without them still imports', () => {
-  const extra = ['Return over 1year', 'Return over 3years', 'Return over 5years', 'FII holding'];
-  const hdr = FUND_HEADER.concat(extra), over = { 'Return over 1year': '-9.88', 'Return over 3years': '11.19', 'Return over 5years': '26.37', 'FII holding': '1.03' };
+  const extra = ['Return over 1year', 'Return over 3years', 'Return over 5years', 'FII holding', 'Change in FII holding'];
+  const hdr = FUND_HEADER.concat(extra), over = { 'Return over 1year': '-9.88', 'Return over 3years': '11.19', 'Return over 5years': '26.37', 'FII holding': '1.03', 'Change in FII holding': '-0.41' };
   const rows = universe.slice(0, 3).map((r, i) => Object.assign({}, r, i === 0 ? over : { 'FII holding': '' }));
   const r = Fe.scoreCsv(fundCsv(rows, hdr), {}).records;
   near(r[0].fiiHolding, 1.03); near(r[0].ret1, -9.88); near(r[0].ret3, 11.19); near(r[0].ret5, 26.37);
+  near(r[0].fiiChange, -0.41); assert.notStrictEqual(r[0].fiiHolding, r[0].fiiChange, 'the quarter change is not mistaken for the holding');
   assert.strictEqual(r[1].fiiHolding, null);   // a blank cell is empty, not 0
   near(r[0].fiiChange3, +universe[0]['Change in FII holding 3Years']);   // the 3-year change column is not mistaken for the holding itself
   const old = Fe.scoreCsv(csv, {}).records[0];
-  assert.strictEqual(old.fiiHolding, null); assert.strictEqual(old.ret1, null);
+  assert.strictEqual(old.fiiHolding, null); assert.strictEqual(old.fiiChange, null); assert.strictEqual(old.ret1, null);
 });
 test('fund columns: Industry Group listed before Industry still maps both (real export order)', () => {
   const swap = h => { const a = h.slice(); const i = a.indexOf('Industry'), j = a.indexOf('Industry Group'); a[i] = 'Industry Group'; a[j] = 'Industry'; return a; };
@@ -664,94 +665,142 @@ test('trade call: missing data never crashes and never invents a call', () => {
   assert.strictEqual(s.call, 'hold'); assert.strictEqual(s.gain, null);
   assert.strictEqual(G.factsFor({ buy: { price: 10 } }, null).price, null);
 });
-const I = load('src/tradelog/ideacall.js');
-const SW = load('src/tradelog/swing.js');
-const idea = (o) => ({ name: 'X', score: 7.2, verdict: 'buy', valuation: { currentPrice: 100, intrinsicValue: 160 }, technical: { score: 7.5, states: { weekMacd: 'bull_above' }, raw: { weekRsi: 65, monthRsi: 60 } }, ...o });
+const I = load('src/tradelog/ideacall.js', 'export { fiiNote };');
+const NW = load('src/tradelog/nextweek.js', 'export { weekFeatures, modelProb };');
+const idea = (o) => ({ name: 'X', score: 7.2, verdict: 'buy', valuation: { currentPrice: 100, intrinsicValue: 160 }, ...o });
+const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'nextweek-fixture.json'), 'utf8'));
+const FEATURES = ['r1', 'r2', 'r4', 'r8', 'r13', 'r26', 'r52', 'vol8', 'vol26', 'dhi52', 'dlo52', 'rngpos', 'rsi', 'macdh', 'volr', 'sma10d', 'sma40d'];
 // Weekly bars [t,o,h,l,c,v] (t = unix seconds, Monday 2026-01-05 onwards) from a list of closes.
-const barsOf = (closes) => closes.map((c, i) => [Date.UTC(2026, 0, 5 + 7 * i) / 1000, c, c, c, c, 1000]);
-const rising = Array.from({ length: 30 }, (_, i) => 100 * Math.pow(1.05, i % 2 ? i : i - 1));   // choppy climb, ends at its high, moves ~5% a week
-const flat = Array.from({ length: 30 }, (_, i) => 100 + (i % 2 ? 0.5 : 0));                      // barely moves
-const SAT = '2027-01-02';
-test('swing: four checks, one point each, from the weekly bars and weekly indicators', () => {
-  const up = SW.swingSetup(idea({}), barsOf(rising), SAT);
-  assert.strictEqual(up.pts, 4); assert.strictEqual(up.chance, 31);
-  const calm = SW.swingSetup(idea({ technical: { states: { weekMacd: 'bear_below' }, raw: { weekRsi: 40 } } }), barsOf(flat), SAT);
-  assert.ok(calm.pts <= 1, 'a flat stock with a weak chart scores little, got ' + calm.pts);
-  assert.ok(calm.misses.some(m => /MACD/.test(m)) && calm.misses.some(m => /a week/.test(m)));
-  assert.strictEqual(SW.swingSetup(idea({}), barsOf(rising.slice(0, 8)), SAT), null, 'too little history gives no reading');
-  assert.strictEqual(SW.swingSetup(idea({}), null, SAT), null);
+const barsOf = (closes) => closes.map((c, i) => [Date.UTC(2026, 0, 5 + 7 * i) / 1000, c, c * 1.01, c * 0.99, c, 1e6]);
+test('next week (v1.289): the in-app features and score match the Python that trained the model, for five real stocks', () => {
+  assert.strictEqual(FIXTURE.length, 5);
+  for(const o of FIXTURE){
+    const w = NW.weekFeatures(o.bars);
+    assert.ok(w, 'features computed');
+    FEATURES.forEach((k, i) => assert.ok(Math.abs(w.x[i] - o.features[k]) <= 1e-9 * (Math.abs(o.features[k]) + 1e-9), k + ' differs: ' + w.x[i] + ' vs ' + o.features[k]));
+    assert.ok(Math.abs(w.turn - o.features.turn) <= 1e-9 * o.features.turn, 'weekly traded value');
+    assert.ok(Math.abs(NW.modelProb(w.x) - o.p) < 1e-9, 'score ' + NW.modelProb(w.x) + ' vs ' + o.p);
+  }
 });
-test('swing: a week still in progress is left out of the reading', () => {
-  const closes = rising.slice();
-  const full = SW.swingSetup(idea({}), barsOf(closes), '2027-01-02');
-  const crashed = closes.concat([60]);   // a new bar far below the high, but the week has not finished
-  const d = new Date(Date.UTC(2026, 0, 5 + 7 * closes.length) + 2 * 86400000).toISOString().slice(0, 10);   // Wednesday of that week
-  assert.strictEqual(SW.swingSetup(idea({}), barsOf(crashed), d).fromHigh, full.fromHigh, 'the forming week does not move the 52-week-high distance');
+test('next week (v1.289): the ranking among a strategy\'s stocks, thin flag and too-little-history are handled; the forming week is left out', () => {
+  const rr = NW.rankReads([{ p: 0.5 }, { p: 0.7 }, null, { p: 0.4 }, { p: 0.6 }], ['up', 'up', 'up', 'up', 'up']);
+  assert.deepStrictEqual(rr.map(x => x && x.pct), [100 / 3, 100, null, 0, 200 / 3], 'rank among the four scored stocks, lowest 0 and highest 100');
+  const two = NW.rankReads([{ p: 0.5 }, { p: 0.7 }, { p: 0.4 }, { p: 0.6 }, { p: 0.9 }], ['up', 'down', 'up', 'down', 'mixed']);
+  assert.deepStrictEqual(two.slice(0, 4).map(x => x.pct), [100, 100, 0, 0], 'each stock is ranked only against stocks of its own trend');
+  assert.strictEqual(two[4].pct, undefined, 'a mixed trend has no rank'); assert.strictEqual(two[4].trend, 'mixed');
+  assert.ok(two[0].base > two[1].base, 'the Upward base rate is higher than the Downward one');
+  assert.strictEqual(rr[1].topPct, 1); assert.strictEqual(rr[3].topPct, 100);
+  assert.ok(rr[1].up > rr[3].up && rr[1].beat > rr[3].beat, 'the top band rose and beat the median more often than the bottom one in the tests');
+  assert.strictEqual(NW.rankReads([{ p: 0.5 }], ['up'])[0].pct, 50, 'one stock alone has no rank'); assert.deepStrictEqual(NW.rankReads([null], ['up']), [null]);
+  const walk = Array.from({ length: 100 }, (_, i) => 100 + 10 * Math.sin(i / 3) + i * 0.2);
+  const SAT = '2028-06-03';
+  const r = load('src/tradelog/nextweek.js').nextWeekRead(barsOf(walk), SAT);
+  assert.ok(r && r.p > 0 && r.p < 1 && typeof r.facts.fromHigh === 'number');
+  assert.strictEqual(r.thin, false, 'a traded value of crores is not thin');
+  const thin = load('src/tradelog/nextweek.js').nextWeekRead(barsOf(walk).map(b => b.slice(0, 5).concat([10])), SAT);
+  assert.strictEqual(thin.thin, true);
+  assert.strictEqual(load('src/tradelog/nextweek.js').nextWeekRead(barsOf(walk.slice(0, 70)), SAT), null, 'fewer than 80 weeks gives no reading');
+  assert.strictEqual(load('src/tradelog/nextweek.js').nextWeekRead(null, SAT), null);
+  const bars = barsOf(walk), forming = bars.concat([[Date.UTC(2026, 0, 5 + 7 * bars.length) / 1000, 40, 41, 39, 40, 1e6]]);
+  const wed = new Date(Date.UTC(2026, 0, 5 + 7 * bars.length) + 2 * 86400000).toISOString().slice(0, 10);
+  assert.strictEqual(load('src/tradelog/nextweek.js').nextWeekRead(forming, wed).p, load('src/tradelog/nextweek.js').nextWeekRead(bars, wed).p, 'the forming week does not move the score');
+  const thu = new Date(Date.UTC(2026, 0, 5 + 7 * bars.length) + 3 * 86400000).toISOString().slice(0, 10), sat = new Date(Date.UTC(2026, 0, 5 + 7 * bars.length) + 5 * 86400000).toISOString().slice(0, 10);
+  const rThu = load('src/tradelog/nextweek.js').nextWeekRead(forming, thu), rWed = load('src/tradelog/nextweek.js').nextWeekRead(forming, wed), rSat = load('src/tradelog/nextweek.js').nextWeekRead(forming, sat);
+  assert.strictEqual(rWed.partial, false); assert.strictEqual(rThu.partial, true, 'from Thursday the week so far is used');
+  assert.notStrictEqual(rThu.p, rWed.p, 'and it changes the score'); assert.strictEqual(rSat.partial, false, 'from Saturday the week is finished and counts as it is'); assert.strictEqual(rSat.p, rThu.p);
 });
-test('ideas: Buy needs a stock worth owning AND a setup of 2 or more; a good company with a poor chart is Wait; a weak overvalued one is Avoid', () => {
-  const good = SW.swingSetup(idea({}), barsOf(rising), SAT), poor = SW.swingSetup(idea({ technical: { states: { weekMacd: 'bear_above' }, raw: { weekRsi: 40 } } }), barsOf(flat), SAT);
-  assert.strictEqual(I.ideaCall(idea({}), null, good).call, 'buy');
-  const wait = I.ideaCall(idea({}), null, poor);
-  assert.strictEqual(wait.call, 'hold'); assert.strictEqual(wait.label, 'Wait');
-  assert.ok(wait.reasons.some(r => /setup \d\/4/.test(r)));
-  assert.strictEqual(I.ideaCall(idea({}), null, null).call, 'hold', 'no weekly bars: the timing cannot be judged, so not a Buy');
-  assert.strictEqual(I.ideaCall(idea({ verdict: 'avoid', score: 4, valuation: { currentPrice: 100, intrinsicValue: 80 } }), null, good).call, 'sell');
-  assert.strictEqual(I.ideaCall(idea({ verdict: 'hold', score: 6, valuation: { currentPrice: 100, intrinsicValue: 105 } }), null, good).call, 'hold', 'a Hold verdict is not worth owning, however good the chart');
-  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 100, intrinsicValue: 105 } }), null, good).call, 'hold', 'a cushion under 10% is not enough');
-  assert.strictEqual(I.ideaCall(idea({ technical: { states: { weekMacd: 'bear_below' }, raw: { weekRsi: 65 } } }), null, good).call, 'hold', 'bearish below zero is never a Buy');
+// A reading as nextWeekRead returns it, for the call rules.
+const nwr = (pct, o) => ({ p: 0.4 + pct / 400, pct, topPct: Math.max(1, Math.round(100 - pct)), trend: 'up', base: 50.7, up: 40 + pct / 5, beat: 45 + pct / 8, turn: 5e7, thin: false, facts: { week: 2, month: 4, half: 12, fromHigh: -8, swing: 5 }, ...o });
+const TODAY = '2026-10-28';
+test('ideas (v1.289): Buy is the top 10% of two-week scores, Avoid the bottom 10%, Wait the rest; no reading is Wait', () => {
+  assert.strictEqual(I.ideaCall(idea({}), null, nwr(95), TODAY).call, 'buy');
+  assert.strictEqual(I.ideaCall(idea({}), null, nwr(90), TODAY).call, 'buy', 'the edge itself is a Buy');
+  assert.strictEqual(I.ideaCall(idea({}), null, nwr(89), TODAY).call, 'hold');
+  assert.strictEqual(I.ideaCall(idea({}), null, nwr(50), TODAY).call, 'hold');
+  assert.strictEqual(I.ideaCall(idea({}), null, nwr(10), TODAY).call, 'sell');
+  assert.strictEqual(I.ideaCall(idea({}), null, nwr(11), TODAY).call, 'hold');
+  const b = I.ideaCall(idea({}), null, nwr(97), TODAY);
+  assert.strictEqual(b.label, 'Buy'); assert.ok(/top 3% of this strategy's upward trend stocks today/.test(b.reasons[0]) && /50\.7%/.test(b.reasons[0]), b.reasons[0]);
+  assert.ok(b.reasons.some(x => /last week \+2\.0%, 4 weeks \+4\.0%, 26 weeks \+12\.0%, 8% below its 52-week high/.test(x)));
+  const none = I.ideaCall(idea({}), null, null, TODAY); assert.strictEqual(none.call, 'hold'); assert.ok(/no weekly price history/.test(none.reasons[0]));
+  const q = (o) => I.ideaCall(idea(o), null, nwr(95), TODAY);
+  const av = q({ verdict: 'avoid', score: 3 });
+  assert.strictEqual(av.call, 'hold'); assert.ok(av.reasons.includes('held back: its Fundamental verdict is Avoid'));
+  const rich = q({ valuation: { currentPrice: 120, intrinsicValue: 100 } });
+  assert.strictEqual(rich.call, 'hold'); assert.ok(rich.reasons.some(x => /held back: it trades at or above fair value \(margin of safety -20\.0%\)/.test(x)));
+  assert.strictEqual(q({ valuation: { currentPrice: 100, intrinsicValue: 100 } }).call, 'hold', 'a margin of safety of exactly zero is not above zero');
+  assert.strictEqual(q({ verdict: 'hold', score: 5.2 }).call, 'buy', 'a Hold verdict is fine; only Avoid is held back');
+  assert.strictEqual(q({ valuation: {} }).call, 'buy', 'no intrinsic value saved: the margin-of-safety check is skipped');
+  assert.strictEqual(I.ideaCall(idea({ verdict: 'avoid', valuation: { currentPrice: 200, intrinsicValue: 100 } }), null, nwr(5), TODAY).call, 'sell', 'the bottom of the ranking is Avoid whatever the quality');
 });
-test('ideas: a stretched weekly RSI no longer blocks a Buy (replayed history shows it does no worse than average)', () => {
-  const s = { pts: 2, of: 4, chance: 25, touch: 56, hits: ['x'], misses: [], fromHigh: -3, move: 6 };
-  assert.strictEqual(I.ideaCall(idea({ technical: { states: { weekMacd: 'bull_above' }, raw: { weekRsi: 82, monthRsi: 60 } } }), null, s).call, 'buy');
-});
-test('ideas (v1.287): a weekly or monthly MACD below its signal line, or results due within 7 days, hold back a Buy; a figure that is not there never does', () => {
-  const s3 = { pts: 3, of: 4, chance: 28, touch: 58, hits: ['x'], misses: [], fromHigh: -3, move: 6 };
-  const tech = (raw) => ({ states: { weekMacd: 'bull_above' }, raw: Object.assign({ weekRsi: 65, monthRsi: 60 }, raw) });
-  const up = { weekMacdLevel: 2, weekMacdSignal: 1, monthMacdLevel: 3, monthMacdSignal: 1 }, TODAY = '2026-10-28';
-  assert.strictEqual(I.ideaCall(idea({ technical: tech(up) }), null, s3, TODAY).call, 'buy', 'both MACDs above their signal lines');
-  const wk = I.ideaCall(idea({ technical: tech(Object.assign({}, up, { weekMacdLevel: 0.5 })) }), null, s3, TODAY);
-  assert.strictEqual(wk.call, 'hold'); assert.ok(wk.reasons.includes('held back: weekly MACD is below its signal line'));
-  const mo = I.ideaCall(idea({ technical: tech(Object.assign({}, up, { monthMacdLevel: 0.5 })) }), null, s3, TODAY);
-  assert.strictEqual(mo.call, 'hold'); assert.ok(mo.reasons.includes('held back: monthly MACD is below its signal line'));
-  assert.strictEqual(I.ideaCall(idea({}), null, s3, TODAY).call, 'buy', 'no MACD levels saved yet: nothing to hold it back');
-  const due = (d, today) => I.ideaCall(idea({ technical: tech(up), liquidity: { nextResults: d } }), null, s3, today);
-  const r2 = due('2026-10-30', TODAY);
-  assert.strictEqual(r2.call, 'hold'); assert.ok(r2.reasons.some(x => /held back: results due in 2 days \(2026-10-30\)/.test(x)));
-  assert.ok(due('2026-10-28', TODAY).reasons.some(x => /results due today/.test(x)));
-  assert.strictEqual(due('2026-11-04', TODAY).call, 'hold', 'seven days is still inside the window');
-  assert.strictEqual(due('2026-11-05', TODAY).call, 'buy', 'eight days out is not');
-  assert.strictEqual(due('2026-10-20', TODAY).call, 'buy', 'a date already past is ignored');
-  assert.strictEqual(due('2026-10-30', undefined).call, 'buy', 'without today the date check is skipped');
-  const held = I.ideaCall(idea({ liquidity: { nextResults: '2026-10-30' } }), { qty: 10, buy: { price: 100 }, ticker: 'X' }, null, TODAY);
-  assert.ok(!held.reasons.some(x => /held back/.test(x)), 'a stock you hold keeps its trade call and is not gated');
-});
-test('ideas (v1.287): thin trading and negative news take a setup point off; positive news adds one; the size class is shown', () => {
-  const s = (pts) => ({ pts, of: 4, chance: 25, touch: 56, hits: ['x'], misses: [], fromHigh: -3, move: 6 });
-  const thin = { avgVolume: 10000 };   // 10,000 shares at 100 = 10 lakh a day
-  assert.strictEqual(I.ideaCall(idea({ liquidity: thin }), null, s(2), '2026-10-28').call, 'hold', 'a setup of 2 less 1 for thin trading is 1');
-  assert.strictEqual(I.ideaCall(idea({ liquidity: thin }), null, s(3), '2026-10-28').call, 'buy');
-  assert.strictEqual(I.ideaCall(idea({ liquidity: { avgVolume: 100000 } }), null, s(2), '2026-10-28').call, 'buy', '1 crore a day is not thin');
+test('ideas (v1.289): quality, results within 7 days, very thin trading and clearly negative news hold a Buy back; missing figures never do', () => {
+  const held = (o) => I.ideaCall(idea(o), null, nwr(95), TODAY);
+  const r2 = held({ liquidity: { nextResults: '2026-10-30' } });
+  assert.strictEqual(r2.call, 'hold'); assert.ok(r2.reasons.includes('held back: results due in 2 days (2026-10-30)'));
+  assert.ok(held({ liquidity: { nextResults: '2026-10-28' } }).reasons.some(x => /results due today/.test(x)));
+  assert.strictEqual(held({ liquidity: { nextResults: '2026-11-04' } }).call, 'hold', 'seven days is still inside the window');
+  assert.strictEqual(held({ liquidity: { nextResults: '2026-11-05' } }).call, 'buy', 'eight days out is not');
+  assert.strictEqual(held({ liquidity: { nextResults: '2026-10-20' } }).call, 'buy', 'a date already past is ignored');
+  assert.strictEqual(I.ideaCall(idea({ liquidity: { nextResults: '2026-10-30' } }), null, nwr(95), undefined).call, 'buy', 'without today the date check is skipped');
+  const thin = held({ liquidity: { avgVolume: 10000 } });   // 10,000 shares at 100 = 10 lakh a day
+  assert.strictEqual(thin.call, 'hold'); assert.ok(thin.reasons.some(x => /held back: very thin trading/.test(x)));
+  assert.strictEqual(held({ liquidity: { avgVolume: 100000 } }).call, 'buy', '1 crore a day is not thin');
   const day = new Date().toISOString().slice(0, 10), ev = (...ss) => ss.map((x, i) => ({ k: 'news', d: day, t: 'n' + i, s: x }));
-  assert.strictEqual(I.ideaCall(idea({ __events: ev('pos', 'pos') }), null, s(1), '2026-10-28').call, 'buy', 'two positive items lift 1 to 2');
-  assert.strictEqual(I.ideaCall(idea({ __events: ev('pos') }), null, s(1), '2026-10-28').call, 'hold', 'one item is not enough');
-  assert.strictEqual(I.ideaCall(idea({ __events: ev('neg', 'neg', 'pos') }), null, s(2), '2026-10-28').call, 'hold', 'negative news leans against it');
-  assert.strictEqual(I.ideaCall(idea({ __events: ev('neg', 'neg', 'pos', 'pos') }), null, s(2), '2026-10-28').call, 'buy', 'level news counts for nothing');
-  const cap = (cr) => I.ideaCall(idea({ liquidity: { marketCap: cr } }), null, s(3), '2026-10-28');
+  const neg = held({ __events: ev('neg', 'neg', 'pos') });
+  assert.strictEqual(neg.call, 'hold'); assert.ok(neg.reasons.some(x => /held back: recent news leans negative \(2 negative, 1 positive\)/.test(x)));
+  assert.strictEqual(held({ __events: ev('neg', 'neg', 'pos', 'pos') }).call, 'buy', 'level news counts for nothing');
+  assert.strictEqual(held({ __events: ev('neg') }).call, 'buy', 'one item is not enough');
+  const pos = held({ __events: ev('pos', 'pos') }); assert.strictEqual(pos.call, 'buy'); assert.ok(pos.reasons.some(x => /news leans positive/.test(x)));
+  assert.strictEqual(held({}).call, 'buy', 'no figures saved yet: nothing to hold it back');
+  assert.strictEqual(I.ideaCall(idea({ liquidity: { nextResults: '2026-10-30' } }), null, nwr(50), TODAY).reasons.some(x => /held back/.test(x)), false, 'only a would-be Buy is told it was held back');
+  const cap = (cr) => I.ideaCall(idea({ liquidity: { marketCap: cr } }), null, nwr(95), TODAY);
   assert.strictEqual(cap(150000).cap, 'large'); assert.strictEqual(cap(50000).cap, 'mid'); assert.strictEqual(cap(14000).cap, 'small');
-  assert.ok(cap(14000).reasons.includes('Small cap')); assert.strictEqual(I.ideaCall(idea({}), null, s(3), '2026-10-28').cap, null);
-  const r = I.rankIdeas([{ s: { name: 'a' }, c: { call: 'buy', setup: 3, rankSetup: 2, pts: 3 } }, { s: { name: 'b' }, c: { call: 'buy', setup: 2, rankSetup: 3, pts: 3 } }]).map(x => x.s.name).join('');
-  assert.strictEqual(r, 'ba', 'the ranking uses the setup after the adjustments');
+  assert.ok(cap(14000).reasons.includes('Small cap')); assert.strictEqual(I.ideaCall(idea({}), null, nwr(95), TODAY).cap, null);
+  assert.ok(I.ideaCall(idea({}), null, nwr(95, { thin: true }), TODAY).reasons.some(x => /below what the model was trained on/.test(x)));
 });
-test('ideas: a stock you hold gets its trade call (add is Buy, trim and review are Sell)', () => {
+test('ideas (v1.289): a stock you hold keeps its trade call and is never gated', () => {
   const tr = { buy: { price: 100, snapshot: { score: 7.2 } } };
-  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 102, intrinsicValue: 160 }, technical: { raw: { weekRsi: 55, monthRsi: 60 } } }), tr, null).label, 'Add more');
-  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 150, intrinsicValue: 300 }, technical: { raw: { weekRsi: 85, monthRsi: 80 } } }), tr, null).call, 'sell');
+  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 102, intrinsicValue: 160 }, technical: { raw: { weekRsi: 55, monthRsi: 60 } } }), tr, nwr(5), TODAY).label, 'Add more');
+  assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 150, intrinsicValue: 300 }, technical: { raw: { weekRsi: 85, monthRsi: 80 } } }), tr, nwr(95), TODAY).call, 'sell');
+  const h = I.ideaCall(idea({ liquidity: { nextResults: '2026-10-30' } }), tr, nwr(95), TODAY);
+  assert.strictEqual(h.held, true); assert.ok(!h.reasons.some(x => /held back/.test(x)));
   assert.strictEqual(I.ideaCall(idea({}), tr, null).held, true);
 });
-test('ideas: ranking puts Buy first by best setup, then quality, then nearness to the high; Wait next; the weakest Avoid first', () => {
-  const mk = (n, call, pts, setup, fromHigh) => ({ s: { name: n }, c: { call, pts, setup, fromHigh } });
-  const r = I.rankIdeas([mk('a', 'sell', -1), mk('b', 'hold', 1, 1, -5), mk('c', 'buy', 4, 2, -8), mk('d', 'buy', 4, 3, -9), mk('e', 'sell', -4), mk('f', 'buy', 4, 2, -2), mk('g', 'buy', 5, 2, -9)]).map(x => x.s.name).join('');
-  assert.strictEqual(r, 'dgfcbea', 'setup first, then quality, then closer to the high; ties no longer fall back to the alphabet');
+test('ideas (v1.289): ranking is Buy, then Wait, then Avoid; the highest score leads Buy and Wait, the lowest leads Avoid; a stock with no score goes last', () => {
+  const mk = (n, call, p) => ({ s: { name: n }, c: { call, p } });
+  const r = I.rankIdeas([mk('a', 'sell', 0.4), mk('b', 'hold', 0.5), mk('c', 'buy', 0.55), mk('d', 'buy', 0.6), mk('e', 'sell', 0.35), mk('f', 'hold', null), mk('g', 'hold', 0.52), mk('h', 'sell', null)]).map(x => x.s.name).join('');
+  assert.strictEqual(r, 'dcgbfeah');
+  const mt = (n, call, trend, held) => ({ s: { name: n }, c: { call, trend, held } });
+  const list = [mt('a', 'buy', 'up'), mt('b', 'buy', 'up', true), mt('c', 'hold', 'up'), mt('d', 'buy', 'up'), mt('e', 'buy', 'up'), mt('f', 'buy', 'up'), mt('g', 'buy', 'up'), mt('h', 'buy', 'up'), mt('i', 'buy', 'down'), mt('j', 'buy', 'down')];
+  assert.strictEqual(I.topBuys(list, 'up').map(x => x.s.name).join(''), 'adefg', 'five Buys of the trend, skipping stocks you hold and non-Buys, in the order given');
+  assert.strictEqual(I.topBuys(list, 'down').map(x => x.s.name).join(''), 'ij', 'the Downward list has its own Buys');
+  assert.strictEqual(I.topBuys(list, 'up', 2).length, 2); assert.strictEqual(I.topBuys([], 'up').length, 0);
+});
+test('ideas (v1.289): the trend comes from weekly and monthly MACD; a mixed or unknown trend is never a Buy; a Downward Buy says it is a bounce', () => {
+  const t = (wl, ws, ml, ms) => ({ technical: { raw: { weekMacdLevel: wl, weekMacdSignal: ws, monthMacdLevel: ml, monthMacdSignal: ms } } });
+  assert.strictEqual(I.trendOf(t(2, 1, 5, 4)), 'up'); assert.strictEqual(I.trendOf(t(1, 2, 4, 5)), 'down');
+  assert.strictEqual(I.trendOf(t(2, 1, 4, 5)), 'mixed'); assert.strictEqual(I.trendOf(t(1, 2, 5, 4)), 'mixed');
+  assert.strictEqual(I.trendOf(t(1, 1, 4, 5)), 'mixed', 'level equal to signal is neither up nor down');
+  assert.strictEqual(I.trendOf(t(null, 1, 4, 5)), null); assert.strictEqual(I.trendOf({}), null); assert.strictEqual(I.trendOf(null), null);
+  const mixed = I.ideaCall(idea({}), null, nwr(97, { trend: 'mixed', up: undefined, beat: undefined }), TODAY);
+  assert.strictEqual(mixed.call, 'hold'); assert.ok(mixed.reasons.some(x => /disagree/.test(x)));
+  const unk = I.ideaCall(idea({}), null, nwr(97, { trend: null }), TODAY);
+  assert.strictEqual(unk.call, 'hold'); assert.ok(unk.reasons.some(x => /trend is unknown/.test(x)));
+  const down = I.ideaCall(idea({}), null, nwr(97, { trend: 'down', base: 45.3 }), TODAY);
+  assert.strictEqual(down.call, 'buy'); assert.ok(down.reasons.some(x => /bounce-back/.test(x)) && /downward trend/.test(down.reasons[0]));
+  assert.strictEqual(down.trend, 'down');
+});
+test('ideas (v1.289): FII selling or buying last quarter is a note, never a block; it needs 0.5 points and 10% of the earlier holding', () => {
+  const v = (h, c, c3) => ({ valuation: { fiiHolding: h, fiiChange: c, fiiChange3: c3 } });
+  assert.strictEqual(I.fiiNote(v(5.86, -1.17, 2.96)), 'FII selling: holding down 1.2 points last quarter (7.0% to 5.9%), as of the last quarter end');
+  assert.ok(/down over 3 years too/.test(I.fiiNote(v(5.86, -1.17, -3))));
+  assert.ok(/^FII buying: holding up 1.2 points last quarter \(8.8% to 10.0%\), up over 3 years too/.test(I.fiiNote(v(10, 1.2, 2))));
+  assert.strictEqual(I.fiiNote(v(19.65, 1.57, 2)), null, '1.57 points of 18.1 is under 10%');
+  assert.strictEqual(I.fiiNote(v(55.65, 0.9, 1)), null, '0.9 points of 54.7 is under 10%');
+  assert.strictEqual(I.fiiNote(v(0.71, -0.18, 0)), null, 'under 0.5 points');
+  assert.ok(I.fiiNote(v(3, -0.5, 0)), 'the edge counts'); assert.strictEqual(I.fiiNote(v(5, null, 0)), null); assert.strictEqual(I.fiiNote({}), null); assert.strictEqual(I.fiiNote(v(1, 1, 0)), null, 'nothing was held before');
+  const c = I.ideaCall(idea({ valuation: { currentPrice: 100, intrinsicValue: 120, fiiHolding: 5.86, fiiChange: -1.17 } }), null, nwr(97, { trend: 'down', base: 45.3 }), TODAY);
+  assert.strictEqual(c.call, 'buy', 'FII selling does not hold a Buy back'); assert.ok(c.reasons.some(x => /FII selling/.test(x)));
 });
 test('ideas: missing data never crashes', () => { assert.strictEqual(I.ideaCall({}, null, null).call, 'hold'); assert.strictEqual(I.ideaCall({}, null).call, 'hold'); });
 test('trade call: history keeps one point a day and lists when the call changed', () => {
