@@ -703,11 +703,11 @@ test('next week (v1.289): the ranking among a strategy\'s stocks, thin flag and 
   assert.strictEqual(load('src/tradelog/nextweek.js').nextWeekRead(null, SAT), null);
   const bars = barsOf(walk), forming = bars.concat([[Date.UTC(2026, 0, 5 + 7 * bars.length) / 1000, 40, 41, 39, 40, 1e6]]);
   const wed = new Date(Date.UTC(2026, 0, 5 + 7 * bars.length) + 2 * 86400000).toISOString().slice(0, 10);
-  assert.strictEqual(load('src/tradelog/nextweek.js').nextWeekRead(forming, wed).p, load('src/tradelog/nextweek.js').nextWeekRead(bars, wed).p, 'the forming week does not move the score');
   const thu = new Date(Date.UTC(2026, 0, 5 + 7 * bars.length) + 3 * 86400000).toISOString().slice(0, 10), sat = new Date(Date.UTC(2026, 0, 5 + 7 * bars.length) + 5 * 86400000).toISOString().slice(0, 10);
   const rThu = load('src/tradelog/nextweek.js').nextWeekRead(forming, thu), rWed = load('src/tradelog/nextweek.js').nextWeekRead(forming, wed), rSat = load('src/tradelog/nextweek.js').nextWeekRead(forming, sat);
-  assert.strictEqual(rWed.partial, false); assert.strictEqual(rThu.partial, true, 'from Thursday the week so far is used');
-  assert.notStrictEqual(rThu.p, rWed.p, 'and it changes the score'); assert.strictEqual(rSat.partial, false, 'from Saturday the week is finished and counts as it is'); assert.strictEqual(rSat.p, rThu.p);
+  assert.strictEqual(rWed.partial, true, 'on any weekday the week so far is used (as of today)'); assert.strictEqual(rThu.partial, true);
+  assert.notStrictEqual(rWed.p, load('src/tradelog/nextweek.js').nextWeekRead(bars, wed).p, 'the week so far moves the score');
+  assert.strictEqual(rSat.partial, false, 'from Saturday the week is finished and counts as it is'); assert.strictEqual(rSat.p, rThu.p, 'the finished week counts the same as the week so far when no more days are added');
 });
 // A reading as nextWeekRead returns it, for the call rules.
 const nwr = (pct, o) => ({ p: 0.4 + pct / 400, pct, topPct: Math.max(1, Math.round(100 - pct)), trend: 'up', base: 50.7, up: 40 + pct / 5, beat: 45 + pct / 8, turn: 5e7, thin: false, facts: { week: 2, month: 4, half: 12, fromHigh: -8, swing: 5 }, ...o });
