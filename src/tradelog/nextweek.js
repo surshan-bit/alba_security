@@ -1,6 +1,6 @@
-// The next-week reading for the Buy / Sell ideas (v1.289): how likely is this stock to beat the typical stock next week, and so to be up?
-// A small gradient-boosted tree model (nextweek-model.js) trained on about 297,000 stock-weeks of weekly prices (2021 to 2026, liquid stocks) and
-// checked week by week on data it had not seen: its top ten percent beat the median stock about 55% of the time (it held in four of the last five years; 2022 was the exception).
+// The two-week reading for the Buy / Sell ideas (v1.289): how likely is this stock to beat the typical stock over the next two weeks, and so to be higher?
+// A small gradient-boosted tree model (nextweek-model.js) trained on about 294,000 stock-weeks of weekly prices (2021 to 2026, liquid stocks) against the
+// return two weeks later, and checked week by week on data it had not seen: its top tenth was higher two weeks later 51.9% of the time (all stocks 48.1%).
 // It reads only the stock's own completed weekly bars, so a stock can be scored on its own. The figures here must match the Python that trained it
 // (tests/nextweek-fixture.json holds five stocks scored by that code); change one and the other, never one alone.
 import { techCompleted } from '../engine/technical.js';
@@ -8,7 +8,7 @@ import { NEXTWEEK_MODEL } from './nextweek-model.js';
 /** @type {{ features: string[], base: number, trees: any[][][], edges: number[], up: number[], beat: number[] }} */
 const M = /** @type {any} */ (NEXTWEEK_MODEL);
 
-const MIN_BARS = 53, MIN_TURN = 1e7;   // 52 weeks of history plus the week being measured; weekly traded value of 1 crore rupees, the floor the model was trained on
+const MIN_BARS = 80, MIN_TURN = 1e7;   // 80 weeks of history, as in the stocks the model was trained on (a recent listing trades differently); weekly traded value of 1 crore rupees, the floor it was trained on
 
 // Exponentially weighted mean the way pandas computes it with adjust=true (every value from the start counts, newest most).
 function ewm(x, span){
@@ -59,17 +59,21 @@ function modelProb(x){
   return 1 / (1 + Math.exp(-s));
 }
 
-const BASE_UP = 47.7;   // share of all stock-weeks in the tests that closed higher
+const BASE_UP = 48.1;   // share of all stock-weeks in the tests that were higher two weeks later
 
-// The reading for one stock: { p (the model's raw score), turn, thin, facts } or null when the stock cannot be scored (fewer than 53 completed weekly bars).
+// The reading for one stock: { p (the model's raw score), partial (the week in progress was used), turn, thin, facts } or null when the stock cannot be scored (fewer than 80 weekly bars).
 // `thin` is true below the weekly traded value the model was trained on. The raw score moves with the whole market (every stock scores higher after a calm
 // rally), so what counts is where a stock ranks among the others: rankReads adds that.
 function nextWeekRead(weekBars, today){
-  const done = techCompleted(Array.isArray(weekBars) ? weekBars : [], 'week', today);
-  const w = weekFeatures(done);
+  const bars = Array.isArray(weekBars) ? weekBars : [];
+  // The model reads finished weeks. From Thursday the week in progress is nearly finished, so it is used as the week's bar (partial: true) for a run made before
+  // Friday's close; from Saturday the week is finished and counts as it is.
+  const done = techCompleted(bars, 'week', today), dow = today ? new Date(today + 'T00:00:00Z').getUTCDay() : -1;
+  const partial = done.length < bars.length && (dow === 4 || dow === 5), use = partial ? bars : done;
+  const w = weekFeatures(use);
   if(!w) return null;
   const p = modelProb(w.x), f = w.byName;
-  return { p, turn: w.turn, thin: w.turn < MIN_TURN,
+  return { p, partial, turn: w.turn, thin: w.turn < MIN_TURN,
     facts: { week: f.r1 * 100, month: f.r4 * 100, half: f.r26 * 100, fromHigh: f.dhi52 * 100, swing: f.vol8 * 100 } };
 }
 
