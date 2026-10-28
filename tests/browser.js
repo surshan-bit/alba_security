@@ -448,6 +448,10 @@ async function rowCapTests(browser){
     ok(await page.locator('#stratList .dm-pop').isHidden(), 'strategy menu: picking a strategy closes the menu');
     await page.locator('#stratList .dm-btn').click(); await page.locator('#stratList [data-strat-pick]').last().click(); await page.waitForTimeout(200);   // back to the new strategy for the checks below
   }
+  { // v1.285: the rule picker offers the Holdings and returns fields
+    const labels = await page.evaluate(() => { const o = document.querySelector('select.sr-add'); return o ? [...o.querySelectorAll('optgroup')].map(g => g.label + ':' + g.querySelectorAll('option').length) : []; });
+    ok(labels.some(l => /^Holdings and returns:6$/.test(l)), 'strategy rules: Holdings and returns group is offered (' + labels.join(', ') + ')');
+  }
   { // v1.282: the rules are a table: column headings, a clear Remove button, a total of the stocks that pass all rules, and Undo
     await page.evaluate(() => { const d = document.querySelector('#stratMain details'); if(d) d.open = true; });
     await page.selectOption('.sr-add', 'score'); await page.waitForTimeout(150);

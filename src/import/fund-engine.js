@@ -127,6 +127,9 @@ const COLUMN_MATCHERS = [
   ['fiiChange3', ['fii', 'holding', '3years']], ['diiChange3', ['dii', 'holding', '3years']],
   ['histPe5', ['historical', 'pe', '5years']], ['avgDebtorDays3', ['debtor', 'days', '3years']],
   ['ncavps', ['ncavps']], ['numShareholders', ['number', 'shareholders']],
+  // Optional columns added later (an older export without them still imports; the fields are then empty).
+  ['fiiHolding', ['fii', 'holding'], ['change', '3years']],
+  ['ret1', ['return', 'over', '1year']], ['ret3', ['return', 'over', '3years']], ['ret5', ['return', 'over', '5years']],
 ];
 
 function buildColumnMap(headerRow) {
@@ -164,6 +167,7 @@ function extractRecords(rows, colMap) {
       medianRoce10: toNum(get(r, 'medianRoce10')), fcf3: toNum(get(r, 'fcf3')), fcf5: toNum(get(r, 'fcf5')), ocf3: toNum(get(r, 'ocf3')), ocf5: toNum(get(r, 'ocf5')),
       croic: toNum(get(r, 'croic')), graham: toNum(get(r, 'graham')), fiiChange3: toNum(get(r, 'fiiChange3')), diiChange3: toNum(get(r, 'diiChange3')),
       histPe5: toNum(get(r, 'histPe5')), avgDebtorDays3: toNum(get(r, 'avgDebtorDays3')), ncavps: toNum(get(r, 'ncavps')), numShareholders: toNum(get(r, 'numShareholders')),
+      fiiHolding: toNum(get(r, 'fiiHolding')), ret1: toNum(get(r, 'ret1')), ret3: toNum(get(r, 'ret3')), ret5: toNum(get(r, 'ret5')),
     });
   }
   return records;
@@ -392,7 +396,7 @@ function buildFactor(key, r, sc, industry, group, scored) {
   } else if (key === 'gov') {
     const pct = scored.piotroskiPct, p = peerText(pct == null ? null : scored.govBasis, industry, group);
     metrics = [['Piotroski F-Score percentile', `${ordN(pct)} (${p.chip})`], ['Promoter pledge', pc(r.pledgePct)], ['Promoter holding change', pc(r.promoterHoldingChange)],
-      ['FII change 3yr', pc(r.fiiChange3, 2)], ['DII change 3yr', pc(r.diiChange3, 2)]];
+      ['FII holding', pc(r.fiiHolding, 2)], ['FII change 3yr', pc(r.fiiChange3, 2)], ['DII change 3yr', pc(r.diiChange3, 2)]];
     note = 'Data-driven mechanical proxy (pending individual research): based on Piotroski F-Score ranked against ' +
       (p.govWhere ? `peers in ${p.govWhere}` : `all stocks (${industry} and its group have fewer than 10 peers)`) +
       ` (${ordN(pct)} percentile), adjusted for promoter pledge (${pc(r.pledgePct)}), promoter-holding change, and institutional (FII/DII) conviction where available.`;
@@ -427,6 +431,9 @@ function pillarsFor(r) { const v = pillarVal(r); return v == null ? null : { val
 function valuationBlock(r, old) {
   const v = { asof, currentPrice: r.currentPrice, grahamNumber: r.graham, intrinsicValue: r.intrinsicValue,
     intrinsicValueSource: 'Screener.in Intrinsic Value estimate (from uploaded fundamentals CSV) — the single source of truth for intrinsic value across this app.', ncavps: r.ncavps };
+  // Holding and return figures from the CSV; kept as they were when this file does not have the column.
+  const extra = { fiiHolding: r.fiiHolding, fiiChange3: r.fiiChange3, diiChange3: r.diiChange3, ret1y: r.ret1, ret3y: r.ret3, ret5y: r.ret5 };
+  Object.keys(extra).forEach(k => { if(extra[k] != null) v[k] = extra[k]; });
   return v;
 }
 

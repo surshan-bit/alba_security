@@ -83,6 +83,17 @@ test('fund columns: similar headers are not confused (TTM vs 3/5-year growth, cu
   near(r.fcf3, +row['Free cash flow 3years']); near(r.ocf5, +row['Operating cash flow 5years']); near(r.de, +row['Debt to equity']);
   assert.strictEqual(r.nseCode, 'WID0'); assert.strictEqual(r.industryGroup, 'Alpha');
 });
+test('fund columns: FII holding and the 1, 3 and 5 year returns are read when present, and an older file without them still imports', () => {
+  const extra = ['Return over 1year', 'Return over 3years', 'Return over 5years', 'FII holding'];
+  const hdr = FUND_HEADER.concat(extra), over = { 'Return over 1year': '-9.88', 'Return over 3years': '11.19', 'Return over 5years': '26.37', 'FII holding': '1.03' };
+  const rows = universe.slice(0, 3).map((r, i) => Object.assign({}, r, i === 0 ? over : { 'FII holding': '' }));
+  const r = Fe.scoreCsv(fundCsv(rows, hdr), {}).records;
+  near(r[0].fiiHolding, 1.03); near(r[0].ret1, -9.88); near(r[0].ret3, 11.19); near(r[0].ret5, 26.37);
+  assert.strictEqual(r[1].fiiHolding, null);   // a blank cell is empty, not 0
+  near(r[0].fiiChange3, +universe[0]['Change in FII holding 3Years']);   // the 3-year change column is not mistaken for the holding itself
+  const old = Fe.scoreCsv(csv, {}).records[0];
+  assert.strictEqual(old.fiiHolding, null); assert.strictEqual(old.ret1, null);
+});
 test('fund columns: Industry Group listed before Industry still maps both (real export order)', () => {
   const swap = h => { const a = h.slice(); const i = a.indexOf('Industry'), j = a.indexOf('Industry Group'); a[i] = 'Industry Group'; a[j] = 'Industry'; return a; };
   const hdr = swap(FUND_HEADER), row = universe[0];
