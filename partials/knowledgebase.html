@@ -251,6 +251,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.290 &middot; 2026-10-28</h3>
+            <ul>
+              <li><strong>Buy / Sell ideas now run when you press Process:</strong> choose a strategy, press <b>Process</b>, and a progress bar (the same look as Data Refresh) shows three steps &mdash; finding the stocks that qualify, reading their weekly prices (&ldquo;12 of 40&rdquo;), then working out each trend, ranking and applying the checks. When it finishes, a summary line says how many stocks were processed and how many are Upward, Downward or Mixed, and the two lists appear. Nothing is read or worked out until you press the button, and the strategy picker waits while it runs. Press <b>Process again</b> after a refresh to redo it.</li>
+              <li><strong>The grid of every stock is gone:</strong> only the two Top 5 lists remain (Upward trend &ndash; positive move, Downward trend &ndash; bounce back). Stocks you hold are not listed there; they keep their Trade Log call above. The summary line says whether the reading is based on the week so far (Thursday and Friday) or the last finished week (earlier in the week).</li>
+            </ul>
             <h3>v1.289 &middot; 2026-10-28</h3>
             <ul>
               <li><strong>Buy / Sell ideas rebuilt around one question &mdash; which stock is likely to be higher two weeks from now:</strong> the old four-point chart setup (near the high, MACD, weekly movement, RSI) is gone. Each stock you do not hold now gets a <b>Two-week score</b> from a model trained and tested week by week on five years of weekly prices (about 294,000 stock-weeks of liquid stocks, against the return two weeks later). It reads seventeen figures from the stock&rsquo;s own weekly bars (returns over 1 to 52 weeks, swing size, distance from the 52-week high and low, RSI, MACD gap, volume trend, distance from the 10- and 40-week averages) and rates how likely the stock is to beat the median stock over the next two weeks.</li>
