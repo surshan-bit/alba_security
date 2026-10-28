@@ -745,6 +745,16 @@ test('trade call: history keeps one point a day and lists when the call changed'
     assert.strictEqual(d.technical.src, 'snapshot');
     assert.strictEqual(d.snapAsof, '2026-10-14', 'the day TradingView confirmed the stock, for the Technical data age');
   });
+  test('live snapshot: market cap comes back in rupees crore, next to the volume (v1.286)', () => {
+    const withCap = Object.assign({}, tv, { market_cap_basic: 15000000000 });
+    const d = L.mergedDoc(stock, undefined, { row: { k: 'ABC', y: 'NSE:ABC', c: L.packValues(withCap) }, asof: '2026-10-14', at: '2026-10-14T10:00:00.000Z' });
+    assert.strictEqual(d.liquidity.marketCap, 1500, '1,500 crore');
+    assert.strictEqual(d.liquidity.avgVolume, 50000);
+    const row = (o) => ({ row: { k: 'ABC', y: 'NSE:ABC', c: L.packValues(Object.assign({ close: 10 }, o)) }, asof: '2026-10-14', at: '2026-10-14T10:00:00.000Z' });
+    assert.strictEqual(L.mergedDoc(stock, undefined, row({ market_cap_basic: 0 })).liquidity, undefined, 'no cap and no volume gives nothing');
+    assert.deepStrictEqual(L.mergedDoc(stock, undefined, row({ market_cap_basic: 20000000 })).liquidity, { marketCap: 2, asof: '2026-10-14' }, 'a cap alone is kept');
+    assert.strictEqual(L.mergedDoc(stock, undefined, snap()).liquidity.marketCap, undefined, 'a row saved before v1.286 has no market cap');
+  });
   test('live snapshot: nothing to merge, or a row without a price, leaves the stock record as it is', () => {
     const real = { ticker: 'ABC', globalFactors: { positive: ['x'] } };
     assert.strictEqual(L.mergedDoc(stock, real, undefined), real);

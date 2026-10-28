@@ -10,7 +10,7 @@
 import { snapshotTechnical, techKeepsBarsBlock } from '../engine/technical.js';
 
 // The columns asked of TradingView, in the order they are packed into a row.
-const COLS = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M', 'average_volume_30d_calc'];
+const COLS = ['close', 'MACD.macd|1W', 'MACD.signal|1W', 'MACD.macd|1M', 'MACD.signal|1M', 'RSI|1W', 'RSI|1M', 'change|1W', 'change|1M', 'average_volume_30d_calc', 'market_cap_basic'];
 
 // A row's values as TradingView returned them, packed in COLS order (null for a missing or non-numeric value).
 const packValues = (tv) => COLS.map(k => (tv && typeof tv[k] === 'number' && isFinite(tv[k])) ? tv[k] : null);
@@ -21,6 +21,18 @@ function unpackValues(c){
   return tv;
 }
 
+// The size and trading block of a stock from its TradingView row: average daily volume (shares) and market cap (₹ crore, v1.286).
+// Null when the row has neither. Market cap comes from TradingView in rupees; a stock's size is kept in crore, as the Strategies rules show it.
+function liquidityOf(row, today){
+  const v = row && row['average_volume_30d_calc'], m = row && row['market_cap_basic'];
+  const out = {};
+  if(typeof v === 'number' && v >= 0) out.avgVolume = Math.round(v);
+  if(typeof m === 'number' && isFinite(m) && m > 0) out.marketCap = Math.round(m / 1e7);
+  if(out.avgVolume == null && out.marketCap == null) return null;
+  out.asof = today;
+  return out;
+}
+
 // What to save for one stock from its TradingView row: { valuation?, liquidity?, technical?, kept? }, or { reason } when nothing can be saved.
 // `keepAgainst` is the saved technical block to protect: a completed-weeks block from the last 3 days is kept (only the price moves);
 // pass null to skip that check (the merge below does it against the stock's own saved update).
@@ -28,7 +40,8 @@ function snapshotUpdate(s, row, today, sym, keepAgainst){
   const px = row && typeof row.close === 'number' && row.close > 0 ? row.close : null;
   if(px == null) return { reason: 'TradingView returned no price' };
   const out = { valuation: { currentPrice: px, asof: today, source: 'TradingView (' + sym + ')' } };
-  if(typeof row['average_volume_30d_calc'] === 'number' && row['average_volume_30d_calc'] >= 0) out.liquidity = { avgVolume: Math.round(row['average_volume_30d_calc']), asof: today };
+  const lq = liquidityOf(row, today);
+  if(lq) out.liquidity = lq;
   // The week and month move come back even when TradingView has no MACD or RSI for the stock. Without an indicator there is no technical
   // block to carry them, so they are kept apart (pctChange) and laid onto the stock's saved reading, leaving its score and date alone.
   const wk = typeof row['change|1W'] === 'number' && isFinite(row['change|1W']) ? row['change|1W'] : null;

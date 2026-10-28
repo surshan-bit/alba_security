@@ -58,7 +58,10 @@ function applyUpdatesDoc(s, doc){
   }
   // Average daily volume (30 days) from the TradingView refresh: kept as its own block, so a strategy can skip thinly traded stocks.
   const lq = doc && doc.liquidity;
-  if(lq && typeof lq === 'object' && typeof lq.avgVolume === 'number' && lq.avgVolume >= 0) s.liquidity = { avgVolume: lq.avgVolume, asof: lq.asof || null };
+  if(lq && typeof lq === 'object'){
+    const av = typeof lq.avgVolume === 'number' && lq.avgVolume >= 0 ? lq.avgVolume : null, mc = typeof lq.marketCap === 'number' && lq.marketCap > 0 ? lq.marketCap : null;
+    if(av != null || mc != null) s.liquidity = { avgVolume: av, marketCap: mc, asof: lq.asof || null };   // marketCap in ₹ crore (v1.286)
+  }
   const t = doc && doc.technical;
   if(t && typeof t === 'object'){
     const bt = s.__updBase.technical;
