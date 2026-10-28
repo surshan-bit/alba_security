@@ -26,6 +26,21 @@ function trendOf(stock){
   return w && m ? 'up' : !w && !m && r.weekMacdLevel < r.weekMacdSignal && r.monthMacdLevel < r.monthMacdSignal ? 'down' : 'mixed';
 }
 
+// FII selling or buying last quarter, from the Screener columns (FII holding, its change over the last quarter, and its change over 3 years): a note, never a
+// block, because no link to the next two weeks could be found and there is no history to test one. The change must be at least FII_MIN points AND at least
+// FII_REL of what the funds held before, so a 1-point cut means something for a stock they own 55% of and a 0.5-point cut means something for one they own 3% of.
+// Returns the sentence, or null. The figures are as of the last quarter end, so they cannot explain moves since.
+const FII_MIN = 0.5, FII_REL = 0.1;
+function fiiNote(stock){
+  const v = (stock && stock.valuation) || {}, c = v.fiiChange, h = v.fiiHolding;
+  if(typeof c !== 'number' || typeof h !== 'number' || !isFinite(c) || !isFinite(h)) return null;
+  const prev = h - c;
+  if(!(prev > 0) || Math.abs(c) < FII_MIN || Math.abs(c) / prev < FII_REL) return null;
+  const w = fixedOrNull(prev, 1) + '% to ' + fixedOrNull(h, 1) + '%', long = typeof v.fiiChange3 === 'number' && (c < 0 ? v.fiiChange3 < 0 : v.fiiChange3 > 0);
+  return c < 0 ? 'FII selling: holding down ' + fixedOrNull(-c, 1) + ' points last quarter (' + w + ')' + (long ? ', down over 3 years too' : '') + ', as of the last quarter end'
+    : 'FII buying: holding up ' + fixedOrNull(c, 1) + ' points last quarter (' + w + ')' + (long ? ', up over 3 years too' : '') + ', as of the last quarter end';
+}
+
 const BUY_TOP = 10, AVOID_BOTTOM = 10, RESULTS_DAYS = 7, THIN_LAKH = 50, NEWS_MIN = 2;
 
 // Risk checks for a stock you do not hold: { blocks: reasons a Buy is held back, notes: other news worth saying, cap, resultsIn }. `today` is YYYY-MM-DD in India.
@@ -42,6 +57,7 @@ function risksOf(stock, today, f, mos){
   const n = stock ? newsCounts(stock) : null;
   if(n && n.neg >= NEWS_MIN && n.neg > n.pos) blocks.push('recent news leans negative (' + n.neg + ' negative, ' + n.pos + ' positive)');
   else if(n && n.pos >= NEWS_MIN && n.pos > n.neg) notes.push('recent news leans positive (' + n.pos + ' positive, ' + n.neg + ' negative)');
+  const fn = fiiNote(stock); if(fn) notes.push(fn);
   return { blocks, notes, cap: capClass(lq.marketCap), resultsIn };
 }
 

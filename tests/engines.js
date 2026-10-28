@@ -84,15 +84,16 @@ test('fund columns: similar headers are not confused (TTM vs 3/5-year growth, cu
   assert.strictEqual(r.nseCode, 'WID0'); assert.strictEqual(r.industryGroup, 'Alpha');
 });
 test('fund columns: FII holding and the 1, 3 and 5 year returns are read when present, and an older file without them still imports', () => {
-  const extra = ['Return over 1year', 'Return over 3years', 'Return over 5years', 'FII holding'];
-  const hdr = FUND_HEADER.concat(extra), over = { 'Return over 1year': '-9.88', 'Return over 3years': '11.19', 'Return over 5years': '26.37', 'FII holding': '1.03' };
+  const extra = ['Return over 1year', 'Return over 3years', 'Return over 5years', 'FII holding', 'Change in FII holding'];
+  const hdr = FUND_HEADER.concat(extra), over = { 'Return over 1year': '-9.88', 'Return over 3years': '11.19', 'Return over 5years': '26.37', 'FII holding': '1.03', 'Change in FII holding': '-0.41' };
   const rows = universe.slice(0, 3).map((r, i) => Object.assign({}, r, i === 0 ? over : { 'FII holding': '' }));
   const r = Fe.scoreCsv(fundCsv(rows, hdr), {}).records;
   near(r[0].fiiHolding, 1.03); near(r[0].ret1, -9.88); near(r[0].ret3, 11.19); near(r[0].ret5, 26.37);
+  near(r[0].fiiChange, -0.41); assert.notStrictEqual(r[0].fiiHolding, r[0].fiiChange, 'the quarter change is not mistaken for the holding');
   assert.strictEqual(r[1].fiiHolding, null);   // a blank cell is empty, not 0
   near(r[0].fiiChange3, +universe[0]['Change in FII holding 3Years']);   // the 3-year change column is not mistaken for the holding itself
   const old = Fe.scoreCsv(csv, {}).records[0];
-  assert.strictEqual(old.fiiHolding, null); assert.strictEqual(old.ret1, null);
+  assert.strictEqual(old.fiiHolding, null); assert.strictEqual(old.fiiChange, null); assert.strictEqual(old.ret1, null);
 });
 test('fund columns: Industry Group listed before Industry still maps both (real export order)', () => {
   const swap = h => { const a = h.slice(); const i = a.indexOf('Industry'), j = a.indexOf('Industry Group'); a[i] = 'Industry Group'; a[j] = 'Industry'; return a; };
@@ -664,7 +665,7 @@ test('trade call: missing data never crashes and never invents a call', () => {
   assert.strictEqual(s.call, 'hold'); assert.strictEqual(s.gain, null);
   assert.strictEqual(G.factsFor({ buy: { price: 10 } }, null).price, null);
 });
-const I = load('src/tradelog/ideacall.js');
+const I = load('src/tradelog/ideacall.js', 'export { fiiNote };');
 const NW = load('src/tradelog/nextweek.js', 'export { weekFeatures, modelProb };');
 const idea = (o) => ({ name: 'X', score: 7.2, verdict: 'buy', valuation: { currentPrice: 100, intrinsicValue: 160 }, ...o });
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'nextweek-fixture.json'), 'utf8'));
@@ -788,6 +789,18 @@ test('ideas (v1.289): the trend comes from weekly and monthly MACD; a mixed or u
   const down = I.ideaCall(idea({}), null, nwr(97, { trend: 'down', base: 45.3 }), TODAY);
   assert.strictEqual(down.call, 'buy'); assert.ok(down.reasons.some(x => /bounce-back/.test(x)) && /downward trend/.test(down.reasons[0]));
   assert.strictEqual(down.trend, 'down');
+});
+test('ideas (v1.289): FII selling or buying last quarter is a note, never a block; it needs 0.5 points and 10% of the earlier holding', () => {
+  const v = (h, c, c3) => ({ valuation: { fiiHolding: h, fiiChange: c, fiiChange3: c3 } });
+  assert.strictEqual(I.fiiNote(v(5.86, -1.17, 2.96)), 'FII selling: holding down 1.2 points last quarter (7.0% to 5.9%), as of the last quarter end');
+  assert.ok(/down over 3 years too/.test(I.fiiNote(v(5.86, -1.17, -3))));
+  assert.ok(/^FII buying: holding up 1.2 points last quarter \(8.8% to 10.0%\), up over 3 years too/.test(I.fiiNote(v(10, 1.2, 2))));
+  assert.strictEqual(I.fiiNote(v(19.65, 1.57, 2)), null, '1.57 points of 18.1 is under 10%');
+  assert.strictEqual(I.fiiNote(v(55.65, 0.9, 1)), null, '0.9 points of 54.7 is under 10%');
+  assert.strictEqual(I.fiiNote(v(0.71, -0.18, 0)), null, 'under 0.5 points');
+  assert.ok(I.fiiNote(v(3, -0.5, 0)), 'the edge counts'); assert.strictEqual(I.fiiNote(v(5, null, 0)), null); assert.strictEqual(I.fiiNote({}), null); assert.strictEqual(I.fiiNote(v(1, 1, 0)), null, 'nothing was held before');
+  const c = I.ideaCall(idea({ valuation: { currentPrice: 100, intrinsicValue: 120, fiiHolding: 5.86, fiiChange: -1.17 } }), null, nwr(97, { trend: 'down', base: 45.3 }), TODAY);
+  assert.strictEqual(c.call, 'buy', 'FII selling does not hold a Buy back'); assert.ok(c.reasons.some(x => /FII selling/.test(x)));
 });
 test('ideas: missing data never crashes', () => { assert.strictEqual(I.ideaCall({}, null, null).call, 'hold'); assert.strictEqual(I.ideaCall({}, null).call, 'hold'); });
 test('trade call: history keeps one point a day and lists when the call changed', () => {
