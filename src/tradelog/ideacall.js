@@ -14,7 +14,17 @@ import { CAP_NAME, capClass } from '../core/capclass.js';
 import { newsCounts } from '../strategies/news.js';
 import { marginOfSafety } from '../core/mos.js';
 import { factsFor, tradeSignal } from './signals.js';
-import { BASE_UP } from './nextweek.js';
+
+const TREND_NAME = { up: 'Upward trend', down: 'Downward trend', mixed: 'Mixed trend' };
+// The stock's trend from its weekly and monthly MACD against their signal lines (the dashboard's own technical figures): 'up' when both are above, 'down' when
+// both are below, 'mixed' when they disagree, null when either is missing. The same definition the two-week tests were split by.
+function trendOf(stock){
+  const r = (stock && stock.technical && stock.technical.raw) || {};
+  const v = [r.weekMacdLevel, r.weekMacdSignal, r.monthMacdLevel, r.monthMacdSignal];
+  if(v.some(x => typeof x !== 'number' || !isFinite(x))) return null;
+  const w = r.weekMacdLevel > r.weekMacdSignal, m = r.monthMacdLevel > r.monthMacdSignal;
+  return w && m ? 'up' : !w && !m && r.weekMacdLevel < r.weekMacdSignal && r.monthMacdLevel < r.monthMacdSignal ? 'down' : 'mixed';
+}
 
 const BUY_TOP = 10, AVOID_BOTTOM = 10, RESULTS_DAYS = 7, THIN_LAKH = 50, NEWS_MIN = 2;
 
@@ -38,7 +48,7 @@ function risksOf(stock, today, f, mos){
 const sign = (x) => (x >= 0 ? '+' : '') + fixedOrNull(x, 1) + '%';
 // The sentence that says what the next-week score means, with the numbers from the tests.
 function scoreLine(r){
-  return 'two-week score in the top ' + r.topPct + '% of this strategy\'s stocks today; in five years of tests stocks that ranked like this each week were higher two weeks later ' + fixedOrNull(r.up, 1) + '% of the time (all stocks ' + BASE_UP + '%) and beat the median stock ' + fixedOrNull(r.beat, 1) + '% of the time';
+  return 'two-week score in the top ' + r.topPct + '% of this strategy\'s ' + (TREND_NAME[r.trend] || '').toLowerCase() + ' stocks today; in five years of tests stocks that ranked like this within their trend each week were higher two weeks later ' + fixedOrNull(r.up, 1) + '% of the time (all ' + (TREND_NAME[r.trend] || '').toLowerCase() + ' stocks ' + fixedOrNull(r.base, 1) + '%) and beat the median stock ' + fixedOrNull(r.beat, 1) + '% of the time';
 }
 function factsLine(r){
   const f = r.facts;
@@ -50,7 +60,7 @@ function ideaCall(stock, trade, read, today){
   const f = factsFor(trade || {}, stock);
   const mos = marginOfSafety(f.intrinsic, f.price);
   const r = read || null, o = risksOf(stock, today, f, mos);
-  const base = { mos, cap: o.cap, resultsIn: o.resultsIn, p: r ? r.p : null, pct: r ? r.pct : null, topPct: r ? r.topPct : null, up: r ? r.up : null, beat: r ? r.beat : null };
+  const base = { trend: r ? r.trend || null : null, base: r ? r.base : null, mos, cap: o.cap, resultsIn: o.resultsIn, p: r ? r.p : null, pct: r ? r.pct : null, topPct: r ? r.topPct : null, up: r ? r.up : null, beat: r ? r.beat : null };
   if(trade){
     const sig = tradeSignal(f);
     const call = sig.call === 'add' ? 'buy' : sig.call === 'hold' ? 'hold' : 'sell';
@@ -60,7 +70,9 @@ function ideaCall(stock, trade, read, today){
   const reasons = [];
   let call = 'hold';
   if(!r) reasons.push('no weekly price history yet (80 weeks are needed), so the next two weeks cannot be judged');
+  else if(!r.trend || r.trend === 'mixed') reasons.push(r.trend ? 'weekly and monthly trends disagree, so it is in neither the Upward nor the Downward list' : 'no MACD figures saved for this stock yet, so its trend is unknown (Refresh all stocks)', factsLine(r));
   else {
+    if(r.trend === 'down') o.notes.push('a bounce-back pick: the weekly and monthly trends are both down, so this is a bet on a rebound, not on strength');
     if(r.pct >= 100 - BUY_TOP) { if(o.blocks.length) o.blocks.forEach(b => reasons.push('held back: ' + b)); else call = 'buy'; }
     else if(r.pct <= AVOID_BOTTOM) call = 'sell';
     reasons.unshift(scoreLine(r));
@@ -84,7 +96,7 @@ function rankIdeas(items){
   });
 }
 
-// The best Buy calls for stocks you do not hold, in ranked order (rankIdeas has already put the Buys first).
-function topBuys(ranked, n = 5){ return ranked.filter(x => x.c.call === 'buy' && !x.c.held).slice(0, n); }
+// The best Buy calls of one trend ('up' or 'down') for stocks you do not hold, in ranked order (rankIdeas has already put the Buys first).
+function topBuys(ranked, trend, n = 5){ return ranked.filter(x => x.c.call === 'buy' && !x.c.held && x.c.trend === trend).slice(0, n); }
 
-export { AVOID_BOTTOM, BUY_TOP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys };
+export { AVOID_BOTTOM, BUY_TOP, RESULTS_DAYS, THIN_LAKH, TREND_NAME, ideaCall, rankIdeas, topBuys, trendOf };

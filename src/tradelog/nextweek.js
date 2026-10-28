@@ -5,7 +5,7 @@
 // (tests/nextweek-fixture.json holds five stocks scored by that code); change one and the other, never one alone.
 import { techCompleted } from '../engine/technical.js';
 import { NEXTWEEK_MODEL } from './nextweek-model.js';
-/** @type {{ features: string[], base: number, trees: any[][][], edges: number[], up: number[], beat: number[] }} */
+/** @type {{ features: string[], base: number, trees: any[][][], seg: Record<string, { up: number[], beat: number[], base: number }> }} */
 const M = /** @type {any} */ (NEXTWEEK_MODEL);
 
 const MIN_BARS = 80, MIN_TURN = 1e7;   // 80 weeks of history, as in the stocks the model was trained on (a recent listing trades differently); weekly traded value of 1 crore rupees, the floor it was trained on
@@ -59,7 +59,6 @@ function modelProb(x){
   return 1 / (1 + Math.exp(-s));
 }
 
-const BASE_UP = 48.1;   // share of all stock-weeks in the tests that were higher two weeks later
 
 // The reading for one stock: { p (the model's raw score), partial (the week in progress was used), turn, thin, facts } or null when the stock cannot be scored (fewer than 80 weekly bars).
 // `thin` is true below the weekly traded value the model was trained on. The raw score moves with the whole market (every stock scores higher after a calm
@@ -77,17 +76,22 @@ function nextWeekRead(weekBars, today){
     facts: { week: f.r1 * 100, month: f.r4 * 100, half: f.r26 * 100, fromHigh: f.dhi52 * 100, swing: f.vol8 * 100 } };
 }
 
-// Adds each reading's rank among the readings given (the stocks of one strategy today): pct (0 lowest to 100 highest), topPct (it is in the top N%), and what happened in the
-// five-year tests to stocks that ranked in the same 5% band among all stocks that week: how often they rose (up) and how often they beat the median stock (beat).
-// Returns new objects in the same order; a null stays null.
-function rankReads(reads){
-  const ps = reads.filter(Boolean).map(r => r.p).sort((a, b) => a - b), n = ps.length;
-  return reads.map(r => {
+// Adds each reading's rank among the readings of the same trend (the stocks of one strategy today, split into 'up', 'down' and 'mixed'; `trends` is one entry per
+// reading): pct (0 lowest to 100 highest), topPct (it is in the top N%), and what happened in the five-year tests to stocks that ranked in the same 5% band
+// within their trend group each week: how often they were higher two weeks later (up) and how often they beat the median stock (beat), with `base`, how often
+// any stock of that trend was higher. A reading with no trend, or a mixed one (in neither list), gets no rank. Returns new objects in the same order; a null stays null.
+function rankReads(reads, trends){
+  const groups = {};
+  reads.forEach((r, i) => { const t = trends && trends[i]; if(r && (t === 'up' || t === 'down')) (groups[t] = groups[t] || []).push(r.p); });
+  Object.keys(groups).forEach(t => groups[t].sort((a, b) => a - b));
+  return reads.map((r, i) => {
     if(!r) return null;
-    let lo = 0; while(lo < n && ps[lo] < r.p) lo++;
-    const pct = n > 1 ? 100 * lo / (n - 1) : 50, bin = Math.min(19, Math.floor(pct / 5));
-    return { ...r, pct, topPct: Math.max(1, Math.round(100 - pct)), up: Math.round(M.up[bin] * 1000) / 10, beat: Math.round(M.beat[bin] * 1000) / 10 };
+    const t = trends && trends[i], ps = t && groups[t];
+    if(!ps) return { ...r, trend: t || null };
+    let lo = 0; while(lo < ps.length && ps[lo] < r.p) lo++;
+    const pct = ps.length > 1 ? 100 * lo / (ps.length - 1) : 50, bin = Math.min(19, Math.floor(pct / 5)), seg = M.seg[t];
+    return { ...r, trend: t, pct, topPct: Math.max(1, Math.round(100 - pct)), up: Math.round(seg.up[bin] * 1000) / 10, beat: Math.round(seg.beat[bin] * 1000) / 10, base: seg.base };
   });
 }
 
-export { BASE_UP, nextWeekRead, rankReads };
+export { nextWeekRead, rankReads };

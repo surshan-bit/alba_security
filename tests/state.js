@@ -178,9 +178,9 @@ async function tradeScenarios(){
     if(n > 0){
       const calls = await page.evaluate(() => Array.from(document.querySelectorAll('#tradeIdeasBody tbody .tl-signal-badge')).map(b => b.textContent));
       ok(calls.every(c => ['Buy', 'Wait', 'Avoid', 'Add more', 'Hold', 'Trim', 'Review'].includes(c)), 'every listed stock has a call, got ' + JSON.stringify(calls.slice(0, 5)));
-      // v1.288: a Top 5 block sits above the list; it never holds more than five stocks and every one is a Buy
-      const top = await page.evaluate(() => ({ has: !!document.querySelector('#tradeIdeasBody .tl-top5'), n: document.querySelectorAll('#tradeIdeasBody .tl-top5 li').length, buys: Array.from(document.querySelectorAll('#tradeIdeasBody tbody tr')).filter(r => /^Buy$/.test((r.querySelector('.tl-signal-badge') || {}).textContent || '')).length }));
-      ok(top.has && top.n <= 5 && top.n <= top.buys, 'the Top 5 block lists at most five Buys, got ' + JSON.stringify(top));
+      // v1.288: two Top 5 blocks (Upward, Downward) sit above the list; each holds at most five stocks and every one is a Buy
+      const top = await page.evaluate(() => ({ has: !!document.querySelector('#tradeIdeasBody .tl-top5'), n: document.querySelectorAll('#tradeIdeasBody .tl-top5 li').length, blocks: document.querySelectorAll('#tradeIdeasBody .tl-top5').length, over: Array.from(document.querySelectorAll('#tradeIdeasBody .tl-top5')).some(b => b.querySelectorAll('li').length > 5), buys: Array.from(document.querySelectorAll('#tradeIdeasBody tbody tr')).filter(r => /^Buy$/.test((r.querySelector('.tl-signal-badge') || {}).textContent || '')).length }));
+      ok(top.has && top.blocks === 2 && !top.over && top.n <= top.buys, 'the two Top 5 blocks list at most five Buys each, got ' + JSON.stringify(top));
       await domClick(page, '#tradeIdeasBody a[data-idea-open]');
       await until(page, () => document.getElementById('section-trackrecord').classList.contains('inline-detail-open'), null, 'a stock name in the ideas opens its page');
     } else ok(true, 'no stock qualifies in the fixtures for this strategy');
