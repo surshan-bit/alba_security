@@ -9,12 +9,12 @@ import { appSections } from '../ui/navigation.js';
 import { openStockInline } from '../ui/inlinedetail.js';
 import { ensurePriceBars, pcTickerKey, priceHistoryByTicker, priceLoaded } from '../prices/store.js';
 import { tvIstDate } from '../tv/connector.js';
-import { RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas } from './ideacall.js';
+import { HOLD_SETUP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys } from './ideacall.js';
 import { CAP_NAME } from '../core/capclass.js';
 import { swingSetup } from './swing.js';
 import { compareBy, nextSort, sortHeaderHtml } from '../analysis/columns.js';
 
-const MAX_ROWS = 50;
+const MAX_ROWS = 50, TOP_N = 5;
 function openTradeByStock(){
   const m = new Map();
   for(const t of allTrades()){
@@ -86,6 +86,18 @@ function rowHtml(x, rank){
     <td class="num">${c.mos != null ? (c.mos >= 0 ? '+' : '') + c.mos.toFixed(1) + '%' : '&mdash;'}</td>
     <td class="tl-idea-why">${escapeHtml(c.reasons.join('; '))}</td></tr>`;
 }
+// The five best Buy calls among the stocks you do not hold, above the full list. A Buy that rests on a Hold verdict plus a strong chart is labelled as such.
+function topHtml(list){
+  const top = topBuys(list, TOP_N);
+  if(!top.length) return '<div class="tl-top5"><div class="tl-top5-title">Top ' + TOP_N + ' to buy</div><p class="upload-hint">No stock in this strategy is a Buy today.</p></div>';
+  const item = (x, i) => {
+    const { s, c } = x, idx = stocks.indexOf(s), price = s.valuation && s.valuation.currentPrice;
+    return `<li><span class="tl-top5-rank">${i + 1}</span><div><a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(s.name || tickerSymbol(s))}</a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}${c.cap ? ' &middot; ' + CAP_NAME[c.cap] : ''}</span>${c.viaHold ? '<span class="tl-top5-tag" title="Its Fundamental verdict is Hold; it is a Buy here only because the margin of safety, score and chart all clear their bars.">Hold verdict, strong chart</span>' : ''}
+      <div class="tl-top5-meta">Setup ${c.setup}/${c.of}${c.chance != null ? ' &middot; ~' + c.chance + '% chance of +5% in 2 wks' : ''}${c.mos != null ? ' &middot; MoS ' + (c.mos >= 0 ? '+' : '') + c.mos.toFixed(1) + '%' : ''}${price != null ? ' &middot; &#8377;' + Number(price).toLocaleString('en-IN') + ' &rarr; &#8377;' + (Math.round(price * 105) / 100).toLocaleString('en-IN') : ''}</div>
+      <div class="tl-idea-why">${escapeHtml(c.reasons.join('; '))}</div></div></li>`;
+  };
+  return `<div class="tl-top5"><div class="tl-top5-title">Top ${TOP_N} to buy</div><ol>${top.map(item).join('')}</ol></div>`;
+}
 function bodyHtml(){
   if(sid) loadBars();
   const list = sid ? ideasFor(sid) : null;
@@ -97,10 +109,10 @@ function bodyHtml(){
   const filtered = list.filter(x => filter === 'all' || x.c.call === filter);
   const shown = ideasSort.col ? filtered.slice().sort(compareBy(IDEA_SORT[ideasSort.col], ideasSort.dir)) : filtered;
   const chip = (k, label) => `<button type="button" class="tl-view-btn${filter === k ? ' active' : ''}" data-idea-filter="${k}">${label}</button>`;
-  return `<div class="tl-ideas-bar"><div class="tl-view-toggle" role="group" aria-label="Call filter">${chip('all', 'All ' + list.length)}${chip('buy', 'Buy ' + n('buy'))}${chip('hold', 'Hold ' + n('hold'))}${chip('sell', 'Sell ' + n('sell'))}</div></div>
+  return `${topHtml(list)}<div class="tl-ideas-bar"><div class="tl-view-toggle" role="group" aria-label="Call filter">${chip('all', 'All ' + list.length)}${chip('buy', 'Buy ' + n('buy'))}${chip('hold', 'Hold ' + n('hold'))}${chip('sell', 'Sell ' + n('sell'))}</div></div>
     <div class="help-table-wrap"><table class="help-table"><thead><tr><th>#</th>${th('name', 'Stock')}${th('call', "Today's call")}${th('setup', 'Setup')}${th('chance', 'Chance +5% in 2 wks')}${th('price', 'Price')}<th>Sell at +5%</th>${th('mos', 'MoS')}<th>Why</th></tr></thead>
     <tbody>${shown.slice(0, MAX_ROWS).map((x, i) => rowHtml(x, i + 1)).join('')}</tbody></table></div>
-    <p class="upload-hint">${barsBusy ? 'Loading weekly price history for the timing check (' + barsDone + ' of ' + barsTotal + ')&hellip; ' : ''}<b>Setup</b> counts four timing checks (0 to 4). <b>Chance</b> is how often, in past weeks with that setup, a stock closed 5% or more higher two weeks later (about 7,200 stock-weeks from 43 stocks); an average stock does this about 25% of the time, so treat it as a guide, not a promise. Buy needs a stock worth owning and a setup of 2 or more, and is held back (Wait) when the weekly or monthly MACD is below its signal line or results are due within ${RESULTS_DAYS} days. Very thin trading (under &#8377;${THIN_LAKH} lakh a day) and clearly negative recent news take a point off the setup; clearly positive news adds one. These checks need the latest Refresh all stocks.</p>
+    <p class="upload-hint">${barsBusy ? 'Loading weekly price history for the timing check (' + barsDone + ' of ' + barsTotal + ')&hellip; ' : ''}<b>Setup</b> counts four timing checks (0 to 4). <b>Chance</b> is how often, in past weeks with that setup, a stock closed 5% or more higher two weeks later (about 7,200 stock-weeks from 43 stocks); an average stock does this about 25% of the time, so treat it as a guide, not a promise. Buy needs a stock worth owning (a Strong or Good verdict, or a Hold verdict with a margin of safety of 10%+, a score of 5+, a setup of ${HOLD_SETUP}+ and both MACDs bullish) and a setup of 2 or more, and is held back (Wait) when the weekly or monthly MACD is below its signal line or results are due within ${RESULTS_DAYS} days. Very thin trading (under &#8377;${THIN_LAKH} lakh a day) and clearly negative recent news take a point off the setup; clearly positive news adds one. These checks need the latest Refresh all stocks.</p>
     ${shown.length > MAX_ROWS ? '<p class="upload-hint">Showing the top ' + MAX_ROWS + ' of ' + shown.length + '.</p>' : ''}`;
 }
 // Only the table: used when trades or prices change, so the strategy list is not rebuilt under an open dropdown.

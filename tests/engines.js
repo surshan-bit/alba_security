@@ -742,6 +742,27 @@ test('ideas (v1.287): thin trading and negative news take a setup point off; pos
   const r = I.rankIdeas([{ s: { name: 'a' }, c: { call: 'buy', setup: 3, rankSetup: 2, pts: 3 } }, { s: { name: 'b' }, c: { call: 'buy', setup: 2, rankSetup: 3, pts: 3 } }]).map(x => x.s.name).join('');
   assert.strictEqual(r, 'ba', 'the ranking uses the setup after the adjustments');
 });
+test('ideas (v1.288): a Hold verdict is a Buy only with a margin of safety of 10%+, a score of 5+, a setup of 3+ and both MACDs known to be bullish; the Top 5 lists the best Buys you do not hold', () => {
+  const s = (pts) => ({ pts, of: 4, chance: 28, touch: 58, hits: ['x'], misses: [], fromHigh: -3, move: 6 });
+  const up = { weekMacdLevel: 2, weekMacdSignal: 1, monthMacdLevel: 3, monthMacdSignal: 1 };
+  const hold = (over, raw) => idea(Object.assign({ verdict: 'hold', score: 5.74, valuation: { currentPrice: 100, intrinsicValue: 112.5 }, technical: { states: { weekMacd: 'bull_above' }, raw: Object.assign({ weekRsi: 65, monthRsi: 60 }, raw === undefined ? up : raw) } }, over));
+  const ok = I.ideaCall(hold({}), null, s(3), '2026-10-28');
+  assert.strictEqual(ok.call, 'buy'); assert.strictEqual(ok.viaHold, true);
+  assert.ok(ok.reasons.some(x => /^Hold verdict accepted: margin of safety 11\.1%/.test(x)));
+  assert.strictEqual(I.ideaCall(hold({}), null, s(2), '2026-10-28').call, 'hold', 'a setup of 2 is not enough for a Hold verdict');
+  assert.strictEqual(I.ideaCall(hold({}, {}), null, s(3), '2026-10-28').call, 'hold', 'MACD levels not saved yet: a Hold verdict needs them confirmed');
+  assert.strictEqual(I.ideaCall(hold({ valuation: { currentPrice: 100, intrinsicValue: 105 } }), null, s(3), '2026-10-28').call, 'hold', 'cushion under 10%');
+  assert.strictEqual(I.ideaCall(hold({ score: 4.9 }), null, s(3), '2026-10-28').call, 'hold', 'score under 5');
+  assert.strictEqual(I.ideaCall(hold({ liquidity: { nextResults: '2026-10-30' } }), null, s(3), '2026-10-28').call, 'hold', 'results next week still hold it back');
+  assert.strictEqual(I.ideaCall(hold({ liquidity: { avgVolume: 10000 } }), null, s(3), '2026-10-28').call, 'hold', 'thin trading takes the setup to 2');
+  const good = I.ideaCall(hold({ verdict: 'mbuy', score: 6.5 }), null, s(2), '2026-10-28');
+  assert.strictEqual(good.call, 'buy'); assert.strictEqual(good.viaHold, false, 'a Good verdict is not flagged');
+  assert.strictEqual(I.ideaCall(hold({ verdict: 'avoid', score: 4 }), null, s(4), '2026-10-28').viaHold, false);
+  const mk = (n, c) => ({ s: { name: n }, c: Object.assign({ call: 'buy', held: false }, c) });
+  const list = [mk('a', {}), mk('b', { held: true }), mk('c', { call: 'hold' }), mk('d', {}), mk('e', {}), mk('f', {}), mk('g', {}), mk('h', {})];
+  assert.strictEqual(I.topBuys(list).map(x => x.s.name).join(''), 'adefg', 'five Buys, skipping stocks you hold and non-Buys, in the order given');
+  assert.strictEqual(I.topBuys(list, 2).length, 2); assert.strictEqual(I.topBuys([]).length, 0);
+});
 test('ideas: a stock you hold gets its trade call (add is Buy, trim and review are Sell)', () => {
   const tr = { buy: { price: 100, snapshot: { score: 7.2 } } };
   assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 102, intrinsicValue: 160 }, technical: { raw: { weekRsi: 55, monthRsi: 60 } } }), tr, null).label, 'Add more');
