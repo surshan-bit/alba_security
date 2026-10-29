@@ -3,7 +3,7 @@ import { stockIndex, stocks } from '../core/stocks.js';
 import { isPinned, togglePin } from '../core/pins.js';
 import { getAnalysisColumnsPanelOpen, setAnalysisColumnsPanelOpen, analysisFilters, analysisPersistUi, setAnalysisShownIdx, saveAnalysisFilters } from './state.js';
 import { analysisTakeBatch, defineAnalysisScope, updateAnalysisRefresh } from './selectbar.js';
-import { ANALYSIS_LB_COLUMN_IDS, analysisColumnOrder, analysisLbCell, analysisRowContext, columnHeaderHtml, compareByColumn, nextSort, renderAnalysisColumnsPanel } from './columns.js';
+import { analysisColumnOrder, analysisHiddenColumns, analysisVisibleColumns, analysisLbCell, analysisRowContext, columnHeaderHtml, compareByColumn, nextSort, renderAnalysisColumnsPanel } from './columns.js';
 import { ldOpenPermissions } from '../livedata/bar.js';
 import { ldBatchStart, ldBatchStop } from '../livedata/batch.js';
 import { browserFullscreen, fullscreenLabel, watchFullscreenExit } from '../ui/fullscreen.js';
@@ -50,7 +50,7 @@ const iconSvg = (name) => `<svg viewBox="0 0 24 24" width="18" height="18" fill=
 const iconBtnInner = (name, text) => `${iconSvg(name)}<span class="analysis-btn-label">${text}</span>`;
 const iconBtn = (id, name, text, tip, state) => `<button type="button" class="analysis-icon-btn" id="${id}" title="${tip}" aria-label="${tip}"${state}>${iconBtnInner(name, text)}</button>`;
 function leaderboardHtml(chartBlock, viewHtml){
-  const headerColOrder = analysisColumnOrder(), kit = getRefreshKit();
+  const headerColOrder = analysisVisibleColumns(), kit = getRefreshKit();
   return `<div class="analysis-leaderboard${lbFull ? ' lb-full' : ''}">
       <div class="analysis-leaderboard-head analysis-toolbar">
         ${viewHtml}
@@ -63,7 +63,7 @@ function leaderboardHtml(chartBlock, viewHtml){
         </div>
       </div>
       ${chartBlock}
-      ${renderAnalysisColumnsPanel(headerColOrder)}
+      ${renderAnalysisColumnsPanel(analysisColumnOrder())}
       <div class="strat-table-wrap">
         <table class="strat-table">
           <thead><tr>${headerColOrder.map(id => columnHeaderHtml(id, analysisSort())).join('')}</tr></thead>
@@ -105,7 +105,7 @@ function renderLeaderboardRows(filtered){
   const lbCountEl = document.getElementById('analysisLeaderboardCount');
   if(lbCountEl) lbCountEl.textContent = `Showing ${ranked.length} of ${stocks.length} stocks`;
   const lbBody = document.getElementById('analysisLeaderboardBody');
-  const colOrder = analysisColumnOrder(), colSpan = colOrder.length + (getRefreshKit() ? 1 : 0);
+  const colOrder = analysisVisibleColumns(), colSpan = colOrder.length + (getRefreshKit() ? 1 : 0);
   let drawn = Math.min(ranked.length, lbRows), drawable = ranked.length, rowsHtml;
   if(ranked.length === 0) rowsHtml = `<tr><td colspan="${colSpan}" class="analysis-lb-empty">No stocks in the current RSI range.</td></tr>`;
   else rowsHtml = ranked.slice(0, lbRows).map((s, i) => leaderboardRowHtml(s, i, colOrder)).join('');
@@ -231,10 +231,20 @@ function wireColumnControls(rerender){
     });
   }
   wireColumnDrag(rerender);
+  const panel = document.getElementById('analysisColumnsPanel');
+  if(panel) panel.addEventListener('change', (e) => {
+    const box = closestEl(e, '.analysis-col-show');
+    if(!box) return;
+    const id = /** @type {HTMLElement} */ (box).dataset.col, hidden = analysisHiddenColumns();
+    if(/** @type {HTMLInputElement} */ (box).checked) hidden.delete(id); else hidden.add(id);
+    analysisFilters.hiddenCols = [...hidden];
+    saveAnalysisFilters(analysisFilters);
+    rerender();
+  });
   const resetBtn = document.getElementById('analysisColumnsResetBtn');
   if(resetBtn){
     resetBtn.addEventListener('click', () => {
-      analysisFilters.columnOrder = ANALYSIS_LB_COLUMN_IDS.slice();
+      analysisFilters.columnOrder = null; analysisFilters.hiddenCols = null;
       saveAnalysisFilters(analysisFilters);
       rerender();
     });

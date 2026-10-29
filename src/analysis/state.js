@@ -3,7 +3,7 @@ import { prefSet, uiStateSet } from '../identity/prefs.js';
 
 // Sorting is by a column header (see columns.js): { col, dir }. These are the columns that can be sorted, and the readings of the old "Sort by" menu
 // (saved before v1.273) mapped to the column and direction they meant, so a saved choice still applies.
-const SORTABLE_COLUMNS = new Set(['score', 'techScore', 'mos', 'stock', 'weekChg', 'monthChg', 'weekRsi', 'monthRsi', 'techW', 'techM', 'news', 'industry', 'triggered', 'price']);
+const SORTABLE_COLUMNS = new Set(['score', 'techScore', 'mos', 'stock', 'weekChg', 'monthChg', 'weekRsi', 'monthRsi', 'trend', 'techW', 'techM', 'news', 'industry', 'triggered', 'price']);
 const LEGACY_SORT = {
   mos_desc: ['mos', 'desc'], mos_asc: ['mos', 'asc'], score_desc: ['score', 'desc'], weekRsi_desc: ['weekRsi', 'desc'], weekRsi_asc: ['weekRsi', 'asc'],
   monthRsi_desc: ['monthRsi', 'desc'], monthRsi_asc: ['monthRsi', 'asc'], weekChg_desc: ['weekChg', 'desc'], monthChg_desc: ['monthChg', 'desc'],
@@ -35,7 +35,7 @@ const ANALYSIS_MOS_KEYS = ['green', 'orange', 'red'];
 // Tech Rating W / M filters (2026-10-07): the MACD state behind the Tech Rating badge (weekMacd / monthMacd).
 const ANALYSIS_TECH_KEYS = ['bull_above', 'bull_below', 'bear_above', 'bear_below'];
 function loadAnalysisFilters(){
-  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortCol: 'mos', sortDir: 'desc', view: 'stocks', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', ideas: [], rebound: false, columnOrder: null };
+  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortCol: 'mos', sortDir: 'desc', view: 'stocks', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', ideas: [], rebound: false, columnOrder: null, hiddenCols: null, columnsV: 2 };
   try {
     const raw = localStorage.getItem(ANALYSIS_FILTERS_KEY);
     if(!raw) return fallback;
@@ -62,11 +62,14 @@ function loadAnalysisFilters(){
     // v1.306: Upward and Downward Trend can be chosen together, so this is a list. Before, it was one word ('up' or 'down'), which is read as a list of one.
     const ideas = [...new Set((Array.isArray(parsed.ideas) ? parsed.ideas : [parsed.ideas]).filter(v => v === 'up' || v === 'down'))];
     const rebound = parsed.rebound === true;
-    const columnOrder = Array.isArray(parsed.columnOrder) ? parsed.columnOrder : fallback.columnOrder;
+    // v1.307: the grid has a new default set and order, so a column order saved before that is dropped once (columnsV 2 marks the new layout).
+    const migrated = parsed.columnsV === 2;
+    const columnOrder = migrated && Array.isArray(parsed.columnOrder) ? parsed.columnOrder : fallback.columnOrder;
+    const hiddenCols = migrated && Array.isArray(parsed.hiddenCols) ? parsed.hiddenCols.filter(v => typeof v === 'string') : null;
     return {
       weekMin: Math.min(weekMin, weekMax), weekMax: Math.max(weekMin, weekMax),
       monthMin: Math.min(monthMin, monthMax), monthMax: Math.max(monthMin, monthMax),
-      colorBy, xAxis, yAxis, sortCol: sort.col, sortDir: sort.dir, view, verdicts, mosRatings, techW, techM, mosLo, mosHi, strategyId, ideas, rebound, columnOrder
+      colorBy, xAxis, yAxis, sortCol: sort.col, sortDir: sort.dir, view, verdicts, mosRatings, techW, techM, mosLo, mosHi, strategyId, ideas, rebound, columnOrder, hiddenCols, columnsV: 2
     };
   } catch(e){ return fallback; }
 }

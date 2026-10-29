@@ -281,6 +281,32 @@ async function ideasFilterScenarios(){
   });
 }
 
+// v1.307: the simplified Analysis grid: ten default columns, the rest under Columns, filter chips, sortable RSI columns
+async function gridScenario(){
+  await scenario('analysis: simplified grid', {}, null, async page => {
+    await page.setViewportSize({ width: 1500, height: 900 });
+    await goto(page, 'analysis');
+    await until(page, () => document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row').length > 0, null, 'the grid is drawn');
+    const heads = await page.evaluate(() => Array.from(document.querySelectorAll('.analysis-leaderboard thead th')).map(t => t.textContent.replace(/[\u21C5\u25B2\u25BC]/g, '').trim()).filter(Boolean));
+    ok(heads.join('|') === '#|Stock|Fund|Tech|MoS|Price|W % chg|M % chg|W RSI|M RSI|Trend', 'default columns are the ten, got ' + heads.join('|'));
+    ok(await page.evaluate(() => !!document.querySelector('.analysis-lb-row .tr-dots .tr-dot') && !!document.querySelector('.analysis-lb-row td .analysis-lb-ticker')), 'rows show the Trend dots and the ticker under the name');
+    ok(await page.evaluate(() => { const td = document.querySelector('.analysis-lb-row td.num'); return !td || parseFloat(getComputedStyle(td).paddingLeft) >= 16; }), 'cells have room around them');
+    await page.click('[data-sort-col="monthRsi"]');
+    await until(page, () => document.querySelector('[data-sort-col="monthRsi"]').classList.contains('on'), null, 'M RSI can be sorted');
+    await page.click('[data-sort-col="trend"]');
+    await until(page, () => document.querySelector('[data-sort-col="trend"]').classList.contains('on'), null, 'Trend can be sorted');
+    // the other columns are one tick away under Columns
+    await page.click('#analysisColumnsBtn');
+    await page.click('.analysis-col-show[data-col="industry"]');
+    await until(page, () => !!document.querySelector('[data-sort-col="industry"]'), null, 'ticking Industry brings the column back');
+    // filters appear as chips that remove themselves
+    await page.evaluate(() => { const b = document.querySelector('#analysisVerdictFilters [data-averdict="buy"]'); if(b) b.click(); });
+    await until(page, () => document.querySelectorAll('#analysisFilterChips .fchip').length > 0 && !!document.querySelector('.ft-count'), null, 'a chosen filter shows as a chip with a count on the Filters button');
+    await page.click('#analysisClearFilters');
+    await until(page, () => document.querySelectorAll('#analysisFilterChips .fchip').length === 0, null, 'Clear all removes the chips');
+  });
+}
+
 // v1.296: a listed stock that is already a position carries an "In Trade Log" tag
 async function heldTagScenario(){
   const U = FIXTURE[4];
@@ -389,7 +415,7 @@ async function inactiveScenario(){
 
 async function main(){
   base = await srv.listen(); browser = await chromium.launch();
-  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); await bulletsWithoutSourcesScenario(); } finally { await browser.close(); srv.close(); }
+  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await gridScenario(); await heldTagScenario(); await sourceTagsScenario(); await bulletsWithoutSourcesScenario(); } finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('state tests FAILED (' + problems.length + ' problems, ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('state tests: ' + checks + ' checks passed');
 }

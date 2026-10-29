@@ -191,6 +191,7 @@ async function remoteTests(){
 async function scrollKeepTests(){
   const { ctx, page, errs } = await open('scroll keep', {});
   try {
+    await page.setViewportSize({ width: 820, height: 900 });   // v1.307: the default grid has fewer columns, so use a screen it is wider than
     await page.waitForSelector('#section-analysis .strat-table-wrap', { timeout: 8000 });
     const t0 = symOf(FIXTURE[0]);
     const info = await page.evaluate(() => { const w = document.querySelector('#section-analysis .strat-table-wrap'); w.scrollLeft = 300; window.__w = w; return { left: w.scrollLeft, wide: w.scrollWidth > w.clientWidth + 300 }; });
