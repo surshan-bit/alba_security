@@ -139,7 +139,7 @@
   :root[data-theme="white"] #detail .data-chips > .data-chip *{font-size:inherit;}
   /* v1.302: factor-card metric rows stay a grid in the White theme (label left, value, number, source icon at the right edge). */
   :root[data-theme="white"] #detail .fund-cell .data-chips > .data-chip{display:grid;grid-template-columns:10px minmax(0,1fr) auto 18px;column-gap:10px;align-items:baseline;justify-content:stretch;}
-  :root[data-theme="white"] #detail .fund-cell .data-chips.has-n > .data-chip{grid-template-columns:10px minmax(0,1fr) auto 2.3rem 18px;}
+  :root[data-theme="white"] #detail .fund-cell .data-chips.has-n > .data-chip{grid-template-columns:10px minmax(0,1fr) auto 18px 2.3rem;}
   /* Peer table */
   :root[data-theme="white"] #detail .peers-table tbody tr:nth-child(even) td{background:#f7f8fc;}
   :root[data-theme="white"] #detail .peers-table tr.peers-self td{background:#eef0fd;}

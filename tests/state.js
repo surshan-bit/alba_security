@@ -318,8 +318,8 @@ async function sourceTagsScenario(){
         rowNum: chip('Debt-to-Equity') && chip('Debt-to-Equity').getAttribute('data-n'),
         pos: Array.from(document.querySelectorAll('#detail .fund-cell-research .fund-research-list.pos li')).map(e => e.textContent),
         badgeRight: (() => { const c = document.querySelector('#detail .fund-cell .data-chip[data-n]'); const n = c && c.querySelector('.chip-n'), v = c && c.querySelector('.chip-val'); return !!(n && v && n.getBoundingClientRect().left >= v.getBoundingClientRect().right - 1); })(),
-        iconsRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt')).every(li => { const a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); return b.right - a.right < 4; }),
-        numRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt[data-n]')).every(li => { const n = li.querySelector('.fr-numr').getBoundingClientRect(), a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); return n.width > 0 && n.right <= a.left + 1 && b.right - a.right < 4; }),
+        iconsRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt')).every(li => { const a = li.querySelector('.fr-src').getBoundingClientRect(), n = li.querySelector('.fr-numr').getBoundingClientRect(); return a.right <= n.left + 1; }),
+        numRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt[data-n]')).every(li => { const n = li.querySelector('.fr-numr').getBoundingClientRect(), a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); return n.width > 0 && a.right <= n.left + 1 && b.right - n.right < 4; }),
         iconText: document.querySelectorAll('#detail .fund-cell .srctag').length,
         sources: Array.from(document.querySelectorAll('#detail .fund-research-sources')).map(e => e.textContent),
         align: Array.from(document.querySelectorAll('#detail .fund-cell .data-chip .chip-val')).every(e => getComputedStyle(e).textAlign === 'right'),
@@ -333,23 +333,31 @@ async function sourceTagsScenario(){
     ok(r.sources.length === 1 && /Other source/.test(r.sources[0]) && !/Wire/.test(r.sources[0]), 'the Sources line lists only what no bullet already links to: ' + JSON.stringify(r.sources));
     ok(r.pos.length === 1 && /separate strength/.test(r.pos[0]), 'a Strengths line that repeats a numbered bullet is dropped: ' + JSON.stringify(r.pos));
     ok(r.badgeRight, 'the link numbers sit at the right end of the row, after the value');
-    ok(r.iconsRight && r.iconText === 0, 'source marks are small icons at the right end of each bullet, with no long text tags');
-    ok(r.numRight, 'the bullet numbers sit at the right end of the bullet, like the row numbers');
+    ok(r.iconsRight && r.iconText === 0, 'source marks are small icons just before the number slot at the right end of each bullet, with no long text tags');
+    ok(r.numRight, 'the bullet numbers sit flush at the right end of the bullet, like the row numbers');
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white'));
     const w = await page.evaluate(() => {
       const c = document.querySelector('#detail .fund-cell .data-chip[data-n]'), q = e => c.querySelector(e);
       const cr = c.getBoundingClientRect(), pad = parseFloat(getComputedStyle(c).paddingRight) || 0;
-      return { display: getComputedStyle(c).display, label: getComputedStyle(q('.chip-label')).textAlign, iconRight: Math.round(cr.right - pad - q('.chip-src').getBoundingClientRect().right), valBeforeNum: q('.chip-val').getBoundingClientRect().right <= q('.chip-n').getBoundingClientRect().left + 1, numBeforeIcon: q('.chip-n').getBoundingClientRect().right <= q('.chip-src').getBoundingClientRect().left + 1 };
+      return { display: getComputedStyle(c).display, label: getComputedStyle(q('.chip-label')).textAlign, numRight: Math.round(cr.right - pad - q('.chip-n').getBoundingClientRect().right), valBeforeIcon: q('.chip-val').getBoundingClientRect().right <= q('.chip-src').getBoundingClientRect().left + 1, iconBeforeNum: q('.chip-src').getBoundingClientRect().right <= q('.chip-n').getBoundingClientRect().left + 1 };
     });
-    ok(w.display === 'grid' && w.label === 'left' && Math.abs(w.iconRight) <= 1 && w.valBeforeNum && w.numBeforeIcon, 'White theme: metric rows are still a grid, label left, value then number then icon flush right: ' + JSON.stringify(w));
+    ok(w.display === 'grid' && w.label === 'left' && Math.abs(w.numRight) <= 1 && w.valBeforeIcon && w.iconBeforeNum, 'White theme: metric rows are still a grid, label left, then value, icon, and the number flush right: ' + JSON.stringify(w));
     await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
     // v1.305: the one-card Valuation subsection is as wide as a single column of Traditional Analysis, and reads top to bottom
     const lay = await page.evaluate(() => {
-      const one = document.querySelector('#detail .fund-subsection .fund-grid > .fund-cell:only-child'), many = document.querySelector('#detail .fund-subsection .fund-grid > .fund-cell:not(:only-child)');
+      const one = document.querySelector('#detail .fund-subsection .fund-grid > .fund-cell:only-child'), many = document.querySelectorAll('#detail .fund-subsection .fund-grid > .fund-cell:not(:only-child)')[1];
       if(!one || !many) return null;
       const cols = el => getComputedStyle(el).gridTemplateColumns.split(' ').length;
       return { oneW: Math.round(one.getBoundingClientRect().width), colW: Math.round(many.getBoundingClientRect().width), researchCols: cols(one.querySelector('.fund-cell-research') || one), chipCols: cols(one.querySelector('.data-chips')) };
     });
+    // v1.308: a card with written points and a metric table puts them side by side on a wide page
+    const two = await page.evaluate(() => {
+      const c = document.querySelector('#detail .fund-subsection .fund-grid > .fund-cell:not(:only-child):has(.fund-cell-research):has(.data-chips)');
+      if(!c) return null;
+      const r = c.querySelector('.fund-cell-research').getBoundingClientRect(), m = c.querySelector('.data-chips').getBoundingClientRect();
+      return { sideBySide: r.right <= m.left + 1 && Math.abs(r.top - m.top) < 40 };
+    });
+    ok(two && two.sideBySide, 'a factor with points and metrics shows them side by side on a wide page: ' + JSON.stringify(two));
     ok(lay && Math.abs(lay.oneW - lay.colW) <= 2 && lay.chipCols === 1, 'the Valuation card is as wide as one Traditional column and its rows stack top to bottom: ' + JSON.stringify(lay));
     if(process.env.SHOT_DETAIL){ await page.setViewportSize({ width: 1700, height: 1000 }); await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white')); await page.waitForTimeout(300); await page.locator('#detail').screenshot({ path: process.env.SHOT_DETAIL }); await page.evaluate(() => document.documentElement.removeAttribute('data-theme')); }
     ok(r.align, 'every metric value is right-aligned');
