@@ -302,46 +302,40 @@ async function sourceTagsScenario(){
   const research = { ticker: sym, asof: '2026-10-29', changeNote: 'x', metricsFilled: 0, factors: { fin: { metricsTv: [m1], research: { asof: '2026-10-29', headline: 'Headline', sources: [{ title: 'Wire', url: 'https://news.example/n1' }, { title: 'Other source', url: 'https://news.example/n2' }],
     points: [{ text: 'Debt sentence', basis: ['csv', 'claude'], refs: [m0], ok: true }, { text: 'News sentence', basis: ['tv-news'], refs: [], ok: true, url: 'https://news.example/n1', src: 'Order win' }, { text: 'Odd figure 55.5%', basis: ['claude'], refs: [m0], ok: false }, 'Old plain sentence'],
     facts: [{ label: 'Price to book value (TradingView)', value: '13.9496814684338', basis: 'tv-financials', tone: 'pos', note: 'differs from the CSV' }], positives: ['Debt sentence', 'A separate strength worth noting'], negatives: [] } } } };
-  await scenario('stock page: bullets carry source tags and numbered links', { section: 'analysis' }, { ['stockResearch/' + sid(sym)]: research }, async page => {
+  await scenario('stock page: bullets and rows without icons or number pills', { section: 'analysis' }, { ['stockResearch/' + sid(sym)]: research }, async page => {
     await page.fill('#globalSearch', T.name); await page.waitForTimeout(300); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
     await until(page, () => document.querySelectorAll('#detail .fund-cell-research .fr-pt:not(.fr-plain)').length === 4, null, 'the four bullets are shown');
-    const r = await page.evaluate(([a, b]) => {
+    const r = await page.evaluate(() => {
       const pts = Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt:not(.fr-plain)')), chips = Array.from(document.querySelectorAll('#detail .data-chip'));
       const chip = l => chips.find(c => c.querySelector('.chip-label') && c.querySelector('.chip-label').textContent.includes(l));
       return {
-        tags: pts.map(p => Array.from(p.querySelectorAll('.srcico')).map(t => t.getAttribute('aria-label').replace(/^Not verified.*/, 'not verified'))),
-        nums: pts.map(p => p.getAttribute('data-n')),
+        warn: pts.map(p => p.querySelectorAll('.srcico.st-warn').length),
+        icons: document.querySelectorAll('#detail .fund-cell .srcico:not(.st-warn)').length,
+        marks: document.querySelectorAll('#detail .fund-cell .fr-n, #detail .fund-cell .chip-n, #detail .fund-cell .fr-numr, #detail .fund-cell .chip-src, #detail .fund-cell .fr-legend').length,
         link: pts[1].querySelector('a') && pts[1].querySelector('a').getAttribute('href'),
-        factRow: (() => { const c = chips.find(x => x.classList.contains('chip-new')); return c && { text: c.textContent, tag: c.querySelector('.srcico').getAttribute('aria-label') }; })(),
-        csvTags: chips.filter(c => !c.classList.contains('chip-new')).map(c => c.querySelector('.srcico') && c.querySelector('.srcico').getAttribute('aria-label')),
-        filled: (chip('Interest coverage') || {}).querySelector && chip('Interest coverage').querySelector('.srcico').getAttribute('aria-label'),
-        rowNum: chip('Debt-to-Equity') && chip('Debt-to-Equity').getAttribute('data-n'),
+        factRow: (() => { const c = chips.find(x => x.classList.contains('chip-new')); return c && { text: c.textContent }; })(),
+        rowLink: chip('Debt-to-Equity') && chip('Debt-to-Equity').getAttribute('data-n'),
         pos: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-plain.fr-pos')).map(e => e.textContent),
-        badgeRight: (() => { const c = document.querySelector('#detail .fund-cell .data-chip[data-n]'); const n = c && c.querySelector('.chip-n'), v = c && c.querySelector('.chip-val'); return !!(n && v && n.getBoundingClientRect().left >= v.getBoundingClientRect().right - 1); })(),
-        iconsRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt:not(.fr-plain)')).every(li => { const a = li.querySelector('.fr-src').getBoundingClientRect(), n = li.querySelector('.fr-numr').getBoundingClientRect(); return a.right <= n.left + 1; }),
-        numRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt:not(.fr-plain)[data-n]')).every(li => { const n = li.querySelector('.fr-numr').getBoundingClientRect(), a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); return n.width > 0 && a.right <= n.left + 1 && b.right - n.right < 4; }),
-        iconText: document.querySelectorAll('#detail .fund-cell .srctag').length,
         sources: Array.from(document.querySelectorAll('#detail .fund-research-sources')).map(e => e.textContent),
-        align: Array.from(document.querySelectorAll('#detail .fund-cell .data-chip .chip-val')).every(e => getComputedStyle(e).textAlign === 'right'),
-        gutters: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt:not(.fr-plain) .fr-body')).map(e => Math.round(e.getBoundingClientRect().left)).filter((v, i, a) => a.indexOf(v) === i).length
+        align: Array.from(document.querySelectorAll('#detail .fund-cell .data-chip:not(.chip-long) .chip-val')).every(e => getComputedStyle(e).textAlign === 'right'),
+        gutters: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt .fr-body')).map(e => Math.round(e.getBoundingClientRect().left)).filter((v, i, a) => a.indexOf(v) === i).length
       };
-    }, [m0, m1]);
-    ok(r.tags[0].length === 0 && JSON.stringify(r.tags[1]) === JSON.stringify(['TradingView news']) && JSON.stringify(r.tags[2]) === JSON.stringify(['not verified']) && r.tags[3].length === 0, 'when most points are Claude\'s view the card says so once (legend) and leaves the sparkle off each line; a TradingView point keeps its chart icon, and "not verified" shows when a figure was not found: ' + JSON.stringify(r.tags));
-    ok(r.nums[0] === '1' && r.nums[1] === null && r.nums[2] === '2' && r.rowNum === '1 2', 'bullets that rely on rows are numbered and the row carries the same numbers: ' + JSON.stringify([r.nums, r.rowNum]));
+    });
+    ok(r.icons === 0 && r.marks === 0, 'v1.310: no TradingView or Claude icons, no number pills and no legend line are drawn: ' + JSON.stringify([r.icons, r.marks]));
+    ok(JSON.stringify(r.warn) === JSON.stringify([0, 0, 1, 0]), 'a point whose figure could not be verified keeps its warning mark, and the others have none: ' + JSON.stringify(r.warn));
+    ok(r.rowLink === '1 2', 'a metric row still knows which points rely on it (they light up together on hover): ' + r.rowLink);
     ok(r.link === 'https://news.example/n1', 'a news bullet links to its headline');
-    ok(r.factRow && /Price to book value:/.test(r.factRow.text) && !/\(TradingView\)/.test(r.factRow.text) && /13\.95/.test(r.factRow.text) && !/13\.9496/.test(r.factRow.text) && r.factRow.tag === 'TradingView financials', 'an extra figure row from TradingView is added, tagged, without a repeated (TradingView) and with a long decimal rounded: ' + JSON.stringify(r.factRow));
+    ok(r.factRow && /Price to book value:/.test(r.factRow.text) && !/\(TradingView\)/.test(r.factRow.text) && /13\.95/.test(r.factRow.text) && !/13\.9496/.test(r.factRow.text), 'an extra figure row from TradingView is added, without a repeated (TradingView) and with a long decimal rounded: ' + JSON.stringify(r.factRow));
     ok(r.sources.length === 1 && /Other source/.test(r.sources[0]) && !/Wire/.test(r.sources[0]), 'the Sources line lists only what no bullet already links to: ' + JSON.stringify(r.sources));
     ok(r.pos.length === 1 && /separate strength/.test(r.pos[0]), 'a Strengths line that repeats a numbered bullet is dropped: ' + JSON.stringify(r.pos));
-    ok(r.badgeRight, 'the link numbers sit at the right end of the row, after the value');
-    ok(r.iconsRight && r.iconText === 0, 'source marks are small icons just before the number slot at the right end of each bullet, with no long text tags');
-    ok(r.numRight, 'the bullet numbers sit flush at the right end of the bullet, like the row numbers');
+    ok(r.align, 'every metric value is right-aligned');
+    ok(r.gutters === 1, 'every bullet sentence starts at the same left edge');
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white'));
     const w = await page.evaluate(() => {
       const c = document.querySelector('#detail .fund-cell .data-chip[data-n]'), q = e => c.querySelector(e);
-      const cr = c.getBoundingClientRect(), pad = parseFloat(getComputedStyle(c).paddingRight) || 0;
-      return { display: getComputedStyle(c).display, label: getComputedStyle(q('.chip-label')).textAlign, numRight: Math.round(cr.right - pad - q('.chip-n').getBoundingClientRect().right), valBeforeIcon: q('.chip-val').getBoundingClientRect().right <= q('.chip-src').getBoundingClientRect().left + 1, iconBeforeNum: q('.chip-src').getBoundingClientRect().right <= q('.chip-n').getBoundingClientRect().left + 1 };
+      return { display: getComputedStyle(c).display, label: getComputedStyle(q('.chip-label')).textAlign, valAtRight: Math.round(c.getBoundingClientRect().right - parseFloat(getComputedStyle(c).paddingRight) - q('.chip-val').getBoundingClientRect().right) };
     });
-    ok(w.display === 'grid' && w.label === 'left' && Math.abs(w.numRight) <= 1 && w.valBeforeIcon && w.iconBeforeNum, 'White theme: metric rows are still a grid, label left, then value, icon, and the number flush right: ' + JSON.stringify(w));
+    ok(w.display === 'grid' && w.label === 'left' && Math.abs(w.valAtRight) <= 1, 'White theme: metric rows are still a grid, label left, value flush right: ' + JSON.stringify(w));
     await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
     // v1.309: every factor card shows its metric rows first and the explanation after. A card with points takes the whole row (metrics left, points right); a lone card does too; the rest go two to a row, metrics above the sentence.
     const lay = await page.evaluate(() => {
@@ -360,10 +354,8 @@ async function sourceTagsScenario(){
     ok(lay.wideSide, 'a factor with points shows its metrics on the left and the points on the right: ' + JSON.stringify(lay));
     ok(lay.loneSide && lay.loneFull && lay.chipCols === 1, 'the lone Valuation card takes the whole row, metrics left and explanation right: ' + JSON.stringify(lay));
     ok(lay.halfStacked, 'a card without points is half a row wide, with the metrics above the sentence: ' + JSON.stringify(lay));
+    if(process.env.SHOT_MOBILE){ await page.setViewportSize({ width: 420, height: 900 }); await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white')); await page.waitForTimeout(400); await page.locator('#detail .fund-subsection').first().screenshot({ path: process.env.SHOT_MOBILE }); await page.evaluate(() => document.documentElement.removeAttribute('data-theme')); }
     if(process.env.SHOT_DETAIL){ await page.setViewportSize({ width: 1700, height: 1000 }); await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white')); await page.waitForTimeout(300); await page.locator('#detail').screenshot({ path: process.env.SHOT_DETAIL }); await page.evaluate(() => document.documentElement.removeAttribute('data-theme')); }
-    ok(r.align, 'every metric value is right-aligned');
-    ok(r.gutters === 1, 'every bullet sentence starts at the same left edge (numbered or not)');
-    ok(r.csvTags.every(t => t === null || t === 'TradingView') && r.filled === 'TradingView', 'a metric row has an icon only when TradingView supplied it (CSV rows have none): ' + JSON.stringify(r.csvTags));
   });
 }
 
