@@ -255,15 +255,21 @@ async function ideasFilterScenarios(){
     await goto(page, 'analysis');
     await until(page, () => !!document.querySelector('#analysisIdeasFilter'), null, 'the Buy / Sell ideas filter is drawn');
     ok(await page.evaluate(() => Array.from(document.querySelectorAll('#analysisIdeasFilter .filter-btn')).map(b => b.textContent.replace(/\d+$/, '').trim()).join('|') === 'All|Upward Trend|Downward Trend'), 'it offers All, Upward Trend and Downward Trend');
+    // v1.306: the View button sits below the sticky top bar, so scrolling slides it under the bar with the rest of the toolbar
+    ok(await page.evaluate(() => { const z = e => parseInt(getComputedStyle(e).zIndex, 10); return z(document.querySelector('.analysis-view-bar')) < z(document.querySelector('.topbar')); }), 'the View button is layered below the top bar');
     await pick(page, '#analysisMosFilters [data-amos="all"]');
     const all = (await rows(page)).length;
     ok(all > 2, 'with All, many stocks are listed, got ' + all);
     await pick(page, '#analysisIdeasFilter [data-aideas="up"]');
     await until(page, n => { const r = document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row'); return r.length === 1 && r[0].textContent.includes(n); }, U.name, 'Upward Trend shows only the stock of the saved Upward list');
     ok(await page.evaluate(() => /processed 29 Oct 2026/.test((document.getElementById('analysisIdeasNote') || {}).textContent || '')), 'the note says when the list was processed');
+    // v1.306: both lists can be chosen together (the stocks of either), and each button toggles on its own
     await pick(page, '#analysisIdeasFilter [data-aideas="down"]');
-    await until(page, n => { const r = document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row'); return r.length === 1 && r[0].textContent.includes(n); }, Dn.name, 'Downward Trend shows only the stock of the saved Downward list');
-    ok(await page.evaluate(() => document.getElementById('analysisLeaderboardCount').textContent.startsWith('Showing 1 of')), 'the count follows the shortlist');
+    await until(page, ([a, b]) => { const r = Array.from(document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row')).map(x => x.textContent); return r.length === 2 && r.some(t => t.includes(a)) && r.some(t => t.includes(b)); }, [U.name, Dn.name], 'Upward and Downward Trend together show the stocks of both lists');
+    ok(await page.evaluate(() => Array.from(document.querySelectorAll('#analysisIdeasFilter .filter-btn.active')).map(b => b.dataset.aideas).join() === 'up,down'), 'both buttons show as chosen');
+    ok(await page.evaluate(() => document.getElementById('analysisLeaderboardCount').textContent.startsWith('Showing 2 of')), 'the count follows the shortlist');
+    await pick(page, '#analysisIdeasFilter [data-aideas="up"]');
+    await until(page, n => { const r = document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row'); return r.length === 1 && r[0].textContent.includes(n); }, Dn.name, 'switching Upward Trend off leaves only the stock of the Downward list');
     await pick(page, '#analysisIdeasFilter [data-aideas="all"]');
     await until(page, n => document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row').length === n, all, 'All brings every stock back');
   });

@@ -251,6 +251,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.306 &middot; 2026-10-29</h3>
+            <ul>
+              <li><strong>Analysis is fast again:</strong> with a Buy / Sell ideas choice on, every click (a filter, a sort, a column) took over a second because the shortlist was rebuilt from the whole stock list a dozen times per redraw. It is now built once and reused until the saved result changes, so clicks take a few hundredths of a second.</li>
+              <li><strong>Upward and Downward Trend together:</strong> the Buy / Sell ideas filter now lets you choose both lists at once (the stocks of either), and each button switches on and off by itself. <em>All</em> clears the choice.</li>
+              <li><strong>View button no longer floats over the top bar:</strong> when you scroll Analysis, the View button now slides under the sticky top bar together with the rest of the toolbar.</li>
+            </ul>
             <h3>v1.305 &middot; 2026-10-29</h3>
             <ul>
               <li><strong>Fewer icons on the stock page:</strong> the table (CSV) icon is gone from metric rows and bullets, since almost every figure comes from the CSV. An icon now appears only where the data came from <strong>TradingView</strong> (chart icon) or is <strong>Claude&rsquo;s own view</strong> (sparkle), plus the warning triangle for a figure that could not be verified.</li>

@@ -6,8 +6,16 @@ import { userRef } from './session.js';
 const KEY = 'albaDashboard.ideasResults.v1', MAX_KEPT = 20;
 let timer = null, chain = Promise.resolve();
 
+// v1.306: parsed once per stored text, so asking again (Analysis does, many times per redraw) costs nothing and returns the same object while nothing changed.
+let lastRaw = null, lastMap = {};
 function readLocal(){
-  try { const o = JSON.parse(localStorage.getItem(KEY) || '{}'); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; } catch(e){ return {}; }
+  let raw = '{}';
+  try { raw = localStorage.getItem(KEY) || '{}'; } catch(e){ return {}; }
+  if(raw === lastRaw) return lastMap;
+  let o = {};
+  try { o = JSON.parse(raw); } catch(e){ o = {}; }
+  lastRaw = raw; lastMap = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+  return lastMap;
 }
 // The newest results first, at most MAX_KEPT strategies.
 function trim(map){

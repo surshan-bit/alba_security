@@ -195,7 +195,8 @@ body.biz-full-open{overflow:hidden;}
 .biz-field select{background:transparent;border:0;color:var(--text);font:inherit;font-weight:600;padding:0 4px;height:100%;cursor:pointer;}
 .biz-matched-only{display:inline-flex;align-items:center;gap:6px;font-size:.86rem;white-space:nowrap;cursor:pointer;}
 .biz-matched-only:has(input:disabled){opacity:.55;cursor:default;}
-.analysis-view-bar{position:relative;z-index:30;}
+/* v1.306: below the sticky top bar (z-index 20), so scrolling the page slides the View button under the bar like the rest of the toolbar instead of over it. Its pop-up still sits above the filters below. */
+.analysis-view-bar{position:relative;z-index:15;}
 .biz-embedded .biz-actions{display:flex;align-items:center;gap:12px;}
 
 /* The industry table inside Analysis: the "#" slot of the first column has a fixed width (not em, which differs between the heading and the cells), so the
