@@ -45,6 +45,7 @@ const ALL_FIELDS = [
   { id: 'predict', group: 'Fundamental factors (0-10)', label: 'Earnings predictability', type: 'num', unit: '/10', dp: 1, get: factorScore('predict') },
   { id: 'reinvest', group: 'Fundamental factors (0-10)', label: 'Reinvestment efficiency', type: 'num', unit: '/10', dp: 1, get: factorScore('reinvest') },
   { id: 'dcf', group: 'Fundamental factors (0-10)', label: 'Margin-of-safety factor', type: 'num', unit: '/10', dp: 1, get: factorScore('dcf') },
+  { id: 'promoterHolding', group: 'Holdings and returns', label: 'Promoter holding %', type: 'num', unit: '%', dp: 2, get: (s) => num(s.valuation && s.valuation.promoterHolding) },
   { id: 'fiiHolding', group: 'Holdings and returns', label: 'FII holding %', type: 'num', unit: '%', dp: 2, get: (s) => num(s.valuation && s.valuation.fiiHolding) },
   { id: 'fiiChange', group: 'Holdings and returns', label: 'FII holding change last quarter (points)', type: 'num', unit: '', dp: 2, get: (s) => num(s.valuation && s.valuation.fiiChange) },
   { id: 'fiiChange3', group: 'Holdings and returns', label: 'FII holding change over 3 years (points)', type: 'num', unit: '', dp: 2, get: (s) => num(s.valuation && s.valuation.fiiChange3) },
