@@ -15,8 +15,8 @@ function pointsView(f) {
     }
     pts.push(q);
   });
-  const facts = (Array.isArray(r.facts) ? r.facts : []).filter(x => x && x.label && x.value);
-  facts.forEach(x => { x.n = nums.get(x.label) || []; });
+  // Copies: the saved research is read-only, so a row is never changed in place.
+  const facts = (Array.isArray(r.facts) ? r.facts : []).filter(x => x && x.label && x.value).map(x => ({ ...x, n: nums.get(x.label) || [] }));
   return { pts, nums, facts };
 }
 

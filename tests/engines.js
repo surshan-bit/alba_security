@@ -818,6 +818,13 @@ test('source tags (v1.299): where each bullet and extra figure comes from, and w
   assert.deepStrictEqual(view.pts.map(x => x.n), [undefined, 1, 2]); assert.deepStrictEqual(view.pts[0].tags, [], 'old bullets show no tags');
   assert.deepStrictEqual(view.nums.get('PEG'), [1, 2]); assert.strictEqual(view.pts[2].url, '', 'only http(s) links are kept'); assert.strictEqual(view.pts[2].ok, false);
   assert.deepStrictEqual(V.pointsView({}).pts, []);
+  // the saved research is read-only in the page (v1.299 crashed the stock page by adding a number to a row): drawing it must not change it
+  const frozen = o => { Object.values(o).forEach(v => { if (v && typeof v === 'object') frozen(v); }); return Object.freeze(o); };
+  const ro = frozen({ research: { points: [{ text: 'A', basis: ['csv'], refs: ['PEG'], ok: true }], facts: [{ label: 'Price to book value', value: '1.3x', basis: 'tv-financials', tone: 'neu' }] } });
+  const rv = V.pointsView({ research: ro.research });
+  assert.deepStrictEqual(rv.facts[0].n, [], 'a row nobody points at has no numbers'); assert.strictEqual(ro.research.facts[0].n, undefined, 'the saved row is left as it was');
+  const rv2 = V.pointsView({ research: frozen({ points: [{ text: 'A', refs: ['Price to book value'], ok: true }], facts: [{ label: 'Price to book value', value: '1.3x', basis: 'tv-financials' }] }) });
+  assert.deepStrictEqual(rv2.facts[0].n, [1]);
 });
 test('ideas (v1.289): a stock you hold keeps its trade call and is never gated', () => {
   const tr = { buy: { price: 100, snapshot: { score: 7.2 } } };
