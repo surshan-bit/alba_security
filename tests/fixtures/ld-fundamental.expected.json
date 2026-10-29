@@ -440,13 +440,7 @@
       "url": "https://news.example/n1"
      }
     ],
-    "negative": [
-     {
-      "text": "Input costs rising",
-      "source": "Claude analysis, no live source",
-      "url": ""
-     }
-    ],
+    "negative": [],
     "events": [
      {
       "headline": "Oil shock",
@@ -454,13 +448,6 @@
       "why": "Raises freight cost.",
       "source": "Wire",
       "url": "https://news.example/n2"
-     },
-     {
-      "headline": "Odd impact",
-      "impact": "mixed",
-      "why": "x",
-      "source": "Claude analysis, no live source",
-      "url": ""
      }
     ]
    }
@@ -478,22 +465,27 @@
    },
    {
     "tier": "quick",
-    "len": 6830,
+    "len": 6157,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 4230,
-    "task": " Write this company's Global & Macro Information: macro, com"
+    "len": 6021,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 5078,
+    "len": 3978,
+    "task": " Write this company's Global & Macro Information using ONLY "
+   },
+   {
+    "tier": "quick",
+    "len": 5060,
     "task": " Write the Strengths and Watch-outs box shown at the top of "
    }
   ]
  },
- "promptsAfterSecondA": 9,
+ "promptsAfterSecondA": 11,
  "firstB": {
   "title": "Fundamental refresh finished · Company 02",
   "text": "1 of 1 refreshed.",
@@ -957,13 +949,7 @@
       "url": "https://news.example/n1"
      }
     ],
-    "negative": [
-     {
-      "text": "Input costs rising",
-      "source": "Claude analysis, no live source",
-      "url": ""
-     }
-    ],
+    "negative": [],
     "events": [
      {
       "headline": "Oil shock",
@@ -971,13 +957,6 @@
       "why": "Raises freight cost.",
       "source": "Wire",
       "url": "https://news.example/n2"
-     },
-     {
-      "headline": "Odd impact",
-      "impact": "mixed",
-      "why": "x",
-      "source": "Claude analysis, no live source",
-      "url": ""
      }
     ]
    },
@@ -1033,17 +1012,22 @@
    },
    {
     "tier": "quick",
-    "len": 6830,
+    "len": 6157,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 4230,
-    "task": " Write this company's Global & Macro Information: macro, com"
+    "len": 6021,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 5078,
+    "len": 3978,
+    "task": " Write this company's Global & Macro Information using ONLY "
+   },
+   {
+    "tier": "quick",
+    "len": 5060,
     "task": " Write the Strengths and Watch-outs box shown at the top of "
    },
    {
@@ -1053,17 +1037,22 @@
    },
    {
     "tier": "quick",
-    "len": 6830,
+    "len": 6157,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 4215,
-    "task": " Write this company's Global & Macro Information: macro, com"
+    "len": 6021,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 5078,
+    "len": 3978,
+    "task": " Write this company's Global & Macro Information using ONLY "
+   },
+   {
+    "tier": "quick",
+    "len": 5060,
     "task": " Write the Strengths and Watch-outs box shown at the top of "
    },
    {
@@ -1083,17 +1072,22 @@
    },
    {
     "tier": "quick",
-    "len": 6824,
+    "len": 6153,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 4221,
-    "task": " Write this company's Global & Macro Information: macro, com"
+    "len": 6006,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 5079,
+    "len": 3965,
+    "task": " Write this company's Global & Macro Information using ONLY "
+   },
+   {
+    "tier": "quick",
+    "len": 5061,
     "task": " Write the Strengths and Watch-outs box shown at the top of "
    }
   ]
