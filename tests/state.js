@@ -312,8 +312,8 @@ async function sourceTagsScenario(){
         rowNum: chip('Debt-to-Equity') && chip('Debt-to-Equity').getAttribute('data-n'),
         pos: Array.from(document.querySelectorAll('#detail .fund-cell-research .fund-research-list.pos li')).map(e => e.textContent),
         badgeRight: (() => { const c = document.querySelector('#detail .fund-cell .data-chip[data-n]'); const n = c && c.querySelector('.chip-n'), v = c && c.querySelector('.chip-val'); return !!(n && v && n.getBoundingClientRect().left >= v.getBoundingClientRect().right - 1); })(),
-        iconsRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt')).every(li => { const a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); const n = li.querySelector('.fr-numr').getBoundingClientRect(); return a.right <= n.left + 1 && n.right - a.right < 50 && b.right - n.right < 4; }),
-        numRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt[data-n]')).every(li => { const a = li.querySelector('.fr-numr').getBoundingClientRect(), b = li.getBoundingClientRect(); return a.width > 0 && b.right - a.right < 4; }),
+        iconsRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt')).every(li => { const a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); return b.right - a.right < 4; }),
+        numRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt[data-n]')).every(li => { const n = li.querySelector('.fr-numr').getBoundingClientRect(), a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); return n.width > 0 && n.right <= a.left + 1 && b.right - a.right < 4; }),
         iconText: document.querySelectorAll('#detail .fund-cell .srctag').length,
         sources: Array.from(document.querySelectorAll('#detail .fund-research-sources')).map(e => e.textContent),
         align: Array.from(document.querySelectorAll('#detail .fund-cell .data-chip .chip-val')).every(e => getComputedStyle(e).textAlign === 'right'),
@@ -329,6 +329,14 @@ async function sourceTagsScenario(){
     ok(r.badgeRight, 'the link numbers sit at the right end of the row, after the value');
     ok(r.iconsRight && r.iconText === 0, 'source marks are small icons at the right end of each bullet, with no long text tags');
     ok(r.numRight, 'the bullet numbers sit at the right end of the bullet, like the row numbers');
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white'));
+    const w = await page.evaluate(() => {
+      const c = document.querySelector('#detail .fund-cell .data-chip[data-n]'), q = e => c.querySelector(e);
+      const cr = c.getBoundingClientRect(), pad = parseFloat(getComputedStyle(c).paddingRight) || 0;
+      return { display: getComputedStyle(c).display, label: getComputedStyle(q('.chip-label')).textAlign, iconRight: Math.round(cr.right - pad - q('.chip-src').getBoundingClientRect().right), valBeforeNum: q('.chip-val').getBoundingClientRect().right <= q('.chip-n').getBoundingClientRect().left + 1, numBeforeIcon: q('.chip-n').getBoundingClientRect().right <= q('.chip-src').getBoundingClientRect().left + 1 };
+    });
+    ok(w.display === 'grid' && w.label === 'left' && Math.abs(w.iconRight) <= 1 && w.valBeforeNum && w.numBeforeIcon, 'White theme: metric rows are still a grid, label left, value then number then icon flush right: ' + JSON.stringify(w));
+    await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
     ok(r.align, 'every metric value is right-aligned');
     ok(r.gutters === 1, 'every bullet sentence starts at the same left edge (numbered or not)');
     ok(r.csvTags.every(t => t === 'CSV' || t === 'TradingView') && r.filled === 'TradingView', 'every metric row names its source, and a row TradingView filled says TradingView');
