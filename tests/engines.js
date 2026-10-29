@@ -720,8 +720,10 @@ test('ideas (v1.289): Buy is the top 10% of two-week scores, Avoid the bottom 10
   assert.strictEqual(I.ideaCall(idea({}), null, nwr(10), TODAY).call, 'sell');
   assert.strictEqual(I.ideaCall(idea({}), null, nwr(11), TODAY).call, 'hold');
   const b = I.ideaCall(idea({}), null, nwr(97), TODAY);
-  assert.strictEqual(b.label, 'Buy'); assert.ok(/top 3% of this strategy's upward trend stocks today/.test(b.reasons[0]) && /50\.7%/.test(b.reasons[0]), b.reasons[0]);
-  assert.ok(b.reasons.some(x => /last week \+2\.0%, 4 weeks \+4\.0%, 26 weeks \+12\.0%, 8% below its 52-week high/.test(x)));
+  assert.strictEqual(b.label, 'Buy'); assert.strictEqual(b.reasons[0], 'Top 3% of the Upward stocks in this strategy today');
+  assert.ok(/^In 5 years of tests, stocks ranked like this were higher after 2 weeks \d+% of the time \(all Upward stocks: 51%\)$/.test(b.reasons[1]), b.reasons[1]);
+  assert.ok(b.reasons.some(x => x === 'Priced 38% below its fair value'), 'the margin of safety in plain words'); assert.ok(b.reasons.every(x => x.length < 130), 'each line is short: ' + b.reasons.map(x => x.length));
+  assert.ok(b.reasons.some(x => x === 'Price: last week +2.0%, 4 weeks +4.0%, 26 weeks +12.0%') && b.reasons.includes('8% below its 52-week high'));
   const none = I.ideaCall(idea({}), null, null, TODAY); assert.strictEqual(none.call, 'hold'); assert.ok(/no weekly price history/.test(none.reasons[0]));
   const q = (o) => I.ideaCall(idea(o), null, nwr(95), TODAY);
   const av = q({ verdict: 'avoid', score: 3 });
@@ -750,13 +752,13 @@ test('ideas (v1.289): quality, results within 7 days, very thin trading and clea
   assert.strictEqual(neg.call, 'hold'); assert.ok(neg.reasons.some(x => /held back: recent news leans negative \(2 negative, 1 positive\)/.test(x)));
   assert.strictEqual(held({ __events: ev('neg', 'neg', 'pos', 'pos') }).call, 'buy', 'level news counts for nothing');
   assert.strictEqual(held({ __events: ev('neg') }).call, 'buy', 'one item is not enough');
-  const pos = held({ __events: ev('pos', 'pos') }); assert.strictEqual(pos.call, 'buy'); assert.ok(pos.reasons.some(x => /news leans positive/.test(x)));
+  const pos = held({ __events: ev('pos', 'pos') }); assert.strictEqual(pos.call, 'buy'); assert.ok(pos.reasons.some(x => /news is positive/.test(x)));
   assert.strictEqual(held({}).call, 'buy', 'no figures saved yet: nothing to hold it back');
   assert.strictEqual(I.ideaCall(idea({ liquidity: { nextResults: '2026-10-30' } }), null, nwr(50), TODAY).reasons.some(x => /held back/.test(x)), false, 'only a would-be Buy is told it was held back');
   const cap = (cr) => I.ideaCall(idea({ liquidity: { marketCap: cr } }), null, nwr(95), TODAY);
   assert.strictEqual(cap(150000).cap, 'large'); assert.strictEqual(cap(50000).cap, 'mid'); assert.strictEqual(cap(14000).cap, 'small');
-  assert.ok(cap(14000).reasons.includes('Small cap')); assert.strictEqual(I.ideaCall(idea({}), null, nwr(95), TODAY).cap, null);
-  assert.ok(I.ideaCall(idea({}), null, nwr(95, { thin: true }), TODAY).reasons.some(x => /below what the model was trained on/.test(x)));
+  assert.strictEqual(cap(14000).cap, 'small'); assert.strictEqual(I.ideaCall(idea({}), null, nwr(95), TODAY).cap, null);
+  assert.ok(I.ideaCall(idea({}), null, nwr(95, { thin: true }), TODAY).reasons.some(x => /Trades thinly/.test(x)));
 });
 test('ideas (v1.289): a stock you hold keeps its trade call and is never gated', () => {
   const tr = { buy: { price: 100, snapshot: { score: 7.2 } } };
@@ -787,12 +789,12 @@ test('ideas (v1.289): the trend comes from weekly and monthly MACD; a mixed or u
   const unk = I.ideaCall(idea({}), null, nwr(97, { trend: null }), TODAY);
   assert.strictEqual(unk.call, 'hold'); assert.ok(unk.reasons.some(x => /trend is unknown/.test(x)));
   const down = I.ideaCall(idea({}), null, nwr(97, { trend: 'down', base: 45.3 }), TODAY);
-  assert.strictEqual(down.call, 'buy'); assert.ok(down.reasons.some(x => /bounce-back/.test(x)) && /downward trend/.test(down.reasons[0]));
+  assert.strictEqual(down.call, 'buy'); assert.ok(down.reasons.some(x => /Bounce-back pick/.test(x)) && /Downward stocks/.test(down.reasons[1]));
   assert.strictEqual(down.trend, 'down');
 });
 test('ideas (v1.289): FII selling or buying last quarter is a note, never a block; it needs 0.5 points and 10% of the earlier holding', () => {
   const v = (h, c, c3) => ({ valuation: { fiiHolding: h, fiiChange: c, fiiChange3: c3 } });
-  assert.strictEqual(I.fiiNote(v(5.86, -1.17, 2.96)), 'FII selling: holding down 1.2 points last quarter (7.0% to 5.9%), as of the last quarter end');
+  assert.strictEqual(I.fiiNote(v(5.86, -1.17, 2.96)), 'FII selling: holding down 1.2 points last quarter (7.0% to 5.9%)');
   assert.ok(/down over 3 years too/.test(I.fiiNote(v(5.86, -1.17, -3))));
   assert.ok(/^FII buying: holding up 1.2 points last quarter \(8.8% to 10.0%\), up over 3 years too/.test(I.fiiNote(v(10, 1.2, 2))));
   assert.strictEqual(I.fiiNote(v(19.65, 1.57, 2)), null, '1.57 points of 18.1 is under 10%');
