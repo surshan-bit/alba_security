@@ -320,7 +320,7 @@ async function sourceTagsScenario(){
         gutters: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt .fr-body')).map(e => Math.round(e.getBoundingClientRect().left)).filter((v, i, a) => a.indexOf(v) === i).length
       };
     }, [m0, m1]);
-    ok(JSON.stringify(r.tags[0]) === JSON.stringify(['CSV', "Claude's view"]) && JSON.stringify(r.tags[1]) === JSON.stringify(['TradingView news']) && JSON.stringify(r.tags[2]) === JSON.stringify(["Claude's view", 'not verified']) && r.tags[3].length === 0, 'each bullet shows its sources, "not verified" when a figure was not found, and an old plain bullet shows none: ' + JSON.stringify(r.tags));
+    ok(JSON.stringify(r.tags[0]) === JSON.stringify(["Claude's view"]) && JSON.stringify(r.tags[1]) === JSON.stringify(['TradingView news']) && JSON.stringify(r.tags[2]) === JSON.stringify(["Claude's view", 'not verified']) && r.tags[3].length === 0, 'each bullet shows an icon for TradingView or Claude (never for the CSV), "not verified" when a figure was not found, and an old plain bullet shows none: ' + JSON.stringify(r.tags));
     ok(r.nums[0] === '1' && r.nums[1] === null && r.nums[2] === '2' && r.rowNum === '1 2', 'bullets that rely on rows are numbered and the row carries the same numbers: ' + JSON.stringify([r.nums, r.rowNum]));
     ok(r.link === 'https://news.example/n1', 'a news bullet links to its headline');
     ok(r.factRow && /Price to book value:/.test(r.factRow.text) && !/\(TradingView\)/.test(r.factRow.text) && /13\.95/.test(r.factRow.text) && !/13\.9496/.test(r.factRow.text) && r.factRow.tag === 'TradingView financials', 'an extra figure row from TradingView is added, tagged, without a repeated (TradingView) and with a long decimal rounded: ' + JSON.stringify(r.factRow));
@@ -337,9 +337,18 @@ async function sourceTagsScenario(){
     });
     ok(w.display === 'grid' && w.label === 'left' && Math.abs(w.iconRight) <= 1 && w.valBeforeNum && w.numBeforeIcon, 'White theme: metric rows are still a grid, label left, value then number then icon flush right: ' + JSON.stringify(w));
     await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
+    // v1.305: the one-card Valuation subsection is as wide as a single column of Traditional Analysis, and reads top to bottom
+    const lay = await page.evaluate(() => {
+      const one = document.querySelector('#detail .fund-subsection .fund-grid > .fund-cell:only-child'), many = document.querySelector('#detail .fund-subsection .fund-grid > .fund-cell:not(:only-child)');
+      if(!one || !many) return null;
+      const cols = el => getComputedStyle(el).gridTemplateColumns.split(' ').length;
+      return { oneW: Math.round(one.getBoundingClientRect().width), colW: Math.round(many.getBoundingClientRect().width), researchCols: cols(one.querySelector('.fund-cell-research') || one), chipCols: cols(one.querySelector('.data-chips')) };
+    });
+    ok(lay && Math.abs(lay.oneW - lay.colW) <= 2 && lay.chipCols === 1, 'the Valuation card is as wide as one Traditional column and its rows stack top to bottom: ' + JSON.stringify(lay));
+    if(process.env.SHOT_DETAIL){ await page.setViewportSize({ width: 1700, height: 1000 }); await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white')); await page.waitForTimeout(300); await page.locator('#detail').screenshot({ path: process.env.SHOT_DETAIL }); await page.evaluate(() => document.documentElement.removeAttribute('data-theme')); }
     ok(r.align, 'every metric value is right-aligned');
     ok(r.gutters === 1, 'every bullet sentence starts at the same left edge (numbered or not)');
-    ok(r.csvTags.every(t => t === 'CSV' || t === 'TradingView') && r.filled === 'TradingView', 'every metric row names its source, and a row TradingView filled says TradingView');
+    ok(r.csvTags.every(t => t === null || t === 'TradingView') && r.filled === 'TradingView', 'a metric row has an icon only when TradingView supplied it (CSV rows have none): ' + JSON.stringify(r.csvTags));
   });
 }
 

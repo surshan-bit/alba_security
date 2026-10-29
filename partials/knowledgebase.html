@@ -251,6 +251,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.305 &middot; 2026-10-29</h3>
+            <ul>
+              <li><strong>Fewer icons on the stock page:</strong> the table (CSV) icon is gone from metric rows and bullets, since almost every figure comes from the CSV. An icon now appears only where the data came from <strong>TradingView</strong> (chart icon) or is <strong>Claude&rsquo;s own view</strong> (sparkle), plus the warning triangle for a figure that could not be verified.</li>
+              <li><strong>Valuation &amp; Margin of Safety card:</strong> it is now one column wide, the same width as one column of Traditional Analysis, and reads top to bottom (summary, bullets, then the figures) instead of spreading across the page.</li>
+            </ul>
             <h3>v1.304 &middot; 2026-10-29</h3>
             <ul>
               <li><strong>Fix:</strong> stocks new in the latest Fundamental import (Harig Crankshaft, Sanblue Corp.) were left out of every <em>Refresh all stocks</em> run, so they never got technical data. A bulk run only used symbols already saved for each ISIN and never searched, so a new stock had to be opened and refreshed by hand first. The run now looks up the TradingView symbol by ISIN for up to 25 such stocks, saves it, and refreshes them in the same run. If TradingView lists the ISIN on neither NSE nor BSE, the skipped list now says so.</li>
