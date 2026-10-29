@@ -290,6 +290,36 @@ async function heldTagScenario(){
   });
 }
 
+// v1.299: a factor card shows each bullet's source tags, the numbers tying bullets to rows, the extra TradingView rows and the source tag on every row
+async function sourceTagsScenario(){
+  const T = FIXTURE[2], sym = symOf(T), fin = T.fundamentals.factors.find(f => f.key === 'fin'), m0 = fin.metrics[0][0], m1 = fin.metrics[1][0];
+  const research = { ticker: sym, asof: '2026-10-29', changeNote: 'x', metricsFilled: 0, factors: { fin: { metricsTv: [m1], research: { asof: '2026-10-29', headline: 'Headline', sources: [{ title: 'Wire', url: 'https://news.example/n1' }],
+    points: [{ text: 'Debt sentence', basis: ['csv', 'claude'], refs: [m0], ok: true }, { text: 'News sentence', basis: ['tv-news'], refs: [], ok: true, url: 'https://news.example/n1', src: 'Order win' }, { text: 'Odd figure 55.5%', basis: ['claude'], refs: [m0], ok: false }, 'Old plain sentence'],
+    facts: [{ label: 'Price to book value', value: '1.3x', basis: 'tv-financials', tone: 'pos', note: 'differs from the CSV' }], positives: [], negatives: [] } } } };
+  await scenario('stock page: bullets carry source tags and numbered links', { section: 'analysis' }, { ['stockResearch/' + sid(sym)]: research }, async page => {
+    await page.fill('#globalSearch', T.name); await page.waitForTimeout(300); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+    await until(page, () => document.querySelectorAll('#detail .fund-cell-research .fr-pt').length === 4, null, 'the four bullets are shown');
+    const r = await page.evaluate(([a, b]) => {
+      const pts = Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt')), chips = Array.from(document.querySelectorAll('#detail .data-chip'));
+      const chip = l => chips.find(c => c.querySelector('.chip-l') && c.querySelector('.chip-l').textContent.includes(l));
+      return {
+        tags: pts.map(p => Array.from(p.querySelectorAll('.srctag')).map(t => t.textContent)),
+        nums: pts.map(p => p.getAttribute('data-n')),
+        link: pts[1].querySelector('a') && pts[1].querySelector('a').getAttribute('href'),
+        factRow: (() => { const c = chips.find(x => x.classList.contains('chip-new')); return c && { text: c.textContent, tag: c.querySelector('.srctag').textContent }; })(),
+        csvTags: chips.filter(c => !c.classList.contains('chip-new')).map(c => c.querySelector('.srctag') && c.querySelector('.srctag').textContent),
+        filled: (chip('Interest coverage') || {}).querySelector && chip('Interest coverage').querySelector('.srctag').textContent,
+        rowNum: chip('Debt-to-Equity') && chip('Debt-to-Equity').getAttribute('data-n')
+      };
+    }, [m0, m1]);
+    ok(JSON.stringify(r.tags[0]) === JSON.stringify(['CSV', "Claude's view"]) && JSON.stringify(r.tags[1]) === JSON.stringify(['TradingView news']) && JSON.stringify(r.tags[2]) === JSON.stringify(["Claude's view", 'not verified']) && r.tags[3].length === 0, 'each bullet shows its sources, "not verified" when a figure was not found, and an old plain bullet shows none: ' + JSON.stringify(r.tags));
+    ok(r.nums[0] === '1' && r.nums[1] === null && r.nums[2] === '2' && r.rowNum === '1 2', 'bullets that rely on rows are numbered and the row carries the same numbers: ' + JSON.stringify([r.nums, r.rowNum]));
+    ok(r.link === 'https://news.example/n1', 'a news bullet links to its headline');
+    ok(r.factRow && /Price to book value/.test(r.factRow.text) && r.factRow.tag === 'TradingView financials', 'an extra figure row from TradingView is added and tagged');
+    ok(r.csvTags.every(t => t === 'CSV' || t === 'TradingView') && r.filled === 'TradingView', 'every metric row names its source, and a row TradingView filled says TradingView');
+  });
+}
+
 // An inactive stock (not in the latest Fundamental CSV) is hidden from the lists and the search, but a position held in it stays on the Trade Log, tagged.
 async function inactiveScenario(){
   const off = Object.assign({}, FIXTURE[5], { active: false }), chunks = CHUNKS.map(c => c.map(s => s === FIXTURE[5] ? off : s));
@@ -309,7 +339,7 @@ async function inactiveScenario(){
 
 async function main(){
   base = await srv.listen(); browser = await chromium.launch();
-  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); } finally { await browser.close(); srv.close(); }
+  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); } finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('state tests FAILED (' + problems.length + ' problems, ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('state tests: ' + checks + ' checks passed');
 }

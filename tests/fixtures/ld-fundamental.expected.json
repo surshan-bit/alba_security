@@ -55,8 +55,27 @@
       "asof": "2026-10-11",
       "headline": "Headline for fin",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [
+         "D/E"
+        ],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -77,8 +96,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for prof",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -99,8 +135,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for growth",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -121,8 +174,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for val",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -145,8 +215,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for moat",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -169,8 +256,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for gov",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -191,8 +295,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for predict",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -213,8 +334,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for reinvest",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -235,8 +373,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for dcf",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -318,12 +473,12 @@
    },
    {
     "tier": "quick",
-    "len": 5076,
+    "len": 6227,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 5428,
+    "len": 6579,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
@@ -396,8 +551,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for prof",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -414,7 +586,10 @@
      },
      "metrics": {
       "Avg ROE 7yr": "12.5%"
-     }
+     },
+     "metricsTv": [
+      "Avg ROE 7yr"
+     ]
     },
     "gov": {
      "score": 0.5,
@@ -423,8 +598,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for gov",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -442,7 +634,11 @@
      "metrics": {
       "FII change 3yr": "12.5%",
       "DII change 3yr": "12.5%"
-     }
+     },
+     "metricsTv": [
+      "FII change 3yr",
+      "DII change 3yr"
+     ]
     },
     "predict": {
      "note": "basis: made-up",
@@ -450,8 +646,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for predict",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -468,15 +681,37 @@
      },
      "metrics": {
       "5-year average": "12.5%"
-     }
+     },
+     "metricsTv": [
+      "5-year average"
+     ]
     },
     "fin": {
      "research": {
       "asof": "2026-10-11",
       "headline": "Headline for fin",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [
+         "D/E"
+        ],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -497,8 +732,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for growth",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -519,8 +771,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for val",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -543,8 +812,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for moat",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -565,8 +851,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for reinvest",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -587,8 +890,25 @@
       "asof": "2026-10-11",
       "headline": "Headline for dcf",
       "points": [
-       "Point one",
-       "Point two <b>x</b>"
+       {
+        "text": "Point one",
+        "basis": [
+         "tv-news",
+         "claude"
+        ],
+        "refs": [],
+        "ok": true,
+        "url": "https://news.example/n1",
+        "src": "Company wins a big order"
+       },
+       {
+        "text": "Point two <b>x</b> grew 777.7%",
+        "basis": [
+         "claude"
+        ],
+        "refs": [],
+        "ok": false
+       }
       ],
       "positives": [
        "Plus"
@@ -708,12 +1028,12 @@
    },
    {
     "tier": "quick",
-    "len": 5076,
+    "len": 6227,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 5428,
+    "len": 6579,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
@@ -728,12 +1048,12 @@
    },
    {
     "tier": "quick",
-    "len": 5076,
+    "len": 6227,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 5428,
+    "len": 6579,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
@@ -758,12 +1078,12 @@
    },
    {
     "tier": "quick",
-    "len": 5064,
+    "len": 6215,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {
     "tier": "quick",
-    "len": 5422,
+    "len": 6573,
     "task": " Refresh the written analysis on these Fundamental Score fac"
    },
    {

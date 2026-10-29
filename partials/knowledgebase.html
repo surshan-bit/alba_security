@@ -251,6 +251,14 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.299 &middot; 2026-10-29</h3>
+            <ul>
+              <li><strong>Every bullet in the written analysis now says where it comes from:</strong> a small tag for <b>CSV</b> (the imported screener.in figures), <b>TradingView</b> (financials, forecasts, news or filings, named) or <b>Claude&rsquo;s view</b> (a judgement, not a figure). Every metric row carries a source tag too.</li>
+              <li><strong>Bullets and rows are numbered together:</strong> a bullet that relies on metric rows shows a number, and the same number appears on those rows. Hover either one to light up the other.</li>
+              <li><strong>Numbers are checked:</strong> after Claude writes a bullet, each figure in it is looked up in the metric rows and in the TradingView data Claude was given. The source tag comes from where the figure was found, and a figure found in neither place is marked <b>not verified</b>.</li>
+              <li><strong>Extra rows:</strong> a figure a bullet uses that has no row (price to book, analyst ratings, a bank&rsquo;s bad-loan ratio) is added as a row tagged TradingView, but only if the figure is really in the TradingView data. When TradingView disagrees with the CSV, both values are shown.</li>
+              <li>Research written before this version has plain bullets with no tags until the stock&rsquo;s next Fundamental refresh.</li>
+            </ul>
             <h3>v1.298 &middot; 2026-10-29</h3>
             <ul>
               <li><strong>Green, red and grey dots on every key metric</strong> in the Traditional, Buffett and Valuation cards of the stock page. Green is a healthy reading, red is a weak one, grey is in between or has no data.</li>
