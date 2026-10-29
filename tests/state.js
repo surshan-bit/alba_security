@@ -355,6 +355,7 @@ async function sourceTagsScenario(){
     ok(lay.loneSide && lay.loneFull && lay.chipCols === 1, 'the lone Valuation card takes the whole row, metrics left and explanation right: ' + JSON.stringify(lay));
     ok(lay.halfStacked, 'a card without points is half a row wide, with the metrics above the sentence: ' + JSON.stringify(lay));
     if(process.env.SHOT_MOBILE){ await page.setViewportSize({ width: 420, height: 900 }); await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white')); await page.waitForTimeout(400); await page.locator('#detail .fund-subsection').first().screenshot({ path: process.env.SHOT_MOBILE }); await page.evaluate(() => document.documentElement.removeAttribute('data-theme')); }
+    if(process.env.SHOT_TECH){ await page.setViewportSize({ width: 420, height: 900 }); await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white')); await page.waitForTimeout(600); await page.locator('#detail .tech-panel').first().screenshot({ path: process.env.SHOT_TECH }); await page.evaluate(() => document.documentElement.removeAttribute('data-theme')); }
     if(process.env.SHOT_DETAIL){ await page.setViewportSize({ width: 1700, height: 1000 }); await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white')); await page.waitForTimeout(300); await page.locator('#detail').screenshot({ path: process.env.SHOT_DETAIL }); await page.evaluate(() => document.documentElement.removeAttribute('data-theme')); }
   });
 }
