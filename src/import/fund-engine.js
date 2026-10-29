@@ -432,7 +432,7 @@ function valuationBlock(r, old) {
   const v = { asof, currentPrice: r.currentPrice, grahamNumber: r.graham, intrinsicValue: r.intrinsicValue,
     intrinsicValueSource: 'Screener.in Intrinsic Value estimate (from uploaded fundamentals CSV) — the single source of truth for intrinsic value across this app.', ncavps: r.ncavps };
   // Holding and return figures from the CSV; kept as they were when this file does not have the column.
-  const extra = { fiiHolding: r.fiiHolding, fiiChange: r.fiiChange, fiiChange3: r.fiiChange3, diiChange3: r.diiChange3, ret1y: r.ret1, ret3y: r.ret3, ret5y: r.ret5 };
+  const extra = { profitGrowth: r.profitGrowthTTM, fiiHolding: r.fiiHolding, fiiChange: r.fiiChange, fiiChange3: r.fiiChange3, diiChange3: r.diiChange3, ret1y: r.ret1, ret3y: r.ret3, ret5y: r.ret5 };
   Object.keys(extra).forEach(k => { if(extra[k] != null) v[k] = extra[k]; });
   return v;
 }

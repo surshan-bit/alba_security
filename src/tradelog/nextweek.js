@@ -8,7 +8,12 @@ import { NEXTWEEK_MODEL } from './nextweek-model.js';
 /** @type {{ features: string[], base: number, trees: any[][][], seg: Record<string, { up: number[], beat: number[], base: number }> }} */
 const M = /** @type {any} */ (NEXTWEEK_MODEL);
 
-const MIN_BARS = 80, MIN_TURN = 1e7;   // 80 weeks of history, as in the stocks the model was trained on (a recent listing trades differently); weekly traded value of 1 crore rupees, the floor it was trained on
+// Fewest weekly bars a stock needs (the model's 52-week figures need 53), the length under which a stock counts as a recent listing (a short history), and the
+// weekly traded value of 1 crore rupees that the model was trained on. v1.292: the minimum is 53, down from 80, because in the five-year tests the model still ranked
+// recent listings (53 to 79 weeks of prices) usefully. Their own numbers are in SHORT_HISTORY: stocks ranked in the top decile were higher two weeks later 52.4% of the
+// time (719 stock-weeks), against 45.1% for all recent listings, because recent listings fall more often than older stocks (48.2%).
+const MIN_BARS = 53, SHORT_WEEKS = 80, MIN_TURN = 1e7;
+const SHORT_HISTORY = { up: 52.4, base: 45.1, n: 719 };
 
 // Exponentially weighted mean the way pandas computes it with adjust=true (every value from the start counts, newest most).
 function ewm(x, span){
@@ -60,7 +65,7 @@ function modelProb(x){
 }
 
 
-// The reading for one stock: { p (the model's raw score), partial (the week in progress was used), turn, thin, facts } or null when the stock cannot be scored (fewer than 80 weekly bars).
+// The reading for one stock: { p (the model's raw score), partial (the week in progress was used), turn, thin, facts } or null when the stock cannot be scored (fewer than 53 weekly bars); `short` is true under 80 weeks.
 // `thin` is true below the weekly traded value the model was trained on. The raw score moves with the whole market (every stock scores higher after a calm
 // rally), so what counts is where a stock ranks among the others: rankReads adds that.
 function nextWeekRead(weekBars, today){
@@ -72,7 +77,7 @@ function nextWeekRead(weekBars, today){
   const w = weekFeatures(use);
   if(!w) return null;
   const p = modelProb(w.x), f = w.byName;
-  return { p, partial, turn: w.turn, thin: w.turn < MIN_TURN,
+  return { p, partial, weeks: use.length, short: use.length < SHORT_WEEKS, turn: w.turn, thin: w.turn < MIN_TURN,
     facts: { week: f.r1 * 100, month: f.r4 * 100, half: f.r26 * 100, fromHigh: f.dhi52 * 100, swing: f.vol8 * 100 } };
 }
 
@@ -94,4 +99,4 @@ function rankReads(reads, trends){
   });
 }
 
-export { nextWeekRead, rankReads };
+export { SHORT_HISTORY, nextWeekRead, rankReads };
