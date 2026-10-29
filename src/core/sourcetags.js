@@ -104,4 +104,27 @@ function tagPoint(raw, ctx) {
   return out;
 }
 
-export { BASIS_LABEL, SECTION_BASIS, cleanFacts, tagPoint };
+// v1.301: the same sentence said twice (e.g. a Strengths line repeating a numbered point) is shown once.
+const FILLER = new Set(['the', 'and', 'for', 'are', 'was', 'were', 'its', 'has', 'have', 'with', 'than', 'that', 'this', 'from', 'but', 'not', 'very', 'also', 'into', 'over', 'which']);
+function wordsOf(t){
+  return new Set((String(t || '').toLowerCase().match(/[a-z0-9][a-z0-9.%]*/g) || []).map(w => w.replace(/\.$/, '')).filter(w => w.length >= 3 && !FILLER.has(w)));
+}
+function sameSentence(a, b){
+  const x = wordsOf(a), y = wordsOf(b);
+  if(x.size < 3 || y.size < 3) return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+  let hit = 0;
+  for(const w of x) if(y.has(w)) hit++;
+  return hit / Math.min(x.size, y.size) >= 0.65;
+}
+/** Items of `list` (strings or {text}) that no earlier item and nothing in `against` already says. */
+function dropRepeats(list, against){
+  const seen = (against || []).map(x => typeof x === 'string' ? x : (x && x.text) || '');
+  const out = [];
+  for(const x of list || []){
+    const t = typeof x === 'string' ? x : (x && x.text) || '';
+    if(!t || seen.some(s => sameSentence(s, t))) continue;
+    seen.push(t); out.push(x);
+  }
+  return out;
+}
+export { BASIS_LABEL, SECTION_BASIS, cleanFacts, tagPoint, dropRepeats };

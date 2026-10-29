@@ -789,6 +789,17 @@ test('metric dots (v1.298): green / red / grey by fixed thresholds', () => {
   assert.strictEqual(t('Industry P/E', '18.15x', f), 'neu'); assert.strictEqual(t('Unknown thing', '5'), 'neu');
   assert.match(D.metricDotHtml({ metrics: [] }, 'D/E', '0.5x'), /mdot-pos/);
 });
+test('repeated sentences (v1.301): a Strengths line that restates a numbered point is dropped', async () => {
+  const S = load('src/core/sourcetags.js');
+  const pts = [{ text: "Profit earned on owners' money is 13.5%, above its 7-year average of 9.4%." }, { text: 'Profit earned on all money invested is low at 6.4%, barely above its 10-year median of 6.1%.' }];
+  const pos = ["Returns on owners' money are above the 7-year average.", 'Profit margin is very high at 66.4%.'];
+  const neg = ['Returns on all money invested are low at 6.4%.', "Sources disagree on profit margin and returns on owners' money."];
+  const p2 = S.dropRepeats(pos, pts), n2 = S.dropRepeats(neg, pts.concat(p2));
+  assert.deepStrictEqual(p2, ['Profit margin is very high at 66.4%.']);
+  assert.deepStrictEqual(n2, ["Sources disagree on profit margin and returns on owners' money."]);
+  assert.deepStrictEqual(S.dropRepeats(['Same line.', 'same line.', 'Different thing here entirely'], []), ['Same line.', 'Different thing here entirely']);
+  assert.deepStrictEqual(S.dropRepeats(undefined, pts), []);
+});
 test('source tags (v1.299): where each bullet and extra figure comes from, and whether its numbers were found', () => {
   const T = load('src/core/sourcetags.js'), V = load('src/detail/pointview.js');
   const chips = [['D/E', '11.67x'], ['PEG', '0.39'], ['Contingent liabilities', '\u20b914247.8 Cr'], ['Historical PE 5yr', '6.66x'], ['P/E', '9.03x'], ['Industry P/E', '12.18x']];
