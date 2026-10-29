@@ -23,13 +23,15 @@ async function fetchCalendar(){
 
 // Recent headlines from several market feeds; a feed that fails or has no news is skipped.
 async function fetchHeadlines(){
+  const errors = [];
   const got = await Promise.all(BRIEFING_FEEDS.map(async sym => {
     try {
       const p = await tvCall('mcp-tv-get-news', { symbol: sym, limit: 15 });
       const d = p && p.data !== undefined ? p.data : p;
       return d && Array.isArray(d.headlines) ? d.headlines : [];
-    } catch(e){ return []; }
+    } catch(e){ errors.push(e); return []; }
   }));
+  if(errors.length === BRIEFING_FEEDS.length) throw errors[0];   // every feed failed: report why, not "no headlines"
   return mergeHeadlines(got);
 }
 
@@ -77,7 +79,7 @@ async function refreshPulse(onChange){
       onChange();
       try {
         const heads = await fetchHeadlines();
-        if(heads.length < 3) throw new Error('TradingView returned too few headlines (' + heads.length + ').');
+        if(!heads.length) throw new Error('TradingView returned no headlines.');
         const items = cleanBriefings(await ldAskJson(sample, briefingsPrompt(heads), { modelTier: 'quick', cache: false }), heads);
         if(!items.length) throw new Error('Claude wrote no usable briefings.');
         const mref = db.doc('news/macro'), mcur = await mref.get(), at2 = new Date().toISOString(), upd = { briefings: items, briefingsAt: at2, asof: at2.slice(0, 10) };

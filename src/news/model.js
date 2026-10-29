@@ -127,17 +127,23 @@ const BRIEFING_FEEDS = ['NSE:NIFTY', 'BSE:SENSEX', 'TVC:DXY', 'SP:SPX', 'TVC:GOL
 const BRIEFING_MAX = 10;
 // TradingView headlines from several market feeds -> one list without repeats, newest first, at most 30: [{ title, published, src, url }].
 function mergeHeadlines(lists){
-  const seen = new Set(), out = [];
+  const seen = new Map(), out = [];
   /** @type {any[]} */ const all = [];
   (lists || []).forEach(l => all.push(...l));
+  // Newest first, so a repeated headline keeps its newest copy; a link from an older copy fills in a missing one.
+  all.sort((a, b) => String(b && b.published || '').localeCompare(String(a && a.published || '')));
   all.forEach(h => {
     if(!h || !h.title || !h.published) return;
     const key = String(h.title).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    if(seen.has(key)) return;
-    seen.add(key);
-    out.push({ title: String(h.title).slice(0, 160), published: h.published, src: h.provider && h.provider.name ? String(h.provider.name).slice(0, 40) : '', url: typeof h.link === 'string' && /^https?:\/\//i.test(h.link) ? h.link.replace(/^http:/i, 'https:') : '' });
+    const src = h.provider && h.provider.name ? String(h.provider.name).slice(0, 40) : '';
+    const url = typeof h.link === 'string' && /^https?:\/\//i.test(h.link) ? h.link.replace(/^http:/i, 'https:') : '';
+    const prior = seen.get(key);
+    if(prior){ if(!prior.url && url){ prior.url = url; prior.src = src || prior.src; } return; }
+    const item = { title: String(h.title).slice(0, 160), published: h.published, src, url };
+    seen.set(key, item);
+    out.push(item);
   });
-  return out.sort((a, b) => String(b.published).localeCompare(String(a.published))).slice(0, 30);
+  return out.slice(0, 30);
 }
 // The prompt for the briefings. Claude only sees the numbered headlines and says which ones each briefing is based on.
 function briefingsPrompt(heads){
@@ -154,12 +160,12 @@ function cleanBriefings(r, heads){
   const out = [], used = new Set();
   arr.forEach(b => {
     const h = b && heads[Number(b.from) - 1], headline = b && text(b.headline, 140);
-    if(!h || !headline || used.has(b.from)) return;
+    if(!h || !h.url || !headline || used.has(b.from)) return;   // every briefing keeps its source link
     used.add(b.from);
     const o = { headline, date: String(h.published).slice(0, 10), group: BRIEFING_GROUP_IDS.includes(b.group) ? b.group : 'market', impact: ['positive', 'negative', 'mixed'].includes(b.impact) ? b.impact : 'mixed' };
     const why = text(b.why, 240);
     if(why) o.why = why;
-    if(h.url) o.links = [{ label: h.src || 'Source', url: h.url }];
+    o.links = [{ label: h.src || 'Source', url: h.url }];
     out.push(o);
   });
   return out.slice(0, BRIEFING_MAX);
