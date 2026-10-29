@@ -57,7 +57,7 @@ const numBadges = ns => ns.slice(0, 2).map(n => `<span class="fr-n">${n}</span>`
 const tidyValue = v => String(v).replace(/-?\d+\.\d{3,}/g, m => parseFloat(m).toFixed(2));
 // One metric row: [number slot] [dot] label + source tag ........ value (right-aligned, one column for the whole card).
 function rowHtml(slot, cls, ns, dot, label, tag, value, extra, attrs){
-  return `<span class="data-chip ${cls}"${ns.length ? ` data-n="${ns.join(' ')}"` : ''}${attrs || ''}>${dot}<span class="chip-label">${label}</span><b class="chip-val">${value}</b><span class="chip-src">${tag}</span>${slot ? `<span class="chip-n">${numBadges(ns)}</span>` : ''}${extra || ''}</span>`;
+  return `<span class="data-chip ${cls}"${ns.length ? ` data-n="${ns.join(' ')}"` : ''}${attrs || ''}>${dot}<span class="chip-label">${label}</span><b class="chip-val">${value}</b>${slot ? `<span class="chip-n">${numBadges(ns)}</span>` : ''}<span class="chip-src">${tag}</span>${extra || ''}</span>`;
 }
 function chipHtml(f, view, k, v){
   const ns = view.nums.get(k) || [], fromTv = (f.metricsTv || []).includes(k);
@@ -108,7 +108,7 @@ function renderFactorResearchBlock(f, view){
   const stale = age !== null && age > RESEARCH_STALE_DAYS
     ? `<p class="fund-research-stale">&#9888; Research is ${age} days old &mdash; use "Refresh Fundamental Info" to update it.</p>` : '';
   const li = (x) => `<li>${escapeHtml(typeof x === 'string' ? x : (x && x.text) || '')}</li>`;
-  const pointLi = (p) => `<li class="fr-pt"${p.n ? ` data-n="${p.n}"` : ''}><span class="fr-gut"><span class="fr-bul"></span></span><span class="fr-body"><span class="fr-text">${escapeHtml(p.text)}</span>${p.url ? `<span class="fr-meta"><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.src || 'Source')} ↗</a></span>` : ''}</span><span class="fr-src">${p.tags.map(tagPill).join('')}${p.ok ? '' : srcIcon('warn', 'Not verified: a figure in this sentence could not be found in the metric rows or the TradingView data.')}</span><span class="fr-numr">${p.n ? numBadges([p.n]) : ''}</span></li>`;
+  const pointLi = (p) => `<li class="fr-pt"${p.n ? ` data-n="${p.n}"` : ''}><span class="fr-gut"><span class="fr-bul"></span></span><span class="fr-body"><span class="fr-text">${escapeHtml(p.text)}</span>${p.url ? `<span class="fr-meta"><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.src || 'Source')} ↗</a></span>` : ''}</span><span class="fr-numr">${p.n ? numBadges([p.n]) : ''}</span><span class="fr-src">${p.tags.map(tagPill).join('')}${p.ok ? '' : srcIcon('warn', 'Not verified: a figure in this sentence could not be found in the metric rows or the TradingView data.')}</span></li>`;
   const src = (x) => {
     if(typeof x === 'string') return escapeHtml(x);
     const title = escapeHtml((x && (x.title || x.url)) || '');
