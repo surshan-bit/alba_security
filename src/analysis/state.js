@@ -35,7 +35,7 @@ const ANALYSIS_MOS_KEYS = ['green', 'orange', 'red'];
 // Tech Rating W / M filters (2026-10-07): the MACD state behind the Tech Rating badge (weekMacd / monthMacd).
 const ANALYSIS_TECH_KEYS = ['bull_above', 'bull_below', 'bear_above', 'bear_below'];
 function loadAnalysisFilters(){
-  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortCol: 'mos', sortDir: 'desc', view: 'stocks', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', ideas: '', rebound: false, columnOrder: null };
+  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortCol: 'mos', sortDir: 'desc', view: 'stocks', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', ideas: [], rebound: false, columnOrder: null };
   try {
     const raw = localStorage.getItem(ANALYSIS_FILTERS_KEY);
     if(!raw) return fallback;
@@ -59,7 +59,8 @@ function loadAnalysisFilters(){
     const isNum = (n) => typeof n === 'number' && isFinite(n);
     const mosLo = isNum(parsed.mosLo) ? parsed.mosLo : null, mosHi = isNum(parsed.mosHi) ? parsed.mosHi : null;
     const strategyId = typeof parsed.strategyId === 'string' ? parsed.strategyId : '';
-    const ideas = parsed.ideas === 'up' || parsed.ideas === 'down' ? parsed.ideas : '';
+    // v1.306: Upward and Downward Trend can be chosen together, so this is a list. Before, it was one word ('up' or 'down'), which is read as a list of one.
+    const ideas = [...new Set((Array.isArray(parsed.ideas) ? parsed.ideas : [parsed.ideas]).filter(v => v === 'up' || v === 'down'))];
     const rebound = parsed.rebound === true;
     const columnOrder = Array.isArray(parsed.columnOrder) ? parsed.columnOrder : fallback.columnOrder;
     return {

@@ -177,7 +177,7 @@ const IDEAS_BUTTONS = [['up', 'var(--buy)', 'Upward Trend', 'The Upward trend li
 function ideasGroup(){
   const inStrategy = strategyPassSet(), chosen = analysisFilters.ideas;
   const c = { all: 0, up: 0, down: 0 };
-  const sets = { up: ideasStockSet('up', analysisFilters.strategyId).set, down: ideasStockSet('down', analysisFilters.strategyId).set };
+  const sets = { up: ideasStockSet(['up'], analysisFilters.strategyId).set, down: ideasStockSet(['down'], analysisFilters.strategyId).set };
   stocks.forEach(s => {
     if(!analysisPasses(s, 'aideas', inStrategy, null)) return;
     c.all++;
@@ -185,11 +185,11 @@ function ideasGroup(){
     if(sets.down && sets.down.has(s)) c.down++;
   });
   const { source } = ideasStockSet(chosen, analysisFilters.strategyId);
-  const note = !chosen ? '' : source.snap
+  const note = !chosen.length ? '' : source.snap
     ? `<p class="filter-note" id="analysisIdeasNote">From &ldquo;${escapeHtml(source.name)}&rdquo;, processed ${escapeHtml(ideasWhen(source.snap))}. Process again in the Trade Log to update the list.</p>`
     : `<p class="filter-note" id="analysisIdeasNote">No Buy / Sell result is saved yet${analysisFilters.strategyId && source.name ? ' for &ldquo;' + escapeHtml(source.name) + '&rdquo;' : ''}. Open the Trade Log, choose a strategy and press Process.</p>`;
-  const buttons = [filterButton('aideas', 'all', !chosen, 'var(--text)', 'All', c.all, 'Do not narrow Analysis by the Buy / Sell ideas')]
-    .concat(IDEAS_BUTTONS.map(([v, dot, label, title]) => filterButton('aideas', v, chosen === v, dot, label, c[v], title)));
+  const buttons = [filterButton('aideas', 'all', !chosen.length, 'var(--text)', 'All', c.all, 'Do not narrow Analysis by the Buy / Sell ideas')]
+    .concat(IDEAS_BUTTONS.map(([v, dot, label, title]) => filterButton('aideas', v, chosen.includes(v), dot, label, c[v], title)));
   return `<div class="filter-group" id="analysisIdeasFilter">
         <h2>Buy / Sell ideas</h2>
         <div class="filter-group-row">
@@ -264,7 +264,8 @@ const GROUPS = [
   ['analysisVerdictFilters', 'averdict', 'verdicts'],
   ['analysisTechWFilters', 'atechw', 'techW'],
   ['analysisTechMFilters', 'atechm', 'techM'],
-  ['analysisMosFilters', 'amos', 'mosRatings']
+  ['analysisMosFilters', 'amos', 'mosRatings'],
+  ['analysisIdeasFilter', 'aideas', 'ideas']   // v1.306: Upward and Downward Trend can both be chosen
 ];
 
 // Draws the panel and makes its buttons work. `rerender` redraws the whole Analysis section.
@@ -294,12 +295,6 @@ function renderAnalysisFilterPanel(rerender){
   document.querySelectorAll('#analysisStrategyFilter .filter-btn').forEach(btn => btn.addEventListener('click', () => {
     const id = /** @type {HTMLElement} */ (btn).dataset.astrat === 'all' ? '' : /** @type {HTMLElement} */ (btn).dataset.astrat;
     analysisFilters.strategyId = (id && id === analysisFilters.strategyId) ? '' : id;   // clicking the chosen one again goes back to All
-    saveAnalysisFilters(analysisFilters);
-    rerender();
-  }));
-  document.querySelectorAll('#analysisIdeasFilter .filter-btn').forEach(btn => btn.addEventListener('click', () => {
-    const v = /** @type {HTMLElement} */ (btn).dataset.aideas;
-    analysisFilters.ideas = v === 'up' || v === 'down' ? (v === analysisFilters.ideas ? '' : v) : '';   // clicking the chosen one again goes back to All
     saveAnalysisFilters(analysisFilters);
     rerender();
   }));
