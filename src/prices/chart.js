@@ -70,7 +70,7 @@ function initPriceChart(s){
     const c = cfg[k], el = elOf(k), svg = el.querySelector('svg');
     const lanes = haveGroups.filter(g => shown.has(g.id)), evH = lanes.length ? lanes.length * LANE + 4 : 0;
     const ms = macd[k], MH = ms ? 70 : 0, MG = ms ? 22 : 0, mBlock = MH + MG;   // the MACD band sits under the volume, above the event tags
-    const W = el.querySelector('.pc-chart').clientWidth || 320, H = 250 + evH + mBlock, padL = 6, padR = 44, padT = 8, padB = 22 + evH, volH = 44, gap = 8;
+    const W = el.querySelector('.pc-chart').clientWidth || 320, H = 250 + evH + mBlock, padL = 2, padR = W < 520 ? 32 : 44, padT = 8, padB = 22 + evH, volH = 44, gap = 8;
     const all = bars[k], n = Math.min(all.length, c.ranges[state[k]][1]), off = all.length - n, b = all.slice(off);
     const pw = W - padL - padR, ph = H - padT - padB - mBlock - volH - gap, vBase = H - padB - mBlock;   // vBase: the volume bars' baseline
     let lo = Math.min(...b.map(r => r[3])), hi = Math.max(...b.map(r => r[2])); const pad = (hi - lo) * .06; lo -= pad; hi += pad;
