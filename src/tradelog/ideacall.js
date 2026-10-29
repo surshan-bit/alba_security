@@ -14,13 +14,21 @@ import { capClass } from '../core/capclass.js';
 import { newsCounts } from '../strategies/news.js';
 import { marginOfSafety } from '../core/mos.js';
 import { factsFor, tradeSignal } from './signals.js';
+import { SHORT_HISTORY } from './nextweek.js';
 
 // The stock's trend from its weekly and monthly MACD against their signal lines (the dashboard's own technical figures): 'up' when both are above, 'down' when
-// both are below, 'mixed' when they disagree, null when either is missing. The same definition the two-week tests were split by.
+// both are below, 'mixed' when they disagree. The same definition the two-week tests were split by. A recent listing has no monthly MACD yet (it needs about three
+// years of prices), so from v1.292 the weekly MACD alone decides (weeklyOnly() says so): above its signal line is 'up', below is 'down'. null when the weekly figures are missing.
+const isNum = (x) => typeof x === 'number' && isFinite(x);
+const macdOf = (stock) => (stock && stock.technical && stock.technical.raw) || {};
+function weeklyOnly(stock){
+  const r = macdOf(stock);
+  return isNum(r.weekMacdLevel) && isNum(r.weekMacdSignal) && !(isNum(r.monthMacdLevel) && isNum(r.monthMacdSignal));
+}
 function trendOf(stock){
-  const r = (stock && stock.technical && stock.technical.raw) || {};
-  const v = [r.weekMacdLevel, r.weekMacdSignal, r.monthMacdLevel, r.monthMacdSignal];
-  if(v.some(x => typeof x !== 'number' || !isFinite(x))) return null;
+  const r = macdOf(stock);
+  if(!isNum(r.weekMacdLevel) || !isNum(r.weekMacdSignal)) return null;
+  if(weeklyOnly(stock)) return r.weekMacdLevel > r.weekMacdSignal ? 'up' : r.weekMacdLevel < r.weekMacdSignal ? 'down' : 'mixed';
   const w = r.weekMacdLevel > r.weekMacdSignal, m = r.monthMacdLevel > r.monthMacdSignal;
   return w && m ? 'up' : !w && !m && r.weekMacdLevel < r.weekMacdSignal && r.monthMacdLevel < r.monthMacdSignal ? 'down' : 'mixed';
 }
@@ -40,6 +48,10 @@ function fiiNote(stock){
     : 'FII buying: holding up ' + fixedOrNull(c, 1) + ' points last quarter (' + w + ')' + (long ? ', up over 3 years too' : '');
 }
 
+// Falling profits (v1.292): from the Screener column "Profit growth" (profit over the last 12 months against the 12 months before). A fall of PROFIT_BLOCK percent or
+// worse holds a Buy back; a smaller fall of PROFIT_NOTE percent or worse is a note. Cheap-looking stocks with shrinking profits are the usual trap here: the margin of safety
+// rests on older earnings. Like the other quality checks it could not be tested over the past years (no history of quarterly figures is kept), so it is a judgement.
+const PROFIT_BLOCK = -25, PROFIT_NOTE = -10;
 const BUY_TOP = 10, AVOID_BOTTOM = 10, RESULTS_DAYS = 7, THIN_LAKH = 50, NEWS_MIN = 2;
 
 // Risk checks for a stock you do not hold: { blocks: reasons a Buy is held back, notes: other news worth saying, cap, resultsIn }. `today` is YYYY-MM-DD in India.
@@ -56,6 +68,9 @@ function risksOf(stock, today, f, mos){
   const n = stock ? newsCounts(stock) : null;
   if(n && n.neg >= NEWS_MIN && n.neg > n.pos) blocks.push('recent news leans negative (' + n.neg + ' negative, ' + n.pos + ' positive)');
   else if(n && n.pos >= NEWS_MIN && n.pos > n.neg) notes.push('Recent news is positive (' + n.pos + ' positive, ' + n.neg + ' negative)');
+  const pg = stock && stock.valuation && stock.valuation.profitGrowth;
+  if(isNum(pg) && pg <= PROFIT_BLOCK) blocks.push('profits fell ' + fixedOrNull(-pg, 0) + '% over the last 12 months');
+  else if(isNum(pg) && pg <= PROFIT_NOTE) notes.push('Profits down ' + fixedOrNull(-pg, 0) + '% over the last 12 months');
   const fn = fiiNote(stock); if(fn) notes.push(fn);
   return { blocks, notes, cap: capClass(lq.marketCap), resultsIn };
 }
@@ -64,7 +79,9 @@ const sign = (x) => (x >= 0 ? '+' : '') + fixedOrNull(x, 1) + '%';
 // Short, plain lines for the row (one idea each; the screen shows them as bullets).
 const TREND_WORD = { up: 'Upward', down: 'Downward' };
 function rankLine(r){ return 'Top ' + r.topPct + '% of the ' + (TREND_WORD[r.trend] || '') + ' stocks in this strategy today'; }
-function recordLine(r){ return 'In 5 years of tests, stocks ranked like this were higher after 2 weeks ' + fixedOrNull(r.up, 0) + '% of the time (all ' + (TREND_WORD[r.trend] || '') + ' stocks: ' + fixedOrNull(r.base, 0) + '%)'; }
+function recordLine(r){
+  if(r.short) return 'New listing (' + r.weeks + ' weeks of prices): in 5 years of tests, recent listings ranked in the top 10% were higher after 2 weeks ' + fixedOrNull(SHORT_HISTORY.up, 0) + '% of the time (all recent listings: ' + fixedOrNull(SHORT_HISTORY.base, 0) + '%)';
+  return 'In 5 years of tests, stocks ranked like this were higher after 2 weeks ' + fixedOrNull(r.up, 0) + '% of the time (all ' + (TREND_WORD[r.trend] || '') + ' stocks: ' + fixedOrNull(r.base, 0) + '%)'; }
 function moveLine(r){ const f = r.facts; return 'Price: last week ' + sign(f.week) + ', 4 weeks ' + sign(f.month) + ', 26 weeks ' + sign(f.half); }
 function highLine(r){ const d = -r.facts.fromHigh; return d < 1 ? 'Near its 52-week high' : fixedOrNull(d, 0) + '% below its 52-week high'; }
 function valueLine(mos){ return mos != null && mos > 0 ? 'Priced ' + fixedOrNull(mos, 0) + '% below its fair value' : null; }
@@ -74,7 +91,7 @@ function ideaCall(stock, trade, read, today){
   const f = factsFor(trade || {}, stock);
   const mos = marginOfSafety(f.intrinsic, f.price);
   const r = read || null, o = risksOf(stock, today, f, mos);
-  const base = { trend: r ? r.trend || null : null, base: r ? r.base : null, mos, cap: o.cap, resultsIn: o.resultsIn, p: r ? r.p : null, pct: r ? r.pct : null, topPct: r ? r.topPct : null, up: r ? r.up : null, beat: r ? r.beat : null };
+  const base = { short: !!(r && r.short), weeklyOnly: weeklyOnly(stock), trend: r ? r.trend || null : null, base: r ? r.base : null, mos, cap: o.cap, resultsIn: o.resultsIn, p: r ? r.p : null, pct: r ? r.pct : null, topPct: r ? r.topPct : null, up: r ? r.up : null, beat: r ? r.beat : null };
   if(trade){
     const sig = tradeSignal(f);
     const call = sig.call === 'add' ? 'buy' : sig.call === 'hold' ? 'hold' : 'sell';
@@ -83,10 +100,12 @@ function ideaCall(stock, trade, read, today){
   }
   const reasons = [];
   let call = 'hold';
-  if(!r) reasons.push('no weekly price history yet (80 weeks are needed), so the next two weeks cannot be judged');
+  if(!r) reasons.push('no weekly price history yet (53 weeks are needed), so the next two weeks cannot be judged');
   else if(!r.trend || r.trend === 'mixed') reasons.push(r.trend ? 'Weekly and monthly trends disagree, so it is in neither list' : 'No MACD figures saved yet, so its trend is unknown (import the data)', moveLine(r));
   else {
-    if(r.trend === 'down') o.notes.unshift('Bounce-back pick: both trends are down, so this bets on a rebound');
+    if(r.trend === 'down') o.notes.unshift('Bounce-back pick: ' + (base.weeklyOnly ? 'the weekly trend is down' : 'both trends are down') + ', so this bets on a rebound');
+    if(base.weeklyOnly) o.notes.unshift('Trend uses the weekly MACD only (no monthly figure yet)');
+    if(r.short) o.notes.unshift('Short history: only ' + r.weeks + ' weeks of prices, so the score is less certain');
     if(r.pct >= 100 - BUY_TOP) { if(o.blocks.length) o.blocks.forEach(b => reasons.push('held back: ' + b)); else call = 'buy'; }
     else if(r.pct <= AVOID_BOTTOM) call = 'sell';
     reasons.unshift(rankLine(r), recordLine(r));

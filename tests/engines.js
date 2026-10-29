@@ -665,7 +665,7 @@ test('trade call: missing data never crashes and never invents a call', () => {
   assert.strictEqual(s.call, 'hold'); assert.strictEqual(s.gain, null);
   assert.strictEqual(G.factsFor({ buy: { price: 10 } }, null).price, null);
 });
-const I = load('src/tradelog/ideacall.js', 'export { fiiNote };');
+const I = load('src/tradelog/ideacall.js', 'export { fiiNote, weeklyOnly };');
 const NW = load('src/tradelog/nextweek.js', 'export { weekFeatures, modelProb };');
 const idea = (o) => ({ name: 'X', score: 7.2, verdict: 'buy', valuation: { currentPrice: 100, intrinsicValue: 160 }, ...o });
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'nextweek-fixture.json'), 'utf8'));
@@ -699,7 +699,9 @@ test('next week (v1.289): the ranking among a strategy\'s stocks, thin flag and 
   assert.strictEqual(r.thin, false, 'a traded value of crores is not thin');
   const thin = load('src/tradelog/nextweek.js').nextWeekRead(barsOf(walk).map(b => b.slice(0, 5).concat([10])), SAT);
   assert.strictEqual(thin.thin, true);
-  assert.strictEqual(load('src/tradelog/nextweek.js').nextWeekRead(barsOf(walk.slice(0, 70)), SAT), null, 'fewer than 80 weeks gives no reading');
+  assert.strictEqual(load('src/tradelog/nextweek.js').nextWeekRead(barsOf(walk.slice(0, 50)), SAT), null, 'fewer than 53 weeks gives no reading');
+  const short = load('src/tradelog/nextweek.js').nextWeekRead(barsOf(walk.slice(0, 70)), SAT);
+  assert.ok(short && short.short === true && short.weeks === 70, 'from 53 weeks a stock is scored, flagged as a short history'); assert.strictEqual(r.short, false); assert.ok(r.weeks >= 99, 'the weeks used are reported');
   assert.strictEqual(load('src/tradelog/nextweek.js').nextWeekRead(null, SAT), null);
   const bars = barsOf(walk), forming = bars.concat([[Date.UTC(2026, 0, 5 + 7 * bars.length) / 1000, 40, 41, 39, 40, 1e6]]);
   const wed = new Date(Date.UTC(2026, 0, 5 + 7 * bars.length) + 2 * 86400000).toISOString().slice(0, 10);
@@ -791,6 +793,26 @@ test('ideas (v1.289): the trend comes from weekly and monthly MACD; a mixed or u
   const down = I.ideaCall(idea({}), null, nwr(97, { trend: 'down', base: 45.3 }), TODAY);
   assert.strictEqual(down.call, 'buy'); assert.ok(down.reasons.some(x => /Bounce-back pick/.test(x)) && /Downward stocks/.test(down.reasons[1]));
   assert.strictEqual(down.trend, 'down');
+});
+test('ideas (v1.292): profits that fell 25% or more over 12 months hold a Buy back; a fall of 10% or more is a note', () => {
+  const pg = (v) => I.ideaCall(idea({ valuation: { currentPrice: 100, intrinsicValue: 160, profitGrowth: v } }), null, nwr(97), TODAY);
+  const a = pg(-41.4); assert.strictEqual(a.call, 'hold'); assert.ok(a.reasons.includes('held back: profits fell 41% over the last 12 months'));
+  assert.strictEqual(pg(-25).call, 'hold', 'the edge counts'); assert.strictEqual(pg(-24.9).call, 'buy');
+  const n = pg(-15); assert.strictEqual(n.call, 'buy'); assert.ok(n.reasons.includes('Profits down 15% over the last 12 months'));
+  const ok = pg(5); assert.strictEqual(ok.call, 'buy'); assert.ok(!ok.reasons.some(x => /Profits|profits/.test(x)));
+  assert.strictEqual(pg(null).call, 'buy', 'a missing figure never holds a Buy back'); assert.strictEqual(pg(undefined).call, 'buy');
+  assert.ok(!I.ideaCall(idea({ valuation: { currentPrice: 100, intrinsicValue: 160, profitGrowth: -50 } }), null, nwr(50), TODAY).reasons.some(x => /held back/.test(x)), 'only a would-be Buy is told it was held back');
+});
+test('ideas (v1.292): a recent listing is scored with its own numbers; with no monthly MACD the weekly MACD decides the trend, and says so', () => {
+  const t = (wl, ws, ml, ms) => ({ technical: { raw: { weekMacdLevel: wl, weekMacdSignal: ws, monthMacdLevel: ml, monthMacdSignal: ms } } });
+  assert.strictEqual(I.trendOf(t(2, 1, null, null)), 'up'); assert.strictEqual(I.trendOf(t(1, 2, null, null)), 'down'); assert.strictEqual(I.trendOf(t(1, 1, null, null)), 'mixed');
+  assert.strictEqual(I.trendOf(t(2, 1, 5, null)), 'up', 'half a monthly pair counts as missing'); assert.strictEqual(I.trendOf(t(null, null, 5, 4)), null, 'no weekly figures, no trend');
+  assert.strictEqual(I.weeklyOnly(t(2, 1, null, null)), true); assert.strictEqual(I.weeklyOnly(t(2, 1, 5, 4)), false); assert.strictEqual(I.trendOf(t(2, 1, 4, 5)), 'mixed', 'with both figures the old rule is unchanged');
+  const sh = I.ideaCall(idea({ technical: { raw: { weekMacdLevel: 2, weekMacdSignal: 1 } } }), null, nwr(97, { short: true, weeks: 64 }), TODAY);
+  assert.strictEqual(sh.call, 'buy'); assert.strictEqual(sh.short, true); assert.strictEqual(sh.weeklyOnly, true);
+  assert.ok(sh.reasons.includes('Short history: only 64 weeks of prices, so the score is less certain') && sh.reasons.includes('Trend uses the weekly MACD only (no monthly figure yet)'));
+  assert.ok(sh.reasons.some(x => /^New listing \(64 weeks of prices\): in 5 years of tests, recent listings ranked in the top 10% were higher after 2 weeks 52% of the time \(all recent listings: 45%\)$/.test(x)), 'its own tested numbers, not the main table');
+  const old = I.ideaCall(idea({}), null, nwr(97), TODAY); assert.strictEqual(old.short, false); assert.ok(!old.reasons.some(x => /Short history|weekly MACD only|New listing/.test(x)));
 });
 test('ideas (v1.289): FII selling or buying last quarter is a note, never a block; it needs 0.5 points and 10% of the earlier holding', () => {
   const v = (h, c, c3) => ({ valuation: { fiiHolding: h, fiiChange: c, fiiChange3: c3 } });
