@@ -535,6 +535,12 @@ test('v1.181: a weekly bar counts as finished from Saturday, a monthly bar from 
   const nov = TECH.computeTechnical(W, M, 5, '2026-11-02');
   assert.deepStrictEqual(nov.basis, { week: '2026-10-12', month: '2026-10-01' }); assert.strictEqual(nov.provisional, undefined);
 });
+test('the RSI shown includes the week and month in progress (as TradingView); the score states use completed bars', () => {
+  const TECH = load('src/engine/technical.js'), { W, M } = mkBars();
+  const t = TECH.computeTechnical(W, M, 5, '2026-10-14');
+  assert.strictEqual(t.raw.weekRsi, TECH.techRsi(W.map(b => b[4]))); assert.strictEqual(t.raw.monthRsi, TECH.techRsi(M.map(b => b[4])));
+  assert.ok(t.raw.weekRsi < 100 && t.states.weekRsi === 'overbought');   // completed bars only rise: still overbought for the score
+});
 // ---- v1.182: refresh from TradingView (snapshot readings, no bars) ----
 test('v1.182: a TradingView snapshot is scored by the engine rules and is marked as a snapshot', () => {
   const TECH = load('src/engine/technical.js');

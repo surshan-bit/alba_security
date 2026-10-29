@@ -101,9 +101,12 @@ function computeTechnical(weekBars, monthBars, pillarsVal, today){
   const wp = closes(wAll), mp = closes(mAll);
   const pct = c => c.length >= 2 && c[c.length - 2] ? (c[c.length - 1] / c[c.length - 2] - 1) * 100 : null;
   // The price changes show the current move, so they use every bar; the score inputs use completed bars.
+  // The RSI figures shown are TradingView's: they include the week and month in progress. The score's RSI states stay on completed bars.
+  const wLive = techRsi(wp), mLive = techRsi(mp);
+  const monthRsi = mLive != null ? mLive : r.monthRsi, weekRsi = wLive != null ? wLive : r.weekRsi;
   const raw = { monthMacdLevel: r.monthMacdLevel, monthMacdSignal: r.monthMacdSignal, weekMacdLevel: r.weekMacdLevel, weekMacdSignal: r.weekMacdSignal,
-    weekPctChange: pct(wp), monthPctChange: pct(mp), monthRsi: r.monthRsi, weekRsi: r.weekRsi, valuationScore: pillarsVal == null ? null : pillarsVal };
-  const reason = techReason(states, r, pillarsVal);
+    weekPctChange: pct(wp), monthPctChange: pct(mp), monthRsi, weekRsi, valuationScore: pillarsVal == null ? null : pillarsVal };
+  const reason = techReason({ ...states, monthRsi: techRsiState(monthRsi), weekRsi: techRsiState(weekRsi) }, raw, pillarsVal);
   const out = { score: techComposite(states, pillarsVal), reason, states, raw, asof: today };
   // Which bars the score rests on, and the in-progress reading when a week or month is not finished yet.
   out.basis = { week: wDone.length ? techIstDate(wDone[wDone.length - 1][0]) : null, month: mDone.length ? techIstDate(mDone[mDone.length - 1][0]) : null };
