@@ -303,15 +303,17 @@ async function sourceTagsScenario(){
       const pts = Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt')), chips = Array.from(document.querySelectorAll('#detail .data-chip'));
       const chip = l => chips.find(c => c.querySelector('.chip-label') && c.querySelector('.chip-label').textContent.includes(l));
       return {
-        tags: pts.map(p => Array.from(p.querySelectorAll('.srctag')).map(t => t.textContent)),
+        tags: pts.map(p => Array.from(p.querySelectorAll('.srcico')).map(t => t.getAttribute('aria-label').replace(/^Not verified.*/, 'not verified'))),
         nums: pts.map(p => p.getAttribute('data-n')),
         link: pts[1].querySelector('a') && pts[1].querySelector('a').getAttribute('href'),
-        factRow: (() => { const c = chips.find(x => x.classList.contains('chip-new')); return c && { text: c.textContent, tag: c.querySelector('.srctag').textContent }; })(),
-        csvTags: chips.filter(c => !c.classList.contains('chip-new')).map(c => c.querySelector('.srctag') && c.querySelector('.srctag').textContent),
-        filled: (chip('Interest coverage') || {}).querySelector && chip('Interest coverage').querySelector('.srctag').textContent,
+        factRow: (() => { const c = chips.find(x => x.classList.contains('chip-new')); return c && { text: c.textContent, tag: c.querySelector('.srcico').getAttribute('aria-label') }; })(),
+        csvTags: chips.filter(c => !c.classList.contains('chip-new')).map(c => c.querySelector('.srcico') && c.querySelector('.srcico').getAttribute('aria-label')),
+        filled: (chip('Interest coverage') || {}).querySelector && chip('Interest coverage').querySelector('.srcico').getAttribute('aria-label'),
         rowNum: chip('Debt-to-Equity') && chip('Debt-to-Equity').getAttribute('data-n'),
         pos: Array.from(document.querySelectorAll('#detail .fund-cell-research .fund-research-list.pos li')).map(e => e.textContent),
         badgeRight: (() => { const c = document.querySelector('#detail .fund-cell .data-chip[data-n]'); const n = c && c.querySelector('.chip-n'), v = c && c.querySelector('.chip-val'); return !!(n && v && n.getBoundingClientRect().left >= v.getBoundingClientRect().right - 1); })(),
+        iconsRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt')).every(li => { const a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); return b.right - a.right < 4; }),
+        iconText: document.querySelectorAll('#detail .fund-cell .srctag').length,
         sources: Array.from(document.querySelectorAll('#detail .fund-research-sources')).map(e => e.textContent),
         align: Array.from(document.querySelectorAll('#detail .fund-cell .data-chip .chip-val')).every(e => getComputedStyle(e).textAlign === 'right'),
         gutters: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt .fr-body')).map(e => Math.round(e.getBoundingClientRect().left)).filter((v, i, a) => a.indexOf(v) === i).length
@@ -324,6 +326,7 @@ async function sourceTagsScenario(){
     ok(r.sources.length === 1 && /Other source/.test(r.sources[0]) && !/Wire/.test(r.sources[0]), 'the Sources line lists only what no bullet already links to: ' + JSON.stringify(r.sources));
     ok(r.pos.length === 1 && /separate strength/.test(r.pos[0]), 'a Strengths line that repeats a numbered bullet is dropped: ' + JSON.stringify(r.pos));
     ok(r.badgeRight, 'the link numbers sit at the right end of the row, after the value');
+    ok(r.iconsRight && r.iconText === 0, 'source marks are small icons at the right end of each bullet, with no long text tags');
     ok(r.align, 'every metric value is right-aligned');
     ok(r.gutters === 1, 'every bullet sentence starts at the same left edge (numbered or not)');
     ok(r.csvTags.every(t => t === 'CSV' || t === 'TradingView') && r.filled === 'TradingView', 'every metric row names its source, and a row TradingView filled says TradingView');
