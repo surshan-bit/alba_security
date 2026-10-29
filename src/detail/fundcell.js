@@ -108,7 +108,7 @@ function renderFactorResearchBlock(f, view){
   const stale = age !== null && age > RESEARCH_STALE_DAYS
     ? `<p class="fund-research-stale">&#9888; Research is ${age} days old &mdash; use "Refresh Fundamental Info" to update it.</p>` : '';
   const li = (x) => `<li>${escapeHtml(typeof x === 'string' ? x : (x && x.text) || '')}</li>`;
-  const pointLi = (p) => `<li class="fr-pt"${p.n ? ` data-n="${p.n}"` : ''}><span class="fr-gut">${p.n ? numBadges([p.n]) : '<span class="fr-bul"></span>'}</span><span class="fr-body"><span class="fr-text">${escapeHtml(p.text)}</span>${p.url ? `<span class="fr-meta"><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.src || 'Source')} ↗</a></span>` : ''}</span><span class="fr-src">${p.tags.map(tagPill).join('')}${p.ok ? '' : srcIcon('warn', 'Not verified: a figure in this sentence could not be found in the metric rows or the TradingView data.')}</span></li>`;
+  const pointLi = (p) => `<li class="fr-pt"${p.n ? ` data-n="${p.n}"` : ''}><span class="fr-gut"><span class="fr-bul"></span></span><span class="fr-body"><span class="fr-text">${escapeHtml(p.text)}</span>${p.url ? `<span class="fr-meta"><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.src || 'Source')} ↗</a></span>` : ''}</span><span class="fr-src">${p.tags.map(tagPill).join('')}${p.ok ? '' : srcIcon('warn', 'Not verified: a figure in this sentence could not be found in the metric rows or the TradingView data.')}</span><span class="fr-numr">${p.n ? numBadges([p.n]) : ''}</span></li>`;
   const src = (x) => {
     if(typeof x === 'string') return escapeHtml(x);
     const title = escapeHtml((x && (x.title || x.url)) || '');

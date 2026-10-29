@@ -312,7 +312,8 @@ async function sourceTagsScenario(){
         rowNum: chip('Debt-to-Equity') && chip('Debt-to-Equity').getAttribute('data-n'),
         pos: Array.from(document.querySelectorAll('#detail .fund-cell-research .fund-research-list.pos li')).map(e => e.textContent),
         badgeRight: (() => { const c = document.querySelector('#detail .fund-cell .data-chip[data-n]'); const n = c && c.querySelector('.chip-n'), v = c && c.querySelector('.chip-val'); return !!(n && v && n.getBoundingClientRect().left >= v.getBoundingClientRect().right - 1); })(),
-        iconsRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt')).every(li => { const a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); return b.right - a.right < 4; }),
+        iconsRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt')).every(li => { const a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); const n = li.querySelector('.fr-numr').getBoundingClientRect(); return a.right <= n.left + 1 && n.right - a.right < 50 && b.right - n.right < 4; }),
+        numRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt[data-n]')).every(li => { const a = li.querySelector('.fr-numr').getBoundingClientRect(), b = li.getBoundingClientRect(); return a.width > 0 && b.right - a.right < 4; }),
         iconText: document.querySelectorAll('#detail .fund-cell .srctag').length,
         sources: Array.from(document.querySelectorAll('#detail .fund-research-sources')).map(e => e.textContent),
         align: Array.from(document.querySelectorAll('#detail .fund-cell .data-chip .chip-val')).every(e => getComputedStyle(e).textAlign === 'right'),
@@ -327,6 +328,7 @@ async function sourceTagsScenario(){
     ok(r.pos.length === 1 && /separate strength/.test(r.pos[0]), 'a Strengths line that repeats a numbered bullet is dropped: ' + JSON.stringify(r.pos));
     ok(r.badgeRight, 'the link numbers sit at the right end of the row, after the value');
     ok(r.iconsRight && r.iconText === 0, 'source marks are small icons at the right end of each bullet, with no long text tags');
+    ok(r.numRight, 'the bullet numbers sit at the right end of the bullet, like the row numbers');
     ok(r.align, 'every metric value is right-aligned');
     ok(r.gutters === 1, 'every bullet sentence starts at the same left edge (numbered or not)');
     ok(r.csvTags.every(t => t === 'CSV' || t === 'TradingView') && r.filled === 'TradingView', 'every metric row names its source, and a row TradingView filled says TradingView');
