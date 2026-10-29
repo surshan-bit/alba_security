@@ -33,7 +33,6 @@ select:not([multiple]):not([size]):disabled{opacity:.55;}
 /* The research points share one list with the Strengths and Watch-outs lines; those two carry a green or red dot. */
 .fr-plain .fr-bul{background:var(--buy);}
 .fr-plain.fr-neg .fr-bul{background:var(--avoid);}
-.fr-legend{display:flex;align-items:center;gap:6px;margin:0 0 8px;font-size:.78rem;color:var(--muted);}
 /* v1.309: inside a factor card the metric rows are one column and the points are one block (the older multi-column rules no longer apply). */
 #detail .fund-cell .data-chips{grid-template-columns:minmax(0,1fr);column-gap:0;}
 #detail .fund-cell .fund-cell-research{display:block;padding:0;margin:0 0 10px;border-top:0;}
