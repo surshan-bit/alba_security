@@ -74,9 +74,9 @@ function metricTone(factor, k, v) {
 }
 
 const TONE_TITLE = { pos: 'Positive', neg: 'Negative', neu: 'Neutral or no clear signal' };
-function metricDotHtml(factor, k, v) {
-  const t = metricTone(factor, k, v);
+function toneDotHtml(t) {
   return `<i class="mdot mdot-${t}" role="img" aria-label="${TONE_TITLE[t]}" title="${TONE_TITLE[t]}"></i>`;
 }
+const metricDotHtml = (factor, k, v) => toneDotHtml(metricTone(factor, k, v));
 
-export { metricDotHtml };
+export { metricDotHtml, toneDotHtml };

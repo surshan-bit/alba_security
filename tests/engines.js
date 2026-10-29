@@ -789,6 +789,36 @@ test('metric dots (v1.298): green / red / grey by fixed thresholds', () => {
   assert.strictEqual(t('Industry P/E', '18.15x', f), 'neu'); assert.strictEqual(t('Unknown thing', '5'), 'neu');
   assert.match(D.metricDotHtml({ metrics: [] }, 'D/E', '0.5x'), /mdot-pos/);
 });
+test('source tags (v1.299): where each bullet and extra figure comes from, and whether its numbers were found', () => {
+  const T = load('src/core/sourcetags.js'), V = load('src/detail/pointview.js');
+  const chips = [['D/E', '11.67x'], ['PEG', '0.39'], ['Contingent liabilities', '\u20b914247.8 Cr'], ['Historical PE 5yr', '6.66x'], ['P/E', '9.03x'], ['Industry P/E', '12.18x']];
+  const tv = { 'tv-financials': '{"debt_to_equity":0.30,"price_to_book":1.3,"total_debt":14247800000}', 'tv-news': 'SOUTHBANK: PAT rose 21%, GNPA fell to 1.24%. Shares up 15% in October', 'tv-forecasts': '{"strong_buy":5,"hold":1,"sell":0}' };
+  const urls = new Set(['https://news.example/n1']), titles = new Map([['https://news.example/n1', 'PAT rose 21%']]);
+  const base = { chips, tv, allowedUrls: urls, titles };
+  const facts = T.cleanFacts([{ label: 'Price to book value', value: '1.3x', tone: 'neu' }, { label: 'Analyst ratings', value: '5 buy \u00b7 1 hold \u00b7 0 sell', tone: 'pos' }, { label: 'Invented', value: '999x' }, { label: 'P/E', value: '1.3x' }, { label: 'No figure', value: 'high' }, { label: 'Debt-to-Equity (TradingView)', value: '0.30x', tone: 'pos', note: 'differs from the CSV figure' }], base);
+  assert.deepStrictEqual(facts.map(f => f.label), ['Price to book value', 'Analyst ratings', 'Debt-to-Equity (TradingView)'], 'only figures found in the TradingView text, not duplicating a metric row');
+  assert.strictEqual(facts[0].basis, 'tv-financials'); assert.strictEqual(facts[1].basis, 'tv-forecasts'); assert.strictEqual(facts[2].tone, 'pos');
+  const ctx = { ...base, facts, labels: new Set(chips.map(x => x[0]).concat(facts.map(x => x.label))) };
+  const tag = (x) => T.tagPoint(x, ctx);
+  let p = tag('Price is about 9 times yearly profit, against 12.2 times for the sector.');
+  assert.deepStrictEqual(p.basis, ['csv']); assert.strictEqual(p.ok, true);
+  p = tag("Debt is 0.30 times owners' money in one place and 11.67 times in another.");
+  assert.deepStrictEqual(p.basis, ['csv', 'tv-financials']); assert.strictEqual(p.ok, true);
+  p = tag({ text: 'Bad loans fell to 1.24% of total loans.', view: false, url: 'https://news.example/n1', refs: ['Not a row', 'PEG', 'PEG'] });
+  assert.deepStrictEqual(p.basis, ['tv-news']); assert.strictEqual(p.url, 'https://news.example/n1'); assert.strictEqual(p.src, 'PAT rose 21%'); assert.deepStrictEqual(p.refs, ['PEG'], 'unknown rows dropped, duplicates merged');
+  p = tag({ text: 'Possible future payments of \u20b914,247.8 crore are not counted as debt.', view: true });
+  assert.deepStrictEqual(p.basis, ['csv', 'claude']);
+  p = tag('Shares rose about 15% in October and hit a high.'); assert.deepStrictEqual(p.basis, ['tv-news']);
+  p = tag({ text: 'Total debt is \u20b91,424.78 crore.' }); assert.strictEqual(p.ok, true, 'a crore figure is matched to a raw amount in the data'); assert.deepStrictEqual(p.basis, ['tv-financials']);
+  p = tag('Margin was 55.5% last year.'); assert.strictEqual(p.ok, false, 'a figure in neither place is not verified'); assert.deepStrictEqual(p.basis, ['claude']);
+  p = tag('Over the three-year period to FY23 (2026), 3-year growth and 5 of 6 analysts, 2026-10-29.'); assert.strictEqual(p.ok, true, 'years, dates, ordinals and small counts are not checked'); assert.deepStrictEqual(p.basis, ['claude']);
+  p = tag({ text: 'The cash figures are three-year totals.', basis: ['csv', 'bogus'] }); assert.deepStrictEqual(p.basis, ['csv'], 'a bullet with no figure keeps the sources Claude named, if valid');
+  assert.strictEqual(tag('   '), null); assert.strictEqual(tag({ text: '' }), null);
+  const view = V.pointsView({ research: { points: ['Old plain bullet', { text: 'A', basis: ['csv'], refs: ['PEG', 'P/E'], ok: true }, { text: 'B', basis: ['tv-news'], refs: ['PEG'], ok: false, url: 'javascript:alert(1)' }], facts: [{ label: 'Price to book value', value: '1.3x', basis: 'tv-financials' }] } });
+  assert.deepStrictEqual(view.pts.map(x => x.n), [undefined, 1, 2]); assert.deepStrictEqual(view.pts[0].tags, [], 'old bullets show no tags');
+  assert.deepStrictEqual(view.nums.get('PEG'), [1, 2]); assert.strictEqual(view.pts[2].url, '', 'only http(s) links are kept'); assert.strictEqual(view.pts[2].ok, false);
+  assert.deepStrictEqual(V.pointsView({}).pts, []);
+});
 test('ideas (v1.289): a stock you hold keeps its trade call and is never gated', () => {
   const tr = { buy: { price: 100, snapshot: { score: 7.2 } } };
   assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 102, intrinsicValue: 160 }, technical: { raw: { weekRsi: 55, monthRsi: 60 } } }), tr, nwr(5), TODAY).label, 'Add more');

@@ -245,7 +245,7 @@ const ldScript = () => {
     if(/NEWS HEADLINES TO LABEL/.test(prompt)){ const labels = {}; for(let i = 0; i < 60; i++) labels[i] = ['positive', 'negative', 'neutral'][i % 3]; return reply({ labels }); }
     if(/These metrics are "n\/a"/.test(task)){ const f = {}; for(const m of task.matchAll(/\[(\w+)\] ([^;\[]+?)(?:;|\.\n)/g)){ const metrics = {}; m[2].split(', ').forEach(l => { metrics[l.trim()] = '12.5%'; }); f[m[1]] = { metrics, note: 'basis: made-up' }; } return reply({ factors: f }); }
     if(/Refresh the written analysis on these Fundamental Score factor cards/.test(task)){
-      const f = {}; for(const m of task.split('\n')[0].matchAll(/"(\w+)" \(/g)) f[m[1]] = { score: 0.5, note: 'rescored: made-up', research: { headline: 'Headline for ' + m[1], points: ['Point one', 'Point two <b>x</b>'], positives: ['Plus'], negatives: ['Minus'], sources: [{ title: 'Order win', url: 'https://news.example/n1' }, { title: 'Invented', url: 'https://invented.example/x' }] } };
+      const f = {}; for(const m of task.split('\n')[0].matchAll(/"(\w+)" \(/g)) f[m[1]] = { score: 0.5, note: 'rescored: made-up', research: { headline: 'Headline for ' + m[1], points: [{ text: 'Point one', view: true, refs: ['D/E', 'Not a metric'], url: 'https://news.example/n1' }, 'Point two <b>x</b> grew 777.7%'], facts: [{ label: 'Invented row', value: '4242.4x', tone: 'pos' }], positives: ['Plus'], negatives: ['Minus'], sources: [{ title: 'Order win', url: 'https://news.example/n1' }, { title: 'Invented', url: 'https://invented.example/x' }] } };
       return reply({ factors: f });
     }
     if(/Global & Macro Information/.test(task)) return reply({ positive: [{ text: 'Demand is firm <i>now</i>', source: 'Wire, 2026-10-08', url: 'https://news.example/n1' }], negative: [{ text: 'Input costs rising', source: 'Claude analysis, no live source', url: '' }],
@@ -283,6 +283,12 @@ async function ldFundamentalTests(){
     ok(want && JSON.stringify(got) === JSON.stringify(want), 'Refresh Fundamental Info: the prompts asked, the documents saved and the notices shown are unchanged (' + JSON.stringify(firstA) + ' / ' + JSON.stringify(firstB) + ')');
     ok(firstA && /finished/.test(firstA.title) && secondA && /finished/.test(secondA.title), 'both runs on the first stock end with a finished notice');
     ok(afterA.research && afterA.research.factors && afterA.updates && afterA.updates.globalFactors, 'research and Global & Macro were saved');
+    const pts0 = Object.values((afterA.research && afterA.research.factors) || {}).map(x => x.research).filter(Boolean).flatMap(r => r.points || []);
+    ok(pts0.length && pts0.every(p => p && typeof p === 'object' && Array.isArray(p.basis) && p.basis.length), 'v1.299: every saved bullet carries its source tags');
+    ok(pts0.some(p => p.text === 'Point one' && p.basis.includes('tv-news') && p.basis.includes('claude') && p.url === 'https://news.example/n1'), 'v1.299: a bullet with a supplied news link is tagged TradingView news and Claude\'s view');
+    ok(pts0.some(p => /777\.7%/.test(p.text) && p.ok === false), 'v1.299: a bullet whose figure is in neither the metric rows nor the TradingView data is marked not verified');
+    ok(Object.values(afterA.research.factors).every(x => !x.research || !x.research.facts), 'v1.299: an extra figure row that is not in the TradingView data is dropped');
+    ok(pts0.every(p => !(p.refs || []).includes('Not a metric')), 'v1.299: a reference to a row that does not exist is dropped');
     ok(afterA2.prompts.length > afterA.prompts.length && !/Already up to date/.test(secondA.text), 'v1.297: a stock researched just now is refreshed in full again when asked: ' + afterA.prompts.length + ' -> ' + afterA2.prompts.length);
     ok(afterB.prompts.length > afterA2.prompts.length && afterB.prompts.some(p => /These metrics/.test(p.task)), 'a stock with missing figures is asked for them');
     ok(errs.length === 0, 'ldfund: errors in the page: ' + errs.slice(0, 2).join(' | '));

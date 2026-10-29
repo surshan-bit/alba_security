@@ -81,3 +81,25 @@ footer{margin-top:26px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",s
 .mdot-pos{background:var(--buy);}
 .mdot-neg{background:var(--avoid);}
 .mdot-neu{background:var(--muted);opacity:.45;}
+/* Source tags and numbered links in the Fundamental Score cards (v1.299). */
+.srctag{display:inline-block;font-size:.66rem;font-weight:600;line-height:1.5;padding:0 7px;border-radius:10px;margin-left:5px;white-space:nowrap;vertical-align:1px;border:1px solid transparent;}
+.st-csv{background:transparent;color:var(--muted);border-color:var(--line);}
+.st-tv{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);}
+.st-claude{background:color-mix(in srgb,#8b7fe8 18%,transparent);color:#8b7fe8;}
+.st-warn{background:color-mix(in srgb,var(--hold) 18%,transparent);color:var(--hold);}
+.fr-n{display:inline-flex;align-items:center;justify-content:center;flex:none;width:16px;height:16px;border-radius:50%;border:1px solid var(--line);font-size:.64rem;font-weight:600;color:var(--muted);align-self:center;margin-right:2px;}
+.fund-research-list.fr-tagged{list-style:none;padding-left:0 !important;}
+.fund-research-list.fr-tagged .fr-pt{display:flex;gap:7px;padding:3px 5px;border-radius:6px;}
+.fund-research-list.fr-tagged .fr-pt .fr-n{margin-top:3px;align-self:flex-start;}
+.fund-research-list.fr-tagged .fr-pt:not([data-n]){padding-left:28px;}
+.data-chip .chip-l{flex:1 1 0;min-width:0;}
+.data-chip .chip-r{display:inline-flex;align-items:baseline;gap:0;white-space:nowrap;flex:none;}
+.data-chip.chip-new{flex-wrap:wrap;border-top-style:dashed;}
+.data-chip .chip-note{flex-basis:100%;font-size:.7rem;color:var(--hold);padding-left:26px;}
+/* Hover a numbered bullet to light up the rows it relies on, or a row to light up its bullets (no script). */
+.fund-cell:has(.fr-pt[data-n="1"]:hover) .data-chip[data-n~="1"],.fund-cell:has(.data-chip[data-n~="1"]:hover) .fr-pt[data-n="1"],.fund-cell:has(.fr-pt[data-n="1"]:hover) .fr-pt[data-n="1"],.fund-cell:has(.data-chip[data-n~="1"]:hover) .data-chip[data-n~="1"],
+.fund-cell:has(.fr-pt[data-n="2"]:hover) .data-chip[data-n~="2"],.fund-cell:has(.data-chip[data-n~="2"]:hover) .fr-pt[data-n="2"],.fund-cell:has(.fr-pt[data-n="2"]:hover) .fr-pt[data-n="2"],.fund-cell:has(.data-chip[data-n~="2"]:hover) .data-chip[data-n~="2"],
+.fund-cell:has(.fr-pt[data-n="3"]:hover) .data-chip[data-n~="3"],.fund-cell:has(.data-chip[data-n~="3"]:hover) .fr-pt[data-n="3"],.fund-cell:has(.fr-pt[data-n="3"]:hover) .fr-pt[data-n="3"],.fund-cell:has(.data-chip[data-n~="3"]:hover) .data-chip[data-n~="3"],
+.fund-cell:has(.fr-pt[data-n="4"]:hover) .data-chip[data-n~="4"],.fund-cell:has(.data-chip[data-n~="4"]:hover) .fr-pt[data-n="4"],.fund-cell:has(.fr-pt[data-n="4"]:hover) .fr-pt[data-n="4"],.fund-cell:has(.data-chip[data-n~="4"]:hover) .data-chip[data-n~="4"],
+.fund-cell:has(.fr-pt[data-n="5"]:hover) .data-chip[data-n~="5"],.fund-cell:has(.data-chip[data-n~="5"]:hover) .fr-pt[data-n="5"],.fund-cell:has(.fr-pt[data-n="5"]:hover) .fr-pt[data-n="5"],.fund-cell:has(.data-chip[data-n~="5"]:hover) .data-chip[data-n~="5"],
+.fund-cell:has(.fr-pt[data-n="6"]:hover) .data-chip[data-n~="6"],.fund-cell:has(.data-chip[data-n~="6"]:hover) .fr-pt[data-n="6"],.fund-cell:has(.fr-pt[data-n="6"]:hover) .fr-pt[data-n="6"],.fund-cell:has(.data-chip[data-n~="6"]:hover) .data-chip[data-n~="6"]{background:color-mix(in srgb,var(--accent) 18%,transparent);}

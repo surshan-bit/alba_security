@@ -6,7 +6,9 @@ import { scoreBand } from '../list/metrics.js';
 import { fundMissingMetrics } from './completeness.js';
 import { FUND_METRIC_LABEL, PERCENTILE_METRIC_KEYS, fundMetricDisplay, fundMetricNum, fundNoteExtra } from './fundmetrics.js';
 import { fundBusinessSummary, isProxyFactor } from './fundtext.js';
-import { metricDotHtml } from './metricdot.js';
+import { metricDotHtml, toneDotHtml } from './metricdot.js';
+import { BASIS_LABEL } from '../core/sourcetags.js';
+import { pointsView } from './pointview.js';
 
 // Governance red-flag chips (added 2026-10-06) — surfaces the genuinely governance-relevant
 // signals already in the gov factor's own metrics (promoter pledge, promoter holding change,
@@ -40,12 +42,25 @@ function govRedFlags(f) {
 }
 
 const PROXY_NOTE_KEYS = new Set(['moat', 'gov']);
+// A small pill saying where a statement or figure comes from (v1.299): CSV, TradingView (which part) or Claude's view.
+const tagPill = code => `<span class="srctag st-${code.startsWith('tv') ? 'tv' : code}">${BASIS_LABEL[code]}</span>`;
+const numBadges = ns => ns.map(n => `<span class="fr-n">${n}</span>`).join('');
+function chipHtml(f, view, k, v){
+  const ns = view.nums.get(k) || [], fromTv = (f.metricsTv || []).includes(k);
+  return `<span class="data-chip${v === 'n/a' ? ' chip-na' : ''}"${ns.length ? ` data-n="${ns.join(' ')}"` : ''}${PERCENTILE_METRIC_KEYS.has(k) ? ' title="A percentile, not a rank: 100th means the best of its industry peers, 50th is the middle, 1st is the weakest."' : ''}><span class="chip-l">${numBadges(ns)}${metricDotHtml(f, k, v)}${FUND_METRIC_LABEL[k] || k}:</span> <span class="chip-r"><b>${fundMetricDisplay(k, v)}</b>${tagPill(fromTv ? 'tv' : 'csv')}</span></span>`;
+}
+// Figures Claude found in the TradingView data that no metric row shows (kept only when the figure is in that data).
+function factHtml(x){
+  const ns = x.n || [];
+  return `<span class="data-chip chip-new"${ns.length ? ` data-n="${ns.join(' ')}"` : ''}><span class="chip-l">${numBadges(ns)}${toneDotHtml(['pos', 'neg'].includes(x.tone) ? x.tone : 'neu')}${escapeHtml(x.label)}:</span> <span class="chip-r"><b>${escapeHtml(x.value)}</b>${BASIS_LABEL[x.basis] ? tagPill(x.basis) : ''}</span>${x.note ? `<span class="chip-note">${escapeHtml(x.note)}</span>` : ''}</span>`;
+}
 function renderFundFactorCell(f){
   const normalized = (f.score/f.weight)*10;
   const band = scoreBand(normalized);
   const pct = Math.max(0, Math.min(100, Math.round((f.score/f.weight)*100)));
   const isProxy = isProxyFactor(f);
   const isResearched = !!f.research;
+  const view = pointsView(f);
   return `
     <div class="fund-cell${isProxy ? ' fund-cell-proxy' : ''}">
       <div class="fund-cell-head">
@@ -56,9 +71,9 @@ function renderFundFactorCell(f){
       ${f.excluded ? `<div class="fund-cell-note fund-cell-excluded">${PROXY_NOTE_KEYS.has(f.key) ? `Left out of the score: ${f.excluded}. Run Refresh Fundamental Info to add a sourced assessment.` : `Counted as an average score: ${f.excluded}.`}</div>` : (() => { const biz = fundBusinessSummary(f); return biz ? `<div class="fund-cell-business ${biz.band}">${biz.text}</div>` : ''; })()}
       ${(() => { const flags = govRedFlags(f); return flags.length ? `<div class="fund-cell-flags">${flags.map(fl => `<div class="fund-flag ${fl.sev}">⚠ ${fl.text}</div>`).join('')}</div>` : ''; })()}
       ${f.excluded ? '' : (() => { const extra = fundNoteExtra(f.note); return extra ? `<div class="fund-cell-note">${extra}</div>` : ''; })()}
-      ${isResearched && hasSource(f) ? renderFactorResearchBlock(f) : ''}
+      ${isResearched && hasSource(f) ? renderFactorResearchBlock(f, view) : ''}
       <div class="data-chips">
-        ${f.metrics.map(([k,v])=>`<span class="data-chip${v === 'n/a' ? ' chip-na' : ''}"${PERCENTILE_METRIC_KEYS.has(k) ? ' title="A percentile, not a rank: 100th means the best of its industry peers, 50th is the middle, 1st is the weakest."' : ''}><span class="chip-l">${metricDotHtml(f, k, v)}${FUND_METRIC_LABEL[k] || k}:</span> <b>${fundMetricDisplay(k, v)}</b></span>`).join('')}
+        ${f.metrics.map(([k,v])=>chipHtml(f, view, k, v)).join('')}${view.facts.map(factHtml).join('')}
       </div>
     </div>
   `;
@@ -71,12 +86,13 @@ function researchAgeDays(r){
   const t = r && r.asof ? Date.parse(r.asof) : NaN;
   return isNaN(t) ? null : Math.floor((Date.now() - t) / 86400000);
 }
-function renderFactorResearchBlock(f){
+function renderFactorResearchBlock(f, view){
   const r = f.research || {};
   const age = researchAgeDays(r);
   const stale = age !== null && age > RESEARCH_STALE_DAYS
     ? `<p class="fund-research-stale">&#9888; Research is ${age} days old &mdash; use "Refresh Fundamental Info" to update it.</p>` : '';
   const li = (x) => `<li>${escapeHtml(typeof x === 'string' ? x : (x && x.text) || '')}</li>`;
+  const pointLi = (p) => `<li class="fr-pt"${p.n ? ` data-n="${p.n}"` : ''}>${p.n ? numBadges([p.n]) : ''}<span>${escapeHtml(p.text)}${p.tags.map(tagPill).join('')}${p.ok ? '' : '<span class="srctag st-warn" title="A figure in this sentence could not be found in the metric rows or the TradingView data.">not verified</span>'}${p.url ? ` <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.src || 'Source')} ↗</a>` : ''}</span></li>`;
   const src = (x) => {
     if(typeof x === 'string') return escapeHtml(x);
     const title = escapeHtml((x && (x.title || x.url)) || '');
@@ -85,7 +101,7 @@ function renderFactorResearchBlock(f){
   return `
     <div class="fund-cell-research">
       ${stale}
-      ${r.points && r.points.length ? `<ul class="fund-research-list pts">${r.points.map(li).join('')}</ul>` : (r.summary ? `<p class="fund-research-summary">${escapeHtml(r.summary)}</p>` : '')}
+      ${view.pts.length ? `<ul class="fund-research-list pts${view.pts.some(p => p.tags.length || p.n) ? ' fr-tagged' : ''}">${view.pts.map(pointLi).join('')}</ul>` : (r.summary ? `<p class="fund-research-summary">${escapeHtml(r.summary)}</p>` : '')}
       ${r.positives && r.positives.length ? `<ul class="fund-research-list pos">${r.positives.map(li).join('')}</ul>` : ''}
       ${r.negatives && r.negatives.length ? `<ul class="fund-research-list neg">${r.negatives.map(li).join('')}</ul>` : ''}
       ${r.sources && r.sources.length ? `<div class="fund-research-sources">Sources: ${r.sources.map(src).join(' · ')}</div>` : ''}

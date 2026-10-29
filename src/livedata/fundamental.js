@@ -10,6 +10,7 @@ import { ldAbort, ldGet, ldJson, ldSet } from './bar.js';
 import { ldAskJson, ldEnsureClaudeAccess, ldErrText } from './claude.js';
 import { claudeAnyOn, claudeStepOn } from './claudegate.js';
 import { ldVerifiedSymbol } from './symbols.js';
+import { SECTION_BASIS, cleanFacts, tagPoint } from '../core/sourcetags.js';
 import { ldApplyLabels, ldBuildEvents, ldLabelPrompt, ldMergeEvents, ldUnlabeledNews } from './events.js';
 
 // Two buttons in each stock's detail view, both run entirely in the page (no Claude conversation is opened):
@@ -137,7 +138,7 @@ function ldPromptKit(c){
     halt();
     return ldAskJson(sample, prompt, { modelTier: tier || 'quick', cache: false, signal, onText: nudge(from, to, expected) });
   };
-  Object.assign(c, { factors, headFor, ask });
+  Object.assign(c, { factors, headFor, ask, TV });
 }
 
 // Works out what is missing. A Fundamental refresh that is asked for always runs in full (v1.297): the old rule that left research under 30 days old alone,
@@ -182,7 +183,7 @@ async function ldFillMissingMetrics(c){
 
 // 2. Every factor card: Traditional Analysis and Buffett-Style Analysis. Moat and Governance may get a new score.
 async function ldRefreshCards(c){
-  const { s, key, today, set, notes, failed, offNote, news, allowedUrls, stories, factors, headFor, ask, pend, needCards, upd } = c;
+  const { s, key, today, set, notes, failed, offNote, news, allowedUrls, stories, factors, headFor, ask, TV, pend, needCards, upd } = c;
   // ---- 2. Every factor card: Traditional Analysis and Buffett-Style Analysis ----
   // Moat and Governance (and any other data-proxy factor) may get a new score. The engine-scored factors keep their CSV score;
   // only their written research (headline, summary, positives, negatives, sources, date) is refreshed.
@@ -200,15 +201,25 @@ async function ldRefreshCards(c){
     set(g.from, 'Refreshing ' + g.label + '…');
     try {
       const listing = g.keys.map(k => '"' + k + '" (' + (SCORABLE.has(k) ? 'you may re-score it' : 'scored mechanically, do not return a score') + ')').join(', ');
-      const r = await ask(headFor(g.keys, g.tv) + 'TASK: Refresh the written analysis on these Fundamental Score factor cards (' + g.label + '): ' + listing + '.\nFor each, write a one-sentence plain-English headline, 3 or 4 short bullet "points" on what it means for the business (these replace a paragraph), and up to 4 positives and up to 4 negatives as short bullets, based on the latest TradingView data above (TTM and fiscal-year financials, current price, forecasts, news, filings) together with that factor\'s own metrics. Replace out-of-date statements with what the latest data shows.\nMoat: brand and pricing power, market position, switching costs, scale or cost advantages, threats, durability of returns on capital. Governance: promoter record, related-party dealings, auditor and disclosure quality, regulatory or legal actions, capital allocation, management changes, pledge and holding trend.\nScoring: for a factor marked "you may re-score it", give a new score between 0 and its weight and change it from the current score only when the supplied data supports that; otherwise return the current score. For every other factor do not return a score; if the latest data clearly disagrees with its mechanical score, say so in the summary. Never invent figures. Say plainly when a figure is not available instead of treating the gap as a strength. "sources" may list only items from the supplied news or filings (title plus the exact url given), otherwise an empty list.\nReply with only JSON: {"factors":{"<key>":{"score":<number, only where allowed>,"note":"<one sentence, only where a score is returned>","research":{"headline":"<one plain sentence>","points":["<short bullet>"],"positives":["<short bullet>"],"negatives":["<short bullet>"],"sources":[{"title":"...","url":"..."}]}}}}', g.from, g.to, 3800, g.tier);
+      const r = await ask(headFor(g.keys, g.tv) + 'TASK: Refresh the written analysis on these Fundamental Score factor cards (' + g.label + '): ' + listing + '.\nFor each, write a one-sentence plain-English headline, 3 or 4 short bullet "points" on what it means for the business (these replace a paragraph; each point is an object, see the reply format), and up to 4 positives and up to 4 negatives as short bullets, based on the latest TradingView data above (TTM and fiscal-year financials, current price, forecasts, news, filings) together with that factor\'s own metrics. Replace out-of-date statements with what the latest data shows.\nMoat: brand and pricing power, market position, switching costs, scale or cost advantages, threats, durability of returns on capital. Governance: promoter record, related-party dealings, auditor and disclosure quality, regulatory or legal actions, capital allocation, management changes, pledge and holding trend.\nScoring: for a factor marked "you may re-score it", give a new score between 0 and its weight and change it from the current score only when the supplied data supports that; otherwise return the current score. For every other factor do not return a score; if the latest data clearly disagrees with its mechanical score, say so in the summary. Never invent figures: every number in a point must be one shown in that factor\'s metrics or in the TRADINGVIEW DATA, written the way it appears there (rounded is fine), never a number you worked out yourself. For each point set "view" to true when it contains your own judgement (such as weak, cheap, or what a ratio means for this kind of business) and false when it only restates data; list in "refs" the metric names, spelled exactly as in the metrics, that the point relies on (an empty list if none); add "url" (exactly as supplied) when the point comes from a news item. In "facts" list up to 4 figures from the TRADINGVIEW DATA that a point uses and that no metric row shows (for example price to book, analyst ratings, a bank\'s bad-loan ratio), and any TradingView figure that disagrees with a metric row (label it with "(TradingView)" and say so in "note"); each needs a "label", a "value" copied from the TRADINGVIEW DATA, and a "tone" of "pos", "neg" or "neu". Say plainly when a figure is not available instead of treating the gap as a strength. "sources" may list only items from the supplied news or filings (title plus the exact url given), otherwise an empty list.\nReply with only JSON: {"factors":{"<key>":{"score":<number, only where allowed>,"note":"<one sentence, only where a score is returned>","research":{"headline":"<one plain sentence>","points":[{"text":"<short bullet>","view":<true|false>,"refs":["<metric name>"],"url":"<optional>"}],"facts":[{"label":"...","value":"...","tone":"pos|neg|neu","note":"<optional>"}],"positives":["<short bullet>"],"negatives":["<short bullet>"],"sources":[{"title":"...","url":"..."}]}}}}', g.from, g.to, 5200, g.tier);
       g.keys.forEach(k => {
         const o = r && r.factors && r.factors[k], f = factors.find(x => x.key === k);
         if(!o || !f || !o.research || typeof o.research.headline !== 'string' || !o.research.headline.trim()) return;
         const strs = (a, n) => (Array.isArray(a) ? a : []).filter(x => typeof x === 'string' && x.trim()).slice(0, n).map(x => x.trim().slice(0, 300));
         const srcs = (Array.isArray(o.research.sources) ? o.research.sources : []).filter(x => x && typeof x.url === 'string' && allowedUrls.has(x.url)).slice(0, 5).map(x => ({ title: String(x.title || x.url).slice(0, 160), url: x.url }));
-        let pts = strs(o.research.points, 4);
-        if(!pts.length && typeof o.research.summary === 'string') pts = (o.research.summary.match(/[^.!?]+[.!?]*/g) || []).map(x => x.trim()).filter(Boolean).slice(0, 3).map(x => x.slice(0, 200));
         const entry = upd[k] || {};
+        // What each bullet rests on: its figures are looked up in the metric rows and in the TradingView text this call was given.
+        const chips = (f.metrics || []).map(([mk, mv]) => [mk, entry.metrics && Object.prototype.hasOwnProperty.call(entry.metrics, mk) ? entry.metrics[mk] : mv]);
+        const tvText = {};
+        (g.tv || []).forEach(t => { const b = SECTION_BASIS[t]; if(b) tvText[b] = (tvText[b] || '') + '\n' + TV[t](); });
+        const titles = new Map(news.map(n => [n.url, n.title]));
+        const base = { chips, tv: tvText, allowedUrls, titles };
+        const facts = cleanFacts(o.research.facts, base);
+        const tctx = { ...base, facts, labels: new Set(chips.map(x => x[0]).concat(facts.map(x => x.label))) };
+        let raws = (Array.isArray(o.research.points) ? o.research.points : []).filter(x => (typeof x === 'string' && x.trim()) || (x && typeof x.text === 'string' && x.text.trim())).slice(0, 4);
+        if(!raws.length && typeof o.research.summary === 'string') raws = (o.research.summary.match(/[^.!?]+[.!?]*/g) || []).map(x => x.trim()).filter(Boolean).slice(0, 3).map(x => x.slice(0, 200));
+        const pts = raws.map(x => tagPoint(x, tctx)).filter(Boolean);
+        const factsOut = facts.length ? { facts } : {};
         const w = Number(f.weight);
         if(SCORABLE.has(k)){
           let sc = Number(o.score);
@@ -218,7 +229,7 @@ async function ldRefreshCards(c){
           const nm = String(f.name).replace(/&amp;/g, '&');
           scoreNotes.push(sc !== undefined && typeof f.score === 'number' && Math.abs(sc - f.score) >= 0.005 ? nm + ' ' + f.score.toFixed(2) + ' → ' + sc.toFixed(2) : null);
         }
-        entry.research = { asof: today, headline: o.research.headline.trim().slice(0, 240), points: pts, positives: strs(o.research.positives, 4), negatives: strs(o.research.negatives, 4), sources: srcs };
+        entry.research = { asof: today, headline: o.research.headline.trim().slice(0, 240), points: pts, ...factsOut, positives: strs(o.research.positives, 4), negatives: strs(o.research.negatives, 4), sources: srcs };
         upd[k] = entry;
         cardsRefreshed++;
       });
@@ -248,7 +259,7 @@ async function ldSaveResearch(c){
       if(n.score !== undefined) o.score = n.score;
       if(n.note) o.note = n.note;
       if(n.research) o.research = n.research;
-      if(n.metrics) o.metrics = Object.assign({}, o.metrics || {}, n.metrics);
+      if(n.metrics){ o.metrics = Object.assign({}, o.metrics || {}, n.metrics); o.metricsTv = Array.from(new Set((o.metricsTv || []).concat(Object.keys(n.metrics)))); }
       merged[k] = o;
     });
     const changeNote = (scoreChanges.concat(metricsFilled ? [metricsFilled + ' metric(s) filled'] : [])).join('; ') || 'Refreshed from the screener page';

@@ -63,6 +63,7 @@ function revertResearch(s){
       if(bf.note === undefined) delete f.note; else f.note = bf.note;
       if(bf.research === undefined) delete f.research; else f.research = bf.research;
       if(bf.metrics) f.metrics = bf.metrics.map(x => x.slice());
+      delete f.metricsTv;
     });
   }
   applyFundamentalConfidence(s);   // marks the factors and rebuilds the score for the restored data
@@ -87,6 +88,7 @@ function applyResearchDoc(s, doc){
     if(o.metrics && typeof o.metrics === 'object' && Array.isArray(f.metrics)){
       f.metrics = f.metrics.map(([k, v]) => [k, Object.prototype.hasOwnProperty.call(o.metrics, k) ? o.metrics[k] : v]);
     }
+    if(Array.isArray(o.metricsTv)) f.metricsTv = o.metricsTv; else delete f.metricsTv;   // metric rows that TradingView filled in (the CSV had no figure)
   });
   recomputeFundamentals(s);
   if(typeof doc.changeNote === 'string' && doc.changeNote) s.changeNote = doc.changeNote;
