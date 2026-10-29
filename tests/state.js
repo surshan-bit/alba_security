@@ -175,13 +175,13 @@ async function tradeScenarios(){
     // v1.290: Process reads the weekly prices (the panel says it is working), then shows the results
     await page.evaluate(() => { window.__sawBar = null; new MutationObserver(() => { const b = document.querySelector('#tradeIdeasBody .fi-bar[role="progressbar"]'); if(b && !window.__sawBar) window.__sawBar = { steps: document.querySelectorAll('#tradeIdeasBody .fi-step').length, pct: document.querySelector('#tradeIdeasBody .fi-pct').textContent }; }).observe(document.getElementById('tradeIdeasBody'), { childList: true, subtree: true }); });
     await page.evaluate(() => document.getElementById('tradeIdeasRun').click());
-    await until(page, () => /Processed \d+ stocks|No stock qualifies|no longer available/.test((document.getElementById('tradeIdeasBody') || {}).textContent || '') || /Processing/.test(document.getElementById('tradeIdeasRun').textContent), null, 'pressing Process shows that it is working, then the result');
-    await until(page, () => /Processed \d+ stocks|No stock qualifies/.test((document.getElementById('tradeIdeasBody') || {}).textContent || ''), null, 'the results appear when processing is done');
+    await until(page, () => /Processed on|No stock qualifies|no longer available/.test((document.getElementById('tradeIdeasBody') || {}).textContent || '') || /Processing/.test(document.getElementById('tradeIdeasRun').textContent), null, 'pressing Process shows that it is working, then the result');
+    await until(page, () => /Processed on|No stock qualifies/.test((document.getElementById('tradeIdeasBody') || {}).textContent || ''), null, 'the results appear when processing is done');
     ok(await page.evaluate(() => document.getElementById('tradeIdeasBody').getAttribute('aria-busy') === 'false' && document.getElementById('tradeIdeasRun').textContent === 'Process again' && !document.getElementById('tradeIdeasRun').disabled), 'when done the button offers Process again');
     const saw = await page.evaluate(() => window.__sawBar);
     ok(saw && saw.steps === 3 && /^\d+%$/.test(saw.pct), 'while it runs a progress bar with three steps and a percentage is shown, got ' + JSON.stringify(saw));
     ok(await page.evaluate(() => !document.querySelector('#tradeIdeasBody table')), 'there is no table of every stock under the lists');
-    const n = await page.evaluate(() => Number(((document.getElementById('tradeIdeasBody').textContent || '').match(/Processed (\d+) stocks/) || [0, 0])[1]));
+    const n = await page.evaluate(() => Number(((document.getElementById('tradeIdeasBody').textContent || '').match(/\. (\d+) stocks:/) || [0, 0])[1]));
     // v1.190: the timing check reads each listed stock's bars with its own filtered read, never the whole priceHistory collection
     ok(await page.evaluate(() => !(window.__colGets || []).includes('priceHistory')), 'the whole price-history collection is not read for the ideas');
     ok(await page.evaluate(n => (window.__filteredGets || []).filter(x => /^priceHistory /.test(x)).length >= Math.min(n, 1), n), 'each listed stock\'s bars are read with a filtered read');
@@ -191,6 +191,12 @@ async function tradeScenarios(){
       ok(top.blocks === 2 && !top.over, 'the two Top 5 lists hold at most five stocks each, got ' + JSON.stringify(top));
       await page.selectOption('#tradeIdeasStrategy', '');
       await until(page, () => /Choose a strategy/.test((document.getElementById('tradeIdeasBody') || {}).textContent || '') && !document.querySelector('#tradeIdeasBody .tl-top5'), null, 'changing the strategy clears the lists until Process is pressed again');
+      // v1.293: the result is kept with a date stamp, saved for the user, and comes back with the strategy
+      await until(page, () => window.__store.has('data/users/u_SMOKE/ideasResults'), null, 'the result is written to the database');
+      const kept = await page.evaluate(() => window.__store.get('data/users/u_SMOKE/ideasResults'));
+      ok(kept && kept.v === 1 && /"starter-deep-value":\{"v":1,"at":"/.test(kept.json), 'the Process result is saved for the user, got ' + JSON.stringify(kept).slice(0, 120));
+      await page.selectOption('#tradeIdeasStrategy', 'starter-deep-value');
+      await until(page, () => /Processed on .*\(today\)/.test((document.getElementById('tradeIdeasBody') || {}).textContent || '') && document.querySelectorAll('#tradeIdeasBody .tl-top5').length === 2 && document.getElementById('tradeIdeasRun').textContent === 'Process again', null, 'choosing the strategy again shows the kept result with its date stamp and offers Process again, without processing');
     } else ok(true, 'no stock qualifies in the fixtures for this strategy');
   });
 

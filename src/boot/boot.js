@@ -6,6 +6,7 @@ import { init_identity_flush } from '../identity/flush.js';
 import { loadIdentity, touchUser } from '../identity/session.js';
 import { syncPrefs } from '../identity/prefs.js';
 import { syncStrategies } from '../identity/strategies.js';
+import { syncIdeasResults } from '../identity/ideasresults.js';
 
 // Waits for `work`, but no longer than `ms` (a slow preference sync must not hold the page back).
 function atMost(ms, work){
@@ -21,7 +22,7 @@ async function boot(deps){
   // Who is viewing, then their saved preferences (they replace this browser's mirror before the app reads it).
   const identity = loadIdentity().then(() => {
     touchUser();
-    return atMost(4000, Promise.all([syncPrefs(), syncStrategies()]));
+    return atMost(4000, Promise.all([syncPrefs(), syncStrategies(), syncIdeasResults()]));
   });
   identity.catch(() => {});   // a failure here must not go unhandled while the stock list loads; the await below reports it
   const list = await loadStocks();
