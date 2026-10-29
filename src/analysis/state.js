@@ -35,7 +35,7 @@ const ANALYSIS_MOS_KEYS = ['green', 'orange', 'red'];
 // Tech Rating W / M filters (2026-10-07): the MACD state behind the Tech Rating badge (weekMacd / monthMacd).
 const ANALYSIS_TECH_KEYS = ['bull_above', 'bull_below', 'bear_above', 'bear_below'];
 function loadAnalysisFilters(){
-  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortCol: 'mos', sortDir: 'desc', view: 'stocks', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', rebound: false, columnOrder: null };
+  const fallback = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, colorBy: 'week', xAxis: 'week', yAxis: 'month', sortCol: 'mos', sortDir: 'desc', view: 'stocks', verdicts: [], mosRatings: ['green'], techW: [], techM: [], mosLo: null, mosHi: null, strategyId: '', ideas: '', rebound: false, columnOrder: null };
   try {
     const raw = localStorage.getItem(ANALYSIS_FILTERS_KEY);
     if(!raw) return fallback;
@@ -59,12 +59,13 @@ function loadAnalysisFilters(){
     const isNum = (n) => typeof n === 'number' && isFinite(n);
     const mosLo = isNum(parsed.mosLo) ? parsed.mosLo : null, mosHi = isNum(parsed.mosHi) ? parsed.mosHi : null;
     const strategyId = typeof parsed.strategyId === 'string' ? parsed.strategyId : '';
+    const ideas = parsed.ideas === 'up' || parsed.ideas === 'down' ? parsed.ideas : '';
     const rebound = parsed.rebound === true;
     const columnOrder = Array.isArray(parsed.columnOrder) ? parsed.columnOrder : fallback.columnOrder;
     return {
       weekMin: Math.min(weekMin, weekMax), weekMax: Math.max(weekMin, weekMax),
       monthMin: Math.min(monthMin, monthMax), monthMax: Math.max(monthMin, monthMax),
-      colorBy, xAxis, yAxis, sortCol: sort.col, sortDir: sort.dir, view, verdicts, mosRatings, techW, techM, mosLo, mosHi, strategyId, rebound, columnOrder
+      colorBy, xAxis, yAxis, sortCol: sort.col, sortDir: sort.dir, view, verdicts, mosRatings, techW, techM, mosLo, mosHi, strategyId, ideas, rebound, columnOrder
     };
   } catch(e){ return fallback; }
 }
