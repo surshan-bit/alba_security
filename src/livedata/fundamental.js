@@ -1,6 +1,6 @@
 // Live Data Refresh: Fundamental Info (asks Claude, writes research).
 import { dbCapabilityPromise } from '../core/store.js';
-import { daysSinceDate, escapeHtml, sanitizeDocId, tickerIndustry, tickerSymbol } from '../core/util.js';
+import { escapeHtml, sanitizeDocId, tickerIndustry, tickerSymbol } from '../core/util.js';
 import { marginOfSafety } from '../core/mos.js';
 import { fundamentalPendingItems, globalPendingInfo, technicalPendingItems } from '../detail/pending.js';
 import { pcTickerKey } from '../prices/store.js';
@@ -23,8 +23,6 @@ import { ldApplyLabels, ldBuildEvents, ldLabelPrompt, ldMergeEvents, ldUnlabeled
 
 // Writing rules that apply to EVERY piece of Fundamental Score research the page asks Claude to write (and are repeated in the
 // "fundamental-research-style" skill). Keep the two in step: change both when the rules change.
-var LD_FRESH_DAYS = 30;          // research newer than this (with no newer news and no missing metrics) is not re-run
-var ldForce = new Set();         // tickers whose next Fundamental refresh skips the freshness check (set after an 'already up to date' answer)
 var LD_STYLE = 'WRITING RULES (apply to every word you write):\n'
   + '1. Write for a business owner who has never studied finance. Use everyday words, no jargon and no abbreviations. Say "profit earned on the money invested in the business" instead of ROCE or ROE, "debt compared with the owners\' own money" instead of D/E, "profit margin" instead of OPM, "cash left after running costs and investments" instead of free cash flow, "price compared with yearly profit" instead of P/E, "price below estimated fair value" instead of margin of safety, "momentum" instead of MACD or RSI. When a figure helps, put it in brackets after the plain statement, for example "Cheaper than most peers (P/E 14.4)". If a technical term is truly unavoidable, explain it in a few words in brackets.\n'
   + '2. Use bullets, not paragraphs. One idea per bullet, under 20 words, starting with the point itself, not with background. Never write a block of prose longer than two short sentences.\n'
@@ -142,26 +140,14 @@ function ldPromptKit(c){
   Object.assign(c, { factors, headFor, ask });
 }
 
-// Works out what is missing and whether the research is recent enough to leave alone. Returns the "Already up to date" answer, or null to go on.
+// Works out what is missing. A Fundamental refresh that is asked for always runs in full (v1.297): the old rule that left research under 30 days old alone,
+// and asked for a second click within 2 minutes, is gone, so the factor cards, Global & Macro and the summary are rewritten every time.
 function ldCheckFresh(c){
-  const { s, key, failed, news } = c;
-  // ---- 1. Missing metrics not available in the CSV ----
+  const { s } = c;
   const pend = fundamentalPendingItems(s);
   const withGaps = pend.filter(x => x.missing.length);
-  // Skip the Claude calls when nothing would change: research is recent, no metric is missing and TradingView shows no news newer than it.
-  const asofR = s.__researchAsof ? String(s.__researchAsof).slice(0, 10) : null;
-  const newestNews = news.reduce((m, n) => (n.date && n.date > m ? n.date : m), '');
-  const researchFresh = !!asofR && daysSinceDate(asofR) !== null && daysSinceDate(asofR) <= LD_FRESH_DAYS && !(newestNews && newestNews > asofR);
-  const forced = ldForce.has(key);
-  // Global & Macro with nothing in it counts as missing, so a stock whose earlier Global & Macro step failed is not skipped as 'up to date'.
   const gfMissing = globalPendingInfo(s) === 'not yet researched';
-  if(researchFresh && !withGaps.length && !forced && !gfMissing){
-    ldForce.add(key); setTimeout(() => ldForce.delete(key), 120000);
-    return 'Already up to date: researched ' + asofR + ', no missing metrics and no newer news' + (newestNews ? ' (latest ' + newestNews + ')' : '') + '. ' + (c.labelled ? 'Claude only c.labelled ' + c.labelled + ' news headline' + (c.labelled === 1 ? '' : 's') + ' for the price chart.' : 'No Claude usage.') + ' Click again within 2 minutes to refresh anyway.';
-  }
-  ldForce.delete(key);
-  const needCards = !researchFresh || forced;   // factor cards, Global & Macro and the summary only when stale, newer news exists, or forced
-  Object.assign(c, { pend, withGaps, gfMissing, needCards });
+  Object.assign(c, { pend, withGaps, gfMissing, needCards: true });
 }
 
 // 1. Missing metrics not available in the CSV.
@@ -393,8 +379,7 @@ async function ldRunFundamental(s){
     await ldGather(c);
     await ldSaveEvents(c);
     ldPromptKit(c);
-    const upToDate = ldCheckFresh(c);
-    if(upToDate) return upToDate;
+    ldCheckFresh(c);
     await ldFillMissingMetrics(c);
     await ldRefreshCards(c);
     await ldSaveResearch(c);
@@ -408,6 +393,4 @@ async function ldRunFundamental(s){
 }
 
 
-// The refresh kit asks for these stocks because they are out of date for their tier, so the 30-day skip must not apply to them.
-function ldForceKeys(keys){ keys.forEach(k => { ldForce.add(k); setTimeout(() => ldForce.delete(k), 3600000); }); }
-export { ldForceKeys, ldRunFundamental };
+export { ldRunFundamental };

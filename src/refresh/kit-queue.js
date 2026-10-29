@@ -1,7 +1,6 @@
 // Refresh kit: the saved queue of refresh jobs, the runner that feeds the Live Data Refresh engine, the notices in the bell,
 // and the other-device sync. It knows nothing about the buttons and menus: those live in kit-controls.js and reach this module through
 // its exported functions, and this module reaches them only through the hooks they register (setQueueHooks).
-import { ldForceKeys } from '../livedata/fundamental.js';
 import { LD_BATCH_MAX, getLdBatch, ldBatchStart, ldBatchStop } from '../livedata/batch.js';
 import { activityDropWhere, activityEnd, activityNotify, activityRun, setNoticeDismissHandler } from '../ui/activity.js';
 import { pcTickerKey } from '../prices/store.js';
@@ -15,7 +14,7 @@ import { isExternalSelection, sectionOf, selKeys, stockByKey } from './kit-looku
 
 const KIND_LABEL = { fund: "Fundamental", tech: "Technical" };
 const CHUNK = Math.min(50, LD_BATCH_MAX.fund, LD_BATCH_MAX.tech);   // stocks per engine batch
-const CAP = { fund: 300, tech: 1000 };                              // most stocks one press may queue
+const CAP = { fund: Infinity, tech: 1000 };                         // most stocks one press may queue (no limit on Fundamental since v1.297)
 const CONFIRM_OVER = { fund: 50, tech: 100 };                       // above this the user is asked first
 const LS_KEY = "albaDashboard.refreshQueue.v1";
 const HEARTBEAT_MS = 15000, TAKEOVER_MS = 45000;
@@ -192,7 +191,6 @@ async function pump() {
       if (!list.length) { queue.shift(); activityEnd("rk-q-" + job.id); continue; }
       activeJob = job; activityEnd("rk-q-" + job.id);
       persistSoon(); repaint();
-      if (job.force) ldForceKeys(list.map(pcTickerKey));   // chosen because it is out of date: do not skip it as "researched within 30 days"
       const before = getLdBatch();
       await ldBatchStart(job.kind, list, job.source || "strat");
       const b = getLdBatch();
