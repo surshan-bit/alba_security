@@ -275,7 +275,7 @@ async function ldFundamentalTests(){
     const grab = st => page.evaluate(id => ({ research: window.__store.get('stockResearch/' + id) || null, updates: window.__store.get('stockUpdates/' + id) || null, prompts: window.__prompts.slice() }), idOf(st));
     const A = FIXTURE[0], B = FIXTURE[1];
     const firstA = await run(A, 1), afterA = await grab(A);
-    const secondA = await run(A, 2), afterA2 = await grab(A);   // researched just now: nothing to ask again
+    const secondA = await run(A, 2), afterA2 = await grab(A);   // researched just now: since v1.297 it is asked about again
     const firstB = await run(B, 1), afterB = await grab(B);     // a stock with figures missing from the file
     const got = JSON.parse(JSON.stringify({ firstA, afterA, promptsAfterSecondA: afterA2.prompts.length, firstB, afterB }));
     if(process.argv.includes('--update-ld')){ fs.writeFileSync(LD_EXPECTED, JSON.stringify(got, null, 1) + '\n'); console.log('ld-fundamental.expected.json written'); }
@@ -283,7 +283,7 @@ async function ldFundamentalTests(){
     ok(want && JSON.stringify(got) === JSON.stringify(want), 'Refresh Fundamental Info: the prompts asked, the documents saved and the notices shown are unchanged (' + JSON.stringify(firstA) + ' / ' + JSON.stringify(firstB) + ')');
     ok(firstA && /finished/.test(firstA.title) && secondA && /finished/.test(secondA.title), 'both runs on the first stock end with a finished notice');
     ok(afterA.research && afterA.research.factors && afterA.updates && afterA.updates.globalFactors, 'research and Global & Macro were saved');
-    ok(afterA2.prompts.length === afterA.prompts.length, 'a stock researched just now is not asked about again: ' + afterA.prompts.length + ' -> ' + afterA2.prompts.length);
+    ok(afterA2.prompts.length > afterA.prompts.length && !/Already up to date/.test(secondA.text), 'v1.297: a stock researched just now is refreshed in full again when asked: ' + afterA.prompts.length + ' -> ' + afterA2.prompts.length);
     ok(afterB.prompts.length > afterA2.prompts.length && afterB.prompts.some(p => /These metrics/.test(p.task)), 'a stock with missing figures is asked for them');
     ok(errs.length === 0, 'ldfund: errors in the page: ' + errs.slice(0, 2).join(' | '));
   } finally { await ctx.close(); }

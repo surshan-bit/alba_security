@@ -338,7 +338,7 @@
    }
   ]
  },
- "promptsAfterSecondA": 5,
+ "promptsAfterSecondA": 9,
  "firstB": {
   "title": "Fundamental refresh finished · Company 02",
   "text": "1 of 1 refreshed.",
@@ -719,6 +719,26 @@
    {
     "tier": "quick",
     "len": 4119,
+    "task": " Write this company's Global & Macro Information: macro, com"
+   },
+   {
+    "tier": "quick",
+    "len": 4967,
+    "task": " Write the Strengths and Watch-outs box shown at the top of "
+   },
+   {
+    "tier": "quick",
+    "len": 5076,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
+   },
+   {
+    "tier": "quick",
+    "len": 5428,
+    "task": " Refresh the written analysis on these Fundamental Score fac"
+   },
+   {
+    "tier": "quick",
+    "len": 4104,
     "task": " Write this company's Global & Macro Information: macro, com"
    },
    {

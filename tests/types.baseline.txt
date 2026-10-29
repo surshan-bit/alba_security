@@ -56,7 +56,6 @@ src/joblogs/integrity.js: error TS18047: 'expected' is possibly 'null'.
 src/live/ticker.js: error TS18047: 'detailEl' is possibly 'null'.
 src/live/ticker.js: error TS18047: 'search.parentNode' is possibly 'null'.
 src/livedata/fundamental.js: error TS2322: Type 'number | undefined' is not assignable to type 'number'.
-src/livedata/fundamental.js: error TS2531: Object is possibly 'null'.
 src/prices/chart.js: error TS18047: 'ch' is possibly 'null'.
 src/prices/chart.js: error TS18047: 'ch' is possibly 'null'.
 src/prices/chart.js: error TS18047: 'el' is possibly 'null'.
