@@ -769,6 +769,26 @@ test('ideas (v1.289): quality, results within 7 days, very thin trading and clea
   assert.strictEqual(cap(14000).cap, 'small'); assert.strictEqual(I.ideaCall(idea({}), null, nwr(95), TODAY).cap, null);
   assert.ok(I.ideaCall(idea({}), null, nwr(95, { thin: true }), TODAY).reasons.some(x => /Trades thinly/.test(x)));
 });
+test('metric dots (v1.298): green / red / grey by fixed thresholds', () => {
+  const D = load('src/detail/metricdot.js', 'export { metricTone };');
+  const f = { metrics: [['P/E', '3.64x'], ['Industry P/E', '18.15x'], ['Current price', '100.00'], ['Intrinsic Value (Screener.in)', '120'], ['Graham Number', '80']] };
+  const t = (k, v, fac) => D.metricTone(fac || { metrics: [] }, k, v);
+  assert.strictEqual(t('D/E', '0.00x'), 'pos'); assert.strictEqual(t('D/E', '1.50x'), 'neu'); assert.strictEqual(t('D/E', '2.40x'), 'neg');
+  assert.strictEqual(t('ROCE', '21.1%'), 'pos'); assert.strictEqual(t('ROCE', '12.0%'), 'neu'); assert.strictEqual(t('Median ROCE 10yr', '4.2%'), 'neg');
+  assert.strictEqual(t('Contingent liabilities', '₹9.5 Cr'), 'neg'); assert.strictEqual(t('Contingent liabilities', '₹0.0 Cr'), 'neu');
+  assert.strictEqual(t('FCF 3yr', '₹57.3 Cr'), 'pos'); assert.strictEqual(t('OCF 3yr', '₹-1.07 Cr'), 'neg');
+  assert.strictEqual(t('Sales growth 3yr', 'n/a (FY23 revenue was negative)'), 'neu', 'no number: grey');
+  assert.strictEqual(t('Piotroski F-Score percentile', '82nd (Banks)'), 'pos');
+  assert.strictEqual(t('Promoter pledge', '0.0%'), 'pos'); assert.strictEqual(t('Promoter pledge', '30.0%'), 'neg');
+  assert.strictEqual(t('Promoter holding change', '-2.5%'), 'neg');
+  assert.strictEqual(t('P/E', '3.64x', f), 'pos', 'P/E far below the industry'); assert.strictEqual(t('P/E', '25.00x', f), 'neg'); assert.strictEqual(t('P/E', '-4x', f), 'neg');
+  assert.strictEqual(t('PEG', '0.05'), 'pos'); assert.strictEqual(t('PEG', '2.5'), 'neg'); assert.strictEqual(t('PEG', '-1'), 'neg');
+  assert.strictEqual(t('Historical PE 5yr', '12.31x', f), 'pos', 'today cheaper than its own history');
+  assert.strictEqual(t('Intrinsic Value (Screener.in)', '120', f), 'pos'); assert.strictEqual(t('Graham Number', '80', f), 'neg');
+  assert.strictEqual(t('Margin of safety', '38.2%'), 'pos'); assert.strictEqual(t('Margin of safety', '-5.0%'), 'neg');
+  assert.strictEqual(t('Industry P/E', '18.15x', f), 'neu'); assert.strictEqual(t('Unknown thing', '5'), 'neu');
+  assert.match(D.metricDotHtml({ metrics: [] }, 'D/E', '0.5x'), /mdot-pos/);
+});
 test('ideas (v1.289): a stock you hold keeps its trade call and is never gated', () => {
   const tr = { buy: { price: 100, snapshot: { score: 7.2 } } };
   assert.strictEqual(I.ideaCall(idea({ valuation: { currentPrice: 102, intrinsicValue: 160 }, technical: { raw: { weekRsi: 55, monthRsi: 60 } } }), tr, nwr(5), TODAY).label, 'Add more');

@@ -6,6 +6,7 @@ import { scoreBand } from '../list/metrics.js';
 import { fundMissingMetrics } from './completeness.js';
 import { FUND_METRIC_LABEL, PERCENTILE_METRIC_KEYS, fundMetricDisplay, fundMetricNum, fundNoteExtra } from './fundmetrics.js';
 import { fundBusinessSummary, isProxyFactor } from './fundtext.js';
+import { metricDotHtml } from './metricdot.js';
 
 // Governance red-flag chips (added 2026-10-06) — surfaces the genuinely governance-relevant
 // signals already in the gov factor's own metrics (promoter pledge, promoter holding change,
@@ -57,7 +58,7 @@ function renderFundFactorCell(f){
       ${f.excluded ? '' : (() => { const extra = fundNoteExtra(f.note); return extra ? `<div class="fund-cell-note">${extra}</div>` : ''; })()}
       ${isResearched && hasSource(f) ? renderFactorResearchBlock(f) : ''}
       <div class="data-chips">
-        ${f.metrics.map(([k,v])=>`<span class="data-chip${v === 'n/a' ? ' chip-na' : ''}"${PERCENTILE_METRIC_KEYS.has(k) ? ' title="A percentile, not a rank: 100th means the best of its industry peers, 50th is the middle, 1st is the weakest."' : ''}>${FUND_METRIC_LABEL[k] || k}: <b>${fundMetricDisplay(k, v)}</b></span>`).join('')}
+        ${f.metrics.map(([k,v])=>`<span class="data-chip${v === 'n/a' ? ' chip-na' : ''}"${PERCENTILE_METRIC_KEYS.has(k) ? ' title="A percentile, not a rank: 100th means the best of its industry peers, 50th is the middle, 1st is the weakest."' : ''}><span class="chip-l">${metricDotHtml(f, k, v)}${FUND_METRIC_LABEL[k] || k}:</span> <b>${fundMetricDisplay(k, v)}</b></span>`).join('')}
       </div>
     </div>
   `;
