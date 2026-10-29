@@ -577,14 +577,28 @@ async function tvRefreshScenarios(){
   // v1.201: a stock TradingView leaves out of an answer is asked for again, and if it still has no price it keeps its earlier figures with their own date
   const miss = DS.stocks.map(s => symOf(s)).find(x => /^[A-Z0-9]+$/.test(x));
   const snapRows = all => [].concat(...Object.entries(all).filter(([k]) => k.startsWith('liveSnapshot/')).map(([, v]) => v.rows));
-  // v1.225: Refresh all stocks makes no TradingView symbol search; it pairs each stock's saved ISIN with the symbol its last run saved
+  // v1.225: Refresh all stocks makes no TradingView symbol search for stocks that have a saved symbol (v1.304 searches only those that have none); it pairs each stock's saved ISIN with the symbol its last run saved
   await runScenario('refresh all stocks: no symbol search is made, the saved symbols are used and kept', { cfg: { liveCollections: true } }, async page => {
     await page.click('#tvSnapshotBtn');
     await waitDone(page);
-    const st = await tvState(page), searches = st.calls.filter(c => c[0] === 'mcp-tv-search-symbols').length;
-    ok(searches === 0, 'no symbol search was made, got ' + searches);
+    // only the stocks that have an ISIN but no saved symbol (BSE-only stocks with no alpha code in this made-up database) are searched
+    const searches = await page.evaluate(() => window.__isinSearches || []), unsaved = DS.stocks.filter(x => x.isin && !DS.docs['stockMeta/isinSymbol'][x.isin]).map(x => x.isin).sort();
+    eq(searches.slice().sort(), unsaved, 'only the stocks with no saved symbol were searched');
     const a = await readDb(page), map = a.all['stockMeta/isinSymbol'];
     ok(map && Object.keys(map).length > 100, 'the saved symbol list was filled in one go: ' + (map ? Object.keys(map).length : 'missing'));
+  });
+  // v1.304: a stock with an ISIN but no saved symbol (new in the latest import) is looked up by its ISIN during the run and its symbol is saved
+  const newStock = DS.stocks.find(x => x.isin && symOf(x) === miss), newPair = Object.assign({}, DS.docs['stockMeta/isinSymbol']); delete newPair[newStock.isin];
+  await runScenario('refresh all stocks: a new stock with an ISIN but no saved symbol is looked up and refreshed', { cfg: { liveCollections: true }, docs: { 'stockMeta/isinSymbol': newPair } }, async page => {
+    await page.click('#tvSnapshotBtn');
+    const text = await waitDone(page);
+    const searches = await page.evaluate(() => window.__isinSearches || []);
+    const unsavedNow = DS.stocks.filter(x => x.isin && !DS.docs['stockMeta/isinSymbol'][x.isin]).map(x => x.isin);
+    eq(searches.slice().sort(), [newStock.isin, ...unsavedNow].sort(), 'the new stock was searched by its ISIN, with no others beyond those that never had a symbol');
+    const a = await readDb(page);
+    ok(a.all['stockMeta/isinSymbol'][newStock.isin] === 'NSE:' + miss, 'its symbol was saved: ' + a.all['stockMeta/isinSymbol'][newStock.isin]);
+    ok(snapRows(a.all).some(r => r.k === sid(miss) && r.c[0] === 111.1), 'it has today\'s figures in the same run');
+    ok(!new RegExp(miss).test((text.split('without a TradingView symbol:')[1] || '').slice(0, 4000)), 'it is not listed as having no symbol');
   });
   await runScenario('refresh all stocks: a stock TradingView misses once is asked for again', { cfg: { liveCollections: true } }, async page => {
     await page.evaluate(sym => { window.__tvFlaky = { [sym]: 1 }; }, 'NSE:' + miss);
