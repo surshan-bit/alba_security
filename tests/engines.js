@@ -106,6 +106,13 @@ test('fund columns: Promoter holding is read, kept apart from its change, and an
   const old = Fe.scoreCsv(csv, {}).records[0];
   assert.strictEqual(old.promoterHolding, null); assert.notStrictEqual(old.promoterHoldingChange, undefined);
 });
+test('fund import: a symbol listed on two rows is read once, from its first row, and reported', () => {
+  const dup = Object.assign({}, universe[0], { 'Profit growth': '99.99' });
+  const out = Fe.scoreCsv(fundCsv(universe.slice(0, 5).concat([dup]), FUND_HEADER), {});
+  assert.strictEqual(out.records.length, 5); assert.deepStrictEqual(out.duplicates, [out.records[0].sym]);
+  near(out.records[0].profitGrowthTTM, +universe[0]['Profit growth']);   // the first row wins
+  assert.deepStrictEqual(Fe.scoreCsv(csv, {}).duplicates, []);
+});
 test('fund columns: Industry Group listed before Industry still maps both (real export order)', () => {
   const swap = h => { const a = h.slice(); const i = a.indexOf('Industry'), j = a.indexOf('Industry Group'); a[i] = 'Industry Group'; a[j] = 'Industry'; return a; };
   const hdr = swap(FUND_HEADER), row = universe[0];

@@ -204,7 +204,9 @@ function scoreCsv(csvText, opts) {
   const rows = parseCSV(csvText);
   if (rows.length < 2) throw new Error('No data rows found.');
   const colMap = buildColumnMap(rows[0]);
-  const records = extractRecords(rows, colMap);
+  // A symbol listed twice (the same NSE or BSE code on two rows) is read once, from its first row: two stocks with one ticker would break the data.
+  const allRecords = extractRecords(rows, colMap), seenSym = new Set(), duplicates = /** @type {string[]} */ ([]);
+  const records = allRecords.filter(r => { const k = normSym(r.sym); if (seenSym.has(k)) { duplicates.push(r.sym); return false; } seenSym.add(k); return true; });
   if (records.length === 0) throw new Error('No rows had an NSE or BSE code to key off.');
   // v3: attach each record's exact industry label (symbol -> label map built from the dashboard's own ticker fields; keys normalised with normSym).
   const exactMap = opts && opts.exactIndustryBySym;
@@ -250,7 +252,7 @@ function scoreCsv(csvText, opts) {
     r.scored.govBasis = piotBasis.get(r) || null;
     r.scored.reinvestCroic = useCroic(r);
   }
-  return { records, columnMap: colMap };
+  return { records, columnMap: colMap, duplicates };
 }
 
 function scoreOne(r, pct, moatPct) {
@@ -440,7 +442,7 @@ function valuationBlock(r, old) {
 const symOf = s => E.normSym(s.ticker.split('·')[0].trim());
 const indOf = s => (s.ticker.split('·')[1] || '').trim();
 const exact = new Map(stocks.map(s => [symOf(s), indOf(s)]));
-const { records } = E.scoreCsv(csvText, { exactIndustryBySym: exact });
+const { records, duplicates } = E.scoreCsv(csvText, { exactIndustryBySym: exact });
 const byNse = new Map(), byBse = new Map();
 for (const r of records) { if (r.nseCode) byNse.set(E.normSym(r.nseCode), r); if (r.bseCode) byBse.set(E.normSym(r.bseCode), r); }
 const used = new Set(); let rescored = 0; const dropped = [], inactive = [];
@@ -472,7 +474,7 @@ for (const r of records) {
   onboarded.push(code); needScreenerCheck.push(code); if (/^\d+$/.test(code)) bseOnly.push(code);
 }
   const verdictMix = {}; for(const s of stocks) verdictMix[s.verdict] = (verdictMix[s.verdict] || 0) + 1;
-  return { csvRows: records.length, rescored, onboarded, bseOnly, dropped, inactive, verdictMix };
+  return { csvRows: records.length, duplicates, rescored, onboarded, bseOnly, dropped, inactive, verdictMix };
 }
 
 export { applyFundamental };
