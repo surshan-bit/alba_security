@@ -343,6 +343,18 @@ async function sourceTagsScenario(){
   });
 }
 
+// v1.303: bullets show even when the research lists no sources, and a number on a row always has a bullet to match.
+async function bulletsWithoutSourcesScenario(){
+  const T = FIXTURE[2], sym = symOf(T), prof = T.fundamentals.factors.find(f => f.key === 'prof'), pm = prof.metrics[0][0];
+  const research = { ticker: sym, asof: '2026-10-29', changeNote: 'x', metricsFilled: 0, factors: { prof: { research: { asof: '2026-10-29', sources: [], points: [{ text: 'Returns look healthy for a bank.', basis: ['csv'], refs: [pm], ok: true }] } } } };
+  await scenario('stock page: bullets without a sources list are still shown', { section: 'analysis' }, { ['stockResearch/' + sid(sym)]: research }, async page => {
+    await page.fill('#globalSearch', T.name); await page.waitForTimeout(300); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+    await until(page, () => document.querySelectorAll('#detail .fund-cell').length > 2, null, 'the factor cards are drawn');
+    const np = await page.evaluate(() => { const c = Array.from(document.querySelectorAll('#detail .fund-cell')).find(x => /Profitab/i.test(x.textContent)); return c && { bullets: c.querySelectorAll('.fr-pt').length, rowNums: c.querySelectorAll('.data-chip[data-n]').length }; });
+    ok(np && np.bullets === 1 && np.rowNums === 1, 'the bullet is shown and its one row number has a bullet to match: ' + JSON.stringify(np));
+  });
+}
+
 // An inactive stock (not in the latest Fundamental CSV) is hidden from the lists and the search, but a position held in it stays on the Trade Log, tagged.
 async function inactiveScenario(){
   const off = Object.assign({}, FIXTURE[5], { active: false }), chunks = CHUNKS.map(c => c.map(s => s === FIXTURE[5] ? off : s));
@@ -362,7 +374,7 @@ async function inactiveScenario(){
 
 async function main(){
   base = await srv.listen(); browser = await chromium.launch();
-  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); } finally { await browser.close(); srv.close(); }
+  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); await bulletsWithoutSourcesScenario(); } finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('state tests FAILED (' + problems.length + ' problems, ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('state tests: ' + checks + ' checks passed');
 }

@@ -76,6 +76,8 @@ function renderFundFactorCell(f){
   const isProxy = isProxyFactor(f);
   const isResearched = !!f.research;
   const view = pointsView(f);
+  // v1.303: the written bullets show whenever there are any (before, only when the research also listed sources, so a card could show link numbers on its rows with no bullets to match).
+  const showResearch = isResearched && (hasSource(f) || view.pts.length > 0);
   const slotOn = view.nums.size > 0;
   return `
     <div class="fund-cell${isProxy ? ' fund-cell-proxy' : ''}">
@@ -87,7 +89,7 @@ function renderFundFactorCell(f){
       ${f.excluded ? `<div class="fund-cell-note fund-cell-excluded">${PROXY_NOTE_KEYS.has(f.key) ? `Left out of the score: ${f.excluded}. Run Refresh Fundamental Info to add a sourced assessment.` : `Counted as an average score: ${f.excluded}.`}</div>` : (() => { const biz = fundBusinessSummary(f); return biz ? `<div class="fund-cell-business ${biz.band}">${biz.text}</div>` : ''; })()}
       ${(() => { const flags = govRedFlags(f); return flags.length ? `<div class="fund-cell-flags">${flags.map(fl => `<div class="fund-flag ${fl.sev}">⚠ ${fl.text}</div>`).join('')}</div>` : ''; })()}
       ${f.excluded ? '' : (() => { const extra = fundNoteExtra(f.note); return extra ? `<div class="fund-cell-note">${extra}</div>` : ''; })()}
-      ${isResearched && hasSource(f) ? renderFactorResearchBlock(f, view) : ''}
+      ${showResearch ? renderFactorResearchBlock(f, view) : ''}
       <div class="data-chips${slotOn ? ' has-n' : ''}">
         ${f.metrics.map(([k,v])=>chipHtml(f, view, k, v)).join('')}${view.facts.map(x => factHtml(x, slotOn)).join('')}
       </div>
