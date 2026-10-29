@@ -1,7 +1,7 @@
 // News page: the plain logic (no page, no database), so it can be tested on its own.
 // Three saved records in the collection "news":
 //   news/pulse   written by the page's Refresh News button: { at, tiles, reading, readingAt }
-//   news/macro   written from a research session: { asof, calendar, briefings, sources }
+//   news/macro   { asof, calendar, calendarAt, briefings, briefingsAt, sources }; the Refresh News button writes calendar and briefings, a research session may too
 //   news/events  written from a research session: { asof, items }   (upcoming results, dividends, board meetings, company events)
 
 // The market pulse tiles. `bad: true` means a rise is bad news for Indian stocks (shown red when it goes up).
@@ -121,6 +121,50 @@ function buildCalendar(result, country){
   return out.sort((a, b) => a.date.localeCompare(b.date)).slice(0, CAL_KEEP);
 }
 
+// ---- briefings ----
+const BRIEFING_GROUP_IDS = ['market', 'india', 'data', 'commodities', 'flows', 'trade', 'global'];
+const BRIEFING_FEEDS = ['NSE:NIFTY', 'BSE:SENSEX', 'TVC:DXY', 'SP:SPX', 'TVC:GOLD', 'ICEEUR:BRN1!'];
+const BRIEFING_MAX = 10;
+// TradingView headlines from several market feeds -> one list without repeats, newest first, at most 30: [{ title, published, src, url }].
+function mergeHeadlines(lists){
+  const seen = new Set(), out = [];
+  /** @type {any[]} */ const all = [];
+  (lists || []).forEach(l => all.push(...l));
+  all.forEach(h => {
+    if(!h || !h.title || !h.published) return;
+    const key = String(h.title).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push({ title: String(h.title).slice(0, 160), published: h.published, src: h.provider && h.provider.name ? String(h.provider.name).slice(0, 40) : '', url: typeof h.link === 'string' && /^https?:\/\//i.test(h.link) ? h.link.replace(/^http:/i, 'https:') : '' });
+  });
+  return out.sort((a, b) => String(b.published).localeCompare(String(a.published))).slice(0, 30);
+}
+// The prompt for the briefings. Claude only sees the numbered headlines and says which ones each briefing is based on.
+function briefingsPrompt(heads){
+  return 'You write short briefings for a retail investor in Indian stocks, in very simple words, from the numbered headlines below.\n' +
+    'Use ONLY these headlines. Do not add any fact, number or event that is not in them. Skip headlines that do not matter for Indian stocks.\n' +
+    'Headlines:\n' + heads.map((h, i) => (i + 1) + '. ' + h.title + (h.src ? ' (' + h.src + ')' : '')).join('\n') + '\n' +
+    `Write at most ${BRIEFING_MAX} briefings. Each has: "headline" (under 110 characters), "why" (one plain sentence on why it matters for Indian stocks, under 200 characters), "group" (one of ${BRIEFING_GROUP_IDS.join(', ')}), "impact" (positive, negative or mixed for Indian stocks), "from" (the number of the one headline it is based on).\n` +
+    'Reply with JSON only: {"briefings": [{"headline": "...", "why": "...", "group": "market", "impact": "mixed", "from": 1}]}';
+}
+// Claude's reply + the headlines it saw -> the briefings this page saves. The link and date come from the headline, never from Claude.
+function cleanBriefings(r, heads){
+  const arr = r && Array.isArray(r.briefings) ? r.briefings : Array.isArray(r) ? r : [];
+  const text = (x, n) => String(x == null ? '' : x).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, n);
+  const out = [], used = new Set();
+  arr.forEach(b => {
+    const h = b && heads[Number(b.from) - 1], headline = b && text(b.headline, 140);
+    if(!h || !headline || used.has(b.from)) return;
+    used.add(b.from);
+    const o = { headline, date: String(h.published).slice(0, 10), group: BRIEFING_GROUP_IDS.includes(b.group) ? b.group : 'market', impact: ['positive', 'negative', 'mixed'].includes(b.impact) ? b.impact : 'mixed' };
+    const why = text(b.why, 240);
+    if(why) o.why = why;
+    if(h.url) o.links = [{ label: h.src || 'Source', url: h.url }];
+    out.push(o);
+  });
+  return out.slice(0, BRIEFING_MAX);
+}
+
 // ---- stock events ----
 const EVENT_TYPES = [
   { id: 'results', label: 'Results', tag: 'RESULTS' },
@@ -162,4 +206,4 @@ function filterItems(items, f, today){
   return items.filter(x => (f.type === 'all' || x.type === f.type) && (!limit || x.date <= limit || x.date < today));
 }
 
-export { EVENT_TYPES, buildCalendar, IMPORTANCE, PULSE_SYMBOLS, buildTiles, calValue, cleanReading, filterItems, groupCalendar, nextBigEvents, readingPrompt, recentItems, shortDate, tileView, typeTag, upcomingItems };
+export { BRIEFING_FEEDS, EVENT_TYPES, briefingsPrompt, buildCalendar, cleanBriefings, mergeHeadlines, IMPORTANCE, PULSE_SYMBOLS, buildTiles, calValue, cleanReading, filterItems, groupCalendar, nextBigEvents, readingPrompt, recentItems, shortDate, tileView, typeTag, upcomingItems };

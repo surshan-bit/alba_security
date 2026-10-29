@@ -76,8 +76,8 @@ function pulseHtml(){
 function briefingsHtml(){
   const m = news.macro, items = m && Array.isArray(m.briefings) ? m.briefings.filter(b => b && b.headline) : [];
   let h = '<h2 class="news-h2" data-icon="globe">Briefings</h2>';
-  if(!items.length) return h + '<p class="news-empty">No briefings yet. They are researched and saved from a Claude session with official links; ask Claude to refresh the news.</p>';
-  if(m.asof) h += `<div class="news-hint">Researched ${escapeHtml(shortDate(m.asof))}. Each card says why it matters; links go to official sources.</div>`;
+  if(!items.length) return h + '<p class="news-empty">No briefings yet. Press <b>Refresh News</b> to write them from the latest market headlines.</p>';
+  if(m.asof) h += `<div class="news-hint">${m.briefingsAt ? 'Updated ' + escapeHtml(stamp(m.briefingsAt)) + ' from TradingView headlines' : 'Researched ' + escapeHtml(shortDate(m.asof))}. Each card says why it matters; links go to the source.</div>`;
   const known = new Set(BRIEFING_GROUPS.map(g => g.id));
   BRIEFING_GROUPS.concat([{ id: '_other', label: 'Other' }]).forEach(g => {
     const rows = items.filter(b => (known.has(b.group) ? b.group : '_other') === g.id);

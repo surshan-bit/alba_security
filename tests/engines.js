@@ -1208,6 +1208,14 @@ test('trade call: history keeps one point a day and lists when the call changed'
     assert.deepStrictEqual(N.cleanReading(null), []);
     assert.ok(N.readingPrompt(N.buildTiles({ 'NSE:NIFTY': { close: 1, change: 1 } }), [{ date: '2026-10-28', title: 'RBI' }]).includes('2026-10-28: RBI'));
   });
+  test('news: briefings keep the link and date of the headline they came from and drop made-up ones', () => {
+    const heads = N.mergeHeadlines([[{ title: 'RBI holds rates', published: '2026-10-28T10:00:00Z', provider: { name: 'Reuters' }, link: 'http://x.com/a' }], [{ title: 'RBI holds  rates!', published: '2026-10-28T11:00:00Z' }, { title: 'Crude falls', published: '2026-10-29T01:00:00Z' }]]);
+    assert.deepStrictEqual(heads.map(h => h.title), ['Crude falls', 'RBI holds rates']);
+    const r = N.cleanBriefings({ briefings: [{ headline: 'RBI <b>holds</b>', why: 'Steady', group: 'zzz', impact: 'up', from: 2 }, { headline: 'Ghost', from: 9 }, { headline: 'Dup', from: 2 }] }, heads);
+    assert.strictEqual(r.length, 1);
+    assert.deepStrictEqual(r[0], { headline: 'RBI holds', date: '2026-10-28', group: 'market', impact: 'mixed', why: 'Steady', links: [{ label: 'Reuters', url: 'https://x.com/a' }] });
+    assert.ok(N.briefingsPrompt(heads).includes('1. Crude falls'));
+  });
   test('news: calendar groups by IST date, filters by importance, and finds the next big event', () => {
     const rows = [{ date: '2026-10-29T08:00:00Z', title: 'B', importance: 0 }, { date: '2026-10-28T20:00:00Z', title: 'A', importance: 1 }, { date: '2026-10-28T09:00:00Z', title: 'C', importance: -1 }, { date: '2026-10-30T09:00:00Z', title: 'D', importance: 1 }];
     const g = N.groupCalendar(rows, 0);
