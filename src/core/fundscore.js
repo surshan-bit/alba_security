@@ -7,15 +7,24 @@
 const PROXY_KEYS = new Set(['moat', 'gov']);
 const CATEGORY_KEYS = { Traditional: 'traditionalSubscore', Buffett: 'buffettSubscore', Valuation: 'valuationSubscore' };
 function hasSource(f){ const r = f && f.research; return !!(r && Array.isArray(r.sources) && r.sources.length); }
+// v1.318: research with no news or filing link still counts when it rests on figures the refresh was given: it has written points, none of them is marked
+// "not verified" (ok === false), and at least one rests on the CSV or TradingView data. Research made only of Claude's own view does not count.
+function dataBacked(f){
+  const r = f && f.research, pts = r && Array.isArray(r.points) ? r.points : [];
+  if(!pts.length) return false;
+  const objs = pts.filter(p => p && typeof p === 'object');
+  return objs.length === pts.length && objs.every(p => p.ok !== false) && objs.some(p => Array.isArray(p.basis) && p.basis.some(b => b === 'csv' || /^tv-/.test(b)));
+}
+const researched = f => hasSource(f) || dataBacked(f);
 // null when the factor counts, otherwise the reason it is left out.
 function exclusionReason(f){
   if(!f) return 'no data';
   if(f.na) return 'it does not apply to ' + f.na;   // set by the import for a bank's or insurer's Financial Health
-  if(PROXY_KEYS.has(f.key) && !hasSource(f)) return 'an estimate from peer rankings, not individually researched with a cited source';
+  if(PROXY_KEYS.has(f.key) && !researched(f)) return 'an estimate from peer rankings, not individually researched with a cited source';
   if(Array.isArray(f.metrics) && f.metrics.length && f.metrics.every(m => Array.isArray(m) && m[1] === 'n/a')) return 'no data available';
   // The import stores a factor it could not compute (missing input) as score 0. A real computed factor is never exactly 0
   // (percentile ranks are at least 100/n), so a 0 with no researched source means "no data": leave it out, do not count it as worst.
-  if((typeof f.score !== 'number' || f.score === 0) && !hasSource(f)) return 'not enough data to score this factor';
+  if((typeof f.score !== 'number' || f.score === 0) && !researched(f)) return 'not enough data to score this factor';
   return null;
 }
 const r2 = x => Math.round(x * 100) / 100;
@@ -27,7 +36,7 @@ function countedPairs(factors){
   factors.forEach(f => {
     const why = exclusionReason(f);
     if(!why) ok.push([f, typeof f.score === 'number' ? f.score : 0]);
-    else if(!f.na && !(PROXY_KEYS.has(f.key) && !hasSource(f))) ok.push([f, f.weight / 2]);   // a factor that does not apply is dropped, not counted as average
+    else if(!f.na && !(PROXY_KEYS.has(f.key) && !researched(f))) ok.push([f, f.weight / 2]);   // a factor that does not apply is dropped, not counted as average
   });
   return ok;
 }

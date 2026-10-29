@@ -478,6 +478,22 @@ test('fix: the technical valuation anchor is refreshed on every fundamental impo
     const s = { fundamentals: { factors: [fac('fin', 'Traditional', 1, 0.8), fac('dcf', 'Valuation', 1, 0)], total: 10 }, score: 0 }; FS.applyFundamentalConfidence(s);
     assert.strictEqual(s.score, 6.5); assert.strictEqual(FS.expectedScore(s.fundamentals.factors), s.score);
   });
+  const pt = (basis, ok) => ({ text: 't', basis, ok, refs: [] });
+  const gov = res => fac('gov', 'Buffett', 1, 0.8, { research: Object.assign({ asof: '2026-10-29', sources: [] }, res) });
+  const run = g => { const s = { fundamentals: { factors: [fac('fin', 'Traditional', 1, 0.6), g], total: 10 }, score: 0 }; FS.applyFundamentalConfidence(s); return s; };
+  test('v1.318: Moat/Governance research with no link counts when its bullets rest on the CSV or TradingView data and all check out', () => {
+    const s = run(gov({ points: [pt(['claude'], true), pt(['csv'], true)] }));
+    assert.strictEqual(s.fundamentals.factors[1].excluded, undefined); assert.strictEqual(s.score, 7);
+  });
+  test('v1.318: research made only of Claude\'s view, or with an unverified bullet, or with no bullets, still stays out', () => {
+    [[pt(['claude'], true)], [pt(['csv'], true), pt(['tv-news'], false)], []].forEach(points => {
+      const s = run(gov({ points })); assert.ok(/individually researched/.test(s.fundamentals.factors[1].excluded)); assert.strictEqual(s.score, 6);
+    });
+  });
+  test('v1.318: research with a news or filing link still counts as before', () => {
+    const s = run(gov({ points: [pt(['claude'], true)], sources: [{ title: 'x', url: 'https://n.example/1' }] }));
+    assert.strictEqual(s.fundamentals.factors[1].excluded, undefined);
+  });
 }
 test('fix: a flat price series has no RSI (not 100)', () => {
   const TECH = load('src/engine/technical.js');

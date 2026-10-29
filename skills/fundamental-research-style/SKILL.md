@@ -45,7 +45,7 @@ The fields below are stored per stock and shown on the stock detail screen:
 
 - Factor card research: `headline` (one plain sentence), `points` (2 or 3 short bullets), `positives` and `negatives` (up to 2 short bullets each, only what the points do not already say), `sources`. Do not write a `summary` paragraph; it is only read for older records.
 - Strengths and Watch-outs box: up to 4 bullets each, one short sentence per bullet, with a tone of strong or good for strengths and caution or concern for watch-outs.
-- Global and Macro Information: up to 5 positive and 5 negative short items, each with a source and, when it was actually read, its link.
+- Global and Macro Information: up to 5 positive and 5 negative short items, each from a news item or filing the refresh read, with its source and link (nothing without a source, no general analysis).
 
 The dashboard's own Refresh Fundamental Info button already carries these rules (the `LD_STYLE` text in `js/livedata.js`). If the rules here change, change that text too so the two stay in step.
 

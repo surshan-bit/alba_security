@@ -197,14 +197,19 @@ async function ldRefreshCards(c){
   const TRAD = ['fin', 'prof', 'growth', 'val'];
   const groups = [
     { step: 'tradCards', label: 'Traditional Analysis', keys: factors.filter(f => TRAD.includes(f.key)).map(f => f.key), from: 48, to: 60, tier: 'quick', tv: ['fin', 'fcLite', 'newsLite'] },
-    { step: 'buffettCards', label: 'Buffett-Style Analysis', keys: factors.filter(f => !TRAD.includes(f.key)).map(f => f.key), from: 60, to: 74, tier: 'quick', tv: ['finLite', 'fcLite', 'news', 'stories', 'docs'] }
+    // Moat and Governance need the news, stories and filings, so their prompt is the heaviest; the three number-based factors are asked separately so neither waits for the other.
+    { step: 'buffettCards', label: 'Buffett-Style Analysis', keys: factors.filter(f => ['moat', 'gov'].includes(f.key)).map(f => f.key), from: 60, to: 74, tier: 'quick', tv: ['finLite', 'fcLite', 'news', 'stories', 'docs'] },
+    { step: 'buffettCards', part: 'numbers', label: 'Buffett-Style Analysis', keys: factors.filter(f => !TRAD.includes(f.key) && !['moat', 'gov'].includes(f.key)).map(f => f.key), from: 60, to: 74, tier: 'quick', tv: ['finLite', 'fcLite', 'newsLite'] }
   ].filter(g => g.keys.length);
-  const cardGroups = needCards ? groups.filter(g => !offNote(g.step, g.label)) : [];
+  const offSteps = new Map();   // ask the on/off switch once per step, so a skipped step is reported once
+  const stepOff = g => { if(!offSteps.has(g.step)) offSteps.set(g.step, offNote(g.step, g.label)); return offSteps.get(g.step); };
+  const cardGroups = needCards ? groups.filter(g => !stepOff(g)) : [];
   const scoreNotes = [];
   let cardsRefreshed = 0;
   // The two groups do not depend on each other, so they are asked at the same time (the run waits for the slower one, not for both in turn).
   await Promise.all(cardGroups.map(async g => {
     set(g.from, 'Refreshing ' + g.label + '…');
+    const ga = Date.now();
     try {
       const listing = g.keys.map(k => '"' + k + '" (' + (SCORABLE.has(k) ? 'you may re-score it' : 'scored mechanically, do not return a score') + ')').join(', ');
       const r = await ask(headFor(g.keys, g.tv) + 'TASK: Refresh the written analysis on these Fundamental Score factor cards (' + g.label + '): ' + listing + '.\nFor each, write a one-sentence plain-English headline, 2 or 3 short bullet "points" on what it means for the business (these replace a paragraph; each point is an object, see the reply format), and up to 2 positives and up to 2 negatives as short bullets that the points do not already say (empty lists are fine), based on the latest TradingView data above (TTM and fiscal-year financials, current price, forecasts, news, filings) together with that factor\'s own metrics. Replace out-of-date statements with what the latest data shows.\nMoat: brand and pricing power, market position, switching costs, scale or cost advantages, threats, durability of returns on capital. Governance: promoter record, related-party dealings, auditor and disclosure quality, regulatory or legal actions, capital allocation, management changes, pledge and holding trend.\nIf a factor has nothing noteworthy, give a one-sentence headline and empty lists.\nScoring: for a factor marked "you may re-score it", give a new score between 0 and its weight and change it from the current score only when the supplied data supports that; otherwise return the current score. For every other factor do not return a score; if the latest data clearly disagrees with its mechanical score, say so in the summary. Never invent figures: every number in a point must be one shown in that factor\'s metrics or in the TRADINGVIEW DATA, written the way it appears there (rounded is fine), never a number you worked out yourself. For each point set "view" to true when it contains your own judgement (such as weak, cheap, or what a ratio means for this kind of business) and false when it only restates data; list in "refs" the metric names, spelled exactly as in the metrics, that the point relies on (an empty list if none); add "url" (exactly as supplied) when the point comes from a news item. In "facts" list up to 3 figures from the TRADINGVIEW DATA that a point uses and that no metric row shows (for example price to book, analyst ratings, a bank\'s bad-loan ratio), and any TradingView figure that disagrees with a metric row (label it with "(TradingView)" and say so in "note"); each needs a "label", a "value" copied from the TRADINGVIEW DATA, and a "tone" of "pos", "neg" or "neu". Say plainly when a figure is not available instead of treating the gap as a strength. "sources" may list only items from the supplied news or filings (title plus the exact url given), otherwise an empty list.\nReply with only JSON: {"factors":{"<key>":{"score":<number, only where allowed>,"note":"<one sentence, only where a score is returned>","research":{"headline":"<one plain sentence>","points":[{"text":"<short bullet>","view":<true|false>,"refs":["<metric name>"],"url":"<optional>"}],"facts":[{"label":"...","value":"...","tone":"pos|neg|neu","note":"<optional>"}],"positives":["<short bullet>"],"negatives":["<short bullet>"],"sources":[{"title":"...","url":"..."}]}}}}', g.from, g.to, 3600, g.tier);
@@ -242,6 +247,8 @@ async function ldRefreshCards(c){
     } catch(e){
       if(e && e.code === 'cancelled') throw e;
       failed.push(g.label + ' (' + ldErrText(e) + ')');
+    } finally {
+      if(c.T) c.T['cards_' + g.step + (g.part ? '_' + g.part : '')] = Date.now() - ga;   // time per card group, so the slowest one is visible
     }
   }));
   if(cardsRefreshed) notes.push(cardsRefreshed + ' factor card' + (cardsRefreshed === 1 ? '' : 's') + ' refreshed');
@@ -283,30 +290,31 @@ async function ldGlobalMacro(c){
   const needGlobal = (needCards || gfMissing) && !offNote('globalMacro', 'Global & Macro');
   if(needGlobal) set(50, 'Researching Global & Macro and recent news…');
   if(needGlobal) try {
-    const g0 = s.globalFactors || {};
-    const r = await ask(headFor(null, ['news', 'stories', 'docs']) + 'TASK: Write this company\'s Global & Macro Information: macro, commodity, currency and trade-policy linkages that could move its price, plus recent company-specific news and events from the last few weeks that matter for a decision now.\nRules: at most 5 positive and 5 negative items, each one short bullet-style sentence under 25 words. Each item needs "source": a news item or filing from the supplied data (use "<provider>, <date>" and its exact url), or, for a general sector or macro linkage the supplied data does not cover, the source "Claude analysis, no live source" with url "". Never invent a url. Prefer items backed by the supplied news. Current stored sector label: ' + (g0.sectorLabel || 'none') + '.\nALSO add "events": up to 4 CRITICAL news items or world events (wars and geopolitical conflicts, sanctions, oil or commodity shocks, major policy, tariff or regulatory changes, big currency or interest-rate moves) that could materially affect THIS company, even indirectly (for example how a Middle East conflict could change crude oil, freight or input costs for this business). Use events found in the supplied news first; you may add well-known major events from your own knowledge, but say so in the source ("Claude knowledge, may be dated") and never claim a recent event you cannot support. Each event: "headline" (under 12 words), "impact" ("positive", "negative" or "mixed"), "why" (one plain sentence under 30 words on how it reaches this company: cost, demand, currency or regulation), "source" and "url" as above. If nothing critical applies, return an empty list.\nReply with only JSON: {"positive":[{"text":"...","source":"...","url":"..."}],"negative":[{"text":"...","source":"...","url":"..."}],"events":[{"headline":"...","impact":"negative","why":"...","source":"...","url":"..."}]}', 78, 83, 3200, 'quick');
-    const clean = a => (Array.isArray(a) ? a : []).filter(x => x && typeof x.text === 'string' && x.text.trim()).slice(0, 5).map(x => {
-      const url = typeof x.url === 'string' && allowedUrls.has(x.url) ? x.url : '';
-      return { text: escapeHtml(x.text.trim().slice(0, 400)), source: escapeHtml(String(x.source || 'Claude analysis, no live source').slice(0, 120)), url };
-    });
+    const r = await ask(headFor(null, ['news', 'stories', 'docs']) + 'TASK: Write this company\'s Global & Macro Information using ONLY the supplied news items and filings: macro, commodity, currency, trade-policy and regulatory developments, plus company-specific news and events from the last few weeks, that could move its price or matter for a decision now.\nRules: at most 5 positive and 5 negative items, each one short bullet-style sentence under 25 words. Every item must come from one supplied news item or filing and must carry "source" ("<provider>, <date>") and its exact "url". Leave out any point you cannot tie to a supplied item: no general sector or macro views of your own, no points from your own knowledge, never invent a url, and never write about the absence of news. Fewer items, or an empty list, is fine.\nALSO add "events": up to 4 CRITICAL developments found in the supplied news (wars and geopolitical conflicts, sanctions, oil or commodity shocks, major policy, tariff or regulatory changes, big currency or interest-rate moves) that could materially affect THIS company, even indirectly. Each event: "headline" (under 12 words), "impact" ("positive", "negative" or "mixed"), "why" (one plain sentence under 30 words on how it reaches this company: cost, demand, currency or regulation), "source" and "url" as above. If nothing critical applies, return an empty list.\nReply with only JSON: {"positive":[{"text":"...","source":"...","url":"..."}],"negative":[{"text":"...","source":"...","url":"..."}],"events":[{"headline":"...","impact":"negative","why":"...","source":"...","url":"..."}]}', 78, 83, 3200, 'quick');
+    // Only items tied to a supplied news item or filing are kept: an item without a known link is dropped, never shown as "Claude analysis".
+    const clean = a => (Array.isArray(a) ? a : []).filter(x => x && typeof x.text === 'string' && x.text.trim() && typeof x.url === 'string' && allowedUrls.has(x.url)).slice(0, 5).map(x => ({
+      text: escapeHtml(x.text.trim().slice(0, 400)), source: escapeHtml(String(x.source || '').slice(0, 120)), url: x.url
+    }));
     const pos = clean(r && r.positive), neg = clean(r && r.negative);
-    const events = (Array.isArray(r && r.events) ? r.events : []).filter(x => x && typeof x.headline === 'string' && x.headline.trim()).slice(0, 4).map(x => ({
+    const events = (Array.isArray(r && r.events) ? r.events : []).filter(x => x && typeof x.headline === 'string' && x.headline.trim() && typeof x.url === 'string' && allowedUrls.has(x.url)).slice(0, 4).map(x => ({
       headline: escapeHtml(x.headline.trim().slice(0, 160)),
       impact: ['positive', 'negative', 'mixed'].indexOf(x.impact) >= 0 ? x.impact : 'mixed',
       why: escapeHtml(String(x.why || '').trim().slice(0, 400)),
-      source: escapeHtml(String(x.source || 'Claude analysis, no live source').slice(0, 120)),
-      url: typeof x.url === 'string' && allowedUrls.has(x.url) ? x.url : ''
+      source: escapeHtml(String(x.source || '').slice(0, 120)),
+      url: x.url
     }));
-    if(!pos.length && !neg.length) throw new Error('Claude returned no usable items.');
-    const sourced = pos.concat(neg).some(x => x.url);
-    const gf = { scope: sourced ? 'company' : (g0.scope || 'sector'), asof: today, positive: pos, negative: neg, events };
-    if(!sourced && g0.sectorLabel) gf.sectorLabel = g0.sectorLabel;
+    if(!pos.length && !neg.length && !events.length){
+      notes.push('Global & Macro: no item could be tied to a supplied news item or filing, so the stored section was left as it was');
+      Object.assign(c, { gfOut });
+      return;
+    }
+    const gf = { scope: 'company', asof: today, positive: pos, negative: neg, events };
     set(74, 'Saving Global & Macro…');
     const uref = db.doc('stockUpdates/' + docId);
     const ucur = await uref.get();
     if(ucur && ucur.exists) await uref.update({ globalFactors: gf }); else await uref.set({ ticker: sym0, globalFactors: gf });
     gfOut = { pos, neg };
-    notes.push('Global & Macro: ' + pos.length + ' positive, ' + neg.length + ' negative, ' + events.length + ' critical event' + (events.length === 1 ? '' : 's') + (sourced ? '' : ' (no source links, general analysis only)'));
+    notes.push('Global & Macro: ' + pos.length + ' positive, ' + neg.length + ' negative, ' + events.length + ' critical event' + (events.length === 1 ? '' : 's'));
   } catch(e){
     if(e && e.code === 'cancelled') throw e;
     failed.push('Global & Macro (' + ldErrText(e) + ')');
@@ -393,6 +401,7 @@ async function ldRunFundamental(s){
   const halt = () => { if(signal.aborted) throw { code: 'cancelled' }; };
   const c = { s, key, sym0, docId, today, set, halt, signal, notes: [], failed: [], labelled: 0 };   // labelled: news headlines labelled by Claude in this run
   const t0 = Date.now(), T = {};   // how long each step took (ms), saved when the run ends well
+  c.T = T;
   const timed = async (name, fn) => { const a = Date.now(); try { return await fn(); } finally { T[name] = (T[name] || 0) + Date.now() - a; } };
   try {
     set(2, 'Preparing…');

@@ -249,7 +249,7 @@ const ldScript = () => {
       const f = {}; for(const m of task.split('\n')[0].matchAll(/"(\w+)" \(/g)) f[m[1]] = { score: 0.5, note: 'rescored: made-up', research: { headline: 'Headline for ' + m[1], points: [{ text: 'Point one', view: true, refs: ['D/E', 'Not a metric'], url: 'https://news.example/n1' }, 'Point two <b>x</b> grew 777.7%'], facts: [{ label: 'Invented row', value: '4242.4x', tone: 'pos' }], positives: ['Plus'], negatives: ['Minus'], sources: [{ title: 'Order win', url: 'https://news.example/n1' }, { title: 'Invented', url: 'https://invented.example/x' }] } };
       return reply({ factors: f });
     }
-    if(/Global & Macro Information/.test(task)) return reply({ positive: [{ text: 'Demand is firm <i>now</i>', source: 'Wire, 2026-10-08', url: 'https://news.example/n1' }], negative: [{ text: 'Input costs rising', source: 'Claude analysis, no live source', url: '' }],
+    if(/Global & Macro Information/.test(task)) return reply({ positive: [{ text: 'Demand is firm <i>now</i>', source: 'Wire, 2026-10-08', url: 'https://news.example/n1' }], negative: [{ text: 'Input costs rising', source: 'Claude analysis, no live source', url: '' }, { text: 'Rates may rise', source: 'Wire, 2026-10-09', url: 'https://invented.example/z' }],
       events: [{ headline: 'Oil shock', impact: 'negative', why: 'Raises freight cost.', source: 'Wire', url: 'https://news.example/n2' }, { headline: 'Odd impact', impact: 'sideways', why: 'x', source: '', url: 'https://invented.example/y' }] });
     if(/Strengths and Watch-outs box/.test(task)) return reply({ strengths: [{ text: 'Cheap for its quality', tone: 'strong' }, { text: 'Steady', tone: 'weird' }], watchouts: [{ text: 'Debt is rising', tone: 'concern' }] });
     return reply({});
@@ -296,6 +296,9 @@ async function ldFundamentalTests(){
     const par = await page.evaluate(() => ({ max: window.__maxInflight, runs: Array.from(window.__store).filter(([k]) => /^refreshRunLog\/fundamental-\d$/.test(k)).map(([, v]) => v) }));
     ok(par.max >= 2, 'v1.316: the factor cards and Global & Macro are asked at the same time (most open at once: ' + par.max + ')');
     ok(par.runs.length >= 1 && par.runs.every(r => r.kind === 'fundamental' && typeof r.durationMs === 'number' && typeof r.stepsMs.cards === 'number' && typeof r.stepsMs.globalMacro === 'number'), 'v1.316: a finished run saves its timing (total and per step; the test page runs on a stopped clock, so only the shape is checked)');
+    const gfA = afterA.updates.globalFactors, gfItems = [].concat(gfA.positive, gfA.negative, gfA.events || []);
+    ok(gfItems.length && gfItems.every(x => /^https:\/\/news\.example\//.test(x.url)) && !gfItems.some(x => /Claude analysis|Claude knowledge/.test(x.source)), 'v1.317: Global & Macro keeps only items tied to a supplied news link (an item with no link or an invented link is dropped)');
+    ok(par.runs.every(r => ['cards_tradCards', 'cards_buffettCards', 'cards_buffettCards_numbers'].every(k => typeof r.stepsMs[k] === 'number')), 'v1.317: the timing record has the time of each card group');
     ok(errs.length === 0, 'ldfund: errors in the page: ' + errs.slice(0, 2).join(' | '));
   } finally { await ctx.close(); }
 }

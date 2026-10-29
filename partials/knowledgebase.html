@@ -192,7 +192,7 @@
         <li><b>Single stock:</b> <b>Refresh Fundamental Info</b> in the stock's Live Data Refresh section, in scope or not. It runs inside the page (no Claude chat) and refreshes the macro linkages and a new <b>Critical news &amp; world events</b> block: up to 4 events (wars, sanctions, oil or commodity shocks, tariffs, policy, currency) tagged Helps, Hurts or Mixed with a one-line plain reason and a source.
           <ul>
             <li>It is context only and never changes a score. It sits above the Technical Score panel.</li>
-            <li>Events come from the TradingView headlines the refresh reads plus Claude's own knowledge (to about mid-2026). There is no live web search, so events from Claude's knowledge are labelled "may be dated".</li>
+            <li>Since v1.317 Global &amp; Macro and the events come only from the TradingView news and filings the refresh reads. Each item has its source and link; anything Claude cannot tie to one of them is dropped, and there is no &ldquo;Claude analysis&rdquo; filler. If nothing can be sourced, the stored section is left unchanged.</li>
           </ul>
         </li>
       </ul>
@@ -251,6 +251,16 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.318 &middot; 2026-10-29</h3>
+            <ul>
+              <li><strong>Governance (and Moat) now count when the refresh backs them with your own data:</strong> before, a researched factor was left out of the score unless it linked a news item or filing, so a quiet company with no governance news stayed &ldquo;Not scored&rdquo; even after a refresh. Now it counts when its bullets have at least one resting on the CSV or TradingView figures and none is marked &ldquo;not verified&rdquo;. Research made only of Claude&rsquo;s own view, or with an unverified bullet, still stays out. Factors with a link count as before.</li>
+            </ul>
+            <h3>v1.317 &middot; 2026-10-29</h3>
+            <ul>
+              <li><strong>Global &amp; Macro uses only sourced items:</strong> every positive, negative and critical-event item must come from a news item or filing the refresh actually read, with its source and link. Items marked &ldquo;Claude analysis, no live source&rdquo;, points from Claude&rsquo;s own knowledge and &ldquo;no news found&rdquo; remarks are gone. If nothing can be sourced, the stored section is left as it was. Older saved text is replaced on the next refresh of that stock.</li>
+              <li><strong>Factor cards in three requests instead of two:</strong> Moat and Governance (which read the news, stories and filings) are asked separately from Reinvestment, Predictability and Margin of Safety, so the heavy one no longer holds up the rest.</li>
+              <li><strong>Timing per card group:</strong> the saved timing record now also has the time of each card group (<code>cards_tradCards</code>, <code>cards_buffettCards</code>, <code>cards_buffettCards_numbers</code>).</li>
+            </ul>
             <h3>v1.316 &middot; 2026-10-29</h3>
             <ul>
               <li><strong>Refresh Fundamental Info should finish sooner:</strong> the two groups of factor cards and Global &amp; Macro are now asked at the same time instead of one after another, and the news stories are read together. The progress bar only moves forward. How much time this saves depends on whether Claude answers several requests at once; the timing record below shows the real figure.</li>
