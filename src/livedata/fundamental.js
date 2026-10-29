@@ -74,14 +74,17 @@ async function ldGather(c){
     date: h.published ? tvIstDate(h.published) : '', url: h.link || ''
   }));
   const allowedUrls = new Set(news.map(n => n.url).filter(u => /^https?:\/\//i.test(u)));
-  const stories = [];
-  for(const h of heads.filter(x => x && x.paywall === false).slice(0, 3)){
-    halt();
-    set(22 + stories.length * 2, 'Reading news story ' + (stories.length + 1) + '…');
+  // Up to 3 free stories, read together (each is a separate TradingView call that does not depend on the others).
+  set(22, 'Reading news stories…');
+  const storyHeads = heads.filter(x => x && x.paywall === false).slice(0, 3);
+  halt();
+  const storyBodies = await Promise.all(storyHeads.map(async h => {
     const st = await grab('mcp-tv-get-news-story', { id: h.id });
     const body = st && (st.summary || st.short_description) ? { summary: st.summary, short: st.short_description } : null;
-    if(body) stories.push({ title: h.title, url: h.link, text: ldJson(body, 1500) });
-  }
+    return body ? { title: h.title, url: h.link, text: ldJson(body, 1500) } : null;
+  }));
+  halt();
+  const stories = storyBodies.filter(Boolean);
   const gotAnything = [finTtm, finFy, fc, newsRaw, docsRaw].some(x => x && !x.unavailable);
   if(!gotAnything) throw new Error('TradingView returned no data for ' + sym + '.');
   Object.assign(c, { sym, finTtm, finFy, fc, docsRaw, earnRaw, corpRaw, allHeads, news, allowedUrls, stories });
@@ -199,7 +202,8 @@ async function ldRefreshCards(c){
   const cardGroups = needCards ? groups.filter(g => !offNote(g.step, g.label)) : [];
   const scoreNotes = [];
   let cardsRefreshed = 0;
-  for(const g of cardGroups){
+  // The two groups do not depend on each other, so they are asked at the same time (the run waits for the slower one, not for both in turn).
+  await Promise.all(cardGroups.map(async g => {
     set(g.from, 'Refreshing ' + g.label + '…');
     try {
       const listing = g.keys.map(k => '"' + k + '" (' + (SCORABLE.has(k) ? 'you may re-score it' : 'scored mechanically, do not return a score') + ')').join(', ');
@@ -239,7 +243,7 @@ async function ldRefreshCards(c){
       if(e && e.code === 'cancelled') throw e;
       failed.push(g.label + ' (' + ldErrText(e) + ')');
     }
-  }
+  }));
   if(cardsRefreshed) notes.push(cardsRefreshed + ' factor card' + (cardsRefreshed === 1 ? '' : 's') + ' refreshed');
   else if(cardGroups.length && !failed.length) failed.push('factor cards (Claude returned nothing usable)');
   const scoreChanges = scoreNotes.filter(Boolean);
@@ -277,7 +281,7 @@ async function ldGlobalMacro(c){
   // ---- 3. Global & Macro plus recent news ----
   let gfOut = null;
   const needGlobal = (needCards || gfMissing) && !offNote('globalMacro', 'Global & Macro');
-  if(needGlobal) set(78, 'Researching Global & Macro and recent news…');
+  if(needGlobal) set(50, 'Researching Global & Macro and recent news…');
   if(needGlobal) try {
     const g0 = s.globalFactors || {};
     const r = await ask(headFor(null, ['news', 'stories', 'docs']) + 'TASK: Write this company\'s Global & Macro Information: macro, commodity, currency and trade-policy linkages that could move its price, plus recent company-specific news and events from the last few weeks that matter for a decision now.\nRules: at most 5 positive and 5 negative items, each one short bullet-style sentence under 25 words. Each item needs "source": a news item or filing from the supplied data (use "<provider>, <date>" and its exact url), or, for a general sector or macro linkage the supplied data does not cover, the source "Claude analysis, no live source" with url "". Never invent a url. Prefer items backed by the supplied news. Current stored sector label: ' + (g0.sectorLabel || 'none') + '.\nALSO add "events": up to 4 CRITICAL news items or world events (wars and geopolitical conflicts, sanctions, oil or commodity shocks, major policy, tariff or regulatory changes, big currency or interest-rate moves) that could materially affect THIS company, even indirectly (for example how a Middle East conflict could change crude oil, freight or input costs for this business). Use events found in the supplied news first; you may add well-known major events from your own knowledge, but say so in the source ("Claude knowledge, may be dated") and never claim a recent event you cannot support. Each event: "headline" (under 12 words), "impact" ("positive", "negative" or "mixed"), "why" (one plain sentence under 30 words on how it reaches this company: cost, demand, currency or regulation), "source" and "url" as above. If nothing critical applies, return an empty list.\nReply with only JSON: {"positive":[{"text":"...","source":"...","url":"..."}],"negative":[{"text":"...","source":"...","url":"..."}],"events":[{"headline":"...","impact":"negative","why":"...","source":"...","url":"..."}]}', 78, 83, 3200, 'quick');
@@ -297,7 +301,7 @@ async function ldGlobalMacro(c){
     const sourced = pos.concat(neg).some(x => x.url);
     const gf = { scope: sourced ? 'company' : (g0.scope || 'sector'), asof: today, positive: pos, negative: neg, events };
     if(!sourced && g0.sectorLabel) gf.sectorLabel = g0.sectorLabel;
-    set(84, 'Saving Global & Macro…');
+    set(74, 'Saving Global & Macro…');
     const uref = db.doc('stockUpdates/' + docId);
     const ucur = await uref.get();
     if(ucur && ucur.exists) await uref.update({ globalFactors: gf }); else await uref.set({ ticker: sym0, globalFactors: gf });
@@ -380,30 +384,48 @@ function ldFinish(c){
 // each step found). A step that cannot go on throws; one that only fails to add something records it in `c.failed` and the run carries on.
 async function ldRunFundamental(s){
   const key = pcTickerKey(s), sym0 = tickerSymbol(s), docId = sanitizeDocId(sym0), today = tvIstDate();
-  const set = (pct, msg) => ldSet(key, 'fund', { state: 'running', pct, msg });
+  // Two steps can now run side by side, so the bar only ever moves forward.
+  let top = 0;
+  const set = (pct, msg) => { top = Math.max(top, pct); ldSet(key, 'fund', { state: 'running', pct: top, msg }); };
   const ctl = new AbortController();
   ldAbort.set(key + '|fund', ctl);
   const signal = ctl.signal;
   const halt = () => { if(signal.aborted) throw { code: 'cancelled' }; };
   const c = { s, key, sym0, docId, today, set, halt, signal, notes: [], failed: [], labelled: 0 };   // labelled: news headlines labelled by Claude in this run
+  const t0 = Date.now(), T = {};   // how long each step took (ms), saved when the run ends well
+  const timed = async (name, fn) => { const a = Date.now(); try { return await fn(); } finally { T[name] = (T[name] || 0) + Date.now() - a; } };
   try {
     set(2, 'Preparing…');
     await ldPrepare(c);
-    await ldGather(c);
-    await ldSaveEvents(c);
+    await timed('gather', () => ldGather(c));
+    await timed('events', () => ldSaveEvents(c));
     ldPromptKit(c);
     ldCheckFresh(c);
-    await ldFillMissingMetrics(c);
-    await ldRefreshCards(c);
-    await ldSaveResearch(c);
-    await ldGlobalMacro(c);
-    await ldTechnicalSignals(c);
-    await ldStrengths(c);
-    return ldFinish(c);
+    await timed('missingMetrics', () => ldFillMissingMetrics(c));
+    // The factor cards (then their save) and Global & Macro do not need each other, and write to different documents, so they run together.
+    await Promise.all([
+      timed('cards', async () => { await ldRefreshCards(c); await ldSaveResearch(c); }),
+      timed('globalMacro', () => ldGlobalMacro(c))
+    ]);
+    await timed('technical', () => ldTechnicalSignals(c));
+    await timed('strengths', () => ldStrengths(c));
+    const text = ldFinish(c);
+    await ldSaveTimings(c, T, t0);
+    return text;
   } finally {
     ldAbort.delete(key + '|fund');
   }
 }
 
+// One small record per finished run in refreshRunLog/fundamental-0..9 (the slot is the start second modulo 10, so the newest ten stay and nothing
+// needs deleting). It only tells us where the time went. A failed save never matters.
+async function ldSaveTimings(c, T, t0){
+  const total = Date.now() - t0;
+  console.info('[Refresh Fundamental Info] ' + c.sym0 + ' took ' + Math.round(total / 1000) + ' s', T);
+  try {
+    if(!c.db) return;
+    await c.db.doc('refreshRunLog/fundamental-' + (Math.floor(t0 / 1000) % 10)).set({ v: 1, kind: 'fundamental', ticker: c.sym0, startedAt: new Date(t0).toISOString(), durationMs: total, stepsMs: T, parallel: true, claudeOn: !!c.useClaude });
+  } catch(e){ console.error('Could not save the fundamental refresh timing', e); }
+}
 
 export { ldRunFundamental };

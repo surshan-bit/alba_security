@@ -27,9 +27,9 @@ const KIND_WORD = { bank: 'banks', insurer: 'insurers', lender: 'lenders' };
 const finFactorNotApplicable = kind => !!kind && kind !== 'lender';
 /** One line for the research prompts, so Claude does not write about figures that do not apply. */
 function sectorPromptNote(kind){
-  if(kind === 'bank') return 'SECTOR NOTE: this is a bank. Debt compared with the owners\' money, interest cover, liquidity ratios, Altman Z and debtor days do not describe a bank and are not scored. Do not write about them. Judge it on bad loans, capital buffer, low-cost deposits and loan growth when the data shows them, and say plainly when it does not.\n';
-  if(kind === 'insurer') return 'SECTOR NOTE: this is an insurer. Debt, interest cover, liquidity ratios, Altman Z and debtor days do not describe an insurer and are not scored. Do not write about them.\n';
-  if(kind === 'lender') return 'SECTOR NOTE: this is a lender (finance company). Borrowing is its raw material, so a high debt level is normal and only matters against other lenders. Liquidity ratios, Altman Z and debtor days are not scored. Do not write about them. Judge it on bad loans, the gap between lending and borrowing rates, and funding cost when the data shows them.\n';
+  if(kind === 'bank') return 'SECTOR NOTE: this is a bank. Debt, interest cover, liquidity ratios, Altman Z and debtor days do not apply to a bank and are not scored. Do not write about them.\n';
+  if(kind === 'insurer') return 'SECTOR NOTE: this is an insurer. Debt, interest cover, liquidity ratios, Altman Z and debtor days do not apply to an insurer and are not scored. Do not write about them.\n';
+  if(kind === 'lender') return 'SECTOR NOTE: this is a lender. High debt is normal for a lender and only matters against other lenders. Liquidity ratios, Altman Z and debtor days do not apply and are not scored. Do not write about them.\n';
   return '';
 }
 export { financialKind, FIN_NOT_APPLICABLE, KIND_WORD, finFactorNotApplicable, sectorPromptNote };
