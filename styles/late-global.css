@@ -14,19 +14,27 @@ select:not([multiple]):not([size]):disabled{opacity:.55;}
 :root:not([data-theme="indigo"]):not([data-theme="light"]):not([data-theme="white"]) #section-business .biz-side{margin:0 0 0 -18px;width:260px;}
 .filters.analysis-filters-panel{padding-top:16px;}
 }
-/* Stock page, Traditional and Buffett-style analysis: a tidy grid at every width instead of columns that squeeze and leave gaps.
-   Wide windows: 4 cards across (one row of four). Laptop and narrower: 2 across (2 x 2). Phones: 1 across. */
-#detail .fund-subsection .fund-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 28px;align-items:start;}
-@media (max-width:1399px){#detail .fund-subsection .fund-grid{grid-template-columns:repeat(2,minmax(0,1fr));}#detail .fund-subsection .fund-grid>.fund-cell:last-child:nth-child(odd){grid-column:1 / -1;}}
-@media (max-width:600px){#detail .fund-subsection .fund-grid{grid-template-columns:minmax(0,1fr);}}
-/* v1.305: a subsection with one card (Valuation) is as wide as one column of Traditional Analysis, and reads top to bottom like them, instead of spreading over the page. */
-#detail .fund-subsection .fund-grid>.fund-cell:only-child{grid-column:1 / 2;}
-@media (max-width:1399px){#detail .fund-subsection .fund-grid>.fund-cell:only-child:last-child:nth-child(odd){grid-column:1 / 2;}}
-/* v1.308: a factor with written points AND a metric table uses two columns when the page is wide: the points on the left, the metrics on the right (before, the metrics sat under the points and left a tall empty strip under the shorter cards beside it). */
-@media (min-width:1100px){
-  #detail .fund-subsection .fund-grid>.fund-cell:not(:only-child):has(.fund-cell-research):has(.data-chips){grid-column:span 2;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px;align-items:start;}
-  #detail .fund-subsection .fund-grid>.fund-cell:not(:only-child):has(.fund-cell-research):has(.data-chips)>:is(.fund-cell-head,.fund-cell-bar,.fund-cell-business,.fund-cell-flags,.fund-cell-note){grid-column:1 / -1;}
-  #detail .fund-subsection .fund-grid>.fund-cell:not(:only-child):has(.fund-cell-research):has(.data-chips)>.fund-cell-research{grid-column:1;}
-  #detail .fund-subsection .fund-grid>.fund-cell:not(:only-child):has(.fund-cell-research):has(.data-chips)>.data-chips{grid-column:2;margin-top:0;}
+/* v1.309: Stock page factor cards. Every card shows its metric rows first and the explanation after them.
+   A card with written points takes the whole row (metrics on the left, points on the right); the others go two to a row
+   (metrics on top, the sentence under them); a lone one takes the row. Phones: one column, metrics first. */
+#detail .fund-subsection .fund-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 44px;align-items:start;}
+#detail .fund-subsection .fund-grid>.fund-cell-wide{grid-column:1 / -1;}
+#detail .fund-cell-cols{display:flex;flex-direction:column;align-items:stretch;gap:12px;}
+#detail .fund-cell-cols>.data-chips{order:1;}
+#detail .fund-cell-cols>.fund-cell-exp{order:2;min-width:0;}
+#detail .fund-cell-cols>.data-chips:empty{display:none;}
+@media (min-width:1000px){
+  #detail .fund-cell-wide>.fund-cell-cols{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);column-gap:44px;align-items:start;}
+  #detail .fund-cell-wide>.fund-cell-cols>.data-chips{grid-column:1;}
+  #detail .fund-cell-wide>.fund-cell-cols>.fund-cell-exp{grid-column:2;}
+  #detail .fund-cell-wide>.fund-cell-cols>.data-chips:empty+.fund-cell-exp{grid-column:1 / -1;}
 }
-#detail .fund-subsection .fund-cell:only-child .fund-cell-research,#detail .fund-subsection .fund-cell:only-child .data-chips{grid-template-columns:minmax(0,1fr);}
+@media (max-width:900px){#detail .fund-subsection .fund-grid{grid-template-columns:minmax(0,1fr);}}
+/* The research points share one list with the Strengths and Watch-outs lines; those two carry a green or red dot. */
+.fr-plain .fr-bul{background:var(--buy);}
+.fr-plain.fr-neg .fr-bul{background:var(--avoid);}
+.fr-legend{display:flex;align-items:center;gap:6px;margin:0 0 8px;font-size:.78rem;color:var(--muted);}
+/* v1.309: inside a factor card the metric rows are one column and the points are one block (the older multi-column rules no longer apply). */
+#detail .fund-cell .data-chips{grid-template-columns:minmax(0,1fr);column-gap:0;}
+#detail .fund-cell .fund-cell-research{display:block;padding:0;margin:0 0 10px;border-top:0;}
+#detail .fund-cell .fund-cell-research .fund-research-sources{margin-top:6px;}
