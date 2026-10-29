@@ -251,6 +251,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.304 &middot; 2026-10-29</h3>
+            <ul>
+              <li><strong>Fix:</strong> stocks new in the latest Fundamental import (Harig Crankshaft, Sanblue Corp.) were left out of every <em>Refresh all stocks</em> run, so they never got technical data. A bulk run only used symbols already saved for each ISIN and never searched, so a new stock had to be opened and refreshed by hand first. The run now looks up the TradingView symbol by ISIN for up to 25 such stocks, saves it, and refreshes them in the same run. If TradingView lists the ISIN on neither NSE nor BSE, the skipped list now says so.</li>
+            </ul>
             <h3>v1.303 &middot; 2026-10-29</h3>
             <ul>
               <li><strong>Fix:</strong> a factor card could show link numbers (1, 2, 3) on its metric rows with no written bullets above to match. The bullets were hidden whenever the research listed no sources. They are now shown whenever there are any, and a number only appears on a row when its bullet is on the card.</li>

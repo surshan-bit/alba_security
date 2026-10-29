@@ -16,7 +16,7 @@ import { priceHistoryByTicker, pcTickerKey, ensureAllPriceBars } from '../prices
 import { refreshOneNow, priceJobs, saveFullBars } from '../prices/refresh.js';
 import { COMPACT_LAG, lagOf } from '../prices/recent.js';
 import { saveRecentBars, saveTechBlocks, sameValue } from './barchunks.js';
-import { isinOf, isinSymbolCached, useSavedSymbols } from '../tv/isin.js';
+import { isinOf, isinSymbolCached, resolveIsinSymbols, useSavedSymbols } from '../tv/isin.js';
 import { tvCall, tvErrorText, tvIsFatal, tvIsQuota, tvIstDate, tvMcp } from '../tv/connector.js';
 import { loadRuns } from '../strategies/tracking.js';
 import { priorityOrder } from './freshness.js';
@@ -41,6 +41,7 @@ const STEPS = [{ key: 'prepare', label: 'Prepare the stock list', w: 5 }, { key:
 
 // The TradingView symbol for a stock: its ISIN is in the database, and the symbol is the one the last run saved for it (see tv/isin.js). No TradingView search is made. null when it has none.
 const snapshotSymbol = isinSymbolCached;
+const SYMBOL_LOOKUPS_PER_RUN = 25;   // new stocks searched by ISIN in one bulk run (a search is 1 to 3 TradingView calls)
 let stopAsked = false;
 let busy = false;
 registerBusy(() => busy);
@@ -97,10 +98,21 @@ async function rsPrepare(run){
   stored.forEach(c => { if(c && Array.isArray(c.rows)) c.rows.forEach(r => { if(r && typeof r.k === 'string' && Array.isArray(r.c)) prevRows.set(r.k, { y: r.y, c: r.c, d: r.d || c.asof, t: r.t || c.at }); }); });
   fiSet('prepare', 'running', 'Using the saved TradingView symbols…', 0.5);
   await useSavedSymbols(stocks, s => { const p = prevRows.get(sanitizeDocId(tickerSymbol(s))); return p ? p.y : null; });
+  // v1.304: a stock with an ISIN but no saved symbol (typically one added by the latest Fundamental import, so no earlier run has seen it) is looked up
+  // by its ISIN now, a few per run, and the symbol is saved for next time. Before, it stayed out of every bulk run until someone opened it and pressed Refresh.
+  const lacking = stocks.filter(s => !snapshotSymbol(s) && isinOf(s)), looked = new Set(lacking.slice(0, SYMBOL_LOOKUPS_PER_RUN));
+  if(looked.size){
+    fiSet('prepare', 'running', 'Looking up TradingView symbols for ' + looked.size + ' new stock' + (looked.size === 1 ? '' : 's') + '…', 0.7);
+    // A refused or failed search only leaves those stocks without a symbol this time; it does not stop the run.
+    try { await resolveIsinSymbols([...looked]); } catch(e){ console.error('Could not look up the TradingView symbols', e); }
+  }
   const todo = [];
   for(const s of stocks){
     const sym = snapshotSymbol(s);
-    if(!sym){ run.skipped.push({ sym: tickerSymbol(s), name: s.name, reason: isinOf(s) ? 'No saved TradingView symbol (open the stock and press Refresh once)' : 'No ISIN saved (import the Fundamental CSV)' }); run.noSymbol.push(tickerSymbol(s) + ' ' + s.name); } else todo.push({ s, sym });
+    if(!sym){
+      const reason = !isinOf(s) ? 'No ISIN saved (import the Fundamental CSV)' : looked.has(s) ? 'TradingView has no NSE or BSE listing with ISIN ' + isinOf(s) : 'Not looked up yet: only ' + SYMBOL_LOOKUPS_PER_RUN + ' new stocks are searched per run (the next run continues)';
+      run.skipped.push({ sym: tickerSymbol(s), name: s.name, reason }); run.noSymbol.push(tickerSymbol(s) + ' ' + s.name);
+    } else todo.push({ s, sym });
   }
   fiSet('prepare', 'done', num(todo.length) + ' stocks' + (run.skipped.length ? ', ' + run.skipped.length + ' without a symbol' : ''));
   run.planned = todo.length;
