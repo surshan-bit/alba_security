@@ -27,6 +27,7 @@ const ANALYSIS_LB_COLUMNS = [
   { id: 'monthChg', label: 'M % chg', num: true, sortName: 'Monthly % change' },
   { id: 'weekRsi', label: 'W RSI', num: true },
   { id: 'monthRsi', label: 'M RSI', num: true },
+  { id: 'trend', label: 'Trend', title: 'Weekly and monthly Tech Rating, as two dots (hover a dot for its name)', sortName: 'Trend' },
   { id: 'techW', label: 'W Tech Rating' },
   { id: 'techM', label: 'M Tech Rating' },
   { id: 'news', label: 'News 14d', num: true, title: 'Positive and negative news items in the last 14 days' },
@@ -37,6 +38,11 @@ const ANALYSIS_LB_COLUMNS = [
   { id: 'tv', label: 'TradingView' },
 ];
 const ANALYSIS_LB_COLUMN_IDS = ANALYSIS_LB_COLUMNS.map(c => c.id);
+// v1.307: what Analysis shows until the person chooses otherwise: the Stock beside its rank, then the scores, price, moves, both RSIs and the Trend dots.
+// The other columns stay one tick away under Columns. The other stock grids (Strategies, Explorer, peers) keep the full column set in the registry order.
+const ANALYSIS_DEFAULT_ORDER = ['pin', 'rank', 'stock', 'score', 'techScore', 'mos', 'price', 'weekChg', 'monthChg', 'weekRsi', 'monthRsi', 'trend', 'techW', 'techM', 'news', 'industry', 'triggered', 'screener', 'tv'];
+const ANALYSIS_DEFAULT_HIDDEN = ['techW', 'techM', 'news', 'industry', 'triggered', 'screener', 'tv'];
+const ALWAYS_SHOWN = new Set(['pin', 'rank', 'stock']);   // the columns that cannot be hidden
 const ANALYSIS_LB_COLUMN_MAP = new Map(ANALYSIS_LB_COLUMNS.map(c => [c.id, c]));
 // Guards against a stale/corrupt persisted order (an unknown id, or a column added to the app
 // after the order was saved) by filtering to known ids and appending anything missing, rather
@@ -44,7 +50,7 @@ const ANALYSIS_LB_COLUMN_MAP = new Map(ANALYSIS_LB_COLUMNS.map(c => [c.id, c]));
 function analysisColumnOrder(){
   const saved = Array.isArray(analysisFilters.columnOrder)
     ? analysisFilters.columnOrder.filter(id => ANALYSIS_LB_COLUMN_MAP.has(id))
-    : [];
+    : ANALYSIS_DEFAULT_ORDER.filter(id => ANALYSIS_LB_COLUMN_MAP.has(id));
   // A column added after the order was saved (e.g. "Researched") is slotted in right after the
   // column that precedes it in the default list, so it shows up next to its neighbours instead of
   // being appended past the far-right TradingView link where it is easy to miss.
@@ -57,6 +63,12 @@ function analysisColumnOrder(){
   });
   return out;
 }
+// The columns the Analysis grid draws: the order above without the ones switched off (analysisFilters.hiddenCols; never saved means the default set).
+function analysisHiddenColumns(){
+  const list = Array.isArray(analysisFilters.hiddenCols) ? analysisFilters.hiddenCols : ANALYSIS_DEFAULT_HIDDEN;
+  return new Set(list.filter(id => ANALYSIS_LB_COLUMN_MAP.has(id) && !ALWAYS_SHOWN.has(id)));
+}
+const analysisVisibleColumns = () => { const hidden = analysisHiddenColumns(); return analysisColumnOrder().filter(id => !hidden.has(id)); };
 const rsiText = (v) => typeof v === 'number' && isFinite(v) ? v.toFixed(1) : '';
 // Numeric columns are right-aligned like the Strategies table (the `num` class).
 function analysisLbCell(colId, ctx){
@@ -112,6 +124,10 @@ function analysisLbCellRaw(colId, ctx){
     case 'news': return newsCellHtml(s);
     case 'weekRsi': return `<td>${rsiText(r.weekRsi)}</td>`;
     case 'monthRsi': return `<td>${rsiText(r.monthRsi)}</td>`;
+    case 'trend': {
+      const dot = (key, w) => { const t = techRatingInfo(s.technical && s.technical.states && s.technical.states[key]); return t ? `<span class="tr-dot ${t.cls}" title="${w}: ${t.label}" aria-label="${w}: ${t.label}"></span>` : `<span class="tr-dot tr-none" title="${w}: no rating" aria-label="${w}: no rating"></span>`; };
+      return `<td class="analysis-lb-trend"><span class="tr-dots">${dot('weekMacd', 'Weekly')}${dot('monthMacd', 'Monthly')}</span></td>`;
+    }
     case 'techW': return `<td>${techWCell}</td>`;
     case 'techM': return `<td>${techMCell}</td>`;
     case 'weekChg': return `<td data-live="weekChg">${pctChangeSpan(r.weekPctChange)}</td>`;
@@ -140,7 +156,7 @@ function analysisRowContext(s, i, idx){
 }
 // The columns of every other stock grid (Strategies, Explorer, a stock's peers): the Analysis "Columns" setting (its order), without the
 // pin column, which only the Analysis leaderboard has. Change the order once in Analysis and every grid follows.
-const stockGridColumnIds = () => analysisColumnOrder().filter(id => id !== 'pin');
+const stockGridColumnIds = () => (Array.isArray(analysisFilters.columnOrder) ? analysisColumnOrder() : ANALYSIS_LB_COLUMN_IDS).filter(id => id !== 'pin' && id !== 'trend');
 // ---- sorting by a column header ----
 // Every grid that draws its header with columnHeaderHtml(id, sort) gets clickable headers: a click sorts by that column, a second click reverses it.
 // `sort` is { col, dir } ('asc' | 'desc'). A stock with no figure for the column always goes last, whichever way the column is sorted.
@@ -163,6 +179,7 @@ const SORT_VALUE = {
   monthChg: (s) => rawOf(s, 'monthPctChange'),
   weekRsi: (s) => rawOf(s, 'weekRsi'),
   monthRsi: (s) => rawOf(s, 'monthRsi'),
+  trend: (s) => { const w = techRank(s, 'weekMacd'), m = techRank(s, 'monthMacd'); return w === null && m === null ? null : (w || 0) * 10 + (m || 0); },
   techW: (s) => techRank(s, 'weekMacd'),
   techM: (s) => techRank(s, 'monthMacd'),
   news: (s) => { const c = newsCounts(s); return c ? c.pos - c.neg : null; },
@@ -203,23 +220,25 @@ function columnHeaderHtml(id, sort){
 function renderAnalysisColumnsPanel(colOrder){
   if(!getAnalysisColumnsPanelOpen()) return '';
   const grip = '<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true" fill="currentColor"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
+  const hidden = analysisHiddenColumns();
   const rows = colOrder.map((id) => {
     const col = ANALYSIS_LB_COLUMN_MAP.get(id);
     const label = col.label || (id === 'pin' ? 'Pin' : id);
+    const fixed = ALWAYS_SHOWN.has(id);
     return `
-      <div class="analysis-column-row" data-col="${id}">
+      <div class="analysis-column-row${hidden.has(id) ? ' col-off' : ''}" data-col="${id}">
         <button type="button" class="analysis-col-grip" data-col="${id}" aria-label="Move ${escapeHtml(label)}: drag it, or press the up and down arrow keys" title="Drag to move">${grip}</button>
-        <span class="analysis-column-label">${escapeHtml(label)}</span>
+        <label class="analysis-column-label"><input type="checkbox" class="analysis-col-show" data-col="${id}"${hidden.has(id) ? '' : ' checked'}${fixed ? ' disabled' : ''} aria-label="Show ${escapeHtml(label)}"> ${escapeHtml(label)}</label>
       </div>
     `;
   }).join('');
   return `
     <div class="analysis-columns-panel" id="analysisColumnsPanel">
-      <div class="analysis-columns-panel-title">Reorder columns <span class="analysis-columns-hint">drag a row by its handle</span></div>
+      <div class="analysis-columns-panel-title">Columns <span class="analysis-columns-hint">tick to show, drag a row by its handle to move it</span></div>
       <div class="analysis-columns-list">${rows}</div>
-      <button type="button" class="analysis-reset-btn" id="analysisColumnsResetBtn">Reset order</button>
+      <button type="button" class="analysis-reset-btn" id="analysisColumnsResetBtn">Reset columns</button>
     </div>
   `;
 }
 
-export { ANALYSIS_LB_COLUMN_IDS, analysisColumnOrder, analysisLbCell, analysisRowContext, columnHeaderHtml, compareBy, compareByColumn, nextSort, renderAnalysisColumnsPanel, sortHeaderHtml, sortLabelOf, stockGridColumnIds };
+export { analysisColumnOrder, analysisHiddenColumns, analysisVisibleColumns, analysisLbCell, analysisRowContext, columnHeaderHtml, compareBy, compareByColumn, nextSort, renderAnalysisColumnsPanel, sortHeaderHtml, sortLabelOf, stockGridColumnIds };

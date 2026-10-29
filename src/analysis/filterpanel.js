@@ -13,6 +13,7 @@ import { strategyStockSet } from '../strategies/pick.js';
 import { sheetFrame } from '../ui/phonesheet.js';
 import { filtersOpenSaved, rememberFiltersOpen } from '../ui/filterdock.js';
 import { escapeHtml } from '../core/util.js';
+import { closestEl } from '../core/evt.js';
 import { isRebound } from '../list/rebound.js';
 import { ensureAllPriceBars } from '../prices/store.js';
 import { ideasStockSet, ideasWhen } from './ideasfilter.js';
@@ -227,6 +228,25 @@ function hiddenNote(){
         <p class="filter-note" id="analysisHiddenNote">Showing ${fmt(shown)} of ${fmt(base.length)} ${inIdeas ? 'stocks in the Buy / Sell ideas list' : inStrategy ? 'stocks that qualify for this strategy' : 'stocks'}. Hidden: ${parts.join('; ')}.</p>`;
 }
 
+// v1.307: what is filtered, as removable chips beside the Filters button, with a Clear all link. Each chip names its list and the value it removes.
+const FILTER_CHIP_LABELS = { buy: 'Buy', mbuy: 'Mild buy', hold: 'Hold', avoid: 'Avoid', green: 'MoS green', orange: 'MoS orange', red: 'MoS red', bull_above: 'Bullish above', bull_below: 'Bullish below', bear_above: 'Bearish above', bear_below: 'Bearish below', up: 'Upward trend', down: 'Downward trend' };
+function filterChipList(){
+  const f = analysisFilters, chips = [];
+  if(f.strategyId) chips.push({ list: 'strategyId', value: f.strategyId, label: 'Strategy: ' + f.strategyId });
+  f.ideas.forEach(v => chips.push({ list: 'ideas', value: v, label: FILTER_CHIP_LABELS[v] }));
+  f.verdicts.forEach(v => chips.push({ list: 'verdicts', value: v, label: 'Fund: ' + FILTER_CHIP_LABELS[v] }));
+  f.mosRatings.forEach(v => chips.push({ list: 'mosRatings', value: v, label: FILTER_CHIP_LABELS[v] }));
+  f.techW.forEach(v => chips.push({ list: 'techW', value: v, label: 'W: ' + FILTER_CHIP_LABELS[v] }));
+  f.techM.forEach(v => chips.push({ list: 'techM', value: v, label: 'M: ' + FILTER_CHIP_LABELS[v] }));
+  if(f.rebound) chips.push({ list: 'rebound', value: 'on', label: 'Rebound' });
+  return chips;
+}
+function filterChipsHtml(){
+  const chips = filterChipList();
+  if(!chips.length) return '';
+  return chips.map(c => `<span class="fchip">${escapeHtml(String(c.label))}<button type="button" data-fchip-list="${c.list}" data-fchip-value="${escapeHtml(String(c.value))}" aria-label="Remove ${escapeHtml(String(c.label))}">&times;</button></span>`).join('') + '<button type="button" class="fchip-clear" id="analysisClearFilters">Clear all</button>';
+}
+
 // Phones: the filters fold into one "Filters" line that lists what is selected (closed to start with).
 // Wide screens: the same button shows or hides the filter column, and the choice is remembered (src/ui/filterdock.js).
 var analysisFiltersOpen = filtersOpenSaved('aFiltersOpen');
@@ -234,7 +254,8 @@ function analysisFiltersHtml(){
   const facetCount = facetCounts();
   return `
     <div class="filters analysis-filters-panel${analysisFiltersOpen ? '' : ' filters-collapsed'}" id="analysisFilterPanel">
-      <button type="button" class="filters-toggle" id="analysisFiltersToggle" aria-expanded="${analysisFiltersOpen}" aria-controls="analysisFilterGroups"><span class="ft-label" aria-label="Filters"></span><span class="ft-summary" id="analysisFiltersSummary"></span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
+      <button type="button" class="filters-toggle" id="analysisFiltersToggle" aria-expanded="${analysisFiltersOpen}" aria-controls="analysisFilterGroups"><span class="ft-label" aria-label="Filters"></span>${filterChipList().length ? `<span class="ft-count">${filterChipList().length}</span>` : ''}<span class="ft-summary" id="analysisFiltersSummary"></span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
+      <span class="filter-chips" id="analysisFilterChips">${filterChipsHtml()}</span>
       ${sheetFrame(`      <div class="filter-groups" id="analysisFilterGroups">
       ${strategyGroup()}
       ${ideasGroup()}
@@ -292,6 +313,18 @@ function renderAnalysisFilterPanel(rerender){
     });
   }
   dockFiltersPanel();
+  const chipHost = document.getElementById('analysisFilterChips');
+  if(chipHost) chipHost.addEventListener('click', (e) => {
+    const f = analysisFilters, x = closestEl(e, '[data-fchip-list]'), clear = closestEl(e, '#analysisClearFilters');
+    if(x){
+      const list = /** @type {HTMLElement} */ (x).dataset.fchipList, v = /** @type {HTMLElement} */ (x).dataset.fchipValue;
+      if(list === 'strategyId') f.strategyId = ''; else if(list === 'rebound') f.rebound = false; else f[list] = f[list].filter(k => k !== v);
+    } else if(clear){
+      f.strategyId = ''; f.ideas = []; f.verdicts = []; f.mosRatings = []; f.techW = []; f.techM = []; f.rebound = false;
+    } else return;
+    saveAnalysisFilters(f);
+    rerender();
+  });
   document.querySelectorAll('#analysisStrategyFilter .filter-btn').forEach(btn => btn.addEventListener('click', () => {
     const id = /** @type {HTMLElement} */ (btn).dataset.astrat === 'all' ? '' : /** @type {HTMLElement} */ (btn).dataset.astrat;
     analysisFilters.strategyId = (id && id === analysisFilters.strategyId) ? '' : id;   // clicking the chosen one again goes back to All
