@@ -3,13 +3,14 @@
 // Moat / Governance only once they carry researched findings with a cited source. A factor that is an estimate
 // (the Moat and Governance peer-ranking proxies without sourced research) or has no data at all is shown as
 // "not scored" and left out; the score, verdict and the block scores are then worked out over the factors that
-// count, scaled to 10. No imports, so it can be used from the start-up code as well as the overlays.
+// count, scaled to 10. A factor that does not apply to the company at all (na) is left out the same way, never as average. No imports, so it can be used from the start-up code as well as the overlays.
 const PROXY_KEYS = new Set(['moat', 'gov']);
 const CATEGORY_KEYS = { Traditional: 'traditionalSubscore', Buffett: 'buffettSubscore', Valuation: 'valuationSubscore' };
 function hasSource(f){ const r = f && f.research; return !!(r && Array.isArray(r.sources) && r.sources.length); }
 // null when the factor counts, otherwise the reason it is left out.
 function exclusionReason(f){
   if(!f) return 'no data';
+  if(f.na) return 'it does not apply to ' + f.na;   // set by the import for a bank's or insurer's Financial Health
   if(PROXY_KEYS.has(f.key) && !hasSource(f)) return 'an estimate from peer rankings, not individually researched with a cited source';
   if(Array.isArray(f.metrics) && f.metrics.length && f.metrics.every(m => Array.isArray(m) && m[1] === 'n/a')) return 'no data available';
   // The import stores a factor it could not compute (missing input) as score 0. A real computed factor is never exactly 0
@@ -26,7 +27,7 @@ function countedPairs(factors){
   factors.forEach(f => {
     const why = exclusionReason(f);
     if(!why) ok.push([f, typeof f.score === 'number' ? f.score : 0]);
-    else if(!(PROXY_KEYS.has(f.key) && !hasSource(f))) ok.push([f, f.weight / 2]);
+    else if(!f.na && !(PROXY_KEYS.has(f.key) && !hasSource(f))) ok.push([f, f.weight / 2]);   // a factor that does not apply is dropped, not counted as average
   });
   return ok;
 }

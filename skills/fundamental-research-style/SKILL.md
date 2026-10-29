@@ -35,13 +35,15 @@ Apply these two rules to every piece of Fundamental Score research, whether it i
 - Lead with what it means for the business or the investor, then the number.
 - Say plainly when something could not be found or calculated. Never present a data gap as a strength. Mention it as a watch-out only when it limits how far the score can be trusted.
 - No hype, no filler, no stacked hedges. Do not repeat a point in two places.
+- Say each fact once. Never restate a number the card already shows unless the bullet explains what it means.
+- For a bank, insurer or lender, do not write about figures that do not apply to it (debt, liquidity ratios, Altman Z, debtor days); the research prompt carries a sector note saying so.
 - Only cite sources that were actually read. Never invent a figure, date or web address.
 
 ## Where this applies in the dashboard
 
 The fields below are stored per stock and shown on the stock detail screen:
 
-- Factor card research: `headline` (one plain sentence), `points` (3 or 4 short bullets), `positives` and `negatives` (up to 4 short bullets each), `sources`. Do not write a `summary` paragraph; it is only read for older records.
+- Factor card research: `headline` (one plain sentence), `points` (2 or 3 short bullets), `positives` and `negatives` (up to 2 short bullets each, only what the points do not already say), `sources`. Do not write a `summary` paragraph; it is only read for older records.
 - Strengths and Watch-outs box: up to 4 bullets each, one short sentence per bullet, with a tone of strong or good for strengths and caution or concern for watch-outs.
 - Global and Macro Information: up to 5 positive and 5 negative short items, each with a source and, when it was actually read, its link.
 
