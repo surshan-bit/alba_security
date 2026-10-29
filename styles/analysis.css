@@ -223,16 +223,16 @@ body.biz-full-open{overflow:hidden;}
 .dm-item.current .dm-t::after{content:" \2713";color:var(--accent);}
 
 /* v1.307: the Analysis grid. More room around every column, numbers right-aligned under right-aligned headers,
-   the ticker on a second line under the stock name, quiet headers, and the Trend column drawn as two dots. */
+   the ticker on the same line after the stock name, quiet headers, and the Trend column drawn as two dots. */
 .analysis-leaderboard .strat-table{border-spacing:0;width:100%;}
-.analysis-leaderboard .strat-table th{padding:14px 28px;font-size:.68rem;letter-spacing:.07em;font-weight:600;color:var(--muted);text-align:right;vertical-align:bottom;}
-.analysis-leaderboard .strat-table td{padding:18px 28px;line-height:1.4;text-align:right;vertical-align:middle;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line);}
+.analysis-leaderboard .strat-table th{padding:14px 32px;font-size:.68rem;letter-spacing:.07em;font-weight:600;color:var(--muted);text-align:right;vertical-align:bottom;}
+.analysis-leaderboard .strat-table td{padding:16px 32px;line-height:1.4;text-align:right;vertical-align:middle;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line);}
 .analysis-leaderboard .strat-table th:nth-child(1),.analysis-leaderboard .strat-table td:nth-child(1){padding-left:14px;padding-right:6px;text-align:center;}
 .analysis-leaderboard .strat-table th.strat-selcell,.analysis-leaderboard .strat-table td.strat-selcell{text-align:left;}
 .analysis-leaderboard .strat-table td.analysis-lb-rank{padding-right:10px;color:var(--muted);}
-.analysis-leaderboard .strat-table th:has(.th-sort[data-sort-col="stock"]),.analysis-leaderboard .strat-table td:has(> .stock-link){text-align:left;min-width:190px;padding-left:12px;}
-.analysis-leaderboard .strat-table td > .stock-link{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;}
-.analysis-leaderboard .strat-table td > .analysis-lb-ticker{display:block;margin:3px 0 0;font-size:.72rem;letter-spacing:.04em;color:var(--muted);}
+.analysis-leaderboard .strat-table th:has(.th-sort[data-sort-col="stock"]),.analysis-leaderboard .strat-table td:has(> .stock-link){text-align:left;min-width:300px;padding-left:12px;}
+.analysis-leaderboard .strat-table td > .stock-link{display:inline-block;vertical-align:middle;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;}
+.analysis-leaderboard .strat-table td > .analysis-lb-ticker{display:inline-block;vertical-align:middle;margin:0 0 0 12px;font-size:.72rem;letter-spacing:.04em;color:var(--muted);}
 .analysis-leaderboard .strat-table td.analysis-lb-industry,.analysis-leaderboard .strat-table td.analysis-lb-researched,.analysis-leaderboard .strat-table td:has(> .analysis-lb-link){text-align:left;}
 .analysis-leaderboard .strat-table th:has(.th-sort[data-sort-col="industry"]){text-align:left;}
 .analysis-leaderboard .strat-table .th-sort{padding:0;}
