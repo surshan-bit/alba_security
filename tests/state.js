@@ -275,6 +275,21 @@ async function ideasFilterScenarios(){
   });
 }
 
+// v1.296: a listed stock that is already a position carries an "In Trade Log" tag
+async function heldTagScenario(){
+  const U = FIXTURE[4];
+  const item = (s, holding) => ({ sym: symOf(s), name: s.name, cap: '', price: 100, reasons: ['x'], holding });
+  const snap = { v: 1, at: '2026-10-29T04:34:00.000Z', today: '2026-10-29', n: 2, up: 2, down: 0, mixed: 0, short: 0, lists: { up: [item(U, 'Hold'), item(FIXTURE[3], '')], down: [] } };
+  const docs = { 'data/users/u_SMOKE/ideasResults': { v: 1, json: JSON.stringify({ 'starter-deep-value': snap }), updatedAt: '2026-10-29T04:34:00.000Z' } };
+  await scenario('trade log: a listed stock already held is tagged', { section: 'trackrecord' }, docs, async page => {
+    await goto(page, 'trackrecord');
+    await until(page, () => document.querySelectorAll('#tradeIdeasStrategy option').length > 1, null, 'the strategy picker is filled');
+    await page.selectOption('#tradeIdeasStrategy', 'starter-deep-value');
+    await until(page, () => document.querySelectorAll('#tradeIdeasBody .tl-top5 li .tl-top5-head').length === 2, null, 'both stocks of the saved list are shown');
+    ok(await page.evaluate(() => { const t = document.querySelectorAll('#tradeIdeasBody .tl-held-tag'); return t.length === 1 && /In Trade Log . Hold/.test(t[0].textContent); }), 'only the held stock carries the In Trade Log tag, with its call');
+  });
+}
+
 // An inactive stock (not in the latest Fundamental CSV) is hidden from the lists and the search, but a position held in it stays on the Trade Log, tagged.
 async function inactiveScenario(){
   const off = Object.assign({}, FIXTURE[5], { active: false }), chunks = CHUNKS.map(c => c.map(s => s === FIXTURE[5] ? off : s));
@@ -294,7 +309,7 @@ async function inactiveScenario(){
 
 async function main(){
   base = await srv.listen(); browser = await chromium.launch();
-  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); } finally { await browser.close(); srv.close(); }
+  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); } finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('state tests FAILED (' + problems.length + ' problems, ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('state tests: ' + checks + ' checks passed');
 }

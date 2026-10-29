@@ -33,7 +33,11 @@ function ideasFor(strategyId){
   const today = tvIstDate();
   const list = qualifyingStocks(stocks, st.rules);
   const reads = rankReads(list.map(s => { const bars = priceHistoryByTicker[pcTickerKey(s)]; return bars && bars['1W'] ? nextWeekRead(bars['1W'], today) : null; }), list.map(trendOf));
-  return rankIdeas(list.map((s, i) => ({ s, c: ideaCall(s, held.get(s) || null, reads[i], today) })));
+  // A stock already in the Trade Log is ranked and listed like any other (v1.296); `holding` is the call its Trade Log card gives, shown beside its name.
+  return rankIdeas(list.map((s, i) => {
+    const trade = held.get(s) || null;
+    return { s, c: ideaCall(s, null, reads[i], today), holding: trade ? ideaCall(s, trade, reads[i], today).label || 'Held' : '' };
+  }));
 }
 
 let sid = '';
@@ -82,7 +86,7 @@ function progressHtml(st){
 }
 const remember = () => { try { localStorage.setItem('albaDashboard.ideasStrategy.v1', sid); } catch(e){ /* kept for this visit */ } };
 
-// The five best Buy calls of each trend among the stocks you do not hold: Upward trend (positive move) and Downward trend (bounce back).
+// The five best Buy calls of each trend (stocks already in the Trade Log included, tagged): Upward trend (positive move) and Downward trend (bounce back).
 const TOP_LISTS = [['up', 'Upward trend – positive move', 'Stocks whose weekly and monthly trends are both up, ranked by two-week score.'],
   ['down', 'Downward trend – bounce back', 'Stocks whose weekly and monthly trends are both down: a bet on a rebound, so the hit rate is lower and the risk higher.']];
 // What is kept of a finished Process (v1.293): the counts, the two Top 5 lists as shown, and when it was done, so it can be shown again after a refresh.
@@ -103,7 +107,7 @@ function snapshotOf(list){
   const nt = k => list.filter(x => x.c.trend === k).length, today = tvIstDate();
   const lists = {};
   TOP_LISTS.forEach(([t]) => {
-    lists[t] = topBuys(list, t, TOP_N).map(({ s, c }) => ({ sym: tickerSymbol(s), name: s.name || tickerSymbol(s), cap: c.cap || '', price: s.valuation && s.valuation.currentPrice != null ? Number(s.valuation.currentPrice) : null, reasons: c.reasons.slice(), news: newsOfStock(s) }));
+    lists[t] = topBuys(list, t, TOP_N).map(({ s, c, holding }) => ({ holding: holding || '', sym: tickerSymbol(s), name: s.name || tickerSymbol(s), cap: c.cap || '', price: s.valuation && s.valuation.currentPrice != null ? Number(s.valuation.currentPrice) : null, reasons: c.reasons.slice(), news: newsOfStock(s) }));
   });
   return { v: 1, at: new Date().toISOString(), today, n: list.length, up: nt('up'), down: nt('down'), mixed: nt('mixed'), short: list.filter(x => x.c.short).length, lists };
 }
@@ -118,7 +122,7 @@ function stampText(snap){
 function topHtml(snap){
   const item = (c, i) => {
     const idx = stocks.findIndex(s => tickerSymbol(s) === c.sym), price = c.price;
-    return `<li><span class="tl-top5-rank">${i + 1}</span><div class="tl-top5-body"><div class="tl-top5-head"><span>${idx >= 0 ? `<a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(c.name)}</a>` : escapeHtml(c.name)}<span class="analysis-lb-ticker">${escapeHtml(c.sym)}${c.cap && CAP_NAME[c.cap] ? ' &middot; ' + CAP_NAME[c.cap] : ''}</span></span>${price != null ? '<span class="tl-top5-price">&#8377;' + price.toLocaleString('en-IN') + '</span>' : ''}</div>
+    return `<li><span class="tl-top5-rank">${i + 1}</span><div class="tl-top5-body"><div class="tl-top5-head"><span>${idx >= 0 ? `<a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(c.name)}</a>` : escapeHtml(c.name)}<span class="analysis-lb-ticker">${escapeHtml(c.sym)}${c.cap && CAP_NAME[c.cap] ? ' &middot; ' + CAP_NAME[c.cap] : ''}</span>${c.holding ? `<span class="tl-held-tag" title="You already hold this stock; its Trade Log call is ${escapeHtml(c.holding)}">In Trade Log &middot; ${escapeHtml(c.holding)}</span>` : ''}</span>${price != null ? '<span class="tl-top5-price">&#8377;' + price.toLocaleString('en-IN') + '</span>' : ''}</div>
       <ul class="tl-top5-why">${c.reasons.map(r => '<li>' + escapeHtml(r) + '</li>').join('')}</ul>${c.news === undefined ? '' : newsHtml(c.news)}</div></li>`;
   };
   return TOP_LISTS.map(([t, title, hint]) => {
@@ -136,7 +140,7 @@ function bodyHtml(){
   if(!snap.n) return `<p class="upload-hint tl-ideas-done">Processed on ${stampText(snap)}: no stock qualified for this strategy.</p>`;
   const other = snap.n - snap.up - snap.down - snap.mixed;
   return `<p class="upload-hint tl-ideas-done"><b>Processed on ${stampText(snap)}.</b> ${snap.n} stocks: ${snap.up} in an upward trend, ${snap.down} downward, ${snap.mixed} mixed (in neither list)${other ? ', ' + other + ' without a trend or enough price history' : ''}${snap.short ? '; ' + snap.short + ' recent listing' + (snap.short === 1 ? '' : 's') + ' (under 80 weeks of prices) included' : ''}. Prices as of ${snap.today}, counting that week so far. These results stay until you press <b>Process again</b>.</p>${topHtml(snap)}
-    <p class="upload-hint">The two-week score comes from a model trained and tested week by week on five years of weekly prices (about 294,000 stock-weeks, return two weeks later): it rates how likely a stock is to beat the median stock over the next two weeks. Stocks are split by trend (weekly and monthly MACD both above their signal lines is Upward, both below is Downward; a mix is neither list) and ranked within their own trend, because the two behave differently: in the tests the best five Upward stocks each week were higher after two weeks about 54% of the time (all Upward stocks 51%), the best five Downward ones about 51% (all Downward 45%), so a bounce-back is the weaker bet. <b>Higher after 2 weeks</b> is how often stocks of that trend that ranked like this each week were higher two weeks later in those tests. A stock needs at least 53 weeks of prices. Recent listings (53 to 79 weeks) carry a <b>Short history</b> note and their own, lower tested hit rates, because new listings fall more often than older stocks and the sample is small; they have no monthly MACD yet, so their trend uses the weekly MACD only (noted on the card). A stock is a Buy when it is in the top ${BUY_TOP}% of its trend, and is held back when its margin of safety is zero or below, its Fundamental verdict is Avoid, results are due within ${RESULTS_DAYS} days, trading is very thin (under &#8377;${THIN_LAKH} lakh a day) or recent news clearly leans negative. The edge is real but modest (so expect nearly half to lose), and it cannot see the market: when most stocks fall, the best of them usually falls too. It always uses today&rsquo;s prices, counting this week so far; the model was trained on whole weeks, so a Friday-after-the-close run is the cleanest reading and an early-week run rests on fewer days of this week&rsquo;s move. Positions you hold are in the Trade Log above. The results-date and news checks need the latest Refresh all stocks.</p>`;
+    <p class="upload-hint">The two-week score comes from a model trained and tested week by week on five years of weekly prices (about 294,000 stock-weeks, return two weeks later): it rates how likely a stock is to beat the median stock over the next two weeks. Stocks are split by trend (weekly and monthly MACD both above their signal lines is Upward, both below is Downward; a mix is neither list) and ranked within their own trend, because the two behave differently: in the tests the best five Upward stocks each week were higher after two weeks about 54% of the time (all Upward stocks 51%), the best five Downward ones about 51% (all Downward 45%), so a bounce-back is the weaker bet. <b>Higher after 2 weeks</b> is how often stocks of that trend that ranked like this each week were higher two weeks later in those tests. A stock needs at least 53 weeks of prices. Recent listings (53 to 79 weeks) carry a <b>Short history</b> note and their own, lower tested hit rates, because new listings fall more often than older stocks and the sample is small; they have no monthly MACD yet, so their trend uses the weekly MACD only (noted on the card). A stock is a Buy when it is in the top ${BUY_TOP}% of its trend, and is held back when its margin of safety is zero or below, its Fundamental verdict is Avoid, results are due within ${RESULTS_DAYS} days, trading is very thin (under &#8377;${THIN_LAKH} lakh a day) or recent news clearly leans negative. The edge is real but modest (so expect nearly half to lose), and it cannot see the market: when most stocks fall, the best of them usually falls too. It always uses today&rsquo;s prices, counting this week so far; the model was trained on whole weeks, so a Friday-after-the-close run is the cleanest reading and an early-week run rests on fewer days of this week&rsquo;s move. A stock you already hold is listed too and tagged <b>In Trade Log</b> with the call its Trade Log card gives. The results-date and news checks need the latest Refresh all stocks.</p>`;
 }
 // The Process button and the strategy picker: both wait while the weekly prices are being read.
 function syncControls(){
