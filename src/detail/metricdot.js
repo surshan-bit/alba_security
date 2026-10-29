@@ -67,12 +67,16 @@ function metricTone(factor, k, v) {
   const n = numOf(v);
   if (n == null) return 'neu';
   const num = label => { const m = (factor.metrics || []).find(([x]) => x === label); return m ? numOf(m[1]) : null; };
+  // Banks, insurers and lenders: the fixed thresholds below are written for ordinary companies (a lender's debt of 4x is normal, a
+  // contingent liability is routine and is not scored), so those rows stay grey instead of showing a false alarm.
+  if (factor.sector && SECTOR_GREY.has(k)) return 'neu';
   const rel = relative(k, n, num);
   if (rel) return rel;
   const rule = RULES[k];
   return rule ? rule(n) : 'neu';
 }
 
+const SECTOR_GREY = new Set(['D/E', 'Interest coverage', 'Contingent liabilities']);
 const TONE_TITLE = { pos: 'Positive', neg: 'Negative', neu: 'Neutral or no clear signal' };
 function toneDotHtml(t) {
   return `<i class="mdot mdot-${t}" role="img" aria-label="${TONE_TITLE[t]}" title="${TONE_TITLE[t]}"></i>`;

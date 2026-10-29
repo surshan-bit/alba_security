@@ -1,6 +1,7 @@
 // Fundamental Score engine: turns a screener.in CSV row into factor scores.
 import { parseCSV } from './csvparse.js';
 import { marginOfSafety } from '../core/mos.js';
+import { financialKind, FIN_NOT_APPLICABLE, KIND_WORD, finFactorNotApplicable } from '../core/finsector.js';
 
 // ---- Fundamental Score engine v3 ----
 // ---- Generic O(n log n) percentile-rank engine ----
@@ -189,6 +190,8 @@ function useCroic(r) { return r.croic != null && !capexDragsCroic(r); }
 function reinvestMetric(r) { return useCroic(r) ? r.croic : r.roic != null ? r.roic : r.croic; }
 function marginOfSafetyPct(r) { return marginOfSafety(r.intrinsicValue, r.currentPrice); }
 const groupKey = r => r.industryGroup;
+// False when a Financial Health figure does not describe this kind of company (a bank's current ratio, a lender's Altman Z...).
+const finApplies = (r, field) => !(FIN_NOT_APPLICABLE[r.finKind] || []).includes(field);
 
 // ---- Verdict thresholds (section 6) ----
 function scoreToVerdict(score) {
@@ -209,15 +212,17 @@ function scoreCsv(csvText, opts) {
   // v3: attach each record's exact industry label (symbol -> label map built from the dashboard's own ticker fields; keys normalised with normSym).
   const exactMap = opts && opts.exactIndustryBySym;
   for (const r of records) r.exactIndustry = exactMap ? (exactMap.get(normSym(r.sym)) || null) : null;
+  // Banks, insurers and lenders: the Financial Health figures that mean nothing for them are skipped (see core/finsector.js).
+  for (const r of records) r.finKind = financialKind(r);
   const moatBasis = new Map(), piotBasis = new Map();
 
   const pct = {
-    deInv: relativePercentiles(records, r => { const d = deRankValue(r); return d == null ? null : -d; }, groupKey),
-    intCov: relativePercentiles(records, r => r.interestCoverage, groupKey),
-    quick: relativePercentiles(records, r => r.quickRatio, groupKey),
-    altmanZ: relativePercentiles(records, r => r.altmanZ, groupKey),
-    currentRatio: relativePercentiles(records, r => r.currentRatio, groupKey),
-    debtorDaysInv: relativePercentiles(records, r => (r.avgDebtorDays3 != null ? -r.avgDebtorDays3 : null), groupKey),
+    deInv: relativePercentiles(records, r => { const d = finApplies(r, 'de') ? deRankValue(r) : null; return d == null ? null : -d; }, groupKey),
+    intCov: relativePercentiles(records, r => (finApplies(r, 'interestCoverage') ? r.interestCoverage : null), groupKey),
+    quick: relativePercentiles(records, r => (finApplies(r, 'quickRatio') ? r.quickRatio : null), groupKey),
+    altmanZ: relativePercentiles(records, r => (finApplies(r, 'altmanZ') ? r.altmanZ : null), groupKey),
+    currentRatio: relativePercentiles(records, r => (finApplies(r, 'currentRatio') ? r.currentRatio : null), groupKey),
+    debtorDaysInv: relativePercentiles(records, r => (finApplies(r, 'avgDebtorDays3') && r.avgDebtorDays3 != null ? -r.avgDebtorDays3 : null), groupKey),
     roceEff: relativePercentiles(records, roceEffective, groupKey),
     roeEff: relativePercentiles(records, roeEffective, groupKey),
     opm: relativePercentiles(records, r => r.opm, groupKey),
@@ -255,11 +260,13 @@ function scoreCsv(csvText, opts) {
 
 function scoreOne(r, pct, moatPct) {
   const factors = [];
-  const finScore = weightedPartial(1.8, [
+  // A bank or insurer has no applicable figure here: the factor is left out (na) and its weight shared by the others below.
+  const finNa = finFactorNotApplicable(r.finKind);
+  const finScore = finNa ? null : weightedPartial(1.8, [
     { coef: 0.35, pct: pct.deInv.get(r) }, { coef: 0.55, pct: pct.intCov.get(r) }, { coef: 0.35, pct: pct.quick.get(r) },
     { coef: 0.35, pct: pct.altmanZ.get(r) }, { coef: 0.20, pct: pct.currentRatio.get(r) }, { coef: 0.20, pct: pct.debtorDaysInv.get(r) },
   ]);
-  factors.push({ key: 'fin', label: 'Financial Health & Balance Sheet', weight: 1.8, score: finScore });
+  factors.push({ key: 'fin', label: 'Financial Health & Balance Sheet', weight: 1.8, score: finScore, na: finNa ? KIND_WORD[r.finKind] : undefined });
 
   const trend = [r.profitGrowth3, r.profitGrowth5].filter(v => v != null);
   const trendAvg = trend.length ? trend.reduce((a, b) => a + b, 0) / trend.length : null;
@@ -330,10 +337,13 @@ function scoreOne(r, pct, moatPct) {
   factors.push({ key: 'dcf', label: 'Valuation & Margin of Safety', weight: 1.0, score: mosP != null ? 1.0 * mosP / 100 : null });
 
   const presentScores = factors.filter(f => f.score != null).map(f => f.score);
-  const score = presentScores.length ? Math.round(presentScores.reduce((a, b) => a + b, 0) * 100) / 100 : null;
+  // Factors that do not apply (na) are not counted as zero: the weights that do apply are scaled up to make 10 again.
+  const naWeight = factors.filter(f => f.na).reduce((a, f) => a + f.weight, 0);
+  const score = presentScores.length ? Math.round(presentScores.reduce((a, b) => a + b, 0) * (10 / (10 - naWeight)) * 100) / 100 : null;
   const verdict = scoreToVerdict(score);
   const by = k => (factors.find(f => f.key === k).score || 0);
-  const traditionalSubscore = score != null ? Math.round(((by('fin') + by('prof') + by('growth') + by('val')) / 5.85) * 10 * 100) / 100 : null;
+  const tradWeight = 5.85 - factors.filter(f => f.na && ['fin', 'prof', 'growth', 'val'].includes(f.key)).reduce((a, f) => a + f.weight, 0);
+  const traditionalSubscore = score != null ? Math.round(((by('fin') + by('prof') + by('growth') + by('val')) / tradWeight) * 10 * 100) / 100 : null;
   const buffettSubscore = score != null ? Math.round(((by('moat') + by('gov') + by('predict') + by('reinvest')) / 3.15) * 10 * 100) / 100 : null;
   const valuationSubscore = score != null ? Math.round((by('dcf') / 1.0) * 10 * 100) / 100 : null;
   return { factors, score, verdict, traditionalSubscore, buffettSubscore, valuationSubscore, mosPct: marginOfSafetyPct(r) };
@@ -375,10 +385,13 @@ function buildFactor(key, r, sc, industry, group, scored) {
   const fa = scored.factors.find(x => x.key === key);
   let metrics, note;
   if (key === 'fin') {
-    metrics = [['D/E', xx(r.de)], ['Interest coverage', xx(r.interestCoverage)], ['Quick ratio', xx(r.quickRatio)], ['Altman Z', f(r.altmanZ, 2)],
-      ['Current ratio', xx(r.currentRatio)], ['Avg debtor days 3yr', f(r.avgDebtorDays3, 1)], ['Contingent liabilities', cr(r.contingentLiabilities)]];
-    note = `Mechanically scored from screener.in data: balance-sheet profile (D/E ${xx(r.de)}, interest coverage ${xx(r.interestCoverage)}, Altman Z ${f(r.altmanZ, 2)}, current ratio ${xx(r.currentRatio)}).` +
-      (n(r.contingentLiabilities) && r.contingentLiabilities > 0 ? ` Contingent liabilities of ${cr(r.contingentLiabilities)} noted as a risk flag (not scored).` : '');
+    const all = [['D/E', xx(r.de), 'de'], ['Interest coverage', xx(r.interestCoverage), 'interestCoverage'], ['Quick ratio', xx(r.quickRatio), 'quickRatio'], ['Altman Z', f(r.altmanZ, 2), 'altmanZ'],
+      ['Current ratio', xx(r.currentRatio), 'currentRatio'], ['Avg debtor days 3yr', f(r.avgDebtorDays3, 1), 'avgDebtorDays3']];
+    metrics = all.filter(m => finApplies(r, m[2])).map(m => [m[0], m[1]]).concat([['Contingent liabilities', cr(r.contingentLiabilities)]]);
+    const flag = n(r.contingentLiabilities) && r.contingentLiabilities > 0 ? ` Contingent liabilities of ${cr(r.contingentLiabilities)} noted as a risk flag (not scored).` : '';
+    if (fa.na) note = `Left out of the score: debt, liquidity, distress-model and debtor figures do not describe ${r.finKind === 'insurer' ? 'an insurer' : 'a bank'}.` + flag;
+    else if (r.finKind === 'lender') note = `Scored against other lenders on debt compared with the owners' money (${xx(r.de)}) and interest cover (${xx(r.interestCoverage)}); liquidity, distress-model and debtor figures are left out.` + flag;
+    else note = `Mechanically scored from screener.in data: balance-sheet profile (D/E ${xx(r.de)}, interest coverage ${xx(r.interestCoverage)}, Altman Z ${f(r.altmanZ, 2)}, current ratio ${xx(r.currentRatio)}).` + flag;
   } else if (key === 'prof') {
     metrics = [['ROCE', pc(r.roce)], ['ROE', pc(r.roe)], ['OPM', pc(r.opm)], ['Median ROCE 10yr', pc(r.medianRoce10)], ['Avg ROE 7yr', pc(r.avgRoe7)]];
     note = `Mechanically scored: capital efficiency blending current-year and multi-year-average ROCE/ROE with OPM (ROCE ${pc(r.roce)}, ROE ${pc(r.roe)}, OPM ${pc(r.opm)}).` + eqText(fa.note);
@@ -414,7 +427,8 @@ function buildFactor(key, r, sc, industry, group, scored) {
     note = `Mechanically scored: Screener.in's own Intrinsic Value estimate ₹${px0(r.intrinsicValue)} vs current price ₹${px(r.currentPrice)} (${n(mos) ? mos.toFixed(1) + '%' : 'n/a'} margin of safety, ranked against the current dataset).` +
       (n(r.graham) ? ` Cross-check: Graham Number ₹${px0(r.graham)}` + (n(r.intrinsicValue) && r.intrinsicValue > 0 && Math.abs(r.graham - r.intrinsicValue) / r.intrinsicValue > 0.3 ? ' (diverges notably from Intrinsic Value — informational only, not scored).' : '.') : '');
   }
-  return { category: NAMES[key][0], key, metrics, name: NAMES[key][1], note, score: fa.score == null ? 0 : fa.score, weight: fa.weight };
+  const kindFields = key === 'fin' && r.finKind ? { sector: r.finKind, ...(fa.na ? { na: fa.na } : {}) } : {};
+  return { category: NAMES[key][0], key, metrics, name: NAMES[key][1], note, score: fa.score == null ? 0 : fa.score, weight: fa.weight, ...kindFields };
 }
 // discount sentences derived from the engine's own notes
 function eqText(en) { if (!en) return ''; if (en.includes('0.55x')) return ' (TTM growth far above multi-year trend — cyclical-spike discount applied)'; if (en.includes('0.8x')) return ' (TTM growth notably ahead of multi-year trend — mild discount applied)'; return ''; }

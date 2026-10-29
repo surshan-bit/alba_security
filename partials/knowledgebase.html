@@ -251,6 +251,14 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.313 &middot; 2026-10-29</h3>
+            <ul>
+              <li><strong>Banks and insurers: Financial Health is no longer scored.</strong> Debt, interest cover, liquidity ratios, Altman Z and debtor days were built for companies that sell goods and services; they say nothing about a bank or an insurer. The card now shows &ldquo;Not scored&rdquo;, and its weight is shared across the other factors so the score still adds up to 10.</li>
+              <li><strong>Lenders (finance companies, housing finance, microfinance):</strong> only debt compared with the owners&rsquo; money and how easily profit pays the interest bill count, ranked against other lenders. Liquidity ratios, Altman Z and debtor days are left out.</li>
+              <li><strong>No false alarms on those cards:</strong> debt, interest cover and contingent liabilities show a grey dot for banks, insurers and lenders instead of red.</li>
+              <li><strong>Scores move only after the next Fundamental CSV import.</strong> Checked on the stored data: across 33 banks and 14 insurers the average score moves by about 0.05, but individual stocks move between &minus;0.8 and +1.1 and 8 verdicts change. This replaces the v1.289 decision to leave banks alone, which looked only at the average.</li>
+              <li><strong>Shorter written cards (Refresh Fundamental Info):</strong> 2 or 3 points, at most 2 extra positives and 2 negatives that the points do not already say, each fact once, and no repeating numbers the metric rows already show. For banks, insurers and lenders Claude is told which figures do not apply, so it stops writing about them.</li>
+            </ul>
             <h3>v1.312 &middot; 2026-10-29</h3>
             <ul>
               <li><strong>Bigger bullets beside the explanations:</strong> the dots in front of each point are now the same size as the dots beside the metric rows, in the same colours.</li>
