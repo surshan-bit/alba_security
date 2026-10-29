@@ -45,13 +45,13 @@ const PROXY_NOTE_KEYS = new Set(['moat', 'gov']);
 // A small pill saying where a statement or figure comes from (v1.299): CSV, TradingView (which part) or Claude's view.
 // v1.301: shown as a small icon (generic marks, not brand logos); the full name is in the tooltip and the accessible label.
 const SRC_ICON = {
-  csv: '<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6 3v10M10 3v10"/>',
   tv: '<path d="M4 3v10M8 5v8M12 2v9" /><rect x="2.8" y="5" width="2.4" height="5" rx=".4" fill="currentColor"/><rect x="6.8" y="7" width="2.4" height="4" rx=".4" fill="currentColor"/><rect x="10.8" y="4" width="2.4" height="5" rx=".4" fill="currentColor"/>',
   claude: '<path d="M8 1.5l1.5 4.2 4.2 1.5-4.2 1.5L8 12.9 6.5 8.7 2.3 7.2l4.2-1.5z" fill="currentColor"/>',
   warn: '<path d="M8 2l6.5 11.5h-13z"/><path d="M8 6.5v3.2M8 11.6v.1"/>',
 };
 const srcIcon = (kind, label) => `<span class="srcico st-${kind}" role="img" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SRC_ICON[kind]}</svg></span>`;
-const tagPill = code => srcIcon(code.startsWith('tv') ? 'tv' : code, BASIS_LABEL[code]);
+// v1.305: the CSV is where most figures come from, so it gets no icon; only TradingView and Claude's own view are marked.
+const tagPill = code => code === 'csv' ? '' : srcIcon(code.startsWith('tv') ? 'tv' : code, BASIS_LABEL[code]);
 const numBadges = ns => ns.slice(0, 2).map(n => `<span class="fr-n">${n}</span>`).join('') + (ns.length > 2 ? '<span class="fr-n fr-more">+</span>' : '');
 // Long decimals from TradingView (13.9496814684338) are shown to two places.
 const tidyValue = v => String(v).replace(/-?\d+\.\d{3,}/g, m => parseFloat(m).toFixed(2));
@@ -126,7 +126,7 @@ function renderFactorResearchBlock(f, view){
   return `
     <div class="fund-cell-research">
       ${stale}
-      ${pts.length ? `<ul class="fund-research-list pts${pts.some(p => p.tags.length || p.n) ? ' fr-tagged' : ''}">${pts.map(pointLi).join('')}</ul>` : (r.summary ? `<p class="fund-research-summary">${escapeHtml(r.summary)}</p>` : '')}
+      ${pts.length ? `<ul class="fund-research-list pts${pts.some(p => p.tags.some(t => t !== 'csv') || p.n || !p.ok) ? ' fr-tagged' : ''}">${pts.map(pointLi).join('')}</ul>` : (r.summary ? `<p class="fund-research-summary">${escapeHtml(r.summary)}</p>` : '')}
       ${pos.length ? `<ul class="fund-research-list pos">${pos.map(li).join('')}</ul>` : ''}
       ${neg.length ? `<ul class="fund-research-list neg">${neg.map(li).join('')}</ul>` : ''}
       ${rest.length ? `<div class="fund-research-sources">Sources: ${rest.map(src).join(' · ')}</div>` : ''}
