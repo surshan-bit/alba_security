@@ -789,6 +789,15 @@ test('metric dots (v1.298): green / red / grey by fixed thresholds', () => {
   assert.strictEqual(t('Industry P/E', '18.15x', f), 'neu'); assert.strictEqual(t('Unknown thing', '5'), 'neu');
   assert.match(D.metricDotHtml({ metrics: [] }, 'D/E', '0.5x'), /mdot-pos/);
 });
+test('bullets and link numbers (v1.303): numbers always have a bullet to match', async () => {
+  const V = load('src/detail/pointview.js');
+  const f = { name: 'Financial Health', key: 'fin', score: 1, weight: 1.8, metrics: [['D/E', '0.5x'], ['Quick ratio', '1.2x']],
+    research: { asof: '2026-10-29', points: [{ text: 'Debt is low at 0.5x.', basis: ['csv'], refs: ['D/E'], ok: true }, { text: 'The debt is low at 0.5x.', basis: ['csv'], refs: ['D/E'], ok: true }, { text: 'Quick ratio is comfortable at 1.2x.', basis: ['csv'], refs: ['Quick ratio'], ok: true }], sources: [] } };
+  const v = V.pointsView(f);
+  assert.strictEqual(v.pts.length, 2, 'a repeated sentence is shown once');
+  assert.deepStrictEqual(v.pts.map(p => p.n), [1, 2], 'numbers follow the bullets that are shown');
+  assert.deepStrictEqual(Array.from(v.nums.get('Quick ratio')), [2]);
+});
 test('repeated sentences (v1.301): a Strengths line that restates a numbered point is dropped', async () => {
   const S = load('src/core/sourcetags.js');
   const pts = [{ text: "Profit earned on owners' money is 13.5%, above its 7-year average of 9.4%." }, { text: 'Profit earned on all money invested is low at 6.4%, barely above its 10-year median of 6.1%.' }];
