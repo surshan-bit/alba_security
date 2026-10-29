@@ -93,7 +93,7 @@ footer{margin-top:26px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",s
 .fund-research-list.fr-tagged .fr-pt .fr-n{margin-top:3px;align-self:flex-start;}
 .fund-research-list.fr-tagged .fr-pt:not([data-n]){padding-left:28px;}
 .data-chip .chip-l{flex:1 1 0;min-width:0;}
-.data-chip .chip-r{display:inline-flex;align-items:baseline;gap:0;white-space:nowrap;flex:none;}
+.data-chip .chip-r{display:inline-flex;align-items:baseline;flex-wrap:wrap;justify-content:flex-end;row-gap:2px;min-width:0;max-width:70%;flex:0 1 auto;}
 .data-chip.chip-new{flex-wrap:wrap;border-top-style:dashed;}
 .data-chip .chip-note{flex-basis:100%;font-size:.7rem;color:var(--hold);padding-left:26px;}
 /* Hover a numbered bullet to light up the rows it relies on, or a row to light up its bullets (no script). */
