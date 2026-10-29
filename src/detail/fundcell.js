@@ -7,7 +7,7 @@ import { fundMissingMetrics } from './completeness.js';
 import { FUND_METRIC_LABEL, PERCENTILE_METRIC_KEYS, fundMetricDisplay, fundMetricNum, fundNoteExtra } from './fundmetrics.js';
 import { fundBusinessSummary, isProxyFactor } from './fundtext.js';
 import { metricDotHtml, toneDotHtml } from './metricdot.js';
-import { BASIS_LABEL } from '../core/sourcetags.js';
+import { BASIS_LABEL, dropRepeats } from '../core/sourcetags.js';
 import { pointsView } from './pointview.js';
 
 // Governance red-flag chips (added 2026-10-06) — surfaces the genuinely governance-relevant
@@ -49,7 +49,7 @@ const numBadges = ns => ns.slice(0, 2).map(n => `<span class="fr-n">${n}</span>`
 const tidyValue = v => String(v).replace(/-?\d+\.\d{3,}/g, m => parseFloat(m).toFixed(2));
 // One metric row: [number slot] [dot] label + source tag ........ value (right-aligned, one column for the whole card).
 function rowHtml(slot, cls, ns, dot, label, tag, value, extra, attrs){
-  return `<span class="data-chip ${cls}"${ns.length ? ` data-n="${ns.join(' ')}"` : ''}${attrs || ''}>${slot ? `<span class="chip-n">${numBadges(ns)}</span>` : ''}${dot}<span class="chip-label">${label}${tag}</span><b class="chip-val">${value}</b>${extra || ''}</span>`;
+  return `<span class="data-chip ${cls}"${ns.length ? ` data-n="${ns.join(' ')}"` : ''}${attrs || ''}>${dot}<span class="chip-label">${label}${tag}</span><b class="chip-val">${value}</b>${slot ? `<span class="chip-n">${numBadges(ns)}</span>` : ''}${extra || ''}</span>`;
 }
 function chipHtml(f, view, k, v){
   const ns = view.nums.get(k) || [], fromTv = (f.metricsTv || []).includes(k);
@@ -107,14 +107,18 @@ function renderFactorResearchBlock(f, view){
     return x && /^https?:\/\//.test(x.url || '') ? `<a href="${escapeHtml(x.url)}" target="_blank" rel="noopener noreferrer">${title} ↗</a>` : title;
   };
   // A news source already linked on a bullet is not listed again.
-  const linked = new Set(view.pts.map(p => p.url).filter(Boolean));
+  // v1.301: a Strengths / Watch-outs line that repeats a numbered point (or each other) is shown once.
+  const pts = dropRepeats(view.pts, []);
+  const pos = dropRepeats(r.positives, pts);
+  const neg = dropRepeats(r.negatives, pts.concat(pos));
+  const linked = new Set(pts.map(p => p.url).filter(Boolean));
   const rest = (Array.isArray(r.sources) ? r.sources : []).filter(x => !(x && typeof x === 'object' && linked.has(x.url)));
   return `
     <div class="fund-cell-research">
       ${stale}
-      ${view.pts.length ? `<ul class="fund-research-list pts${view.pts.some(p => p.tags.length || p.n) ? ' fr-tagged' : ''}">${view.pts.map(pointLi).join('')}</ul>` : (r.summary ? `<p class="fund-research-summary">${escapeHtml(r.summary)}</p>` : '')}
-      ${r.positives && r.positives.length ? `<ul class="fund-research-list pos">${r.positives.map(li).join('')}</ul>` : ''}
-      ${r.negatives && r.negatives.length ? `<ul class="fund-research-list neg">${r.negatives.map(li).join('')}</ul>` : ''}
+      ${pts.length ? `<ul class="fund-research-list pts${pts.some(p => p.tags.length || p.n) ? ' fr-tagged' : ''}">${pts.map(pointLi).join('')}</ul>` : (r.summary ? `<p class="fund-research-summary">${escapeHtml(r.summary)}</p>` : '')}
+      ${pos.length ? `<ul class="fund-research-list pos">${pos.map(li).join('')}</ul>` : ''}
+      ${neg.length ? `<ul class="fund-research-list neg">${neg.map(li).join('')}</ul>` : ''}
       ${rest.length ? `<div class="fund-research-sources">Sources: ${rest.map(src).join(' · ')}</div>` : ''}
     </div>`;
 }

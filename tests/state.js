@@ -295,7 +295,7 @@ async function sourceTagsScenario(){
   const T = FIXTURE[2], sym = symOf(T), fin = T.fundamentals.factors.find(f => f.key === 'fin'), m0 = fin.metrics[0][0], m1 = fin.metrics[1][0];
   const research = { ticker: sym, asof: '2026-10-29', changeNote: 'x', metricsFilled: 0, factors: { fin: { metricsTv: [m1], research: { asof: '2026-10-29', headline: 'Headline', sources: [{ title: 'Wire', url: 'https://news.example/n1' }, { title: 'Other source', url: 'https://news.example/n2' }],
     points: [{ text: 'Debt sentence', basis: ['csv', 'claude'], refs: [m0], ok: true }, { text: 'News sentence', basis: ['tv-news'], refs: [], ok: true, url: 'https://news.example/n1', src: 'Order win' }, { text: 'Odd figure 55.5%', basis: ['claude'], refs: [m0], ok: false }, 'Old plain sentence'],
-    facts: [{ label: 'Price to book value (TradingView)', value: '13.9496814684338', basis: 'tv-financials', tone: 'pos', note: 'differs from the CSV' }], positives: [], negatives: [] } } } };
+    facts: [{ label: 'Price to book value (TradingView)', value: '13.9496814684338', basis: 'tv-financials', tone: 'pos', note: 'differs from the CSV' }], positives: ['Debt sentence', 'A separate strength worth noting'], negatives: [] } } } };
   await scenario('stock page: bullets carry source tags and numbered links', { section: 'analysis' }, { ['stockResearch/' + sid(sym)]: research }, async page => {
     await page.fill('#globalSearch', T.name); await page.waitForTimeout(300); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
     await until(page, () => document.querySelectorAll('#detail .fund-cell-research .fr-pt').length === 4, null, 'the four bullets are shown');
@@ -310,6 +310,8 @@ async function sourceTagsScenario(){
         csvTags: chips.filter(c => !c.classList.contains('chip-new')).map(c => c.querySelector('.srctag') && c.querySelector('.srctag').textContent),
         filled: (chip('Interest coverage') || {}).querySelector && chip('Interest coverage').querySelector('.srctag').textContent,
         rowNum: chip('Debt-to-Equity') && chip('Debt-to-Equity').getAttribute('data-n'),
+        pos: Array.from(document.querySelectorAll('#detail .fund-cell-research .fund-research-list.pos li')).map(e => e.textContent),
+        badgeRight: (() => { const c = document.querySelector('#detail .fund-cell .data-chip[data-n]'); const n = c && c.querySelector('.chip-n'), v = c && c.querySelector('.chip-val'); return !!(n && v && n.getBoundingClientRect().left >= v.getBoundingClientRect().right - 1); })(),
         sources: Array.from(document.querySelectorAll('#detail .fund-research-sources')).map(e => e.textContent),
         align: Array.from(document.querySelectorAll('#detail .fund-cell .data-chip .chip-val')).every(e => getComputedStyle(e).textAlign === 'right'),
         gutters: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt .fr-body')).map(e => Math.round(e.getBoundingClientRect().left)).filter((v, i, a) => a.indexOf(v) === i).length
@@ -320,6 +322,8 @@ async function sourceTagsScenario(){
     ok(r.link === 'https://news.example/n1', 'a news bullet links to its headline');
     ok(r.factRow && /Price to book value:/.test(r.factRow.text) && !/\(TradingView\)/.test(r.factRow.text) && /13\.95/.test(r.factRow.text) && !/13\.9496/.test(r.factRow.text) && r.factRow.tag === 'TradingView financials', 'an extra figure row from TradingView is added, tagged, without a repeated (TradingView) and with a long decimal rounded: ' + JSON.stringify(r.factRow));
     ok(r.sources.length === 1 && /Other source/.test(r.sources[0]) && !/Wire/.test(r.sources[0]), 'the Sources line lists only what no bullet already links to: ' + JSON.stringify(r.sources));
+    ok(r.pos.length === 1 && /separate strength/.test(r.pos[0]), 'a Strengths line that repeats a numbered bullet is dropped: ' + JSON.stringify(r.pos));
+    ok(r.badgeRight, 'the link numbers sit at the right end of the row, after the value');
     ok(r.align, 'every metric value is right-aligned');
     ok(r.gutters === 1, 'every bullet sentence starts at the same left edge (numbered or not)');
     ok(r.csvTags.every(t => t === 'CSV' || t === 'TradingView') && r.filled === 'TradingView', 'every metric row names its source, and a row TradingView filled says TradingView');
