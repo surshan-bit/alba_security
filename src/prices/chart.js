@@ -132,8 +132,15 @@ function initPriceChart(s){
         g += path('hu', 'pc-mhu') + path('hd', 'pc-mhd') + `<line x1="${padL}" x2="${W - padR}" y1="${f(y0)}" y2="${f(y0)}" class="pc-mzero"/><text x="${W - padR + 6}" y="${f(y0 + 4)}">0</text>` + path('lm', 'pc-mline') + path('ls', 'pc-msig');
       }
     }
-    const every =c.every ? (W < 520 ? c.every * 2 : c.every) : Math.max(1, Math.round(n / (W < 520 ? 4 : 8)));
-    b.forEach((r, i) => { if(i % every === 0) g += `<text x="${X(i)}" y="${H - 5}" text-anchor="middle">${fmtD(r[0], c.lbl)}</text>`; });
+    // Date labels: spaced by the room they need (so neighbours never touch) and kept inside the chart's side edges.
+    const LBW = 50, minBars = Math.max(1, Math.ceil(LBW / step));
+    const every = c.every ? c.every * Math.max(1, Math.ceil(minBars / c.every)) : Math.max(minBars, Math.round(n / (W < 520 ? 4 : 8)));
+    b.forEach((r, i) => {
+      if(i % every !== 0) return;
+      const x = X(i), t = fmtD(r[0], c.lbl), hw = t.length * 3.1;
+      const a = x - hw < padL ? ['start', padL] : x + hw > W - padR + 20 ? ['end', W - padR + 20] : ['middle', x];
+      g += `<text x="${f(a[1])}" y="${H - 5}" text-anchor="${a[0]}">${t}</text>`;
+    });
     // Event tags, one lane per kind, under the volume bars (only the bars in view).
     if(lanes.length){
       const ts = Math.max(11, Math.min(14, step - 1)), label = true;

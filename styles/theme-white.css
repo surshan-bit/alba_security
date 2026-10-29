@@ -125,6 +125,7 @@
   :root[data-theme="white"] #detail .detail-jump a .jump-preview{font-size:.95rem;}
   /* Section cards */
   :root[data-theme="white"] #detail :is(.val-panel,.global-panel,.fund-panel,.tech-panel){background:#fff;border:0;border-radius:16px;box-shadow:var(--card-shadow);padding:26px 32px 30px;margin-top:14px;}
+  :root[data-theme="white"] #detail .tech-panel .pc-head{right:32px;}
   :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title){font-size:1.55rem;font-weight:500;letter-spacing:-.01em;color:#1b1f2a;}
   :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title) svg{color:var(--accent);width:24px;height:24px;}
   :root[data-theme="white"] #detail :is(.global-panel-sub,.peers-sub,.fund-cell-note){font-size:1rem;color:#4a5163;}
@@ -369,6 +370,7 @@
   :root[data-theme="white"] #detail .detail-meta-links{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;}
   :root[data-theme="white"] #detail .detail-meta-links a,:root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn{font-size:1rem;font-weight:500;color:var(--accent);background:transparent;border:0;padding:0;}
   :root[data-theme="white"] #detail :is(.val-panel,.global-panel,.fund-panel,.tech-panel){background:#fff;border:0;border-radius:16px;box-shadow:var(--card-shadow);padding:18px 16px 20px;margin-top:12px;}
+  :root[data-theme="white"] #detail .tech-panel .pc-head{right:16px;}
   :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title){font-size:1.25rem;font-weight:500;letter-spacing:-.01em;color:#1b1f2a;}
   :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title) svg{color:var(--accent);}
   :root[data-theme="white"] #detail :is(.val-panel-head,.global-panel-head,.fund-panel-head,.tech-panel-head){margin-bottom:14px;}
