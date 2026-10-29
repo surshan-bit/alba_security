@@ -221,3 +221,6 @@ body.biz-full-open{overflow:hidden;}
 .dm-caret{font-size:.7rem;color:var(--muted);margin-left:2px;}
 .dm-item[disabled]{opacity:.5;cursor:default;}
 .dm-item.current .dm-t::after{content:" \2713";color:var(--accent);}
+
+/* Analysis grid: a little more room between the columns (only the side padding changes; wide screens). */
+@media (min-width:901px){.analysis-leaderboard .strat-table th,.analysis-leaderboard .strat-table td{padding-left:16px;padding-right:16px;}}
