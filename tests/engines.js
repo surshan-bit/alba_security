@@ -756,6 +756,13 @@ test('ideas (v1.289): quality, results within 7 days, very thin trading and clea
   assert.strictEqual(held({ __events: ev('neg') }).call, 'buy', 'one item is not enough');
   const pos = held({ __events: ev('pos', 'pos') }); assert.strictEqual(pos.call, 'buy'); assert.ok(pos.reasons.some(x => /news is positive/.test(x)));
   assert.strictEqual(held({}).call, 'buy', 'no figures saved yet: nothing to hold it back');
+  // v1.294: headlines shown under each idea: negative first, then newest; old ones and a missing record are handled
+  const NEWSMOD = load('src/strategies/news.js'), old = '2020-01-01';
+  const rn = NEWSMOD.recentNews({ __events: [{ k: 'news', d: day, t: 'plain', s: 'pos', url: 'https://x.test/a' }, { k: 'news', d: day, t: 'bad', s: 'neg', src: 'Wire' }, { k: 'news', d: old, t: 'ancient', s: 'neg' }, { k: 'earn', d: day, t: 'Results' }, { k: 'news', d: day, t: 'js', s: 'neu', url: 'javascript:alert(1)' }] });
+  assert.deepStrictEqual(rn.map(x => x.t), ['bad', 'plain', 'js'], 'negative first, then newest; old news and results dates are left out');
+  assert.strictEqual(rn[2].url, '', 'only http(s) links are kept');
+  assert.strictEqual(NEWSMOD.recentNews({}), null, 'no news record saved: unknown');
+  assert.strictEqual(NEWSMOD.recentNews({ __events: ev('pos', 'pos', 'pos', 'pos', 'pos', 'pos') }, 14, 4).length, 4, 'at most four headlines');
   assert.strictEqual(I.ideaCall(idea({ liquidity: { nextResults: '2026-10-30' } }), null, nwr(50), TODAY).reasons.some(x => /held back/.test(x)), false, 'only a would-be Buy is told it was held back');
   const cap = (cr) => I.ideaCall(idea({ liquidity: { marketCap: cr } }), null, nwr(95), TODAY);
   assert.strictEqual(cap(150000).cap, 'large'); assert.strictEqual(cap(50000).cap, 'mid'); assert.strictEqual(cap(14000).cap, 'small');

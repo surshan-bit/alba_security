@@ -13,6 +13,7 @@ import { tvIstDate } from '../tv/connector.js';
 import { BUY_TOP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys, trendOf } from './ideacall.js';
 import { CAP_NAME } from '../core/capclass.js';
 import { nextWeekRead, rankReads } from './nextweek.js';
+import { newsCounts, recentNews } from '../strategies/news.js';
 import { ideasResultsGet, ideasResultsSave } from '../identity/ideasresults.js';
 
 const TOP_N = 5;
@@ -85,11 +86,24 @@ const remember = () => { try { localStorage.setItem('albaDashboard.ideasStrategy
 const TOP_LISTS = [['up', 'Upward trend – positive move', 'Stocks whose weekly and monthly trends are both up, ranked by two-week score.'],
   ['down', 'Downward trend – bounce back', 'Stocks whose weekly and monthly trends are both down: a bet on a rebound, so the hit rate is lower and the risk higher.']];
 // What is kept of a finished Process (v1.293): the counts, the two Top 5 lists as shown, and when it was done, so it can be shown again after a refresh.
+// The recent news kept with a card: counts for the last 14 days and the headlines (negative first). null = no news record saved yet (needs a Refresh).
+function newsOfStock(s){
+  const n = newsCounts(s), items = recentNews(s);
+  return n && items ? { pos: n.pos, neg: n.neg, total: n.total, items } : null;
+}
+function newsHtml(nw){
+  if(!nw) return '<div class="tl-news tl-news-none">News: not read yet &ndash; run Refresh Fundamental Info.</div>';
+  const head = `<div class="tl-news-head">News, last 14 days: ${nw.total ? `<span class="news-pos">+${nw.pos}</span> <span class="news-neg">&minus;${nw.neg}</span> of ${nw.total}` : 'none'}${nw.neg ? ' &middot; <b class="news-neg">read the negative news before buying</b>' : ''}</div>`;
+  if(!nw.items.length) return `<div class="tl-news">${head}</div>`;
+  const item = x => { const text = escapeHtml(x.t), inner = x.url ? `<a href="${escapeHtml(x.url)}" target="_blank" rel="noopener noreferrer">${text}</a>` : text;
+    return `<li class="tl-news-${x.s || 'neu'}"><span class="tl-news-dot" aria-hidden="true"></span><span>${inner} <span class="tl-news-meta">${escapeHtml(x.d)}${x.src ? ' &middot; ' + escapeHtml(x.src) : ''}${x.s === 'neg' ? ' &middot; negative' : x.s === 'pos' ? ' &middot; positive' : ''}</span></span></li>`; };
+  return `<div class="tl-news">${head}<ul class="tl-news-list">${nw.items.map(item).join('')}</ul></div>`;
+}
 function snapshotOf(list){
   const nt = k => list.filter(x => x.c.trend === k).length, today = tvIstDate();
   const lists = {};
   TOP_LISTS.forEach(([t]) => {
-    lists[t] = topBuys(list, t, TOP_N).map(({ s, c }) => ({ sym: tickerSymbol(s), name: s.name || tickerSymbol(s), cap: c.cap || '', price: s.valuation && s.valuation.currentPrice != null ? Number(s.valuation.currentPrice) : null, reasons: c.reasons.slice() }));
+    lists[t] = topBuys(list, t, TOP_N).map(({ s, c }) => ({ sym: tickerSymbol(s), name: s.name || tickerSymbol(s), cap: c.cap || '', price: s.valuation && s.valuation.currentPrice != null ? Number(s.valuation.currentPrice) : null, reasons: c.reasons.slice(), news: newsOfStock(s) }));
   });
   return { v: 1, at: new Date().toISOString(), today, n: list.length, up: nt('up'), down: nt('down'), mixed: nt('mixed'), short: list.filter(x => x.c.short).length, lists };
 }
@@ -105,7 +119,7 @@ function topHtml(snap){
   const item = (c, i) => {
     const idx = stocks.findIndex(s => tickerSymbol(s) === c.sym), price = c.price;
     return `<li><span class="tl-top5-rank">${i + 1}</span><div class="tl-top5-body"><div class="tl-top5-head"><span>${idx >= 0 ? `<a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(c.name)}</a>` : escapeHtml(c.name)}<span class="analysis-lb-ticker">${escapeHtml(c.sym)}${c.cap && CAP_NAME[c.cap] ? ' &middot; ' + CAP_NAME[c.cap] : ''}</span></span>${price != null ? '<span class="tl-top5-price">&#8377;' + price.toLocaleString('en-IN') + '</span>' : ''}</div>
-      <ul class="tl-top5-why">${c.reasons.map(r => '<li>' + escapeHtml(r) + '</li>').join('')}</ul></div></li>`;
+      <ul class="tl-top5-why">${c.reasons.map(r => '<li>' + escapeHtml(r) + '</li>').join('')}</ul>${c.news === undefined ? '' : newsHtml(c.news)}</div></li>`;
   };
   return TOP_LISTS.map(([t, title, hint]) => {
     const top = (snap.lists && snap.lists[t]) || [];
