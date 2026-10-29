@@ -251,6 +251,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.313 &middot; 2026-10-29</h3>
+            <ul>
+              <li><strong>Promoter holding:</strong> the Fundamental Score CSV import now also reads the <b>Promoter holding</b> column (the share of the company the promoters own). It shows as a new row, <b>Promoter holding</b>, in the Management &amp; governance card on the stock page, just above the promoter holding change, and as a new <b>Promoter holding %</b> field in the Holdings and returns group of Strategies rules. An older file without the column still imports; the row and the field are then empty until the next file that has it. Scores do not change.</li>
+              <li><strong>Fixed along the way:</strong> a file that has both <b>Promoter holding</b> and <b>Change in promoter holding</b> could have read the holding as the change; the two are now told apart.</li>
+            </ul>
             <h3>v1.312 &middot; 2026-10-29</h3>
             <ul>
               <li><strong>Bigger bullets beside the explanations:</strong> the dots in front of each point are now the same size as the dots beside the metric rows, in the same colours.</li>

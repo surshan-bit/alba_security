@@ -95,6 +95,17 @@ test('fund columns: FII holding and the 1, 3 and 5 year returns are read when pr
   const old = Fe.scoreCsv(csv, {}).records[0];
   assert.strictEqual(old.fiiHolding, null); assert.strictEqual(old.fiiChange, null); assert.strictEqual(old.ret1, null);
 });
+test('fund columns: Promoter holding is read, kept apart from its change, and an older file without it still imports', () => {
+  const chg = FUND_HEADER.find(h => /promoter holding/i.test(h));
+  const hdr = FUND_HEADER.concat(['Promoter holding']).filter((h, i, a) => a.indexOf(h) === i);
+  hdr.splice(hdr.indexOf(chg), 0, hdr.pop());   // the real export lists "Promoter holding" just before "Change in promoter holding"
+  const rows = universe.slice(0, 3).map((r, i) => Object.assign({}, r, i === 0 ? { 'Promoter holding': '45.04', [chg]: '-0.75' } : { 'Promoter holding': '' }));
+  const r = Fe.scoreCsv(fundCsv(rows, hdr), {}).records;
+  near(r[0].promoterHolding, 45.04); near(r[0].promoterHoldingChange, -0.75);
+  assert.strictEqual(r[1].promoterHolding, null);   // a blank cell is empty, not 0
+  const old = Fe.scoreCsv(csv, {}).records[0];
+  assert.strictEqual(old.promoterHolding, null); assert.notStrictEqual(old.promoterHoldingChange, undefined);
+});
 test('fund columns: Industry Group listed before Industry still maps both (real export order)', () => {
   const swap = h => { const a = h.slice(); const i = a.indexOf('Industry'), j = a.indexOf('Industry Group'); a[i] = 'Industry Group'; a[j] = 'Industry'; return a; };
   const hdr = swap(FUND_HEADER), row = universe[0];
