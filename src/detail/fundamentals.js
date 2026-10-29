@@ -5,7 +5,7 @@ import { scoreBand } from '../list/metrics.js';
 import { completenessBadge, fundamentalCompleteness } from './completeness.js';
 import { setFundRenderStock } from './fundmetrics.js';
 import { renderFundOverallSummary } from './fundsummary.js';
-import { renderFundFactorCell } from './fundcell.js';
+import { fundCellHasPoints, renderFundFactorCell } from './fundcell.js';
 
 // Factors carry an optional `category` ("Traditional" | "Buffett" | "Valuation") once a stock's
 // fundamentals have been run through the combined equity-research framework comparison (see
@@ -19,6 +19,18 @@ const FUND_CATEGORY_META = {
   Buffett:     { label:'Buffett-Style Analysis', subscoreKey:'buffettSubscore' },
   Valuation:   { label:'Valuation &amp; Margin of Safety (Screener.in Intrinsic Value)', subscoreKey:'valuationSubscore' }
 };
+
+// v1.309: cards with written points take the whole row (metrics beside the points); the others go two to a row, and one left over takes the row too.
+function renderFundGrid(factors){
+  const wide = factors.map(fundCellHasPoints);
+  for(let i = 0; i < factors.length; ){
+    if(wide[i]){ i++; continue; }
+    let j = i; while(j < factors.length && !wide[j]) j++;
+    if((j - i) % 2 === 1) wide[j - 1] = true;
+    i = j;
+  }
+  return `<div class="fund-grid">${factors.map((f, i) => renderFundFactorCell(f, wide[i])).join('')}</div>`;
+}
 
 function renderFundamentals(s){
   setFundRenderStock(s);
@@ -46,12 +58,12 @@ function renderFundamentals(s){
             ${hasSub ? `<div class="fund-cell-score ${band}">${subscore.toFixed(1)}<span class="fund-cell-max">/10</span></div>` : '<div class="fund-cell-score fs-pending">Not scored</div>'}
           </div>
           ${hasSub ? `<div class="fund-cell-bar"><i class="${band}" style="width:${Math.round(subscore*10)}%"></i></div>` : ''}
-          <div class="fund-grid">${g.factors.map(renderFundFactorCell).join('')}</div>
+          ${renderFundGrid(g.factors)}
         </div>
       `;
-    }).join('') + (uncategorized.length ? `<div class="fund-grid">${uncategorized.map(renderFundFactorCell).join('')}</div>` : '');
+    }).join('') + (uncategorized.length ? `${renderFundGrid(uncategorized)}` : '');
   } else {
-    body = `<div class="fund-grid">${m.factors.map(renderFundFactorCell).join('')}</div>`;
+    body = `${renderFundGrid(m.factors)}`;
   }
 
   return `

@@ -304,9 +304,9 @@ async function sourceTagsScenario(){
     facts: [{ label: 'Price to book value (TradingView)', value: '13.9496814684338', basis: 'tv-financials', tone: 'pos', note: 'differs from the CSV' }], positives: ['Debt sentence', 'A separate strength worth noting'], negatives: [] } } } };
   await scenario('stock page: bullets carry source tags and numbered links', { section: 'analysis' }, { ['stockResearch/' + sid(sym)]: research }, async page => {
     await page.fill('#globalSearch', T.name); await page.waitForTimeout(300); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
-    await until(page, () => document.querySelectorAll('#detail .fund-cell-research .fr-pt').length === 4, null, 'the four bullets are shown');
+    await until(page, () => document.querySelectorAll('#detail .fund-cell-research .fr-pt:not(.fr-plain)').length === 4, null, 'the four bullets are shown');
     const r = await page.evaluate(([a, b]) => {
-      const pts = Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt')), chips = Array.from(document.querySelectorAll('#detail .data-chip'));
+      const pts = Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt:not(.fr-plain)')), chips = Array.from(document.querySelectorAll('#detail .data-chip'));
       const chip = l => chips.find(c => c.querySelector('.chip-label') && c.querySelector('.chip-label').textContent.includes(l));
       return {
         tags: pts.map(p => Array.from(p.querySelectorAll('.srcico')).map(t => t.getAttribute('aria-label').replace(/^Not verified.*/, 'not verified'))),
@@ -316,17 +316,17 @@ async function sourceTagsScenario(){
         csvTags: chips.filter(c => !c.classList.contains('chip-new')).map(c => c.querySelector('.srcico') && c.querySelector('.srcico').getAttribute('aria-label')),
         filled: (chip('Interest coverage') || {}).querySelector && chip('Interest coverage').querySelector('.srcico').getAttribute('aria-label'),
         rowNum: chip('Debt-to-Equity') && chip('Debt-to-Equity').getAttribute('data-n'),
-        pos: Array.from(document.querySelectorAll('#detail .fund-cell-research .fund-research-list.pos li')).map(e => e.textContent),
+        pos: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-plain.fr-pos')).map(e => e.textContent),
         badgeRight: (() => { const c = document.querySelector('#detail .fund-cell .data-chip[data-n]'); const n = c && c.querySelector('.chip-n'), v = c && c.querySelector('.chip-val'); return !!(n && v && n.getBoundingClientRect().left >= v.getBoundingClientRect().right - 1); })(),
-        iconsRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt')).every(li => { const a = li.querySelector('.fr-src').getBoundingClientRect(), n = li.querySelector('.fr-numr').getBoundingClientRect(); return a.right <= n.left + 1; }),
-        numRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt[data-n]')).every(li => { const n = li.querySelector('.fr-numr').getBoundingClientRect(), a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); return n.width > 0 && a.right <= n.left + 1 && b.right - n.right < 4; }),
+        iconsRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt:not(.fr-plain)')).every(li => { const a = li.querySelector('.fr-src').getBoundingClientRect(), n = li.querySelector('.fr-numr').getBoundingClientRect(); return a.right <= n.left + 1; }),
+        numRight: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt:not(.fr-plain)[data-n]')).every(li => { const n = li.querySelector('.fr-numr').getBoundingClientRect(), a = li.querySelector('.fr-src').getBoundingClientRect(), b = li.getBoundingClientRect(); return n.width > 0 && a.right <= n.left + 1 && b.right - n.right < 4; }),
         iconText: document.querySelectorAll('#detail .fund-cell .srctag').length,
         sources: Array.from(document.querySelectorAll('#detail .fund-research-sources')).map(e => e.textContent),
         align: Array.from(document.querySelectorAll('#detail .fund-cell .data-chip .chip-val')).every(e => getComputedStyle(e).textAlign === 'right'),
-        gutters: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt .fr-body')).map(e => Math.round(e.getBoundingClientRect().left)).filter((v, i, a) => a.indexOf(v) === i).length
+        gutters: Array.from(document.querySelectorAll('#detail .fund-cell-research .fr-pt:not(.fr-plain) .fr-body')).map(e => Math.round(e.getBoundingClientRect().left)).filter((v, i, a) => a.indexOf(v) === i).length
       };
     }, [m0, m1]);
-    ok(JSON.stringify(r.tags[0]) === JSON.stringify(["Claude's view"]) && JSON.stringify(r.tags[1]) === JSON.stringify(['TradingView news']) && JSON.stringify(r.tags[2]) === JSON.stringify(["Claude's view", 'not verified']) && r.tags[3].length === 0, 'each bullet shows an icon for TradingView or Claude (never for the CSV), "not verified" when a figure was not found, and an old plain bullet shows none: ' + JSON.stringify(r.tags));
+    ok(r.tags[0].length === 0 && JSON.stringify(r.tags[1]) === JSON.stringify(['TradingView news']) && JSON.stringify(r.tags[2]) === JSON.stringify(['not verified']) && r.tags[3].length === 0, 'when most points are Claude\'s view the card says so once (legend) and leaves the sparkle off each line; a TradingView point keeps its chart icon, and "not verified" shows when a figure was not found: ' + JSON.stringify(r.tags));
     ok(r.nums[0] === '1' && r.nums[1] === null && r.nums[2] === '2' && r.rowNum === '1 2', 'bullets that rely on rows are numbered and the row carries the same numbers: ' + JSON.stringify([r.nums, r.rowNum]));
     ok(r.link === 'https://news.example/n1', 'a news bullet links to its headline');
     ok(r.factRow && /Price to book value:/.test(r.factRow.text) && !/\(TradingView\)/.test(r.factRow.text) && /13\.95/.test(r.factRow.text) && !/13\.9496/.test(r.factRow.text) && r.factRow.tag === 'TradingView financials', 'an extra figure row from TradingView is added, tagged, without a repeated (TradingView) and with a long decimal rounded: ' + JSON.stringify(r.factRow));
@@ -343,22 +343,23 @@ async function sourceTagsScenario(){
     });
     ok(w.display === 'grid' && w.label === 'left' && Math.abs(w.numRight) <= 1 && w.valBeforeIcon && w.iconBeforeNum, 'White theme: metric rows are still a grid, label left, then value, icon, and the number flush right: ' + JSON.stringify(w));
     await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
-    // v1.305: the one-card Valuation subsection is as wide as a single column of Traditional Analysis, and reads top to bottom
+    // v1.309: every factor card shows its metric rows first and the explanation after. A card with points takes the whole row (metrics left, points right); a lone card does too; the rest go two to a row, metrics above the sentence.
     const lay = await page.evaluate(() => {
-      const one = document.querySelector('#detail .fund-subsection .fund-grid > .fund-cell:only-child'), many = document.querySelectorAll('#detail .fund-subsection .fund-grid > .fund-cell:not(:only-child)')[1];
-      if(!one || !many) return null;
-      const cols = el => getComputedStyle(el).gridTemplateColumns.split(' ').length;
-      return { oneW: Math.round(one.getBoundingClientRect().width), colW: Math.round(many.getBoundingClientRect().width), researchCols: cols(one.querySelector('.fund-cell-research') || one), chipCols: cols(one.querySelector('.data-chips')) };
+      const box = e => e.getBoundingClientRect();
+      const wide = document.querySelector('#detail .fund-subsection .fund-grid > .fund-cell-wide:has(.fund-cell-research)');
+      const lone = document.querySelector('#detail .fund-subsection .fund-grid > .fund-cell:only-child');
+      const half = document.querySelector('#detail .fund-subsection .fund-grid > .fund-cell:not(.fund-cell-wide)');
+      const side = c => { if(!c) return null; const m = box(c.querySelector('.data-chips')), x = box(c.querySelector('.fund-cell-exp')); return m.right <= x.left + 1 && Math.abs(m.top - x.top) < 60; };
+      const grid = c => c && box(c.parentElement).width;
+      return {
+        wideSide: side(wide), loneSide: side(lone), loneFull: !!lone && Math.abs(box(lone).width - grid(lone)) <= 2,
+        halfStacked: !!half && box(half.querySelector('.data-chips')).bottom <= box(half.querySelector('.fund-cell-exp')).top + 1 && box(half).width < grid(half) * 0.6,
+        chipCols: lone ? getComputedStyle(lone.querySelector('.data-chips')).gridTemplateColumns.split(' ').length : 0
+      };
     });
-    // v1.308: a card with written points and a metric table puts them side by side on a wide page
-    const two = await page.evaluate(() => {
-      const c = document.querySelector('#detail .fund-subsection .fund-grid > .fund-cell:not(:only-child):has(.fund-cell-research):has(.data-chips)');
-      if(!c) return null;
-      const r = c.querySelector('.fund-cell-research').getBoundingClientRect(), m = c.querySelector('.data-chips').getBoundingClientRect();
-      return { sideBySide: r.right <= m.left + 1 && Math.abs(r.top - m.top) < 40 };
-    });
-    ok(two && two.sideBySide, 'a factor with points and metrics shows them side by side on a wide page: ' + JSON.stringify(two));
-    ok(lay && Math.abs(lay.oneW - lay.colW) <= 2 && lay.chipCols === 1, 'the Valuation card is as wide as one Traditional column and its rows stack top to bottom: ' + JSON.stringify(lay));
+    ok(lay.wideSide, 'a factor with points shows its metrics on the left and the points on the right: ' + JSON.stringify(lay));
+    ok(lay.loneSide && lay.loneFull && lay.chipCols === 1, 'the lone Valuation card takes the whole row, metrics left and explanation right: ' + JSON.stringify(lay));
+    ok(lay.halfStacked, 'a card without points is half a row wide, with the metrics above the sentence: ' + JSON.stringify(lay));
     if(process.env.SHOT_DETAIL){ await page.setViewportSize({ width: 1700, height: 1000 }); await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white')); await page.waitForTimeout(300); await page.locator('#detail').screenshot({ path: process.env.SHOT_DETAIL }); await page.evaluate(() => document.documentElement.removeAttribute('data-theme')); }
     ok(r.align, 'every metric value is right-aligned');
     ok(r.gutters === 1, 'every bullet sentence starts at the same left edge (numbered or not)');
