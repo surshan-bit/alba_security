@@ -84,9 +84,8 @@ const TOP_LISTS = [['up', 'Upward trend – positive move', 'Stocks whose weekly
 function topHtml(list){
   const item = (x, i) => {
     const { s, c } = x, idx = stocks.indexOf(s), price = s.valuation && s.valuation.currentPrice;
-    return `<li><span class="tl-top5-rank">${i + 1}</span><div><a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(s.name || tickerSymbol(s))}</a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}${c.cap ? ' &middot; ' + CAP_NAME[c.cap] : ''}</span>
-      <div class="tl-top5-meta">Top ${c.topPct}% in its trend &middot; higher after 2 weeks ~${Math.round(c.up)}% of the time in tests (all ${Math.round(c.base)}%)${c.mos != null ? ' &middot; MoS ' + (c.mos >= 0 ? '+' : '') + c.mos.toFixed(1) + '%' : ''}${price != null ? ' &middot; &#8377;' + Number(price).toLocaleString('en-IN') : ''}</div>
-      <div class="tl-idea-why">${escapeHtml(c.reasons.join('; '))}</div></div></li>`;
+    return `<li><span class="tl-top5-rank">${i + 1}</span><div class="tl-top5-body"><div class="tl-top5-head"><span><a href="#" class="tl-name-link" data-idea-open="${idx}">${escapeHtml(s.name || tickerSymbol(s))}</a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}${c.cap ? ' &middot; ' + CAP_NAME[c.cap] : ''}</span></span>${price != null ? '<span class="tl-top5-price">&#8377;' + Number(price).toLocaleString('en-IN') + '</span>' : ''}</div>
+      <ul class="tl-top5-why">${c.reasons.map(r => '<li>' + escapeHtml(r) + '</li>').join('')}</ul></div></li>`;
   };
   return TOP_LISTS.map(([t, title, hint]) => {
     const top = topBuys(list, t, TOP_N);

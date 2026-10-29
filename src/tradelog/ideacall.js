@@ -10,12 +10,11 @@
 // same data always gives the same answer. A reference for your own decision, not an order, and it cannot see the market: when every stock falls together,
 // the best of them usually falls too.
 import { daysUntil, fixedOrNull } from '../core/util.js';
-import { CAP_NAME, capClass } from '../core/capclass.js';
+import { capClass } from '../core/capclass.js';
 import { newsCounts } from '../strategies/news.js';
 import { marginOfSafety } from '../core/mos.js';
 import { factsFor, tradeSignal } from './signals.js';
 
-const TREND_NAME = { up: 'Upward trend', down: 'Downward trend', mixed: 'Mixed trend' };
 // The stock's trend from its weekly and monthly MACD against their signal lines (the dashboard's own technical figures): 'up' when both are above, 'down' when
 // both are below, 'mixed' when they disagree, null when either is missing. The same definition the two-week tests were split by.
 function trendOf(stock){
@@ -37,8 +36,8 @@ function fiiNote(stock){
   const prev = h - c;
   if(!(prev > 0) || Math.abs(c) < FII_MIN || Math.abs(c) / prev < FII_REL) return null;
   const w = fixedOrNull(prev, 1) + '% to ' + fixedOrNull(h, 1) + '%', long = typeof v.fiiChange3 === 'number' && (c < 0 ? v.fiiChange3 < 0 : v.fiiChange3 > 0);
-  return c < 0 ? 'FII selling: holding down ' + fixedOrNull(-c, 1) + ' points last quarter (' + w + ')' + (long ? ', down over 3 years too' : '') + ', as of the last quarter end'
-    : 'FII buying: holding up ' + fixedOrNull(c, 1) + ' points last quarter (' + w + ')' + (long ? ', up over 3 years too' : '') + ', as of the last quarter end';
+  return c < 0 ? 'FII selling: holding down ' + fixedOrNull(-c, 1) + ' points last quarter (' + w + ')' + (long ? ', down over 3 years too' : '')
+    : 'FII buying: holding up ' + fixedOrNull(c, 1) + ' points last quarter (' + w + ')' + (long ? ', up over 3 years too' : '');
 }
 
 const BUY_TOP = 10, AVOID_BOTTOM = 10, RESULTS_DAYS = 7, THIN_LAKH = 50, NEWS_MIN = 2;
@@ -56,20 +55,19 @@ function risksOf(stock, today, f, mos){
   if(typeof lq.avgVolume === 'number' && typeof px === 'number' && (lq.avgVolume * px) / 100000 < THIN_LAKH) blocks.push('very thin trading (under ₹' + THIN_LAKH + ' lakh a day)');
   const n = stock ? newsCounts(stock) : null;
   if(n && n.neg >= NEWS_MIN && n.neg > n.pos) blocks.push('recent news leans negative (' + n.neg + ' negative, ' + n.pos + ' positive)');
-  else if(n && n.pos >= NEWS_MIN && n.pos > n.neg) notes.push('recent news leans positive (' + n.pos + ' positive, ' + n.neg + ' negative)');
+  else if(n && n.pos >= NEWS_MIN && n.pos > n.neg) notes.push('Recent news is positive (' + n.pos + ' positive, ' + n.neg + ' negative)');
   const fn = fiiNote(stock); if(fn) notes.push(fn);
   return { blocks, notes, cap: capClass(lq.marketCap), resultsIn };
 }
 
 const sign = (x) => (x >= 0 ? '+' : '') + fixedOrNull(x, 1) + '%';
-// The sentence that says what the next-week score means, with the numbers from the tests.
-function scoreLine(r){
-  return 'two-week score in the top ' + r.topPct + '% of this strategy\'s ' + (TREND_NAME[r.trend] || '').toLowerCase() + ' stocks today; in five years of tests stocks that ranked like this within their trend each week were higher two weeks later ' + fixedOrNull(r.up, 1) + '% of the time (all ' + (TREND_NAME[r.trend] || '').toLowerCase() + ' stocks ' + fixedOrNull(r.base, 1) + '%) and beat the median stock ' + fixedOrNull(r.beat, 1) + '% of the time';
-}
-function factsLine(r){
-  const f = r.facts;
-  return 'last week ' + sign(f.week) + ', 4 weeks ' + sign(f.month) + ', 26 weeks ' + sign(f.half) + ', ' + fixedOrNull(-f.fromHigh, 0) + '% below its 52-week high';
-}
+// Short, plain lines for the row (one idea each; the screen shows them as bullets).
+const TREND_WORD = { up: 'Upward', down: 'Downward' };
+function rankLine(r){ return 'Top ' + r.topPct + '% of the ' + (TREND_WORD[r.trend] || '') + ' stocks in this strategy today'; }
+function recordLine(r){ return 'In 5 years of tests, stocks ranked like this were higher after 2 weeks ' + fixedOrNull(r.up, 0) + '% of the time (all ' + (TREND_WORD[r.trend] || '') + ' stocks: ' + fixedOrNull(r.base, 0) + '%)'; }
+function moveLine(r){ const f = r.facts; return 'Price: last week ' + sign(f.week) + ', 4 weeks ' + sign(f.month) + ', 26 weeks ' + sign(f.half); }
+function highLine(r){ const d = -r.facts.fromHigh; return d < 1 ? 'Near its 52-week high' : fixedOrNull(d, 0) + '% below its 52-week high'; }
+function valueLine(mos){ return mos != null && mos > 0 ? 'Priced ' + fixedOrNull(mos, 0) + '% below its fair value' : null; }
 
 // The call for one stock. `trade` is the open trade in it, or null; `read` is nextWeekRead's reading for the stock (null without enough weekly history).
 function ideaCall(stock, trade, read, today){
@@ -86,17 +84,17 @@ function ideaCall(stock, trade, read, today){
   const reasons = [];
   let call = 'hold';
   if(!r) reasons.push('no weekly price history yet (80 weeks are needed), so the next two weeks cannot be judged');
-  else if(!r.trend || r.trend === 'mixed') reasons.push(r.trend ? 'weekly and monthly trends disagree, so it is in neither the Upward nor the Downward list' : 'no MACD figures saved for this stock yet, so its trend is unknown (Refresh all stocks)', factsLine(r));
+  else if(!r.trend || r.trend === 'mixed') reasons.push(r.trend ? 'Weekly and monthly trends disagree, so it is in neither list' : 'No MACD figures saved yet, so its trend is unknown (import the data)', moveLine(r));
   else {
-    if(r.trend === 'down') o.notes.push('a bounce-back pick: the weekly and monthly trends are both down, so this is a bet on a rebound, not on strength');
+    if(r.trend === 'down') o.notes.unshift('Bounce-back pick: both trends are down, so this bets on a rebound');
     if(r.pct >= 100 - BUY_TOP) { if(o.blocks.length) o.blocks.forEach(b => reasons.push('held back: ' + b)); else call = 'buy'; }
     else if(r.pct <= AVOID_BOTTOM) call = 'sell';
-    reasons.unshift(scoreLine(r));
-    reasons.push(factsLine(r));
-    if(r.thin && !o.blocks.some(b => /thin trading/.test(b))) reasons.push('weekly traded value is below what the model was trained on, so treat the score with care');
+    reasons.unshift(rankLine(r), recordLine(r));
+    const v = valueLine(mos); if(v) reasons.push(v);
+    reasons.push(moveLine(r), highLine(r));
+    if(r.thin && !o.blocks.some(b => /thin trading/.test(b))) reasons.push('Trades thinly, so treat the score with care');
   }
   if(call !== 'sell') o.notes.forEach(x => reasons.push(x));
-  if(o.cap) reasons.push(CAP_NAME[o.cap]);
   return { ...base, call, label: { buy: 'Buy', hold: 'Wait', sell: 'Avoid' }[call], held: false, reasons };
 }
 

@@ -73,3 +73,8 @@
 @media (prefers-reduced-motion:reduce){.tl-ideas-progress .fi-bar-fill{transition:none;}}
 .tl-ideas-done{margin:0 0 10px;}
 .tl-ideas-select:disabled,#tradeIdeasRun:disabled{opacity:.55;cursor:not-allowed;}
+.tl-top5-body{flex:1;min-width:0;}
+.tl-top5-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+.tl-top5-price{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.tl-top5-why{margin:6px 0 0;padding-left:18px;font-size:.8rem;color:var(--muted);}
+.tl-top5-why li{margin:2px 0;display:list-item;}
