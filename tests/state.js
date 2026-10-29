@@ -188,6 +188,7 @@ async function tradeScenarios(){
     if(n > 0){
       // v1.290: two Top 5 lists (Upward, Downward); each holds at most five stocks
       const top = await page.evaluate(() => ({ blocks: document.querySelectorAll('#tradeIdeasBody .tl-top5').length, over: Array.from(document.querySelectorAll('#tradeIdeasBody .tl-top5')).some(b => b.querySelectorAll('li').length > 5), first: document.querySelector('#tradeIdeasBody .tl-top5 a[data-idea-open]') ? true : false }));
+      ok(await page.evaluate(() => { const n = document.querySelectorAll('#tradeIdeasBody .tl-top5 > ol > li').length; return n === document.querySelectorAll('#tradeIdeasBody .tl-top5 .tl-news').length; }), 'v1.294: every listed stock shows its news line');
       ok(top.blocks === 2 && !top.over, 'the two Top 5 lists hold at most five stocks each, got ' + JSON.stringify(top));
       await page.selectOption('#tradeIdeasStrategy', '');
       await until(page, () => /Choose a strategy/.test((document.getElementById('tradeIdeasBody') || {}).textContent || '') && !document.querySelector('#tradeIdeasBody .tl-top5'), null, 'changing the strategy clears the lists until Process is pressed again');

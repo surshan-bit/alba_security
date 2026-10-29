@@ -25,6 +25,22 @@ function newsCounts(s, days = NEWS_DAYS){
   });
   return out;
 }
+// The recent headlines of a stock for the Buy / Sell ideas cards: negative first, then the newest, at most `max`.
+// Each is { d (date), t (headline), s ('pos' | 'neg' | 'neu' | ''), src, url }. Null when the stock has no saved news record at all.
+function recentNews(s, days = NEWS_DAYS, max = 4){
+  const evs = eventsOf(s);
+  if(!evs) return null;
+  const now = Date.now(), list = [];
+  evs.forEach(e => {
+    if(!e || e.k !== 'news' || typeof e.t !== 'string') return;
+    const ms = eventMs(e.d);
+    if(ms === null || now - ms > days * DAY_MS || ms - now > DAY_MS) return;
+    list.push({ d: String(e.d).slice(0, 10), t: e.t, s: e.s === 'pos' || e.s === 'neg' || e.s === 'neu' ? e.s : '', src: e.src || '', url: /^https?:\/\//i.test(e.url || '') ? e.url : '' });
+  });
+  const rank = x => (x.s === 'neg' ? 0 : 1);
+  list.sort((a, b) => rank(a) - rank(b) || (a.d < b.d ? 1 : a.d > b.d ? -1 : 0));
+  return list.slice(0, max);
+}
 // Days since the latest event of a kind ('earn' = results, 'corp' = company event); null if none is known.
 function daysSinceEvent(s, kind){
   const evs = eventsOf(s);
@@ -54,4 +70,4 @@ function newsCellHtml(s){
   return `<td class="num"><span class="news-pos">+${c.pos}</span> <span class="news-neg">&minus;${c.neg}</span></td>`;
 }
 
-export { NEWS_DAYS, daysSinceEvent, eventMs, newsCellHtml, newsCounts, newsTimeline };
+export { NEWS_DAYS, daysSinceEvent, eventMs, newsCellHtml, newsCounts, newsTimeline, recentNews };
