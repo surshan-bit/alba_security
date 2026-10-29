@@ -1241,6 +1241,63 @@ test('trade call: history keeps one point a day and lists when the call changed'
   });
 }
 
+// =========================================================== Banks, insurers and lenders (v1.313): Financial Health figures that do not describe them are left out
+{
+  const FSec = load('src/core/finsector.js'), FS2 = load('src/core/fundscore.js');
+  const mk = (sym, group, industry, over) => Object.assign({}, universe[0], { 'NSE Code': sym, 'BSE Code': '', 'ISIN Code': '', 'Name': 'Co ' + sym, 'Industry Group': group, 'Industry': industry }, over || {});   // clones a made-up row, so the shared random sequence is not touched
+  const bankRow = (i, over) => mk('BNK' + i, 'Banks', 'Private Sector Bank', Object.assign({ 'Debt to equity': 5 + i, 'Interest Coverage': 1 + i / 10, 'Quick ratio': 3 + i / 5, 'Current ratio': 3 + i / 5, 'Altman Z Score': 0.2 + i / 10, 'Average Debtor days 3Years': 0, 'Return on equity': 8 + i }, over || {}));
+  const lendRow = (i, over) => mk('NBF' + i, 'Finance', 'Non Banking Financial Company (NBFC)', Object.assign({ 'Debt to equity': 3 + i / 10, 'Interest Coverage': 1.2 + i / 20, 'Quick ratio': 2 + i / 5, 'Current ratio': 2 + i / 5, 'Altman Z Score': 0.3 + i / 10, 'Average Debtor days 3Years': i, 'Return on equity': 10 + i }, over || {}));
+  const fundOf = (rows, sym) => Fe.scoreCsv(fundCsv(rows), {}).records.find(r => r.sym === sym);
+  const twelve = fn => Array.from({ length: 12 }, (_, i) => fn(i));
+  test('financial kind: banks, lenders and insurers are told apart from industry labels, and other finance firms are left alone', () => {
+    const k = (exactIndustry, industryGroup) => FSec.financialKind({ exactIndustry, industryGroup });
+    assert.strictEqual(k('Private Sector Bank', 'Banks'), 'bank'); assert.strictEqual(k('', 'Banks'), 'bank');
+    assert.strictEqual(k('Non Banking Financial Company (NBFC)', 'Finance'), 'lender'); assert.strictEqual(k('Housing Finance Company', 'Finance'), 'lender');
+    assert.strictEqual(k('Life Insurance', 'Insurance'), 'insurer');
+    assert.strictEqual(k('Investment Banking & Brokerage', 'Finance'), null); assert.strictEqual(k('Widgets', 'Alpha'), null); assert.strictEqual(FSec.financialKind(null), null);
+  });
+  test('bank: Financial Health is left out (not scored 0) and the other factors are scaled back up to 10', () => {
+    const stocks = []; F.applyFundamental(fundCsv(twelve(bankRow)), stocks, '2026-10-29');
+    const st = stocks.find(x => x.ticker.startsWith('BNK5')), fin = st.fundamentals.factors.find(f => f.key === 'fin');
+    assert.strictEqual(fin.na, 'banks'); assert.strictEqual(fin.sector, 'bank'); assert.deepStrictEqual(fin.metrics.map(m => m[0]), ['Contingent liabilities']);
+    const others = st.fundamentals.factors.filter(f => !f.na).reduce((a, f) => a + f.score, 0);
+    near(st.score, Math.round(others * (10 / 8.2) * 100) / 100, 0.011);
+    near(st.fundamentals.factors.reduce((a, f) => a + f.weight, 0), 10, 1e-9);
+  });
+  test('bank: debt, liquidity, distress-model and debtor figures no longer move the score (they did before v1.313)', () => {
+    const a = fundOf(twelve(bankRow), 'BNK0').scored.score;
+    const b = fundOf(twelve(i => bankRow(i, i === 0 ? { 'Debt to equity': 90, 'Interest Coverage': 0.1, 'Quick ratio': 0.1, 'Current ratio': 0.1, 'Altman Z Score': 9, 'Average Debtor days 3Years': 400 } : {})), 'BNK0').scored.score;
+    assert.strictEqual(a, b);
+  });
+  test('lender: only debt and interest cover count in Financial Health; liquidity, Altman Z and debtor days are left out', () => {
+    const base = fundOf(twelve(lendRow), 'NBF0');
+    const noise = fundOf(twelve(i => lendRow(i, i === 0 ? { 'Quick ratio': 0.1, 'Current ratio': 0.1, 'Altman Z Score': 9, 'Average Debtor days 3Years': 400 } : {})), 'NBF0');
+    assert.strictEqual(base.scored.score, noise.scored.score);
+    const moreDebt = fundOf(twelve(i => lendRow(i, i === 0 ? { 'Debt to equity': 99 } : {})), 'NBF0');
+    assert.ok(moreDebt.scored.score < base.scored.score);   // debt compared with other lenders still counts
+    const fin = base.scored.factors.find(f => f.key === 'fin'); assert.ok(fin.score != null && !fin.na);
+    const stocks = []; F.applyFundamental(fundCsv(twelve(lendRow)), stocks, '2026-10-29');
+    const f = stocks[0].fundamentals.factors.find(x => x.key === 'fin');
+    assert.strictEqual(f.sector, 'lender'); assert.strictEqual(f.na, undefined); assert.deepStrictEqual(f.metrics.map(m => m[0]), ['D/E', 'Interest coverage', 'Contingent liabilities']);
+  });
+  test('an ordinary company keeps the full Financial Health factor, unchanged', () => {
+    const r = fundOf(universe.slice(0, 12), 'WID0'), fin = r.scored.factors.find(f => f.key === 'fin');
+    assert.ok(fin.score != null); assert.strictEqual(fin.na, undefined); assert.strictEqual(r.finKind, null);
+  });
+  test('score check: a factor that does not apply is dropped, not counted as average', () => {
+    const fac = (key, category, weight, score, extra) => Object.assign({ key, category, weight, score, name: key, metrics: [['x', '1']], note: '' }, extra || {});
+    const s = { fundamentals: { factors: [fac('fin', 'Traditional', 2, 0, { na: 'banks' }), fac('dcf', 'Valuation', 8, 6)], total: 10 }, score: 0 };
+    FS2.applyFundamentalConfidence(s);
+    assert.strictEqual(s.fundamentals.factors[0].excluded, 'it does not apply to banks'); assert.strictEqual(s.score, 7.5);   // counted as average it would be 7
+    assert.strictEqual(FS2.expectedScore(s.fundamentals.factors), s.score);
+  });
+  test('integrity check: a bank whose Financial Health does not apply passes when the others add up to its score over their own weights', () => {
+    const facs = W9.map((w, i) => (i === 0 ? { weight: w, score: 0, na: 'banks' } : { weight: w, score: w * 0.7 }));
+    const r = C.fiCheck(chkList({ fundamentals: { factors: facs }, score: 7 }), new Map());
+    assert.deepStrictEqual(r.hard, []);
+  });
+}
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

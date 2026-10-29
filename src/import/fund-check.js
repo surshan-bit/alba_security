@@ -22,7 +22,9 @@ function fiCheck(stocks, prev){
     const f = s.fundamentals && s.fundamentals.factors;
     if(!Array.isArray(f) || f.length !== 9 || typeof s.score !== 'number'){ badShape.push(t); continue; }
     if(f.some(x => typeof x.score !== 'number' || !isFinite(x.score))) badNum.push(t);
-    const sum = f.reduce((a, x) => a + (typeof x.score === 'number' ? x.score : 0), 0), w = f.reduce((a, x) => a + x.weight, 0);
+    // A factor that does not apply to the company (na: a bank's Financial Health) is left out and the rest scaled back up to 10.
+    const naW = f.reduce((a, x) => a + (x.na ? x.weight : 0), 0);
+    const sum = f.reduce((a, x) => a + (typeof x.score === 'number' && !x.na ? x.score : 0), 0) * (10 / (10 - naW)), w = f.reduce((a, x) => a + x.weight, 0);
     if(Math.abs(sum - s.score) > 0.05 || Math.abs(w - 10) > 0.02) badSum.push(t);
     if(s.verdict !== band(s.score)) badVerdict.push(t);
     if((!s.pillars || typeof s.pillars.val !== 'number') && fiHasValuation(s)) badPillar.push(t);
