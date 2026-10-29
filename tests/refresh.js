@@ -238,7 +238,8 @@ const ldScript = () => {
     'mcp-tv-get-news-story': { summary: 'made-up story', short_description: 'short' },
     'mcp-tv-get-documents': input => ({ items: input.event === 'earning' ? [{ reported: 1785542400, title: 'Q1 results', correlation_id: 'e1', provider: { name: 'Exch' } }] : input.event === 'corporate_event' ? [{ reported: 1788220800, title: 'Dividend', correlation_id: 'c1', provider: { name: 'Exch' } }] : [] })
   };
-  window.__sample = async (prompt, opts) => {
+  window.__inflight = 0; window.__maxInflight = 0;   // v1.316: how many Claude requests were open at the same moment
+  const inner = async (prompt, opts) => {
     const task = String(prompt).split('TASK:')[1] || '';
     window.__prompts.push({ tier: opts && opts.modelTier, len: String(prompt).length, task: task.slice(0, 60) });
     const reply = o => ({ text: JSON.stringify(o) });
@@ -253,6 +254,7 @@ const ldScript = () => {
     if(/Strengths and Watch-outs box/.test(task)) return reply({ strengths: [{ text: 'Cheap for its quality', tone: 'strong' }, { text: 'Steady', tone: 'weird' }], watchouts: [{ text: 'Debt is rising', tone: 'concern' }] });
     return reply({});
   };
+  window.__sample = async (prompt, opts) => { window.__inflight++; window.__maxInflight = Math.max(window.__maxInflight, window.__inflight); try { await new Promise(r => setTimeout(r, 40)); return await inner(prompt, opts); } finally { window.__inflight--; } };
 };
 async function ldFundamentalTests(){
   const { ctx, page, errs } = await open('ldfund', {}, { fn: ldScript });
@@ -291,6 +293,9 @@ async function ldFundamentalTests(){
     ok(pts0.every(p => !(p.refs || []).includes('Not a metric')), 'v1.299: a reference to a row that does not exist is dropped');
     ok(afterA2.prompts.length > afterA.prompts.length && !/Already up to date/.test(secondA.text), 'v1.297: a stock researched just now is refreshed in full again when asked: ' + afterA.prompts.length + ' -> ' + afterA2.prompts.length);
     ok(afterB.prompts.length > afterA2.prompts.length && afterB.prompts.some(p => /These metrics/.test(p.task)), 'a stock with missing figures is asked for them');
+    const par = await page.evaluate(() => ({ max: window.__maxInflight, runs: Array.from(window.__store).filter(([k]) => /^refreshRunLog\/fundamental-\d$/.test(k)).map(([, v]) => v) }));
+    ok(par.max >= 2, 'v1.316: the factor cards and Global & Macro are asked at the same time (most open at once: ' + par.max + ')');
+    ok(par.runs.length >= 1 && par.runs.every(r => r.kind === 'fundamental' && typeof r.durationMs === 'number' && typeof r.stepsMs.cards === 'number' && typeof r.stepsMs.globalMacro === 'number'), 'v1.316: a finished run saves its timing (total and per step; the test page runs on a stopped clock, so only the shape is checked)');
     ok(errs.length === 0, 'ldfund: errors in the page: ' + errs.slice(0, 2).join(' | '));
   } finally { await ctx.close(); }
 }

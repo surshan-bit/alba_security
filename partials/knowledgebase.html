@@ -251,6 +251,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.316 &middot; 2026-10-29</h3>
+            <ul>
+              <li><strong>Refresh Fundamental Info should finish sooner:</strong> the two groups of factor cards and Global &amp; Macro are now asked at the same time instead of one after another, and the news stories are read together. The progress bar only moves forward. How much time this saves depends on whether Claude answers several requests at once; the timing record below shows the real figure.</li>
+              <li><strong>Where the time goes:</strong> each finished run saves a small timing record (total and per step) under <code>refreshRunLog/fundamental-0</code> to <code>fundamental-9</code>, newest ten kept, and shows the total in the browser console.</li>
+              <li><strong>Shorter note for banks, insurers and lenders:</strong> Claude is now only told which figures do not apply, without being told what to judge them on.</li>
+            </ul>
             <h3>v1.315 &middot; 2026-10-29</h3>
             <ul>
               <li><strong>Banks and insurers: Financial Health is no longer scored.</strong> Debt, interest cover, liquidity ratios, Altman Z and debtor days were built for companies that sell goods and services; they say nothing about a bank or an insurer. The card now shows &ldquo;Not scored&rdquo;, and its weight is shared across the other factors so the score still adds up to 10.</li>
