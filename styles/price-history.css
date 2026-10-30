@@ -106,7 +106,8 @@
 .pc-ptitle{display:flex;align-items:baseline;gap:8px;font-size:var(--t-md);font-weight:700;min-width:0;}
 .pc-ptitle small{margin:0;font-size:var(--t-sm);font-weight:400;}
 #detail .tech-panel .pc-block{margin-top:0;padding-top:0;border-top:0;}
-#detail .tech-panel .pc-head{position:absolute;top:16px;right:0;margin:0;}
+@media (min-width:601px){.tech-panel .pc-head{position:absolute;top:16px;right:0;margin:0;}}
+.tech-panel .pc-head{margin:0 0 8px;justify-content:flex-end;}
 #detail .pc-panel{padding:2px 0 0;}
 #detail .pc-legend{margin:0 0 6px;}
 #detail .pc-evlegend{margin:0 0 6px;}

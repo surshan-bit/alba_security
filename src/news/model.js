@@ -64,6 +64,20 @@ function cleanReading(r){
   return arr.map(x => String(x == null ? '' : x).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 200)).filter(Boolean).slice(0, READING_MAX);
 }
 
+// The colour of a "why it matters" line: green when it helps Indian stocks, red when it hurts, orange when it is mixed or neither.
+const TONE_BAD = /\b(weigh|weighs|weighing|pressure|raises?|rising costs|hurts?|negative|nervous|worr|risk|drag|fall|falls|fell|slump|selloff|sell-off|bad for|headwind|costlier|hit)\b/i;
+const TONE_GOOD = /\b(support|supports|supportive|eases?|eased|helps?|helpful|positive|good for|boosts?|cushion|tailwind|relief|cheaper|lifts?|lower oil|firmed)\b/i;
+const TONE_MIX = /\b(mixed|caution|cautious|offset|offsets|small moves?|only slightly|balanced|unclear)\b/i;
+function readingTone(text){
+  const t = String(text || '');
+  if(TONE_MIX.test(t)) return 'mixed';
+  const bad = TONE_BAD.test(t), good = TONE_GOOD.test(t);
+  return bad && !good ? 'negative' : good && !bad ? 'positive' : 'mixed';
+}
+
+// The saved text of a results date says "TradingView date, can change" on every row; that is said once above the list instead.
+const dateNote = (t) => /^Results expected \(TradingView/.test(t) ? '' : /^Results date \(confirmed\)/.test(t) ? 'Confirmed' : t;
+
 // ---- calendar ----
 const IMPORTANCE = { 1: 'High', 0: 'Medium', '-1': 'Low' };
 // Rows (already filtered by the research session) grouped by IST date, soonest first: [{ date, rows }].
@@ -252,4 +266,4 @@ function mergeTvEvents(saved, tickers, fresh, today){
   return keep.concat(fresh.filter(x => !have.has(x.ticker + '|' + x.type + '|' + x.date)));
 }
 
-export { buildTvEvents, mergeTvEvents, BRIEFING_FEEDS, EVENT_TYPES, briefingsPrompt, buildCalendar, cleanBriefings, mergeHeadlines, IMPORTANCE, PULSE_SYMBOLS, buildTiles, calValue, cleanReading, filterItems, groupCalendar, nextBigEvents, readingPrompt, recentItems, shortDate, tileView, typeTag, upcomingItems };
+export { dateNote, readingTone, buildTvEvents, mergeTvEvents, BRIEFING_FEEDS, EVENT_TYPES, briefingsPrompt, buildCalendar, cleanBriefings, mergeHeadlines, IMPORTANCE, PULSE_SYMBOLS, buildTiles, calValue, cleanReading, filterItems, groupCalendar, nextBigEvents, readingPrompt, recentItems, shortDate, tileView, typeTag, upcomingItems };

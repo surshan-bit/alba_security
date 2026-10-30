@@ -197,7 +197,7 @@ body.biz-full-open{overflow:hidden;}
 
 /* The industry table inside Analysis: the "#" slot of the first column has a fixed width (not em, which differs between the heading and the cells), so the
    heading "Industry" starts exactly above the names; every cell is centred vertically so a long name that wraps does not push the number or the figures to the bottom. */
-.analysis-industry .biz-table{--bn:2.6rem;}
+.analysis-industry .biz-table{--bn:2.6em;}
 .analysis-industry .biz-table > thead > tr > th:first-child,.analysis-industry .biz-table > tbody > .biz-row > .biz-name{padding-left:calc(8px + var(--bn));text-indent:calc(-1 * var(--bn));}
 .analysis-industry .biz-table > thead > tr > th:first-child::before,.analysis-industry .biz-table > tbody > .biz-row > .biz-name::before{width:calc(var(--bn) - 6px);margin-right:6px;text-indent:0;vertical-align:middle;}
 .analysis-industry .biz-table > tbody > .biz-row > td,.analysis-industry .biz-table > tbody > .biz-row > .biz-name .biz-open{vertical-align:middle;}
