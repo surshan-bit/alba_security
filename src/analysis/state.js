@@ -3,7 +3,7 @@ import { prefSet, uiStateSet } from '../identity/prefs.js';
 
 // Sorting is by a column header (see columns.js): { col, dir }. These are the columns that can be sorted, and the readings of the old "Sort by" menu
 // (saved before v1.273) mapped to the column and direction they meant, so a saved choice still applies.
-const SORTABLE_COLUMNS = new Set(['score', 'techScore', 'mos', 'stock', 'weekChg', 'monthChg', 'weekRsi', 'monthRsi', 'techW', 'techM', 'news', 'industry', 'triggered', 'price']);
+const SORTABLE_COLUMNS = new Set(['score', 'techScore', 'mos', 'stock', 'weekChg', 'monthChg', 'weekRsi', 'monthRsi', 'techW', 'techM', 'idea', 'news', 'industry', 'triggered', 'price']);
 const LEGACY_SORT = {
   mos_desc: ['mos', 'desc'], mos_asc: ['mos', 'asc'], score_desc: ['score', 'desc'], weekRsi_desc: ['weekRsi', 'desc'], weekRsi_asc: ['weekRsi', 'asc'],
   monthRsi_desc: ['monthRsi', 'desc'], monthRsi_asc: ['monthRsi', 'asc'], weekChg_desc: ['weekChg', 'desc'], monthChg_desc: ['monthChg', 'desc'],

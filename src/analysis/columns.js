@@ -10,6 +10,7 @@ import { isPinned } from '../core/pins.js';
 import { mosPct, mosRatingAny, scoreBand } from '../list/metrics.js';
 import { techRatingInfo } from '../detail/technical.js';
 import { newsCellHtml, newsCounts } from '../strategies/news.js';
+import { ideaRankOf, ideasWhen } from './ideasfilter.js';
 
 // Analysis leaderboard column registry (added 2026-10-06) — the table's columns used to be
 // hardcoded in both the <thead> markup and the per-row <td> template, in a fixed order. Both
@@ -29,6 +30,7 @@ const ANALYSIS_LB_COLUMNS = [
   { id: 'monthRsi', label: 'M RSI', num: true },
   { id: 'techW', label: 'W Tech Rating' },
   { id: 'techM', label: 'M Tech Rating' },
+  { id: 'idea', label: 'Buy / Sell', sortName: 'Buy / Sell rank', title: 'Call and rank (1 is best) from the last Process in the Trade Log: the strategy chosen in Analysis, else the newest result' },
   { id: 'news', label: 'News 14d', num: true, title: 'Positive and negative news items in the last 14 days' },
   { id: 'industry', label: 'Industry' },
   { id: 'triggered', label: 'Research done' },
@@ -109,6 +111,7 @@ function analysisLbCellRaw(colId, ctx){
       const what = kind === 'price' ? 'price history only' : 'research';
       return `<td class="analysis-lb-researched ${pending ? 'rs-aging' : 'rs-fresh'}" title="${escapeHtml(what)} triggered ${escapeHtml(whenTxt)}${pending ? ' - nothing saved since' : ' - saved afterwards'}">${label}${kind === 'price' ? ' &middot; price only' : ''}${pending ? ' &middot; awaiting save' : ''}</td>`;
     }
+    case 'idea': return ideaCellHtml(s);
     case 'news': return newsCellHtml(s);
     case 'weekRsi': return `<td>${rsiText(r.weekRsi)}</td>`;
     case 'monthRsi': return `<td>${rsiText(r.monthRsi)}</td>`;
@@ -121,6 +124,14 @@ function analysisLbCellRaw(colId, ctx){
     case 'tv': return `<td><a href="${tvUrlFor(s)}" target="_blank" rel="noopener noreferrer" class="analysis-lb-link" onclick="event.stopPropagation()">TV ↗</a></td>`;
     default: return '<td></td>';
   }
+}
+// v1.321: the Buy / Sell column: the call as a tag (a stock you hold shows its Trade Log call) and the rank in the strategy, from the saved Process result.
+const IDEA_BADGE = { 'Buy': 'b-buy', 'Add more': 'b-buy', 'Wait': 'b-hold', 'Hold': 'b-hold', 'Review': 'b-mbuy', 'Trim': 'b-avoid', 'Avoid': 'b-avoid' };
+function ideaCellHtml(s){
+  const r = ideaRankOf(s, analysisFilters.strategyId);
+  if(!r) return '<td class="analysis-lb-idea"></td>';
+  const title = `${r.label}${r.held ? ' (you hold it)' : ''}: rank ${r.rank} of ${r.n} in this strategy, processed ${ideasWhen(r.snap)}`;
+  return `<td class="analysis-lb-idea" title="${escapeHtml(title)}"><span class="badge ${IDEA_BADGE[r.label] || 'b-hold'}" style="padding:1px 8px;font-size:.68rem;">${escapeHtml(r.label)}</span> ${r.rank}</td>`;
 }
 // Everything a row's cells need, shared by the Analysis leaderboard and the Strategies table so both show the same cells.
 function techCell(s, key){
@@ -165,6 +176,7 @@ const SORT_VALUE = {
   monthRsi: (s) => rawOf(s, 'monthRsi'),
   techW: (s) => techRank(s, 'weekMacd'),
   techM: (s) => techRank(s, 'monthMacd'),
+  idea: (s) => { const r = ideaRankOf(s, analysisFilters.strategyId); return r ? r.rank : null; },
   news: (s) => { const c = newsCounts(s); return c ? c.pos - c.neg : null; },
   industry: (s) => tickerIndustry(s).toLowerCase(),
   triggered: researchDoneDays,
@@ -172,7 +184,7 @@ const SORT_VALUE = {
 };
 const isSortableColumn = (id) => Object.prototype.hasOwnProperty.call(SORT_VALUE, id);
 // The direction a column sorts in the first time it is clicked: words A to Z, ratings and figures best (highest) first, research done most recent first.
-const firstSortDir = (id) => (id === 'stock' || id === 'industry' || id === 'name' || id === 'triggered') ? 'asc' : 'desc';
+const firstSortDir = (id) => (id === 'stock' || id === 'industry' || id === 'name' || id === 'triggered' || id === 'idea') ? 'asc' : 'desc';
 // A comparer that orders by `valueOf(item)` (a number, a string, or null for "no figure", which always goes last).
 function compareBy(valueOf, dir){
   const sign = dir === 'asc' ? 1 : -1;

@@ -2,6 +2,7 @@
 // made in the Trade Log, so the header Refresh button works on just that shortlist. It reads the saved Process result (identity/ideasresults.js)
 // of the strategy chosen in Analysis, or the newest result when no strategy is chosen. No result saved yet means no stock to show.
 import { stockByTickerSymbol } from '../core/stocks.js';
+import { tickerSymbol } from '../core/util.js';
 import { ideasResultsGet } from '../identity/ideasresults.js';
 import { publishedStrategies } from '../strategies/state.js';
 
@@ -51,4 +52,15 @@ function ideasWhen(snap){
   return d.toLocaleDateString('en-IN', { ...tz, day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + d.toLocaleTimeString('en-IN', { ...tz, hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
-export { ideasStockSet, ideasWhen };
+// v1.321: the Buy / Sell column. -> { rank, n, label, held, snap } for a stock in the saved result that applies (the strategy chosen in Analysis, else the newest
+// result), or null when it has no entry (not in the strategy, or the result was saved before v1.321 and needs Process again). Asked once per row, so the
+// result that applies is worked out once per saved result and strategy.
+let rankMemo = null;   // { all, strategyId, snap }
+function ideaRankOf(s, strategyId){
+  const all = ideasResultsGet(), sid = strategyId || '';
+  if(!rankMemo || rankMemo.all !== all || rankMemo.strategyId !== sid) rankMemo = { all, strategyId: sid, snap: ideasSource(sid).snap };
+  const snap = rankMemo.snap, e = snap && snap.ranks ? snap.ranks[tickerSymbol(s)] : null;
+  return e ? { rank: e[0], n: snap.n, label: e[1], held: !!e[2], snap } : null;
+}
+
+export { ideaRankOf, ideasStockSet, ideasWhen };
