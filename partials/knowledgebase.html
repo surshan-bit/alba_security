@@ -251,6 +251,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.327 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>Refresh events now also finds results dates:</strong> it reads each stock's next results date from TradingView (the earnings calendar has nothing for Indian stocks, but the quote does) and keeps those in the next 90 days. The date is TradingView's own: the company's announced board meeting once there is one, and an estimate before that, so it is shown as &ldquo;Results expected&rdquo;. Board-meeting dates are still not available from TradingView.</li>
+            </ul>
             <h3>v1.326 &middot; 2026-10-30</h3>
             <ul>
               <li><strong>News shows its saved data again:</strong> in v1.325 the News page could open empty (no market tiles, briefings or calendar, and &ldquo;No upcoming events saved yet&rdquo;) even though the data was saved. The page now listens again when News opens and restarts a listener that has not delivered, so the saved data always shows.</li>
