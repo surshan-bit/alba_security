@@ -2,6 +2,7 @@
 /* Strategies screen. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
 /* ---- Strategies ---- */
 .strat-layout{display:grid;gap:18px;align-items:start;}
+.strat-phonebar{display:none;}   /* the phone's one-row toolbar (phone.css); wide screens keep the picker in its own list */
 .strat-main{min-width:0;}
 .strat-main .strat-panel:first-child{margin-top:0;}
 .strat-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}

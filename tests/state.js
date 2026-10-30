@@ -27,7 +27,7 @@ async function scenario(name, cfg, docs, fn, allowedError){
   try {
     const o = Object.assign({ chunks: CHUNKS, liveCollections: true, section: 'analysis' }, cfg);
     if(docs){ srv.seeds.set(name, JSON.stringify({ docs })); o.seedUrl = base + '/__seed/' + encodeURIComponent(name) + '.json'; }
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }), errs = [];
+    const ctx = await browser.newContext({ viewport: (cfg && cfg.viewport) || { width: 1280, height: 900 } }), errs = [];
     s = { ctx, errs };
     if(cfg && cfg.delayChunks) await ctx.route(/\/chunks\/(strategies|news|tradelog|refreshlog)-/, async r => { await new Promise(x => setTimeout(x, cfg.delayChunks)); r.continue(); });   // a slow download of the lazy pages
     const { page } = await openPage(ctx, base, o, name, errs);
@@ -427,9 +427,69 @@ async function lazyPagesScenario(){
   });
 }
 
+// v1.324: on a phone (412px wide, White theme) the stock grids use the screen better and follow one pattern: rows are 37px with no stock code; the View menu and the Filters chip share a row with the count inside the chip; on Strategies the picker, Setup, Track and refresh and Select share a row and the tick boxes wait for Select. A wide screen is unchanged.
+async function phoneLayoutScenarios(){
+  const phone = { width: 412, height: 744 };
+  const white = page => page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white'));
+  await scenario('phone: Analysis toolbar on one row, no stock code, 37px rows', { viewport: phone }, null, async page => {
+    await white(page);
+    await page.evaluate(() => { const b = document.querySelector('#analysisMosFilters [data-amos="all"]'); if(b) b.click(); });
+    await until(page, () => !!document.querySelector('#analysisLeaderboardBody tr.analysis-lb-row') && /^\d+ of \d+$/.test((document.getElementById('analysisFiltersCount') || {}).textContent || ''), null, 'the rows are drawn and the Filters chip shows the count');
+    const m = await page.evaluate(() => {
+      const top = s => { const e = document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().top) : null; };
+      const row = document.querySelector('#analysisLeaderboardBody tr.analysis-lb-row'), tk = row.querySelector('.analysis-lb-ticker');
+      return { viewTop: top('.analysis-view-bar .dm-btn'), chipTop: top('#analysisFiltersToggle'), countLine: getComputedStyle(document.querySelector('.analysis-toolbar .rk-headline')).display, rowH: row.getBoundingClientRect().height, tkDisplay: getComputedStyle(tk).display };
+    });
+    ok(m.viewTop !== null && Math.abs(m.viewTop - m.chipTop) <= 2, 'the View menu and the Filters chip share one row, got ' + JSON.stringify(m));
+    ok(m.countLine === 'none', 'the separate count line is gone (the chip carries the count)');
+    ok(m.rowH >= 36.5 && m.rowH <= 38, 'rows are 37px tall, got ' + m.rowH);
+    ok(m.tkDisplay === 'none', 'the stock code is left out on a phone, got ' + JSON.stringify(m));
+  });
+  await scenario('phone: Strategies picker, Setup, Track and Select share a row; tick boxes wait for Select', { viewport: phone }, null, async page => {
+    await white(page);
+    await goto(page, 'strategies');
+    await until(page, () => !!document.querySelector('#stratResults tbody tr'), null, 'the picks are drawn');
+    const m = await page.evaluate(() => ({ picker: !!document.querySelector('#stratPhoneBar .strat-phone-pick .dm-strat'), list: document.getElementById('stratList').children.length, btns: document.querySelectorAll('#stratPhoneBar .strat-phone-btn').length, sel: getComputedStyle(document.querySelector('#stratResults .strat-selcell')).display, track: getComputedStyle(document.querySelector('[data-strat-filters]')).display, rowH: document.querySelector('#stratResults tbody tr').getBoundingClientRect().height }));
+    ok(m.picker && m.list === 0 && m.btns === 3, 'the picker joins the three buttons on one row, got ' + JSON.stringify(m));
+    ok(m.sel === 'none', 'the tick boxes are hidden until Select is pressed');
+    ok(m.track === 'none', 'the old "Track and refresh" row is replaced by its button');
+    ok(m.rowH >= 36.5 && m.rowH <= 38, 'rows are 37px tall, got ' + m.rowH);
+    ok(await page.evaluate(() => getComputedStyle(document.querySelector('#stratResults .analysis-lb-ticker')).display === 'none'), 'the stock code is left out here too');
+    await page.evaluate(() => document.querySelector('[data-strat-phone="select"]').click());
+    ok(await page.evaluate(() => getComputedStyle(document.querySelector('#stratResults .strat-selcell')).display !== 'none'), 'Select shows the tick boxes');
+    await page.evaluate(() => document.querySelector('[data-strat-phone="setup"]').click());
+    ok(await page.evaluate(() => document.querySelector('details[data-fold="setup"]').open), 'Setup opens the strategy rules');
+    await page.evaluate(() => document.querySelector('[data-strat-phone="track"]').click());
+    await until(page, () => !!document.querySelector('.strat-filters-panel:not(.filters-collapsed)'), null, 'Track and refresh opens its panel');
+  });
+  await scenario('phone: the Industry view and the stock page peers follow the same grid pattern', { viewport: phone }, null, async page => {
+    await white(page);
+    await page.evaluate(() => { const t = document.querySelector('.analysis-view-bar .dm-btn'); if(t) t.click(); const b = Array.from(document.querySelectorAll('.analysis-view-bar .dm-item')).find(x => /^Industry/.test(x.textContent.trim())); if(b) b.click(); });
+    await until(page, () => !!document.querySelector('#analysisPanelBody .biz-table tbody tr'), null, 'the Industry view is drawn');
+    const m = await page.evaluate(() => {
+      const top = s => { const e = document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().top) : null; };
+      const hs = Array.from(document.querySelectorAll('#analysisPanelBody .biz-table tbody tr.biz-row')).map(r => r.getBoundingClientRect().height);
+      const per = Array.from(document.querySelectorAll('#analysisPanelBody .biz-controls .dm .dm-btn')).map(e => Math.round(e.getBoundingClientRect().top));
+      return { viewTop: top('.analysis-view-bar .dm-btn'), chipTop: top('#analysisFiltersToggle'), periodTop: per[0], showTop: per[1], actionsTop: top('.biz-actions .rk-toolbtn, .biz-actions .rk-main, .biz-actions .dm-btn'), minRow: Math.min(...hs), showing: Array.from(document.querySelectorAll('.biz-showing')).map(e => getComputedStyle(e).display) };
+    });
+    ok(Math.abs(m.viewTop - m.chipTop) <= 2, 'the Industry view: the View menu and the filter share one row, got ' + JSON.stringify(m));
+    ok(m.periodTop === m.showTop && m.periodTop > m.viewTop, 'the Period and Show menus share the second row, got ' + JSON.stringify(m));
+    ok(m.minRow >= 36.5 && m.minRow <= 38.5, 'the Industry rows are 37px tall, got ' + m.minRow);
+    ok(m.showing.every(d => d === 'none'), 'the "Matched n of m stocks" line is gone (the filter carries the count)');
+    await page.evaluate(() => document.querySelector('.analysis-industry .dm-more .dm-btn').click());
+    ok(await page.evaluate(() => { const it = document.querySelector('[data-biz-view="heat"]'), r = it.getBoundingClientRect(), e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!e && !!e.closest('.dm-pop'); }), 'the "..." menu opens on top of the grid and can be clicked (the buttons row does not clip it)');
+  });
+  await scenario('wide screen: Strategies keeps its picker in the list and no phone row', {}, null, async page => {
+    await goto(page, 'strategies');
+    await until(page, () => !!document.querySelector('#stratResults tbody tr'), null, 'the picks are drawn');
+    const m = await page.evaluate(() => ({ bar: getComputedStyle(document.getElementById('stratPhoneBar')).display, list: document.getElementById('stratList').children.length, sel: getComputedStyle(document.querySelector('#stratResults .strat-selcell')).display }));
+    ok(m.bar === 'none' && m.list === 1 && m.sel !== 'none', 'a wide screen is unchanged, got ' + JSON.stringify(m));
+  });
+}
+
 async function main(){
   base = await srv.listen(); browser = await chromium.launch();
-  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); await bulletsWithoutSourcesScenario(); await lazyPagesScenario(); } finally { await browser.close(); srv.close(); }
+  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); await bulletsWithoutSourcesScenario(); await lazyPagesScenario(); await phoneLayoutScenarios(); } finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('state tests FAILED (' + problems.length + ' problems, ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('state tests: ' + checks + ' checks passed');
 }

@@ -255,6 +255,8 @@ function draw(el){
   });
   el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + (embed ? moreMenu : expandBtn) + kit.toolbarButton('biz') + '</div></div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + kit.selbarSlot('biz'));
   syncSheets();
+  const chip = embed ? document.getElementById('analysisFiltersCount') : null;   // a phone shows the count inside the Filters chip (phone.css)
+  if(chip) chip.textContent = strategyOn() ? total + ' of ' + stocks.length : '';
 }
 
 function ensureData(){

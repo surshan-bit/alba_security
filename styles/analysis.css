@@ -74,6 +74,7 @@ body.lb-full-open{overflow:hidden;}
 .analysis-lb-rank{font-variant-numeric:tabular-nums;color:var(--muted);}
 .analysis-lb-name{font-weight:600;}
 .analysis-lb-ticker{color:var(--muted);font-size:.74rem;margin-left:6px;}
+.ft-count{display:none;}   /* the count inside the Filters chip: phones only (phone.css) */
 .analysis-lb-mos{font-weight:700;font-variant-numeric:tabular-nums;}
 .analysis-lb-mos.mos-green{color:var(--buy);}
 .analysis-lb-mos.mos-orange{color:var(--tech-sell);}

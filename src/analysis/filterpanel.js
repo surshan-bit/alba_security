@@ -234,7 +234,7 @@ function analysisFiltersHtml(){
   const facetCount = facetCounts();
   return `
     <div class="filters analysis-filters-panel${analysisFiltersOpen ? '' : ' filters-collapsed'}" id="analysisFilterPanel">
-      <button type="button" class="filters-toggle" id="analysisFiltersToggle" aria-expanded="${analysisFiltersOpen}" aria-controls="analysisFilterGroups"><span class="ft-label" aria-label="Filters"></span><span class="ft-summary" id="analysisFiltersSummary"></span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
+      <button type="button" class="filters-toggle" id="analysisFiltersToggle" aria-expanded="${analysisFiltersOpen}" aria-controls="analysisFilterGroups"><span class="ft-label" aria-label="Filters"></span><span class="ft-summary" id="analysisFiltersSummary"></span><span class="ft-count" id="analysisFiltersCount"></span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
       ${sheetFrame(`      <div class="filter-groups" id="analysisFilterGroups">
       ${strategyGroup()}
       ${ideasGroup()}
@@ -285,6 +285,8 @@ function renderAnalysisFilterPanel(rerender){
       const c = b.cloneNode(true); /** @type {Element} */ (c).querySelectorAll('.filter-n').forEach(n => n.remove()); return c.textContent.trim();
     });
     summary.textContent = names.length ? names.join(', ') : 'All stocks';
+    const cnt = document.getElementById('analysisFiltersCount'), shown = document.getElementById('analysisLeaderboardCount');
+    if(cnt && shown) cnt.textContent = shown.dataset.short || '';   // (a phone shows the count inside this chip: see phone.css)
     toggle.addEventListener('click', () => {
       analysisFiltersOpen = panel.classList.toggle('filters-collapsed') === false;
       toggle.setAttribute('aria-expanded', String(analysisFiltersOpen));
