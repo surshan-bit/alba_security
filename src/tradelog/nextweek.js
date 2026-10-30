@@ -81,13 +81,14 @@ function nextWeekRead(weekBars, today){
     facts: { week: f.r1 * 100, month: f.r4 * 100, half: f.r26 * 100, fromHigh: f.dhi52 * 100, swing: f.vol8 * 100 } };
 }
 
-// Adds each reading's rank among the readings of the same trend (the stocks of one strategy today, split into 'up', 'down' and 'mixed'; `trends` is one entry per
+// Adds each reading's rank among the readings of the same trend (the stocks of one strategy today, split into 'up', 'early', 'down' and 'mixed'; `trends` is one entry per
 // reading): pct (0 lowest to 100 highest), topPct (it is in the top N%), and what happened in the five-year tests to stocks that ranked in the same 5% band
 // within their trend group each week: how often they were higher two weeks later (up) and how often they beat the median stock (beat), with `base`, how often
-// any stock of that trend was higher. A reading with no trend, or a mixed one (in neither list), gets no rank. Returns new objects in the same order; a null stays null.
+// any stock of that trend was higher. The 'early' group (weekly up, monthly not) was not split out in those tests, so it is ranked but its up, beat and base are null.
+// A reading with no trend, or a down or mixed one (in neither list), gets no rank. Returns new objects in the same order; a null stays null.
 function rankReads(reads, trends){
   const groups = {};
-  reads.forEach((r, i) => { const t = trends && trends[i]; if(r && (t === 'up' || t === 'down')) (groups[t] = groups[t] || []).push(r.p); });
+  reads.forEach((r, i) => { const t = trends && trends[i]; if(r && (t === 'up' || t === 'early')) (groups[t] = groups[t] || []).push(r.p); });
   Object.keys(groups).forEach(t => groups[t].sort((a, b) => a - b));
   return reads.map((r, i) => {
     if(!r) return null;
@@ -95,7 +96,7 @@ function rankReads(reads, trends){
     if(!ps) return { ...r, trend: t || null };
     let lo = 0; while(lo < ps.length && ps[lo] < r.p) lo++;
     const pct = ps.length > 1 ? 100 * lo / (ps.length - 1) : 50, bin = Math.min(19, Math.floor(pct / 5)), seg = M.seg[t];
-    return { ...r, trend: t, pct, topPct: Math.max(1, Math.round(100 - pct)), up: Math.round(seg.up[bin] * 1000) / 10, beat: Math.round(seg.beat[bin] * 1000) / 10, base: seg.base };
+    return { ...r, trend: t, pct, topPct: Math.max(1, Math.round(100 - pct)), up: seg ? Math.round(seg.up[bin] * 1000) / 10 : null, beat: seg ? Math.round(seg.beat[bin] * 1000) / 10 : null, base: seg ? seg.base : null };
   });
 }
 

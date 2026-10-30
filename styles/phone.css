@@ -309,11 +309,11 @@ html{font-size:112.5%;}
 :root:root:root #tradeIdeasBody .tl-top5-why{padding-left:0;list-style:none;font-size:12px !important;color:var(--text);}
 :root:root:root #tradeIdeasBody .tl-news{border:0;margin-top:5px;padding:0;font-size:11px !important;}
 :root:root:root #tradeIdeasBody .tl-news-list{display:none;}
-:root:root:root #tradeIdeasBody .tl-top5-down{border-top:1px solid var(--line);padding-top:4px;}
-:root:root:root #tradeIdeasBody .tl-top5-down .tl-top5-title{cursor:pointer;display:flex;justify-content:space-between;}
-:root:root:root #tradeIdeasBody .tl-top5-down .tl-top5-title::after{content:"\203A";transform:rotate(90deg);color:var(--muted);}
-:root:root:root #tradeIdeasBody .tl-top5-down.tl-collapsed .tl-top5-title::after{transform:none;}
-:root:root:root #tradeIdeasBody .tl-top5-down.tl-collapsed > :not(.tl-top5-title){display:none;}
+:root:root:root #tradeIdeasBody .tl-top5-early{border-top:1px solid var(--line);padding-top:4px;}
+:root:root:root #tradeIdeasBody .tl-top5-early .tl-top5-title{cursor:pointer;display:flex;justify-content:space-between;}
+:root:root:root #tradeIdeasBody .tl-top5-early .tl-top5-title::after{content:"\203A";transform:rotate(90deg);color:var(--muted);}
+:root:root:root #tradeIdeasBody .tl-top5-early.tl-collapsed .tl-top5-title::after{transform:none;}
+:root:root:root #tradeIdeasBody .tl-top5-early.tl-collapsed > :not(.tl-top5-title){display:none;}
 :root:root:root #tradeIdeasBody .tl-method,:root:root:root #tradeIdeasBody .tl-ideas-done{display:none;}
 :root:root:root #tradeIdeasBody .tl-ideas-short{display:block;margin:0 0 6px;font-size:var(--t-sm) !important;color:var(--muted);}
 :root:root:root #tradeFormHost .tl-msg:not(.err){display:none;}

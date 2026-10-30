@@ -59,8 +59,8 @@ function loadAnalysisFilters(){
     const isNum = (n) => typeof n === 'number' && isFinite(n);
     const mosLo = isNum(parsed.mosLo) ? parsed.mosLo : null, mosHi = isNum(parsed.mosHi) ? parsed.mosHi : null;
     const strategyId = typeof parsed.strategyId === 'string' ? parsed.strategyId : '';
-    // v1.306: Upward and Downward Trend can be chosen together, so this is a list. Before, it was one word ('up' or 'down'), which is read as a list of one.
-    const ideas = [...new Set((Array.isArray(parsed.ideas) ? parsed.ideas : [parsed.ideas]).filter(v => v === 'up' || v === 'down'))];
+    // v1.306: Upward and Early Trend (Downward before v1.335) can be chosen together, so this is a list. Before, it was one word, which is read as a list of one; a saved 'down' is dropped.
+    const ideas = [...new Set((Array.isArray(parsed.ideas) ? parsed.ideas : [parsed.ideas]).filter(v => v === 'up' || v === 'early'))];
     const rebound = parsed.rebound === true;
     const columnOrder = Array.isArray(parsed.columnOrder) ? parsed.columnOrder : fallback.columnOrder;
     return {

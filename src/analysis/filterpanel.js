@@ -171,18 +171,18 @@ function strategyGroup(){
       </div>`;
 }
 
-// Optional: only the stocks in the Upward trend or Downward trend list from Process in the Trade Log (for the chosen strategy, else the newest result).
+// Optional: only the stocks in the Upward trend or Early trend list from Process in the Trade Log (for the chosen strategy, else the newest result).
 // Each number is how many of those stocks the other Analysis filters leave in. Handy before a Refresh: it works on just the shortlist.
-const IDEAS_BUTTONS = [['up', 'var(--buy)', 'Upward Trend', 'The Upward trend list from the last Process'], ['down', 'var(--hold)', 'Downward Trend', 'The Downward trend (bounce back) list from the last Process']];
+const IDEAS_BUTTONS = [['up', 'var(--buy)', 'Upward Trend', 'The Upward trend list from the last Process'], ['early', 'var(--hold)', 'Early Trend', 'The Early trend (weekly up, monthly not yet) list from the last Process']];
 function ideasGroup(){
   const inStrategy = strategyPassSet(), chosen = analysisFilters.ideas;
-  const c = { all: 0, up: 0, down: 0 };
-  const sets = { up: ideasStockSet(['up'], analysisFilters.strategyId).set, down: ideasStockSet(['down'], analysisFilters.strategyId).set };
+  const c = { all: 0, up: 0, early: 0 };
+  const sets = { up: ideasStockSet(['up'], analysisFilters.strategyId).set, early: ideasStockSet(['early'], analysisFilters.strategyId).set };
   stocks.forEach(s => {
     if(!analysisPasses(s, 'aideas', inStrategy, null)) return;
     c.all++;
     if(sets.up && sets.up.has(s)) c.up++;
-    if(sets.down && sets.down.has(s)) c.down++;
+    if(sets.early && sets.early.has(s)) c.early++;
   });
   const { source } = ideasStockSet(chosen, analysisFilters.strategyId);
   const note = !chosen.length ? '' : source.snap
@@ -265,7 +265,7 @@ const GROUPS = [
   ['analysisTechWFilters', 'atechw', 'techW'],
   ['analysisTechMFilters', 'atechm', 'techM'],
   ['analysisMosFilters', 'amos', 'mosRatings'],
-  ['analysisIdeasFilter', 'aideas', 'ideas']   // v1.306: Upward and Downward Trend can both be chosen
+  ['analysisIdeasFilter', 'aideas', 'ideas']   // v1.306: Upward and Early Trend can both be chosen
 ];
 
 // Draws the panel and makes its buttons work. `rerender` redraws the whole Analysis section.
