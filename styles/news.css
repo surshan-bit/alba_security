@@ -59,15 +59,7 @@ a.news-stock:hover{color:var(--accent);}
 @media (min-width:601px){.news-tiles{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));}}
 
 /* Section headings like Settings: a topic icon, a bold title and a short accent bar, with clear space between sections. */
-.news-h2{display:flex;align-items:center;gap:10px;position:relative;margin:34px 0 14px;padding:0 0 12px;font:700 1.2rem/1.25 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.01em;color:var(--text);}
-.news-h2::before{content:"";width:24px;height:24px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
-.news-h2::after{content:"";position:absolute;left:0;bottom:0;width:48px;height:3px;border-radius:2px;background:var(--accent);}
-.news-h2 small{font:500 .78rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--muted);letter-spacing:0;margin-left:2px;}
-.tabs + .news-h2{margin-top:20px;}
-.news-h2[data-icon="trend"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 7 13.5 15.5 8.5 10.5 2 17'/%3E%3Cpolyline points='16 7 22 7 22 13'/%3E%3C/svg%3E");}
-.news-h2[data-icon="globe"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='2' y1='12' x2='22' y2='12'/%3E%3Cpath d='M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z'/%3E%3C/svg%3E");}
-.news-h2[data-icon="tag"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z'/%3E%3Cline x1='7' y1='7' x2='7.01' y2='7'/%3E%3C/svg%3E");}
-.news-h2[data-icon="calendar"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");}
+.tabs + h2[data-icon]{margin-top:20px;}
 .news-grp{margin:22px 0 10px;padding:0 0 0 10px;border-left:3px solid var(--accent);font-size:var(--t-md);line-height:1.2;}
 .news-sec{display:none;}
 .news-card{margin-bottom:10px;}

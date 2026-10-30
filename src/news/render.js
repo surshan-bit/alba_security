@@ -59,7 +59,7 @@ function scopeInfo(){
 function pulseHtml(){
   const p = news.pulse, run = getPulseRun();
   const tiles = p && Array.isArray(p.tiles) ? p.tiles.map(tileView).filter(Boolean) : [];
-  let h = '<h2 class="news-h2" data-icon="trend">Market pulse</h2>';
+  let h = '<h2 data-icon="trend">Market pulse</h2>';
   if(!tiles.length){
     h += '<p class="news-empty">No market quotes yet. Press <b>Refresh News</b> to load them.</p>';
   } else {
@@ -79,7 +79,7 @@ function pulseHtml(){
 
 function briefingsHtml(){
   const m = news.macro, items = m && Array.isArray(m.briefings) ? m.briefings.filter(b => b && b.headline) : [];
-  let h = '<h2 class="news-h2" data-icon="globe">Briefings</h2>';
+  let h = '<h2 data-icon="globe">Briefings</h2>';
   if(!items.length) return h + '<p class="news-empty">No briefings yet. Press <b>Refresh News</b> to write them from the latest market headlines.</p>';
   if(m.asof) h += `<div class="news-hint">${m.briefingsAt ? (sameStamp(m.briefingsAt) ? 'From TradingView headlines' : 'Updated ' + escapeHtml(stamp(m.briefingsAt)) + ' from TradingView headlines') : 'Researched ' + escapeHtml(shortDate(m.asof))}. Each card says why it matters; links go to the source.</div>`;
   const known = new Set(BRIEFING_GROUPS.map(g => g.id));
@@ -100,7 +100,7 @@ function briefingsHtml(){
 
 function calendarHtml(){
   const m = news.macro, rows = m && Array.isArray(m.calendar) ? m.calendar : [];
-  let h = '<h2 class="news-h2" data-icon="calendar">Economic calendar</h2>';
+  let h = '<h2 data-icon="calendar">Economic calendar</h2>';
   h += '<div class="news-hint">Next 30 days' + (m && m.calendarAt ? (sameStamp(m.calendarAt) ? ', from TradingView' : ', updated ' + escapeHtml(stamp(m.calendarAt)) + ' from TradingView') : '') + '.</div>';
   if(!rows.length) return h + '<p class="news-empty">No calendar yet. It is saved from a Claude session.</p>';
   const groups = groupCalendar(rows, view.calAll ? -1 : 0), today = todayIst();
