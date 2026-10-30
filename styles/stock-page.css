@@ -95,10 +95,6 @@
      lets the pane (and panel) shrink to the screen so .peers-scroll scrolls sideways inside its own box. */
 .detail,.tech-panel{min-width:0;}
 .peers-sub{font-size:.8rem;color:var(--muted);line-height:1.5;margin:0 0 12px;}
-.peers-table th:nth-child(1){min-width:56px;}
-.peers-table td:nth-child(1){min-width:56px;}
-.peers-table th:nth-child(2){min-width:130px;}
-.peers-table td:nth-child(2){min-width:130px;}
 /* Horizontal scroll (2026-10-06): the table keeps its natural column widths and, on a narrow screen,
      scrolls sideways inside .peers-scroll (no columns are pinned — pinned columns ate most of a phone's width). */
 .peers-hint{display:none;font-size:.72rem;color:var(--muted);margin:6px 2px 0;}

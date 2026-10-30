@@ -142,7 +142,7 @@ function detailHtml(r, cols){
   kit.defineScope('biz:' + r.name, { label: r.name, source: 'biz-kit', selName: 'biz', stocks: () => vis });   // what this table's Refresh button works on
   const p = periodOf(period);
   // The short set: Stock, Price, 1W, 1M, MoS, weekly rating, News (All columns follows the order set in Analysis); the chosen period's own change is added when it is not 1W or 1M.
-  const colIds = detailAllCols ? stockGridColumnIds().filter(id => id !== 'industry' && id !== 'rank') : LEAN_COLS;
+  const colIds = detailAllCols ? stockGridColumnIds().filter(id => id !== 'industry' && id !== 'rank' && id !== 'pin') : LEAN_COLS;
   const showPeriod = detailAllCols || needsBars(period);
   const byStock = detailSort.col === 'periodChg' ? compareBy((x) => x.change, detailSort.dir) : (() => { const c = compareByColumn(detailSort.col, detailSort.dir); return (a, b) => c(a.stock, b.stock); })();
   const isDefaultSort = detailSort.col === 'periodChg' && detailSort.dir === 'desc';   // with a strategy chosen, its matches come first until a header is clicked
