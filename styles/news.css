@@ -126,3 +126,4 @@ a.news-stock:hover{color:var(--accent);}
 .news-ev .news-evtext{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--muted);}
 .news-ev .news-evtext a{color:inherit;text-decoration:none;}
 .news-ev .news-tag{flex:none;}
+.news-ev .news-imp{flex:none;}

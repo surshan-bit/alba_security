@@ -30,6 +30,8 @@ const isoDay = (iso) => String(iso || '').slice(0, 10);
 const safeUrl = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : '');
 const link = (label, url, cls) => { const u = safeUrl(url); return u ? `<a class="news-link${cls ? ' ' + cls : ''}" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label || 'Source')} &#8599;</a>` : ''; };
 const impactTag = (v) => (v === 'positive' || v === 'negative' || v === 'mixed' ? `<span class="news-tag news-${v}">${v}</span>` : '');
+// The time of a section's own refresh, said only when it is not the one already shown at the top of the page (same day and minute).
+const sameStamp = (iso) => { const p = news.pulse && news.pulse.at; return !!p && Math.abs(Date.parse(iso) - Date.parse(p)) < 120000; };
 const stamp = (iso) => {
   const t = Date.parse(iso);
   if(!isFinite(t)) return '';
@@ -79,7 +81,7 @@ function briefingsHtml(){
   const m = news.macro, items = m && Array.isArray(m.briefings) ? m.briefings.filter(b => b && b.headline) : [];
   let h = '<h2 class="news-h2" data-icon="globe">Briefings</h2>';
   if(!items.length) return h + '<p class="news-empty">No briefings yet. Press <b>Refresh News</b> to write them from the latest market headlines.</p>';
-  if(m.asof) h += `<div class="news-hint">${m.briefingsAt ? 'Updated ' + escapeHtml(stamp(m.briefingsAt)) + ' from TradingView headlines' : 'Researched ' + escapeHtml(shortDate(m.asof))}. Each card says why it matters; links go to the source.</div>`;
+  if(m.asof) h += `<div class="news-hint">${m.briefingsAt ? (sameStamp(m.briefingsAt) ? 'From TradingView headlines' : 'Updated ' + escapeHtml(stamp(m.briefingsAt)) + ' from TradingView headlines') : 'Researched ' + escapeHtml(shortDate(m.asof))}. Each card says why it matters; links go to the source.</div>`;
   const known = new Set(BRIEFING_GROUPS.map(g => g.id));
   BRIEFING_GROUPS.concat([{ id: '_other', label: 'Other' }]).forEach(g => {
     const rows = items.filter(b => (known.has(b.group) ? b.group : '_other') === g.id);
@@ -99,16 +101,20 @@ function briefingsHtml(){
 function calendarHtml(){
   const m = news.macro, rows = m && Array.isArray(m.calendar) ? m.calendar : [];
   let h = '<h2 class="news-h2" data-icon="calendar">Economic calendar</h2>';
-  h += '<div class="news-hint">Next 30 days' + (m && m.calendarAt ? ', updated ' + escapeHtml(stamp(m.calendarAt)) + ' from TradingView' : '') + '.</div>';
+  h += '<div class="news-hint">Next 30 days' + (m && m.calendarAt ? (sameStamp(m.calendarAt) ? ', from TradingView' : ', updated ' + escapeHtml(stamp(m.calendarAt)) + ' from TradingView') : '') + '.</div>';
   if(!rows.length) return h + '<p class="news-empty">No calendar yet. It is saved from a Claude session.</p>';
   const groups = groupCalendar(rows, view.calAll ? -1 : 0), today = todayIst();
   const shown = groups.filter(g => g.date >= today);
   if(!shown.length) return h + '<p class="news-empty">No upcoming events in the saved calendar. Ask Claude to refresh the news.</p>';
-  shown.forEach(g => g.rows.forEach((r, i) => {
-    const imp = IMPORTANCE[r.importance] || '', impCls = r.importance >= 1 ? 'news-hi' : r.importance === 0 ? 'news-md' : 'news-lo';
-    const bits = [r.country, r.forecast !== undefined && r.forecast !== null ? 'forecast ' + calValue(r.forecast, r.unit) : '', r.previous !== undefined && r.previous !== null ? 'previous ' + calValue(r.previous, r.unit) : '', r.actual !== undefined && r.actual !== null ? 'actual ' + calValue(r.actual, r.unit) : ''].filter(Boolean).map(escapeHtml);
-    h += `<div class="news-row"><div class="news-date">${escapeHtml(shortDate(g.date))}</div><div class="news-text">${imp ? `<span class="news-imp ${impCls}">${escapeHtml(imp.toUpperCase())}</span> ` : ''}${escapeHtml(r.title)}<small>${bits.join(' &middot; ')}${r.source ? ' &middot; ' + (link(r.source, r.url) || escapeHtml(r.source)) : ''}</small></div></div>`;
-  }));
+  shown.forEach(g => {
+    h += `<div class="news-day"><span>${escapeHtml(shortDate(g.date))}</span><span>${g.rows.length}</span></div>`;
+    g.rows.forEach(r => {
+      const imp = IMPORTANCE[r.importance] || '', impCls = r.importance >= 1 ? 'news-hi' : r.importance === 0 ? 'news-md' : 'news-lo';
+      const bits = [r.country, r.forecast !== undefined && r.forecast !== null ? 'forecast ' + calValue(r.forecast, r.unit) : '', r.previous !== undefined && r.previous !== null ? 'previous ' + calValue(r.previous, r.unit) : '', r.actual !== undefined && r.actual !== null ? 'actual ' + calValue(r.actual, r.unit) : ''].filter(Boolean).join(' \u00b7 ');
+      const u = safeUrl(r.url), more = bits + (r.source ? ' \u00b7 ' + r.source : '');
+      h += `<div class="news-row news-ev"><span class="news-evname">${u ? `<a class="news-stock" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title)}</a>` : `<span class="news-stock">${escapeHtml(r.title)}</span>`}</span>${imp ? `<span class="news-imp ${impCls}">${escapeHtml(imp.toUpperCase())}</span>` : ''}<span class="news-evtext" title="${escapeHtml(more)}">${escapeHtml(bits)}</span></div>`;
+    });
+  });
   h += `<button type="button" class="news-more" data-news-cal-all>${view.calAll ? 'Show only medium and high importance' : 'Show all'}</button>`;
   return h;
 }
