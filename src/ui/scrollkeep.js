@@ -27,6 +27,10 @@ function keepScroll(root, redraw){
 }
 
 const IDLE_MS = 350, MAX_WAIT_MS = 5000, SETTLE_MS = 60;
+// While the saved data is still arriving (the first seconds after launch) its snapshots come one by one; waiting a little longer turns
+// them into one redraw instead of one per snapshot.
+const LAUNCH_MS = 12000, LAUNCH_SETTLE_MS = 2500;
+const launchedAt = performance.now();
 let lastScrollAt = -Infinity, listening = false;   // performance.now() values: a monotonic clock, unaffected by the system clock being changed
 const waiting = new Map();   // key -> timer: one redraw per key covers every request made while it waits
 function listen(){
@@ -45,7 +49,7 @@ function redrawWhenIdle(key, redraw){
     waiting.delete(key);
     try { redraw(); } catch(e){ console.error('Could not redraw after an update', e); }
   };
-  waiting.set(key, setTimeout(tick, SETTLE_MS));
+  waiting.set(key, setTimeout(tick, performance.now() - launchedAt < LAUNCH_MS ? LAUNCH_SETTLE_MS : SETTLE_MS));
 }
 
 export { keepScroll, redrawWhenIdle };
