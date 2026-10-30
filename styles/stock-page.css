@@ -352,3 +352,10 @@ html{scrollbar-color:var(--line) transparent;}
 /* Explorer full screen: the table fills the window, headings stay in view while the rows scroll. */
 .biz-main.biz-full{position:fixed;inset:0;z-index:70;margin:0;padding:12px 20px 16px;background:var(--bg);display:flex;flex-direction:column;overflow:auto;}
 .biz-main.biz-full .biz-toolbar{flex:none;}
+/* Phone: the legend button sits on its own line instead of over the score badge, and the Change | RSI | Signal strip shares the row width instead of spilling past the card. */
+@media (max-width:600px){
+.pc-ph{flex-wrap:wrap;}
+.pc-ph .pc-psum{flex:1 1 100%;min-width:0;order:3;}
+.pc-psum .pcs{display:flex;width:100%;}
+.pcs-cell{flex:1 1 0;min-width:0;padding-left:8px;padding-right:8px;}
+}
