@@ -272,7 +272,7 @@ html{font-size:112.5%;}
 :root:root:root #tradeLogPanelBody .tl-prow-why{margin:0 0 10px;font-size:12px !important;line-height:1.4;}
 :root:root:root #tradeLogPanelBody .tl-prow-det .tl-row-actions{border:0;padding:0;}
 /* The add / sell form is a bottom sheet over a dimmed page; the Add trade button is pinned to the bottom of the Positions tab */
-:root:root:root #tradeAddBtn{position:fixed;left:12px;right:12px;bottom:12px;z-index:40;height:46px;width:auto;justify-content:center;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 40%,transparent);}
+:root:root:root #tradeAddBtn{position:fixed;left:12px;right:12px;bottom:12px;z-index:25;height:46px;width:auto;justify-content:center;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 40%,transparent);}
 :root:root:root #section-trackrecord[data-tl-tab="ideas"] #tradeAddBtn,:root:root:root #section-trackrecord:has(.tl-form) #tradeAddBtn{display:none;}
 :root:root:root #section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-head{display:block;height:0;overflow:visible;margin:0;padding:0;}
 :root:root:root #section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-head .analysis-panel-title{display:none;}
