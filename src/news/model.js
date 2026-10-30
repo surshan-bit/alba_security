@@ -75,6 +75,9 @@ function readingTone(text){
   return bad && !good ? 'negative' : good && !bad ? 'positive' : 'mixed';
 }
 
+// The saved text of a results date says "TradingView date, can change" on every row; that is said once above the list instead.
+const dateNote = (t) => /^Results expected \(TradingView/.test(t) ? '' : /^Results date \(confirmed\)/.test(t) ? 'Confirmed' : t;
+
 // ---- calendar ----
 const IMPORTANCE = { 1: 'High', 0: 'Medium', '-1': 'Low' };
 // Rows (already filtered by the research session) grouped by IST date, soonest first: [{ date, rows }].
@@ -263,4 +266,4 @@ function mergeTvEvents(saved, tickers, fresh, today){
   return keep.concat(fresh.filter(x => !have.has(x.ticker + '|' + x.type + '|' + x.date)));
 }
 
-export { readingTone, buildTvEvents, mergeTvEvents, BRIEFING_FEEDS, EVENT_TYPES, briefingsPrompt, buildCalendar, cleanBriefings, mergeHeadlines, IMPORTANCE, PULSE_SYMBOLS, buildTiles, calValue, cleanReading, filterItems, groupCalendar, nextBigEvents, readingPrompt, recentItems, shortDate, tileView, typeTag, upcomingItems };
+export { dateNote, readingTone, buildTvEvents, mergeTvEvents, BRIEFING_FEEDS, EVENT_TYPES, briefingsPrompt, buildCalendar, cleanBriefings, mergeHeadlines, IMPORTANCE, PULSE_SYMBOLS, buildTiles, calValue, cleanReading, filterItems, groupCalendar, nextBigEvents, readingPrompt, recentItems, shortDate, tileView, typeTag, upcomingItems };

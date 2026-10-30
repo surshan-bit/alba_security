@@ -3,7 +3,7 @@ import { escapeHtml, tickerSymbol } from '../core/util.js';
 import { stockByTickerSymbol, stockIndex, stocks } from '../core/stocks.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { publishedStrategies } from '../strategies/state.js';
-import { readingTone, IMPORTANCE, EVENT_TYPES, calValue, filterItems, groupCalendar, nextBigEvents, recentItems, shortDate, tileView, typeTag, upcomingItems } from './model.js';
+import { dateNote, readingTone, IMPORTANCE, EVENT_TYPES, calValue, filterItems, groupCalendar, nextBigEvents, recentItems, shortDate, tileView, typeTag, upcomingItems } from './model.js';
 import { news } from './store.js';
 import { getPulseRun } from './pulse.js';
 import { getEventsRun } from './stockevents.js';
@@ -107,9 +107,6 @@ function countryHtml(c){
   const flag = /^[A-Z]{2}$/.test(code) ? String.fromCodePoint(...[...code].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65)) : '';
   return (flag ? `<span class="news-flag" aria-hidden="true">${flag}</span>` : '') + `<b>${escapeHtml(code)}</b>`;
 }
-// The saved text of a results date says "TradingView date, can change" on every row; that is said once above the list instead.
-const dateNote = (t) => /^Results expected \(TradingView/.test(t) ? '' : /^Results date \(confirmed\)/.test(t) ? 'Confirmed' : t;
-
 function calendarHtml(){
   const m = news.macro, rows = m && Array.isArray(m.calendar) ? m.calendar : [];
   let h = '<h2 data-icon="calendar">Economic calendar</h2>';
