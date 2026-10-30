@@ -72,7 +72,7 @@ function heatmapHtml(rows, period, width, size, hRatio){
     const showName = pw > 30 && nameLines >= 1;
     const chg = r.mean === null ? 'n/a' : (r.mean > 0 ? '+' : '') + r.mean.toFixed(2) + '%';
     const tip = r.name + ': ' + chg + ' average ' + period + ', ' + r.count + ' stock' + (r.count === 1 ? '' : 's');
-    return '<button type="button" class="hm-tile" data-biz-heat="' + escapeHtml(r.name) + '" title="' + escapeHtml(tip) + '" style="left:' + (t.x / W * 100).toFixed(3) + '%;top:' + (t.y / H * 100).toFixed(3) + '%;width:' + (t.w / W * 100).toFixed(3) + '%;height:' + (t.h / H * 100).toFixed(3) + '%;background:' + tileColor(r.mean, period) + ';font-size:' + fs.toFixed(1) + 'px;padding:' + (pw < 60 || ph < 40 ? 2 : 5) + 'px ' + (pw < 60 ? 3 : 6) + 'px">'
+    return '<button type="button" class="hm-tile" data-biz-heat="' + escapeHtml(r.name) + '" title="' + escapeHtml(tip) + '" style="left:' + (t.x / W * 100).toFixed(3) + '%;top:' + (t.y / H * 100).toFixed(3) + '%;width:' + (t.w / W * 100).toFixed(3) + '%;height:' + (t.h / H * 100).toFixed(3) + '%;background:' + tileColor(r.mean, period) + ';padding:' + (pw < 60 || ph < 40 ? 2 : 5) + 'px ' + (pw < 60 ? 3 : 6) + 'px">'
       + (showName ? '<span class="hm-name" style="-webkit-line-clamp:' + Math.min(nameLines, 4) + '">' + escapeHtml(r.name) + '</span>' : '') + (showChg ? '<span class="hm-chg">' + chg + '</span>' : '') + (showN ? '<span class="hm-n">' + r.count + ' stock' + (r.count === 1 ? '' : 's') + '</span>' : '') + '</button>';
   };
   const s = SCALE[period] || 10;

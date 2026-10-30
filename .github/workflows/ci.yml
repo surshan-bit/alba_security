@@ -9,7 +9,7 @@ permissions:
 jobs:
   # Everything except the import flows (about 4 minutes).
   check-main:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # Playwright 1.56 does not support ubuntu-latest (26.04) yet
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -21,7 +21,7 @@ jobs:
       - run: npm run platform
   # The import flows in Chromium: by far the slowest suite (about 7 minutes), so it runs beside the rest.
   check-imports:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # Playwright 1.56 does not support ubuntu-latest (26.04) yet
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -33,7 +33,7 @@ jobs:
   check:
     needs: [check-main, check-imports]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # Playwright 1.56 does not support ubuntu-latest (26.04) yet
     steps:
       - run: |
           echo "check-main: ${{ needs.check-main.result }}, check-imports: ${{ needs.check-imports.result }}"

@@ -71,10 +71,10 @@ function analysisLbCell(colId, ctx){
 function analysisLbCellRaw(colId, ctx){
   const { s, i, idx, r, mosLabel, mosClass, price, pinned, scoreLabel, techWCell, techMCell } = ctx;
   switch(colId){
-    case 'score': return !scoreLabel ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge b-${s.verdict}" style="padding:1px 8px;font-size:.68rem;">${scoreLabel}</span></td>`;
+    case 'score': return !scoreLabel ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge b-${s.verdict}" style="padding:1px 8px;">${scoreLabel}</span></td>`;
     case 'techScore': {
       const ts = s.technical && typeof s.technical.score === 'number' ? s.technical.score : null;
-      return ts === null ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge b-${scoreBand(ts).replace('fs-', '')}" style="padding:1px 8px;font-size:.68rem;">${ts.toFixed(1)}</span></td>`;
+      return ts === null ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge b-${scoreBand(ts).replace('fs-', '')}" style="padding:1px 8px;">${ts.toFixed(1)}</span></td>`;
     }
     case 'pin': return `<td class="pin-col"><button type="button" class="pin-btn${pinned ? ' pinned' : ''}" data-ticker="${escapeHtml(s.ticker)}" title="${pinned ? 'Unpin' : 'Pin to top'}">${pinned ? '★' : '☆'}</button></td>`;
     case 'rank': return `<td class="analysis-lb-rank">${i + 1}</td>`;
@@ -132,12 +132,12 @@ function ideaCellHtml(s){
   const r = ideaRankOf(s, analysisFilters.strategyId);
   if(!r) return '<td class="analysis-lb-idea"></td>';
   const title = `${r.label}${r.held ? ' (you hold it)' : ''}: rank ${r.rank} of ${r.n} Upward-trend stocks in this strategy, processed ${ideasWhen(r.snap)}`;
-  return `<td class="analysis-lb-idea" title="${escapeHtml(title)}"><span class="badge ${IDEA_BADGE[r.label] || 'b-hold'}" style="padding:1px 8px;font-size:.68rem;">${escapeHtml(r.label)}</span> ${r.rank}</td>`;
+  return `<td class="analysis-lb-idea" title="${escapeHtml(title)}"><span class="badge ${IDEA_BADGE[r.label] || 'b-hold'}" style="padding:1px 8px;">${escapeHtml(r.label)}</span> ${r.rank}</td>`;
 }
 // Everything a row's cells need, shared by the Analysis leaderboard and the Strategies table so both show the same cells.
 function techCell(s, key){
   const t = techRatingInfo(s.technical && s.technical.states && s.technical.states[key]);
-  return t ? `<span class="badge ${t.cls}" style="padding:1px 8px;font-size:.68rem;">${t.label}</span>` : '';
+  return t ? `<span class="badge ${t.cls}" style="padding:1px 8px;">${t.label}</span>` : '';
 }
 function analysisRowContext(s, i, idx){
   const r = (s.technical && s.technical.raw) || {};

@@ -68,7 +68,7 @@ const tlInr = (n) => n == null ? '—' : '₹' + n.toLocaleString('en-IN', {maxi
 function tlScoreCell(snap){
   const sc = snap && snap.score != null ? snap.score.toFixed(2) : '—';
   const v = snap && snap.verdict;
-  return v ? `${sc} <span class="badge b-${v}" style="padding:1px 8px;font-size:.66rem;">${verdictLabel[v] || v}</span>` : sc;
+  return v ? `${sc} <span class="badge b-${v}" style="padding:1px 8px;">${verdictLabel[v] || v}</span>` : sc;
 }
 // Everything a trade's card or table row needs, computed once per trade (the markup builders
 // below only format it). A trade counts as closed only when it has a sell record.

@@ -91,10 +91,7 @@ a.news-stock:hover{color:var(--accent);}
 .news-ch{font-weight:700;}
 .news-own{display:inline-block;font:700 .6rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;background:#fdf1c8;color:#7a5a00;}
 .news-types{margin-top:2px;}
-:root:root:root .news-bhead{font-weight:700 !important;}
-:root:root:root .news-bhead small{font-weight:500 !important;}
-:root:root:root .news-bbody p b,:root:root:root .news-why-h{font-weight:700 !important;}
-:root:root:root .news-types{margin-bottom:4px;}
+:root .news-types{margin-bottom:4px;}
 .day-head + .row-line{border-top:0;}
 /* Stock events: one line per event (stock, kind of event, text cut at the end of the line) */
 .row-line .news-et{flex:none;margin:0;}

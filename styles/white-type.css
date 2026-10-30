@@ -6,54 +6,64 @@
    Weights: 500 (medium) for text and values, 700 (bold) for headings, the active choice, buttons and bold words. Nothing else. */
 
 /* 1. Base: blocks and controls are body text. Inline words inherit from the block they sit in. */
-:root[data-theme="white"] body :is(p,li,td,div,label,button,summary,input,select,textarea,dd,dt,blockquote,pre){font-family:var(--ff-white) !important;font-size:var(--t-md) !important;font-weight:var(--w-reg) !important;}
-:root[data-theme="white"] body *{font-family:var(--ff-white) !important;}
-:root[data-theme="white"] body :is(span,a,i,em,small,sub,sup){font-size:inherit !important;font-weight:inherit !important;}
-:root[data-theme="white"] body :is(b,strong){font-family:inherit !important;font-size:inherit !important;font-weight:var(--w-strong) !important;}
-:root[data-theme="white"] body :is(code,.help-formula,.help-formula *){font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace !important;font-size:var(--t-md) !important;font-weight:var(--w-reg) !important;}
-:root[data-theme="white"] body .help-formula b{font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body :is(p,li,td,div,label,button,summary,input,select,textarea,dd,dt,blockquote,pre){font-family:var(--ff-white);font-size:var(--t-md);font-weight:var(--w-reg);}
+:root[data-theme="white"] body *{font-family:var(--ff-white);}
+:root[data-theme="white"] body :is(span,a,i,em,small,sub,sup){font-size:inherit;font-weight:inherit;}
+:root[data-theme="white"] body :is(b,strong){font-family:inherit;font-size:inherit;font-weight:var(--w-strong);}
+:root[data-theme="white"] body :is(code,.help-formula,.help-formula *){font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:var(--t-md);font-weight:var(--w-reg);}
+:root[data-theme="white"] body .help-formula b{font-weight:var(--w-strong);}
 
 /* 2. Headings */
-:root[data-theme="white"] body h1,:root[data-theme="white"] body .detail-name{font-family:var(--ff-white) !important;font-size:var(--t-xl) !important;font-weight:var(--w-strong) !important;}
-:root[data-theme="white"] body :is(h2,h3,.brand-title,.refreshlog-job-title,.settings-row-title,.upload-title,.tech-panel-title,.global-panel-title,.val-panel-title,.fund-panel-title,.analysis-panel-title,summary.analysis-panel-title,.detail-star,.fund-cell-score,.fund-cell-score *,.val-cell-value b){font-family:var(--ff-white) !important;font-size:var(--t-lg) !important;font-weight:var(--w-strong) !important;}
-:root[data-theme="white"] body :is(h4,h5,h6,.refreshlog-freshness-title,.refreshlog-runs-title,.refreshlog-sub-title,.val-cell-value,.glossary-term,.pcs-val,.wl-pick-name){font-size:var(--t-md) !important;font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body h1,:root[data-theme="white"] body .detail-name{font-family:var(--ff-white);font-size:var(--t-xl);font-weight:var(--w-strong);}
+:root[data-theme="white"] body :is(h2,h3,.brand-title,.refreshlog-job-title,.settings-row-title,.upload-title,.tech-panel-title,.global-panel-title,.val-panel-title,.fund-panel-title,.analysis-panel-title,summary.analysis-panel-title,.detail-star,.fund-cell-score,.fund-cell-score *,.val-cell-value b){font-family:var(--ff-white);font-size:var(--t-lg);font-weight:var(--w-strong);}
+:root[data-theme="white"] body :is(h4,h5,h6,.refreshlog-freshness-title,.refreshlog-runs-title,.refreshlog-sub-title,.val-cell-value,.glossary-term,.pcs-val,.wl-pick-name){font-size:var(--t-md);font-weight:var(--w-strong);}
 /* the small uppercase labels above groups */
-:root[data-theme="white"] body :is(.filters h2,.filter-group h2,.strat-section-title,.fund-cell-label,.fund-pc-title,.fund-subsection-title,.nav-section-label){font-size:var(--t-sm) !important;font-weight:var(--w-strong) !important;}
-:root[data-theme="white"] body .nav-section-label{font-size:var(--t-xs) !important;}
+:root[data-theme="white"] body :is(.filters h2,.filter-group h2,.strat-section-title,.fund-cell-label,.fund-pc-title,.fund-subsection-title,.nav-section-label){font-size:var(--t-sm);font-weight:var(--w-strong);}
+:root[data-theme="white"] body .nav-section-label{font-size:var(--t-xs);}
 
 /* 3. Grids: headings, values and pills share one rule on every grid */
-:root[data-theme="white"] body :is(th,.strat-table th,.biz-table th,.help-table th){font-family:var(--ff-white) !important;font-size:var(--t-sm) !important;font-weight:var(--w-reg) !important;}
-:root[data-theme="white"] body :is(td,td *,.chg-up,.chg-down,.ind-w,.analysis-lb-name,.biz-open){font-weight:var(--w-reg) !important;}
-:root[data-theme="white"] body :is(td .badge,.badge,.completeness-badge,.tech-badge,.fund-cell-max,.analysis-lb-ticker,.filter-n,.sr-opt,.sr-unit,.sr-and,.sr-count,.help-tab-link,.data-chip){font-size:var(--t-sm) !important;font-weight:var(--w-reg) !important;}
-:root[data-theme="white"] body :is(.completeness-badge){font-weight:var(--w-strong) !important;}
-:root[data-theme="white"] body :is(.strat-count,.strat-empty,.biz-showing,.analysis-count,.filter-note,.strat-section-hint,.analysis-filter-label,.peers-hint){font-size:var(--t-sm) !important;}
-:root[data-theme="white"] body :is(.biz-showing,.strat-count,.strat-count b){font-weight:var(--w-reg) !important;}
+:root[data-theme="white"] body :is(th,.strat-table th,.biz-table th,.help-table th){font-family:var(--ff-white);font-size:var(--t-sm);font-weight:var(--w-reg);}
+:root[data-theme="white"] body :is(td,td *,.chg-up,.chg-down,.ind-w,.analysis-lb-name,.biz-open){font-weight:var(--w-reg);}
+:root[data-theme="white"] body :is(td .badge,.badge,.completeness-badge,.tech-badge,.fund-cell-max,.analysis-lb-ticker,.filter-n,.sr-opt,.sr-unit,.sr-and,.sr-count,.help-tab-link,.data-chip){font-size:var(--t-sm);font-weight:var(--w-reg);}
+:root[data-theme="white"] body :is(.completeness-badge){font-weight:var(--w-strong);}
+:root[data-theme="white"] body :is(.strat-count,.strat-empty,.biz-showing,.analysis-count,.filter-note,.strat-section-hint,.analysis-filter-label,.peers-hint){font-size:var(--t-sm);}
+:root[data-theme="white"] body :is(.biz-showing,.strat-count,.strat-count b){font-weight:var(--w-reg);}
 
 /* 4. Buttons, menus and choices */
-:root[data-theme="white"] body :is(.biz-expand,.detail-back,.analysis-reset-btn,.rk-btn,.rk-main,.rk-barbtn,.rk-toolbtn,.strat-btn,.refresh-btn,.browse-btn,.select-mode-btn,.tl-btn-primary,.fi-btn-primary){font-size:var(--t-sm) !important;font-weight:var(--w-strong) !important;}
-:root[data-theme="white"] body :is(.nav-item.active,.tl-view-btn.active,.filter-btn.active,.live-toggle){font-weight:var(--w-strong) !important;}
-:root[data-theme="white"] body :is(.live-toggle,.rk-row-btn,.pin-btn,.sr-del){font-size:var(--t-md) !important;}
-:root[data-theme="white"] body :is(.brand-version,.pro-pill,.detail-back-key,.pcs-key,.pcs-arrow){font-size:var(--t-xs) !important;font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body :is(.biz-expand,.detail-back,.analysis-reset-btn,.rk-btn,.rk-main,.rk-barbtn,.rk-toolbtn,.strat-btn,.refresh-btn,.browse-btn,.select-mode-btn,.tl-btn-primary,.fi-btn-primary){font-size:var(--t-sm);font-weight:var(--w-strong);}
+:root[data-theme="white"] body :is(.nav-item.active,.tl-view-btn.active,.filter-btn.active,.live-toggle){font-weight:var(--w-strong);}
+:root[data-theme="white"] body :is(.live-toggle,.rk-row-btn,.pin-btn,.sr-del){font-size:var(--t-md);}
+:root[data-theme="white"] body :is(.brand-version,.pro-pill,.detail-back-key,.pcs-key,.pcs-arrow){font-size:var(--t-xs);font-weight:var(--w-strong);}
 
 /* The logo keeps its own face and size; the small summary / hint texts are regular. */
-:root[data-theme="white"] body .topbar-brand,:root[data-theme="white"] body .topbar-brand *{font-family:"Quicksand","Nunito","Varela Round",-apple-system,"Segoe UI",sans-serif !important;font-size:28px !important;font-weight:700 !important;}
-:root[data-theme="white"] body :is(.strat-fold-sum,.strat-section-hint){font-size:var(--t-sm) !important;font-weight:var(--w-reg) !important;}
+:root[data-theme="white"] body .topbar-brand,:root[data-theme="white"] body .topbar-brand *{font-family:"Quicksand","Nunito","Varela Round",-apple-system,"Segoe UI",sans-serif;font-size:28px;font-weight:700;}
+:root[data-theme="white"] body :is(.strat-fold-sum,.strat-section-hint){font-size:var(--t-sm);font-weight:var(--w-reg);}
 /* Titles inside the Strategies panels are one step down so the setup line and the grid stay the focus. */
-:root[data-theme="white"] body :is(.strat-panel .analysis-panel-title,summary.strat-sub,.strat-panel .analysis-panel-title *){font-size:var(--t-md) !important;}
+:root[data-theme="white"] body :is(.strat-panel .analysis-panel-title,summary.strat-sub,.strat-panel .analysis-panel-title *){font-size:var(--t-md);}
 
 /* Explorer heat map: smaller type in the tiles so the names and numbers fit and stay readable, most of all with "All" (many small tiles). */
-:root[data-theme="white"] body :is(.hm-tile,.hm-name,.hm-chg){font-size:var(--t-sm) !important;line-height:1.25 !important;}
-:root[data-theme="white"] body .hm-n{font-size:var(--t-xs) !important;line-height:1.25 !important;}
-:root[data-theme="white"] body .hm-name{font-weight:var(--w-strong) !important;}
+:root[data-theme="white"] body :is(.hm-tile,.hm-name,.hm-chg){font-size:var(--t-sm);line-height:1.25;}
+:root[data-theme="white"] body .hm-n{font-size:var(--t-xs);line-height:1.25;}
+:root[data-theme="white"] body .hm-name{font-weight:var(--w-strong);}
 
 /* Trade Log cards: smaller type inside the card so the labels and values fit on fewer lines. */
-:root[data-theme="white"] body #section-trackrecord .tl-card :is(div,dd,li,p,span):not(.tl-card-name):not(.tl-card-retval):not(.tl-card-retval *){font-size:var(--t-sm) !important;}
-:root[data-theme="white"] body #section-trackrecord .tl-card :is(.tl-card-grid dt,.tl-signal-label,.tl-card-retlbl){font-size:var(--t-xs) !important;}
-:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-name{font-size:var(--t-md) !important;font-weight:var(--w-strong) !important;}
-:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-retval{font-size:var(--t-lg) !important;font-weight:var(--w-strong) !important;}
-:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-grid dt{font-weight:var(--w-strong) !important;text-transform:uppercase;}
+:root[data-theme="white"] body #section-trackrecord .tl-card :is(div,dd,li,p,span):not(.tl-card-name):not(.tl-card-retval):not(.tl-card-retval *){font-size:var(--t-sm);}
+:root[data-theme="white"] body #section-trackrecord .tl-card :is(.tl-card-grid dt,.tl-signal-label,.tl-card-retlbl){font-size:var(--t-xs);}
+:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-name{font-size:var(--t-md);font-weight:var(--w-strong);}
+:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-retval{font-size:var(--t-lg);font-weight:var(--w-strong);}
+:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-grid dt{font-weight:var(--w-strong);text-transform:uppercase;}
 :root[data-theme="white"] #section-trackrecord .tl-card{padding:16px 18px;}
-:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-retval *{font-size:inherit !important;font-weight:inherit !important;}
+:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-retval *{font-size:inherit;font-weight:inherit;}
 
 /* Trade Log panel titles (Positions, Buy / Sell ideas) are written like the other panel titles (Fundamental Score): same size and weight, not uppercase, no letter spacing. */
-:root[data-theme="white"] body #section-trackrecord .analysis-panel-head .analysis-panel-title{text-transform:none !important;letter-spacing:0 !important;}
+:root[data-theme="white"] body #section-trackrecord .analysis-panel-head .analysis-panel-title{text-transform:none;letter-spacing:0;}
+
+/* Words that stay bold or medium inside a block that is regular: the News briefing headlines, the tab labels, the stock size tag. */
+:root[data-theme="white"] body .tab{font-weight:var(--w-strong);}
+:root[data-theme="white"] body .news-bhead{font-weight:var(--w-strong);}
+:root[data-theme="white"] body .news-bhead small{font-weight:var(--w-reg);}
+:root[data-theme="white"] body :is(.news-bbody p b,.news-why-h){font-weight:var(--w-strong);}
+/* The size tag beside the stock's name (a pill). */
+:root[data-theme="white"] body .dc-tag{font-size:var(--t-xs);font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;line-height:1.3;color:var(--muted);background:color-mix(in srgb,var(--muted) 10%,transparent);}
+:root[data-theme="white"] body .dc-tag.dc-mid{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent);}
+:root[data-theme="white"] body .dc-tag.dc-small{color:var(--hold);border-color:color-mix(in srgb,var(--hold) 45%,transparent);background:color-mix(in srgb,var(--hold) 12%,transparent);}

@@ -25,7 +25,7 @@ function valGapMarkup(currentPrice, iv){
   const gapLabel = gapPct >= 0
     ? `${gapPct.toFixed(1)}% above intrinsic value (${gapPct > 15 ? 'overvalued' : 'slightly overvalued'})`
     : `${Math.abs(gapPct).toFixed(1)}% below intrinsic value (${gapPct < -15 ? 'undervalued' : 'slightly undervalued'})`;
-  return `Current price ₹${currentPrice.toLocaleString('en-IN')} is <span class="${gapBand}" style="font-weight:600;">${gapLabel}</span>.`;
+  return `Current price ₹${currentPrice.toLocaleString('en-IN')} is <span class="${gapBand}">${gapLabel}</span>.`;
 }
 
 function renderValuationPanel(s){
