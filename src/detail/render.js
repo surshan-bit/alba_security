@@ -5,7 +5,8 @@ import { detailEl } from '../core/dom.js';
 import { stocks } from '../core/stocks.js';
 import { isPinned, togglePin } from '../core/pins.js';
 import { escapeHtml, screenerUrl } from '../core/util.js';
-import { renderValuationPanel } from './valuation.js';
+import { renderValuationStrip } from './valuation.js';
+import { CAP_NAME, capClass } from '../core/capclass.js';
 import { renderFundamentals } from './fundamentals.js';
 import { renderTvChart } from '../tv/links.js';
 import { renderTechPanel } from './technical.js';
@@ -41,6 +42,11 @@ function getShownIndex(){ return shownIdx; }
 let detailOpenHook = null;
 function setDetailOpenHook(fn){ detailOpenHook = fn; }
 function rerenderDetail(){ if(stocks[shownIdx]) keepScroll(detailEl, () => renderDetail(shownIdx)); }
+// The size tag beside the name (Large, Mid or Small cap, from the market cap); nothing when the stock has none.
+function capTagHtml(s){
+  const c = capClass(s.liquidity && typeof s.liquidity.marketCap === 'number' ? s.liquidity.marketCap : null);
+  return c ? `<span class="dc-tag dc-${c}" title="Market cap size class (SEBI / AMFI cut-offs)">${CAP_NAME[c]}</span>` : '';
+}
 // The whole stock page as markup: the Back bar, the header with its links, the jump row and the panels.
 function detailHtml(s, idx, pinned){
   return `
@@ -48,8 +54,9 @@ function detailHtml(s, idx, pinned){
     <div class="detail-top">
       <div class="detail-title">
         <button type="button" class="detail-star${pinned?' pinned':''}" id="detailPinBtn" aria-pressed="${pinned?'true':'false'}" aria-label="${pinned?'Unpin from top':'Pin to top'}" title="${pinned?'Pinned — click to unpin':'Pin to top'}">${pinned?'★':'☆'}</button>
-        <div class="detail-title-text"><div class="detail-name">${escapeHtml(s.name)}</div><div class="detail-ticker">${escapeHtml(s.ticker)}</div></div>
+        <div class="detail-title-text"><div class="detail-name-row"><div class="detail-name">${escapeHtml(s.name)}</div>${capTagHtml(s)}</div><div class="detail-ticker">${escapeHtml(s.ticker)}</div></div>
       </div>
+    ${renderValuationStrip(s)}
     <div class="detail-meta">
      <div class="detail-meta-row detail-meta-links">
       <a href="${screenerUrl(s)}" target="_blank" rel="noopener noreferrer">${LINK_ICON}<span>View on screener.in</span></a>
@@ -61,7 +68,6 @@ function detailHtml(s, idx, pinned){
     </div>
     ${renderDetailJumpNav(s)}
     ${renderStockResearchBar(s)}
-    ${renderValuationPanel(s)}
     ${renderGlobalFactorsPanel(s)}
     ${renderFundamentals(s)}
     ${renderTechPanel(s)}
