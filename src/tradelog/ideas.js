@@ -109,7 +109,10 @@ function snapshotOf(list){
   TOP_LISTS.forEach(([t]) => {
     lists[t] = topBuys(list, t, TOP_N).map(({ s, c, holding }) => ({ holding: holding || '', sym: tickerSymbol(s), name: s.name || tickerSymbol(s), cap: c.cap || '', price: s.valuation && s.valuation.currentPrice != null ? Number(s.valuation.currentPrice) : null, reasons: c.reasons.slice(), news: newsOfStock(s) }));
   });
-  return { v: 1, at: new Date().toISOString(), today, n: list.length, up: nt('up'), down: nt('down'), mixed: nt('mixed'), short: list.filter(x => x.c.short).length, lists };
+  // v1.321: one short entry per stock, [rank, call, held], for the Buy / Sell column in the stock grids (the list is already ranked best first).
+  const ranks = {};
+  list.forEach(({ s, c, holding }, i) => { ranks[tickerSymbol(s)] = [i + 1, holding || c.label, holding ? 1 : 0]; });
+  return { v: 1, at: new Date().toISOString(), today, n: list.length, ranks, up: nt('up'), down: nt('down'), mixed: nt('mixed'), short: list.filter(x => x.c.short).length, lists };
 }
 function stampText(snap){
   const d = new Date(snap.at);

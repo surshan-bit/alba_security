@@ -196,6 +196,7 @@ async function tradeScenarios(){
       await until(page, () => window.__store.has('data/users/u_SMOKE/ideasResults'), null, 'the result is written to the database');
       const kept = await page.evaluate(() => window.__store.get('data/users/u_SMOKE/ideasResults'));
       ok(kept && kept.v === 1 && /"starter-deep-value":\{"v":1,"at":"/.test(kept.json), 'the Process result is saved for the user, got ' + JSON.stringify(kept).slice(0, 120));
+      ok(/"ranks":\{"[^"]+":\[1,"/.test(kept.json), 'v1.321: the result keeps the call and rank of every stock for the Buy / Sell column');
       await page.selectOption('#tradeIdeasStrategy', 'starter-deep-value');
       await until(page, () => /Processed on .*\(today\)/.test((document.getElementById('tradeIdeasBody') || {}).textContent || '') && document.querySelectorAll('#tradeIdeasBody .tl-top5').length === 2 && document.getElementById('tradeIdeasRun').textContent === 'Process again', null, 'choosing the strategy again shows the kept result with its date stamp and offers Process again, without processing');
     } else ok(true, 'no stock qualifies in the fixtures for this strategy');
@@ -272,6 +273,22 @@ async function ideasFilterScenarios(){
     await until(page, n => { const r = document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row'); return r.length === 1 && r[0].textContent.includes(n); }, Dn.name, 'switching Upward Trend off leaves only the stock of the Downward list');
     await pick(page, '#analysisIdeasFilter [data-aideas="all"]');
     await until(page, n => document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row').length === n, all, 'All brings every stock back');
+  });
+  // v1.321: the Buy / Sell column shows the saved call and rank of each stock, sorts by rank, and stays empty for a stock the result does not hold
+  const ranked = Object.assign({}, snap, { ranks: { [symOf(U)]: [1, 'Buy', 0], [symOf(Dn)]: [2, 'Trim', 1] } });
+  const rankDocs = { 'data/users/u_SMOKE/ideasResults': { v: 1, json: JSON.stringify({ 'starter-deep-value': ranked }), updatedAt: '2026-10-29T04:34:00.000Z' } };
+  await scenario('analysis: Buy / Sell column', {}, rankDocs, async page => {
+    await goto(page, 'analysis');
+    await until(page, () => !!document.querySelector('#analysisIdeasFilter'), null, 'the Analysis page is drawn');
+    await pick(page, '#analysisMosFilters [data-amos="all"]');
+    const cell = (page, name) => page.evaluate(n => { const r = Array.from(document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row')).find(x => x.textContent.includes(n)); const c = r && r.querySelector('td.analysis-lb-idea'); return c ? c.textContent.replace(/\s+/g, ' ').trim() : null; }, name);
+    await until(page, n => Array.from(document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row')).some(x => x.textContent.includes(n)), U.name, 'the stocks are listed');
+    ok(await cell(page, U.name) === 'Buy 1', 'a ranked stock shows its call and rank, got ' + await cell(page, U.name));
+    ok(await cell(page, Dn.name) === 'Trim 2', 'a stock you hold shows its Trade Log call and its rank, got ' + await cell(page, Dn.name));
+    ok(await page.evaluate(n => { const r = Array.from(document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row')).find(x => x.textContent.includes(n)); return /rank 1 of 2/.test((r.querySelector('td.analysis-lb-idea') || {}).title || ''); }, U.name), 'the cell says its rank and how many were ranked');
+    ok(await page.evaluate(() => Array.from(document.querySelectorAll('#analysisLeaderboardBody td.analysis-lb-idea')).filter(c => !c.textContent.trim()).length > 0), 'a stock the result does not hold has an empty cell');
+    await pick(page, 'th [data-sort-col="idea"]');
+    await until(page, n => { const r = document.querySelector('#analysisLeaderboardBody tr.analysis-lb-row'); return !!r && r.textContent.includes(n); }, U.name, 'sorting by the column puts rank 1 first');
   });
   await scenario('analysis: Buy / Sell ideas filter without a saved result', {}, null, async page => {
     await goto(page, 'analysis');

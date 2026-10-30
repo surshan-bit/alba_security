@@ -251,6 +251,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.321 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>New Buy / Sell column in the stock grids:</strong> each stock shows its call from the Trade Log&rsquo;s Buy / Sell ideas (Buy, Wait or Avoid; Add more, Hold, Trim or Review for a stock you already hold) and its rank in the strategy, where 1 is best. Click the header to sort by rank and see your best Buy ideas first. Hover a cell for how many stocks were ranked and when.</li>
+              <li><strong>It reads the last Process result:</strong> use the strategy chosen in Analysis, or the newest result when none is chosen. Only stocks that pass the strategy get a call; the others stay blank. Press Process again in the Trade Log to refresh the ranks; a result saved before this version has no ranks until then.</li>
+            </ul>
             <h3>v1.320 &middot; 2026-10-29</h3>
             <ul>
               <li><strong>W RSI and M RSI now match TradingView exactly:</strong> the weekly and monthly RSI shown on the stock page, the Analysis table, the RSI chart and the RSI filters include the week and month still in progress, as TradingView does. Before, they were read from completed weeks and months only, so mid-week they could sit several points lower (for example 57.8 against TradingView&rsquo;s 64.5).</li>
