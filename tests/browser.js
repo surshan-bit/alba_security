@@ -516,7 +516,7 @@ async function rowCapTests(browser){
   ok(await rows('#jump-ind-stocks tbody tr') === 100, 'row cap: an industry page draws 100 stocks first');
   await page.locator('[data-ind-more]').click(); await page.waitForTimeout(300);
   ok(await rows('#jump-ind-stocks tbody tr') === Math.min(200, big.count), 'row cap: Show more adds 100 stocks to an industry page');
-  await page.locator('#jump-ind-stocks tbody tr').nth(400).evaluate(tr => tr.click()); await page.waitForTimeout(400);
+  await page.locator('#jump-ind-stocks tbody tr').nth(150).evaluate(tr => tr.click()); await page.waitForTimeout(400);
   ok(await page.evaluate(() => !!document.querySelector('#detail .detail-name') && !document.getElementById('jump-ind-stocks')), 'row cap: a row added by Show more opens its stock');
   ok(errs.length === 0, 'row cap: console errors: ' + errs.slice(0, 3).join(' | '));
   await page.close(); await ctx.close();
