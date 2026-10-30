@@ -11,7 +11,7 @@ html{font-size:112.5%;}
 /* The panel behind each screen's content carried 18px of padding and a border on each side: on a phone the grids use that width instead. */
 .app-section .analysis-panel{padding:4px 0;border-width:0;}
 /* The boxed panels of Trade Log, Data Refresh, Help and the Knowledge Base keep their frame but with less inside padding. */
-.app-section .upload-panel,.app-section .refreshlog-freshness,.app-section .help-panel{padding:10px;}
+.app-section .upload-panel,.app-section .refreshlog-freshness,.app-section .help-panel{padding:var(--card-y) var(--card-x);}
 .help-toc{padding-left:10px;padding-right:10px;}
 /* A stock's page: the floating "Back to ..." button goes (the phone's own Back does the job) and the room kept for it under the name is released. */
 .detail-back-bar{display:none;}
@@ -19,36 +19,36 @@ html{font-size:112.5%;}
 /* Data Refresh: each import box is the title on one line and the two buttons side by side, sharing the width, on the next. */
 .upload-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:stretch;}
 .upload-row .upload-text{grid-column:1 / 3;min-width:0;}
-.upload-row .upload-title{font-size:.88rem;margin-bottom:0;}
+.upload-row .upload-title{font-size:var(--t-sm);margin-bottom:0;}
 .upload-row .browse-wrap{display:flex;}
 .upload-row .browse-wrap .browse-btn,.upload-row > .select-mode-btn{width:100%;height:36px;padding:0 10px;white-space:nowrap;}
-.upload-row .browse-wrap .browse-btn{box-sizing:border-box;font-size:.84rem;}
-.upload-row>.select-mode-btn{box-sizing:border-box;font-size:.84rem;}
+.upload-row .browse-wrap .browse-btn{box-sizing:border-box;font-size:var(--t-sm);}
+.upload-row>.select-mode-btn{box-sizing:border-box;font-size:var(--t-sm);}
 /* Bands between blocks: modest, so the Filters line, the toolbar and the grid read as separate groups instead of one packed block. */
 .topbar{padding:6px 4px 6px 6px;gap:4px;margin-bottom:6px;}
-.topbar .topbar-search-input{height:var(--ph-ctl);font-size:.86rem;padding-left:12px;}
+.topbar .topbar-search-input{height:var(--ph-ctl);font-size:var(--t-sm);padding-left:12px;}
 .topbar .activity-wrap{margin-left:0;}
 .topbar .activity-bell{width:34px;height:var(--ph-ctl);}
 /* The Live switch stays in the top bar on a phone: a small pill with a one-word state (Live off, Live, Closed, Paused) between the search box and the bell. */
 .live-toggle{display:inline-flex;align-items:center;height:26px;padding:0 7px;font-size:0;}
-.live-toggle::before{content:attr(data-short);font-size:.7rem;}
+.live-toggle::before{content:attr(data-short);font-size:var(--t-xs);}
 .live-toggle.live::before{content:"\25CF " attr(data-short);animation:livePulse 1.6s ease-in-out infinite;}
 .analysis-leaderboard-head{gap:var(--ph-space)!important;margin-bottom:12px!important;}
 .live-toggle.live{animation:none;}
 .analysis-leaderboard-head > div:last-child{gap:var(--ph-space)!important;width:100%;}
 .analysis-leaderboard-head .analysis-filter-label{flex:1 1 100%;font-size:0;gap:0 !important;}
-.analysis-leaderboard-head .sort-select{width:100%;height:var(--ph-ctl-lg);font-size:.84rem;}
-.analysis-leaderboard-head .analysis-reset-btn{flex:1 1 0;padding:0 6px;font-size:.76rem;height:var(--ph-ctl-lg);white-space:nowrap;}
-.analysis-leaderboard-head .analysis-panel-title{font-size:.84rem;}
+.analysis-leaderboard-head .sort-select{width:100%;height:var(--ph-ctl-lg);font-size:var(--t-sm);}
+.analysis-leaderboard-head .analysis-reset-btn{flex:1 1 0;padding:0 6px;font-size:var(--t-sm);height:var(--ph-ctl-lg);white-space:nowrap;}
+.analysis-leaderboard-head .analysis-panel-title{font-size:var(--t-sm);}
 /* Grids on a phone: sideways room is scarce (the grid scrolls), so the extra air is added above and below each row. */
-.strat-table th{padding:9px 5px;font-size:.62rem;letter-spacing:.03em;}
-.strat-table td{padding:12px 5px;font-size:.8rem;line-height:1.35;}
+.strat-table th{padding:9px 5px;font-size:var(--t-xs);letter-spacing:.03em;}
+.strat-table td{padding:12px 5px;font-size:var(--t-sm);line-height:1.35;}
 .strat-table .pin-btn{padding:0 2px;}
 .app-section .analysis-main > .analysis-panel,.app-section > .analysis-panel{margin-top:8px;}
 .analysis-leaderboard{margin-top:0;}
 .analysis-filters-panel,.analysis-filters-panel .filters-toggle{margin-bottom:0;}
 .app-section .analysis-filters-panel .filters-toggle,.app-section .biz-filters-toggle{padding:13px 0;}
-.biz-showing{margin:12px 0;font-size:.8rem;line-height:1.4;}
+.biz-showing{margin:12px 0;font-size:var(--t-sm);line-height:1.4;}
 .app-section .biz-toolbar{margin:8px 0 14px;}
 .app-section .biz-side{margin-bottom:0;}
 .app-section .biz-layout,.app-section .analysis-layout{gap:0;row-gap:8px;}
@@ -64,10 +64,10 @@ html{font-size:112.5%;}
 .sr-rules{gap:0;}
 .sr-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 28px;gap:10px;align-items:center;padding:14px 0;border-width:0 0 1px;border-style:solid;border-color:var(--line);}
 .sr-row select,.sr-row input,.sr-opt,.sr-row .sr-val > span,.strat-goal,.strat-goal-in,.strat-goal .strat-btn,.strat-note{font-size:var(--ph-fs);}
-.strat-fold>summary{font-size:.8rem;margin-bottom:2px;padding:8px 0;gap:8px;}
-.strat-fold-sum{font-size:.74rem;}
+.strat-fold>summary{font-size:var(--t-sm);margin-bottom:2px;padding:8px 0;gap:8px;}
+.strat-fold-sum{font-size:var(--t-sm);}
 .strat-fold{margin-bottom:4px;}
-.sr-count{font-size:.8rem;grid-column:1 / 3;grid-row:3;margin:-2px 0 0;text-align:left;white-space:nowrap;}
+.sr-count{font-size:var(--t-sm);grid-column:1 / 3;grid-row:3;margin:-2px 0 0;text-align:left;white-space:nowrap;}
 .sr-row select{width:100%;min-width:0;box-sizing:border-box;}
 .sr-field{grid-column:1;grid-row:1;}
 .sr-op{grid-column:2;grid-row:1;}
@@ -79,32 +79,32 @@ html{font-size:112.5%;}
 .strat-result-head{gap:var(--ph-space);}
 .strat-result-title{margin-right:0;flex:1 1 100%;flex-direction:row;align-items:baseline;gap:8px;white-space:nowrap;overflow:hidden;}
 .strat-total{display:flex;flex-wrap:nowrap;align-items:center;gap:var(--ph-space);flex:1 1 100%;min-width:0;}
-.strat-total .strat-btn{height:var(--ph-ctl-lg);flex:0 0 auto;padding:0 12px;font-size:.82rem;white-space:nowrap;}
+.strat-total .strat-btn{height:var(--ph-ctl-lg);flex:0 0 auto;padding:0 12px;font-size:var(--t-sm);white-space:nowrap;}
 .strat-total .sort-select{height:var(--ph-ctl-lg);}
-.strat-total .strat-sort{font-size:.78rem;flex:1 1 0;min-width:0;justify-content:flex-end;}
-.strat-total .strat-sort select{flex:1 1 0;min-width:0;font-size:.82rem;max-width:100%;}
+.strat-total .strat-sort{font-size:var(--t-sm);flex:1 1 0;min-width:0;justify-content:flex-end;}
+.strat-total .strat-sort select{flex:1 1 0;min-width:0;font-size:var(--t-sm);max-width:100%;}
 /* Strategies: the list of strategies becomes one scrolling row of chips and the editor header shrinks, so the rules and results are what you see. */
 .strat-layout{gap:10px;}
-.strat-name{padding:8px 10px;font-size:.95rem;min-width:0;flex:1 1 100%;}
+.strat-name{padding:8px 10px;font-size:var(--t-md);min-width:0;flex:1 1 100%;}
 .strat-head{margin-bottom:10px;gap:8px;}
 .strat-actions{display:flex;gap:var(--ph-space);}
-.strat-actions .strat-btn{padding:7px 12px;font-size:.76rem;}
-.strat-note{padding:8px 10px;font-size:.78rem;margin-bottom:12px;}
-.strat-panel .analysis-panel-title{font-size:.84rem;}
+.strat-actions .strat-btn{padding:7px 12px;font-size:var(--t-sm);}
+.strat-note{padding:8px 10px;font-size:var(--t-sm);margin-bottom:12px;}
+.strat-panel .analysis-panel-title{font-size:var(--t-sm);}
 .strat-result-title .analysis-panel-title{flex:0 0 auto;}
-.strat-result-title .strat-count{font-size:.76rem;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.strat-result-title .strat-count{font-size:var(--t-sm);min-width:0;overflow:hidden;text-overflow:ellipsis;}
 /* Track record: each saved list takes three lines (date, hit/open/missed and remove button; the goal; the state) instead of five. */
 .trk-goalline{display:none;}
 /* the goal is already in the Goal line above and on each saved list */
 .trk-summary{margin:8px 0 12px;}
 .trk-run{padding:10px 12px;margin-bottom:10px;}
-.trk-run-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"tog chips del" "goal goal goal" "state state state";gap:6px 8px;align-items:center;font-size:.76rem;}
-.trk-toggle{grid-area:tog;font-size:.82rem;white-space:nowrap;}
+.trk-run-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"tog chips del" "goal goal goal" "state state state";gap:6px 8px;align-items:center;font-size:var(--t-sm);}
+.trk-toggle{grid-area:tog;font-size:var(--t-sm);white-space:nowrap;}
 .trk-chips{grid-area:chips;gap:4px;flex-wrap:nowrap;white-space:nowrap;min-width:0;justify-content:flex-end;}
-.trk-status{padding:0 7px;font-size:.68rem;}
-.trk-del{grid-area:del;padding:0 2px;font-size:1.1rem;}
+.trk-status{padding:0 7px;font-size:var(--t-xs);}
+.trk-del{grid-area:del;padding:0 2px;font-size:var(--t-md);}
 .trk-goal{grid-area:goal;color:var(--muted);}
-.trk-state{grid-area:state;margin-left:0;font-size:.72rem;}
+.trk-state{grid-area:state;margin-left:0;font-size:var(--t-sm);}
 #stratMain .strat-panel{margin-top:10px;padding-top:4px;padding-bottom:4px;}
 #stratMain .strat-panel+.strat-panel{margin-top:18px;}
 /* Explorer on phones: the controls fold into one "Filters" line (closed at first, like the Analysis filters); the toolbar and grid are tighter. */
@@ -113,7 +113,7 @@ html{font-size:112.5%;}
 @media (max-width:900px){
 .biz-filters-toggle{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--text);font:inherit;font-size:var(--ph-fs);padding:10px 0;cursor:pointer;text-align:left;}
 .biz-filters-toggle .ft-label{font-weight:700;}
-.biz-filters-toggle .ft-summary{flex:1;min-width:0;color:var(--muted);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.biz-filters-toggle .ft-summary{flex:1;min-width:0;color:var(--muted);font-size:var(--t-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .biz-filters-toggle .ft-caret{color:var(--muted);transition:transform .15s;}
 .biz-filters-toggle[aria-expanded="true"] .ft-caret{transform:rotate(180deg);}
 .biz-side.filters-collapsed .biz-controls{display:none;}
@@ -122,21 +122,21 @@ html{font-size:112.5%;}
 @media (max-width:600px){
 .biz-toolbar{flex-wrap:wrap;gap:var(--ph-space);justify-content:flex-start;}
 .biz-toolbar .biz-showing{flex:1 1 100%;margin:0;}
-.biz-toolbar .biz-expand{height:var(--ph-ctl-lg);padding:0 12px;font-size:.76rem;white-space:nowrap;}
+.biz-toolbar .biz-expand{height:var(--ph-ctl-lg);padding:0 12px;font-size:var(--t-sm);white-space:nowrap;}
 .biz-toolbar .biz-match-toggle{height:var(--ph-ctl-lg);}
-.biz-toolbar .biz-match-toggle .tl-view-btn{padding:0 12px;font-size:.76rem;height:32px;white-space:nowrap;}
+.biz-toolbar .biz-match-toggle .tl-view-btn{padding:0 12px;font-size:var(--t-sm);height:32px;white-space:nowrap;}
 .biz-detail-box{padding:10px 0;}
 .biz-detail h3{margin:6px 0 10px;}
-.biz-table > thead > tr > th{padding:9px 5px;font-size:.62rem;letter-spacing:.03em;}
-.biz-table > tbody > tr > td{padding:12px 5px;font-size:.8rem;line-height:1.35;}
+.biz-table > thead > tr > th{padding:9px 5px;font-size:var(--t-xs);letter-spacing:.03em;}
+.biz-table > tbody > tr > td{padding:12px 5px;font-size:var(--t-sm);line-height:1.35;}
 /* v1.111: Explorer industry names wrap onto a second line; the number hangs to the left so wrapped lines align with the name */
 .biz-table > tbody > .biz-row > .biz-name{white-space:normal;width:62vw;min-width:150px;max-width:62vw;padding-left:calc(5px + 2.6em);text-indent:-2.6em;overflow-wrap:anywhere;line-height:1.3;}
 .biz-table > thead > tr > th:first-child{padding-left:calc(5px + 2.6em);text-indent:-2.6em;}
 }
-.strat-group > summary.analysis-panel-title{font-size:.86rem;}
+.strat-group > summary.analysis-panel-title{font-size:var(--t-sm);}
 /* Phone: marker and title on one line, the one-line summary under the title (indented to line up with it), compact spacing. */
 @media (max-width:600px){
-.strat-group > summary.analysis-panel-title{font-size:.8rem;}
+.strat-group > summary.analysis-panel-title{font-size:var(--t-sm);}
 }
 
 /* ---- Filters and toolbar buttons as a bottom sheet (Explorer, Analysis); src/ui/phonesheet.js builds the frame and moves the buttons in ---- */
@@ -152,19 +152,19 @@ html{font-size:112.5%;}
   body:has(.biz-side:not(.filters-collapsed) .sheet-panel),body:has(.analysis-filters-panel:not(.filters-collapsed) .sheet-panel),body:has(.strat-filters-panel:not(.filters-collapsed) .sheet-panel){overflow:hidden;}
   .sheet-head{display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;padding:24px 0 12px;background:var(--panel);}
   .sheet-head::before{content:"";position:absolute;top:9px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--line);}
-  .sheet-title{font-size:1.15rem;font-weight:700;}
-  .sheet-close{width:36px;height:36px;border:0;border-radius:50%;background:var(--panel2);color:var(--text);font-size:1.5rem;line-height:1;cursor:pointer;}
+  .sheet-title{font-size:var(--t-lg);font-weight:700;}
+  .sheet-close{width:36px;height:36px;border:0;border-radius:50%;background:var(--panel2);color:var(--text);font-size:var(--t-lg);line-height:1;cursor:pointer;}
   /* the row that opens the sheet shows the icon and what is chosen, no "Filters" word */
   .biz-filters-toggle .ft-label::before,.analysis-filters-panel .filters-toggle .ft-label::before{margin-right:0;vertical-align:-4px;}
   .biz-filters-toggle .ft-label,.analysis-filters-panel .filters-toggle .ft-label{display:inline-flex;align-items:center;}
   /* compact but still easy to tap: 38px switches and options, 0.9rem text */
   .sheet-panel .tl-view-toggle{display:flex;width:100%;box-sizing:border-box;height:40px;padding:3px;margin:0 0 8px;}
-  .sheet-panel .tl-view-btn{flex:1 1 0;height:100%;min-height:0;padding:0 4px;font-size:.9rem;}
-  .sheet-panel .filter-group-title,.sheet-panel .filter-group > :first-child:not(.filter-group-row){font-size:.72rem;margin:4px 0 6px;}
+  .sheet-panel .tl-view-btn{flex:1 1 0;height:100%;min-height:0;padding:0 4px;font-size:var(--t-md);}
+  .sheet-panel .filter-group-title,.sheet-panel .filter-group > :first-child:not(.filter-group-row){font-size:var(--t-sm);margin:4px 0 6px;}
   .sheet-panel .filter-group-row{gap:6px;}
-  .sheet-panel .filter-btn{width:auto;min-height:38px;padding:0 11px;font-size:.9rem;gap:6px;border-color:var(--line);border-radius:8px;}
+  .sheet-panel .filter-btn{width:auto;min-height:38px;padding:0 11px;font-size:var(--t-md);gap:6px;border-color:var(--line);border-radius:8px;}
   .sheet-head{padding-top:20px;padding-bottom:6px;}
-  .sheet-title{font-size:1.05rem;}
+  .sheet-title{font-size:var(--t-md);}
   .sheet-slot{margin-top:6px;padding:10px 0 4px;}
   .sheet-slot .tl-view-toggle{margin:0;}
   .sheet-panel .filter-groups{display:block;padding:0;}
@@ -196,7 +196,7 @@ html{font-size:112.5%;}
 :root:root:root .analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle{flex:1 1 0;min-width:0;}
 :root:root:root .analysis-toolbar .analysis-view-bar{flex:0 0 auto;}
 :root:root:root .analysis-toolbar .rk-headline{display:none;}
-:root:root:root .analysis-filters-panel .filters-toggle .ft-count{display:inline;flex:none;color:var(--muted);font-size:.7rem;white-space:nowrap;}
+:root:root:root .analysis-filters-panel .filters-toggle .ft-count{display:inline;flex:none;color:var(--muted);font-size:var(--t-xs);white-space:nowrap;}
 :root:root:root :is(.strat-table,.biz-table) > tbody > tr > td{height:37px;padding:0 4px;line-height:1.15;vertical-align:middle;box-sizing:border-box;}
 :root:root:root :is(.strat-table,.biz-table) > thead > tr > th{padding:7px 4px;}
 :root:root:root :is(.strat-table,.biz-table,.help-table) td .analysis-lb-ticker{display:none;}   /* the stock code is left out on a phone: the name is enough */
@@ -210,7 +210,7 @@ html{font-size:112.5%;}
 :root:root:root #analysisPanelBody:has(> .analysis-industry) .analysis-view-bar{order:1;flex:0 0 auto;}
 :root:root:root #analysisPanelBody:has(> .analysis-industry) .analysis-filters-panel .filters-toggle{order:2;flex:1 1 200px;min-width:0;}
 :root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-controls > .dm{order:3;flex:0 0 auto;}
-:root:root:root #analysisPanelBody:has(> .analysis-industry) :is(.biz-controls > .dm .dm-btn,.biz-actions .dm-btn,.biz-actions .rk-toolbtn,.biz-actions .rk-main){padding:0 8px;font-size:.72rem;gap:4px;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) :is(.biz-controls > .dm .dm-btn,.biz-actions .dm-btn,.biz-actions .rk-toolbtn,.biz-actions .rk-main){padding:0 8px;font-size:var(--t-sm);gap:4px;}
 :root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-actions .dm-more .dm-btn{width:32px;padding:0;}
 :root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-actions{min-width:0;flex:0 1 auto;}
 :root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-controls > .dm:first-child .dm-btn small{display:none;}   /* "1 month" says it is the period */
@@ -242,8 +242,8 @@ html{font-size:112.5%;}
 /* ---- Trade Log on a phone (v1.329): Positions and Ideas as two tabs, one short row per trade, the add form as a bottom sheet. :root:root:root beats the White theme's type scale. ---- */
 @media (max-width:600px){
 :root:root:root #section-trackrecord{padding-bottom:76px;}
-:root:root:root #section-trackrecord .tl-tabs{display:flex;margin:0;padding:8px 10px 0;background:var(--panel);border-radius:14px 14px 0 0;border-bottom:0;position:relative;}   /* the tabs are the top of the white block, like News: the panel under them continues it */
-:root:root:root #section-trackrecord .tl-tabs::after{content:"";position:absolute;left:10px;right:10px;bottom:0;border-bottom:1px solid var(--line);}
+:root:root:root #section-trackrecord .tl-tabs{display:flex;margin:0;padding:8px var(--card-x) 0;background:var(--panel);border-radius:14px 14px 0 0;border-bottom:0;position:relative;}   /* the tabs are the top of the white block, like News: the panel under them continues it */
+:root:root:root #section-trackrecord .tl-tabs::after{content:"";position:absolute;left:var(--card-x);right:var(--card-x);bottom:0;border-bottom:1px solid var(--line);}
 :root:root:root #section-trackrecord .tl-tabs .news-tab{border-bottom-width:2px;margin-bottom:0;position:relative;z-index:1;}
 :root:root:root #section-trackrecord .analysis-panel{margin-top:0;border-top-left-radius:0;border-top-right-radius:0;}
 :root:root:root #section-trackrecord .tl-tabs .news-tab{font-weight:700 !important;}
@@ -293,7 +293,7 @@ html{font-size:112.5%;}
 :root:root:root #section-trackrecord .tl-ideas .analysis-panel-title{display:none;}
 :root:root:root #section-trackrecord .tl-ideas .tl-head-actions{width:100%;}
 :root:root:root #section-trackrecord .tl-ideas .tl-ideas-select{flex:1;max-width:none;min-width:0;height:40px;}
-:root:root:root #section-trackrecord .tl-ideas #tradeIdeasRun{height:40px;white-space:nowrap;color:#fff !important;background:var(--accent) !important;font-size:.76rem !important;padding:0 14px;}
+:root:root:root #section-trackrecord .tl-ideas #tradeIdeasRun{height:40px;white-space:nowrap;color:#fff !important;background:var(--accent) !important;font-size:var(--t-sm) !important;padding:0 14px;}
 :root:root:root #tradeIdeasBody .tl-top5{border:0;background:transparent;padding:0;margin:0 0 6px;}
 :root:root:root #tradeIdeasBody .tl-top5-title{font-size:14px !important;font-weight:600 !important;margin:10px 0 4px;}
 :root:root:root #tradeIdeasBody .tl-top5 > .upload-hint{display:none;}
@@ -302,7 +302,7 @@ html{font-size:112.5%;}
 :root:root:root #tradeIdeasBody .tl-top5 ol > li:first-child{border-top:0;}
 :root:root:root #tradeIdeasBody .tl-top5-why li{padding:0;border:0;margin:2px 0;display:list-item;}
 :root:root:root #tradeIdeasBody .tl-top5-head > span:first-child{flex:1 1 0;min-width:0;}
-:root:root:root #tradeIdeasBody .tl-held-tag{display:table;margin:4px 0 0;padding:1px 8px;font-size:.68rem !important;font-weight:700 !important;}
+:root:root:root #tradeIdeasBody .tl-held-tag{display:table;margin:4px 0 0;padding:1px 8px;font-size:var(--t-xs) !important;font-weight:700 !important;}
 :root:root:root #tradeIdeasBody .tl-top5-head{flex-wrap:wrap;align-items:baseline;}
 :root:root:root #tradeIdeasBody .tl-top5-head > span:first-child{font-size:14px !important;font-weight:600 !important;}
 :root:root:root #tradeIdeasBody .tl-top5-price{font-size:13px !important;font-weight:600 !important;}
@@ -315,7 +315,7 @@ html{font-size:112.5%;}
 :root:root:root #tradeIdeasBody .tl-top5-down.tl-collapsed .tl-top5-title::after{transform:none;}
 :root:root:root #tradeIdeasBody .tl-top5-down.tl-collapsed > :not(.tl-top5-title){display:none;}
 :root:root:root #tradeIdeasBody .tl-method,:root:root:root #tradeIdeasBody .tl-ideas-done{display:none;}
-:root:root:root #tradeIdeasBody .tl-ideas-short{display:block;margin:0 0 6px;font-size:.78rem !important;color:var(--muted);}
+:root:root:root #tradeIdeasBody .tl-ideas-short{display:block;margin:0 0 6px;font-size:var(--t-sm) !important;color:var(--muted);}
 :root:root:root #tradeFormHost .tl-msg:not(.err){display:none;}
 :root:root:root #section-trackrecord > header .sub{display:none;}
 }

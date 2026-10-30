@@ -1,7 +1,6 @@
 // The News page: a "Global & Macro" tab (market pulse, briefings, economic calendar) and a "Stock events" tab.
 import { escapeHtml, tickerSymbol } from '../core/util.js';
 import { stockByTickerSymbol, stockIndex, stocks } from '../core/stocks.js';
-import { scoreBand } from '../list/metrics.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { publishedStrategies } from '../strategies/state.js';
 import { IMPORTANCE, EVENT_TYPES, calValue, filterItems, groupCalendar, nextBigEvents, recentItems, shortDate, tileView, typeTag, upcomingItems } from './model.js';
@@ -31,6 +30,8 @@ const isoDay = (iso) => String(iso || '').slice(0, 10);
 const safeUrl = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : '');
 const link = (label, url, cls) => { const u = safeUrl(url); return u ? `<a class="news-link${cls ? ' ' + cls : ''}" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label || 'Source')} &#8599;</a>` : ''; };
 const impactTag = (v) => (v === 'positive' || v === 'negative' || v === 'mixed' ? `<span class="news-tag news-${v}">${v}</span>` : '');
+// The time of a section's own refresh, said only when it is not the one already shown at the top of the page (same day and minute).
+const sameStamp = (iso) => { const p = news.pulse && news.pulse.at; return !!p && Math.abs(Date.parse(iso) - Date.parse(p)) < 120000; };
 const stamp = (iso) => {
   const t = Date.parse(iso);
   if(!isFinite(t)) return '';
@@ -80,7 +81,7 @@ function briefingsHtml(){
   const m = news.macro, items = m && Array.isArray(m.briefings) ? m.briefings.filter(b => b && b.headline) : [];
   let h = '<h2 class="news-h2" data-icon="globe">Briefings</h2>';
   if(!items.length) return h + '<p class="news-empty">No briefings yet. Press <b>Refresh News</b> to write them from the latest market headlines.</p>';
-  if(m.asof) h += `<div class="news-hint">${m.briefingsAt ? 'Updated ' + escapeHtml(stamp(m.briefingsAt)) + ' from TradingView headlines' : 'Researched ' + escapeHtml(shortDate(m.asof))}. Each card says why it matters; links go to the source.</div>`;
+  if(m.asof) h += `<div class="news-hint">${m.briefingsAt ? (sameStamp(m.briefingsAt) ? 'From TradingView headlines' : 'Updated ' + escapeHtml(stamp(m.briefingsAt)) + ' from TradingView headlines') : 'Researched ' + escapeHtml(shortDate(m.asof))}. Each card says why it matters; links go to the source.</div>`;
   const known = new Set(BRIEFING_GROUPS.map(g => g.id));
   BRIEFING_GROUPS.concat([{ id: '_other', label: 'Other' }]).forEach(g => {
     const rows = items.filter(b => (known.has(b.group) ? b.group : '_other') === g.id);
@@ -100,16 +101,20 @@ function briefingsHtml(){
 function calendarHtml(){
   const m = news.macro, rows = m && Array.isArray(m.calendar) ? m.calendar : [];
   let h = '<h2 class="news-h2" data-icon="calendar">Economic calendar</h2>';
-  h += '<div class="news-hint">Next 30 days' + (m && m.calendarAt ? ', updated ' + escapeHtml(stamp(m.calendarAt)) + ' from TradingView' : '') + '.</div>';
+  h += '<div class="news-hint">Next 30 days' + (m && m.calendarAt ? (sameStamp(m.calendarAt) ? ', from TradingView' : ', updated ' + escapeHtml(stamp(m.calendarAt)) + ' from TradingView') : '') + '.</div>';
   if(!rows.length) return h + '<p class="news-empty">No calendar yet. It is saved from a Claude session.</p>';
   const groups = groupCalendar(rows, view.calAll ? -1 : 0), today = todayIst();
   const shown = groups.filter(g => g.date >= today);
   if(!shown.length) return h + '<p class="news-empty">No upcoming events in the saved calendar. Ask Claude to refresh the news.</p>';
-  shown.forEach(g => g.rows.forEach((r, i) => {
-    const imp = IMPORTANCE[r.importance] || '', impCls = r.importance >= 1 ? 'news-hi' : r.importance === 0 ? 'news-md' : 'news-lo';
-    const bits = [r.country, r.forecast !== undefined && r.forecast !== null ? 'forecast ' + calValue(r.forecast, r.unit) : '', r.previous !== undefined && r.previous !== null ? 'previous ' + calValue(r.previous, r.unit) : '', r.actual !== undefined && r.actual !== null ? 'actual ' + calValue(r.actual, r.unit) : ''].filter(Boolean).map(escapeHtml);
-    h += `<div class="news-row"><div class="news-date">${escapeHtml(shortDate(g.date))}</div><div class="news-text">${imp ? `<span class="news-imp ${impCls}">${escapeHtml(imp.toUpperCase())}</span> ` : ''}${escapeHtml(r.title)}<small>${bits.join(' &middot; ')}${r.source ? ' &middot; ' + (link(r.source, r.url) || escapeHtml(r.source)) : ''}</small></div></div>`;
-  }));
+  shown.forEach(g => {
+    h += `<div class="news-day"><span>${escapeHtml(shortDate(g.date))}</span><span>${g.rows.length}</span></div>`;
+    g.rows.forEach(r => {
+      const imp = IMPORTANCE[r.importance] || '', impCls = r.importance >= 1 ? 'news-hi' : r.importance === 0 ? 'news-md' : 'news-lo';
+      const bits = [r.country, r.forecast !== undefined && r.forecast !== null ? 'forecast ' + calValue(r.forecast, r.unit) : '', r.previous !== undefined && r.previous !== null ? 'previous ' + calValue(r.previous, r.unit) : '', r.actual !== undefined && r.actual !== null ? 'actual ' + calValue(r.actual, r.unit) : ''].filter(Boolean).join(' \u00b7 ');
+      const u = safeUrl(r.url), more = bits + (r.source ? ' \u00b7 ' + r.source : '');
+      h += `<div class="news-row news-ev"><span class="news-evname">${u ? `<a class="news-stock" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title)}</a>` : `<span class="news-stock">${escapeHtml(r.title)}</span>`}</span>${imp ? `<span class="news-imp ${impCls}">${escapeHtml(imp.toUpperCase())}</span>` : ''}<span class="news-evtext" title="${escapeHtml(more)}">${escapeHtml(bits)}</span></div>`;
+    });
+  });
   h += `<button type="button" class="news-more" data-news-cal-all>${view.calAll ? 'Show only medium and high importance' : 'Show all'}</button>`;
   return h;
 }
@@ -117,36 +122,31 @@ function calendarHtml(){
 function macroTab(){ return pulseHtml() + briefingsHtml() + calendarHtml(); }
 
 // ---- Stock events ----
-const scoreBadges = (s) => {
-  const f = Number.isFinite(s.score) ? s.score : null, t = s.technical && Number.isFinite(s.technical.score) ? s.technical.score : null;
-  return (f !== null ? `<span class="news-score ${scoreBand(f)}" title="Fundamental score">F ${f.toFixed(1)}</span>` : '') +
-    (t !== null ? `<span class="news-score ${scoreBand(t)}" title="Technical score">T ${t.toFixed(1)}</span>` : '');
-};
 let heldNow = new Set();   // the stocks in an open trade, worked out once per draw
 const holdTags = (s) => (s && heldNow.has(s) ? '<span class="news-own news-held">HELD</span>' : '') + (s && isPinned(s) ? '<span class="news-own news-pinned">PINNED</span>' : '');
-function eventRowHtml(x, i, showDate){
+// One line per event: the stock, what kind of event, and its text (a link to the source when there is one; the whole text is the tooltip).
+function eventRowHtml(x){
   const s = stockByTickerSymbol.get(x.ticker), idx = s ? stockIndex.get(s) : undefined;
   const name = s ? s.name : (x.name || x.ticker);
   const nameHtml = (idx !== undefined ? `<a class="news-stock" href="#" data-news-open="${idx}">${escapeHtml(name)}</a>` : `<span class="news-stock">${escapeHtml(name)}</span>`) + holdTags(s);
-  const src = link(x.src || 'Source', x.url);
-  return `<div class="news-row"><div class="news-date">${showDate ? escapeHtml(shortDate(x.date)) : ''}</div><div class="news-text">${nameHtml} ${s ? scoreBadges(s) : ''}<small><span class="news-et news-et-${escapeHtml(x.type)}">${escapeHtml(typeTag(x.type))}</span>${escapeHtml(x.text || '')}${src ? ' &middot; ' + src : (x.src ? ' &middot; ' + escapeHtml(x.src) : '')}${x.sentiment ? ' ' + impactTag({ pos: 'positive', neg: 'negative', mix: 'mixed' }[x.sentiment]) : ''}</small></div></div>`;
+  const text = x.text || x.src || '', u = safeUrl(x.url);
+  const textHtml = u ? `<a class="news-link" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text || 'Source')}</a>` : escapeHtml(text);
+  const tone = x.sentiment ? impactTag({ pos: 'positive', neg: 'negative', mix: 'mixed' }[x.sentiment]) : '';
+  return `<div class="news-row news-ev"><span class="news-evname">${nameHtml}</span><span class="news-et news-et-${escapeHtml(x.type)}">${escapeHtml(typeTag(x.type))}</span><span class="news-evtext" title="${escapeHtml(text)}">${textHtml}</span>${tone}</div>`;
 }
-// "2026-11-02" a number of days on (or back).
-const dayShift = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
-const weekEnd = (today) => dayShift(today, 7);
-// The rows in groups (each row goes to the first group whose test it passes), each group headed by its name and a count.
-function groupedRows(rows, today, groups){
-  const out = groups.map(([label]) => ({ label, rows: [] }));
-  rows.forEach(x => { const k = groups.findIndex(([, test]) => test(String(x.date).slice(0, 10))); out[k < 0 ? out.length - 1 : k].rows.push(x); });
-  return out.filter(g => g.rows.length).map(g => `<div class="news-day"><span>${escapeHtml(g.label)}</span><span>${g.rows.length}</span></div>` + g.rows.map(x => eventRowHtml(x, 0, true)).join('')).join('');
+// The rows under one heading per date (the rows come sorted by date): the date is said once, with how many stocks have something on it.
+function groupedRows(rows){
+  const days = [];
+  rows.forEach(x => { const d = String(x.date).slice(0, 10), last = days[days.length - 1]; if(last && last.d === d) last.rows.push(x); else days.push({ d, rows: [x] }); });
+  return days.map(g => `<div class="news-day"><span>${escapeHtml(shortDate(g.d))}</span><span>${g.rows.length}</span></div>` + g.rows.map(eventRowHtml).join('')).join('');
 }
 function eventsTab(){
   const today = todayIst(), scope = scopeInfo(), inScope = new Set(scope.list.map(s => tickerSymbol(s)));
-  const typeChips = '<div class="news-filters news-types">' + [{ id: 'all', label: 'All' }].concat(EVENT_TYPES).map(t => `<button type="button" class="news-pill${view.type === t.id ? ' on' : ''}" data-news-type="${t.id}">${escapeHtml(t.label)}</button>`).join('') + '</div>';
+  const typeOpts = '<option value="all">All types</option>' + EVENT_TYPES.map(t => `<option value="${t.id}"${view.type === t.id ? ' selected' : ''}>${escapeHtml(t.label)}</option>`).join('');
   const rangeOpts = [[7, 'Next 7 days'], [30, 'Next 30 days'], [90, 'Next 90 days'], [0, 'Any date']].map(([v, l]) => `<option value="${v}"${view.upto === v ? ' selected' : ''}>${l}</option>`).join('');
   const stratOpts = '<option value="all"' + (scope.pick === 'all' ? ' selected' : '') + '>All stocks</option>' + publishedStrategies().map(x => `<option value="${escapeHtml(x.id)}"${scope.pick === x.id ? ' selected' : ''}>${escapeHtml(x.name)}</option>`).join('');
   let h = `<div class="news-filters"><button type="button" class="news-pill${view.when === 'upcoming' ? ' on' : ''}" data-news-when="upcoming">Upcoming</button><button type="button" class="news-pill${view.when === 'recent' ? ' on' : ''}" data-news-when="recent">Recent</button>` +
-    `<select class="news-select news-select-strategy" data-news-strategy aria-label="Strategy">${stratOpts}</select>` + (view.when === 'upcoming' ? `<select class="news-select" data-news-upto aria-label="Date range">${rangeOpts}</select>` : '') + '</div>' + typeChips;
+    `<select class="news-select news-select-strategy" data-news-strategy aria-label="Strategy">${stratOpts}</select>` + `<select class="news-select" data-news-type aria-label="Event type">${typeOpts}</select>` + (view.when === 'upcoming' ? `<select class="news-select" data-news-upto aria-label="Date range">${rangeOpts}</select>` : '') + '</div>';
   heldNow = new Set(); for(const t of allTrades()){ if(t.status === 'closed' && t.sell) continue; const hs = stockByTickerSymbol.get(t.ticker); if(hs) heldNow.add(hs); }
   h += `<div class="news-hint">Covers ${scope.list.length.toLocaleString('en-IN')} stocks ${escapeHtml(scope.label)}.</div>`;
   if(view.when === 'upcoming'){
@@ -157,13 +157,13 @@ function eventsTab(){
     if(!all.length) return h + '<p class="news-empty">No upcoming events saved yet. Press <b>Refresh events</b> to read them from TradingView.</p>';
     if(ev && ev.asof) h += `<div class="news-hint">Researched ${escapeHtml(shortDate(ev.asof))}. Dates can change: check the source link.</div>`;
     if(!rows.length) return h + '<p class="news-empty">Nothing matches these filters.</p>';
-    return h + groupedRows(rows, today, [['Today', d => d <= today], ['This week', d => d <= weekEnd(today)], ['Later', () => true]]);
+    return h + groupedRows(rows);
   }
   const withEvents = scope.list.map(s => ({ ticker: tickerSymbol(s), name: s.name, events: Array.isArray(s.__events) ? s.__events : [] }));
   const rows = filterItems(recentItems(withEvents, today, 30), { type: view.type, upto: 0 }, today).slice(0, 60);
   h += '<div class="news-hint">The last 30 days, from the results, company events and news already saved on each stock.</div>';
   if(!rows.length) return h + '<p class="news-empty">No saved events in the last 30 days for these stocks.</p>';
-  return h + groupedRows(rows, today, [['Today', d => d >= today], ['Last 7 days', d => d >= dayShift(today, -7)], ['Earlier', () => true]]);
+  return h + groupedRows(rows);
 }
 
 function newsHtml(){

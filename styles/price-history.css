@@ -3,14 +3,14 @@
 .val-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;}
 .val-text{flex:1 1 260px;min-width:0;text-align:left;}
 .val-text .val-cell-sub{margin-top:6px;}
-.val-cell-value.val-iv{font-size:.95rem;}
+.val-cell-value.val-iv{font-size:var(--t-md);}
 #glossary-data-proxy{grid-column:1/-1;}
 .glossary-def ul{margin:4px 0 0;padding-left:18px;}
 .glossary-def li{font-size:inherit;line-height:inherit;margin-bottom:3px;color:inherit;}
 /* ---- Price history chart inside the Technical Score panel (experimental) ---- */
 .pc-block{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
 .pc-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;margin-bottom:6px;}
-.pc-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.74rem;color:var(--muted);margin-bottom:10px;}
+.pc-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:var(--t-sm);color:var(--muted);margin-bottom:10px;}
 .pc-legend i{display:inline-block;width:9px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-2px;}
 .pc-legend i.pc-vol{background:var(--muted);opacity:.45;}
 .pc-panels{display:flex;flex-direction:column;gap:12px;}
@@ -18,18 +18,18 @@
 .pc-ph{display:flex;flex-wrap:wrap;margin-bottom:2px;}
 .pc-ptitle small{margin-left:6px;color:var(--muted);}
 .pc-pills{display:flex;gap:4px;}
-.pc-pill{appearance:none;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-size:.74rem;padding:2px 9px;border-radius:99px;cursor:pointer;}
+.pc-pill{appearance:none;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-size:var(--t-sm);padding:2px 9px;border-radius:99px;cursor:pointer;}
 .pc-pill[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:600;}
 .pc-chart{position:relative;width:100%;touch-action:pan-y;}
 .pc-chart svg{display:block;width:100%;height:auto;overflow:visible;}
 .pc-chart svg text{font-size:11px;fill:var(--muted);}
 .pc-grid{stroke:var(--line);stroke-width:1;opacity:.7;}
 /* Event tags under the price charts */
-.pc-evlegend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-4px 0 10px;font-size:.74rem;color:var(--muted);}
+.pc-evlegend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-4px 0 10px;font-size:var(--t-sm);color:var(--muted);}
 .pc-evlegend-label{margin-right:2px;}
 .pc-evtoggle{display:inline-flex;align-items:center;gap:5px;padding:2px 9px 2px 3px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--text);font:inherit;cursor:pointer;}
 .pc-evtoggle[aria-pressed="false"]{opacity:.45;}
-.pc-evk{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:16px;height:16px;border-radius:4px;font-size:.66rem;font-weight:700;line-height:1;color:#fff;background:#7d8590;}
+.pc-evk{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:16px;height:16px;border-radius:4px;font-size:var(--t-xs);font-weight:700;line-height:1;color:#fff;background:#7d8590;}
 .pc-evk-news{border-radius:50%;background:#8e4ec6;}
 .pc-evk-corp{background:#3f7cc4;}
 .pc-evk-trade{background:var(--buy);}
@@ -56,10 +56,10 @@
 .pc-evkey i.s-mix{background:var(--hold);}
 .pc-evkey i.s-neu{background:#7d8590;}
 .pc-tip .evmove{margin-top:5px;opacity:.85;}
-.pc-tip{max-width:300px;position:absolute;pointer-events:none;background:var(--text);color:var(--bg);border-radius:8px;padding:8px 10px;font-size:.76rem;line-height:1.5;min-width:150px;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;transition:opacity .08s;z-index:3;}
+.pc-tip{max-width:300px;position:absolute;pointer-events:none;background:var(--text);color:var(--bg);border-radius:8px;padding:8px 10px;font-size:var(--t-sm);line-height:1.5;min-width:150px;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;transition:opacity .08s;z-index:3;}
 .pc-tip .evs{margin-top:6px;padding-top:6px;border-top:1px solid rgba(128,128,128,.4);}
 .pc-tip .ev{display:flex;gap:6px;align-items:flex-start;margin-top:3px;white-space:normal;}
-.pc-tip .ev small{display:block;opacity:.65;font-size:.68rem;}
+.pc-tip .ev small{display:block;opacity:.65;font-size:var(--t-xs);}
 .pc-tip .ev.more{opacity:.7;}
 .pc-volbar{fill:var(--muted);opacity:.38;}
 .pc-bandrect{fill:var(--accent);opacity:.2;}
@@ -103,8 +103,8 @@
 /* Chart header, compact: title, change, rating and RSI close together; RSI is a small label with its value in bold. */
 .pc-ph{justify-content:flex-start;align-items:center;gap:6px 16px;}
 .pc-ph .pc-pills{margin-left:auto;}
-.pc-ptitle{display:flex;align-items:baseline;gap:8px;font-size:1.05rem;font-weight:700;min-width:0;}
-.pc-ptitle small{margin:0;font-size:.8rem;font-weight:400;}
+.pc-ptitle{display:flex;align-items:baseline;gap:8px;font-size:var(--t-md);font-weight:700;min-width:0;}
+.pc-ptitle small{margin:0;font-size:var(--t-sm);font-weight:400;}
 #detail .tech-panel .pc-block{margin-top:0;padding-top:0;border-top:0;}
 #detail .tech-panel .pc-head{position:absolute;top:16px;right:0;margin:0;}
 #detail .pc-panel{padding:2px 0 0;}

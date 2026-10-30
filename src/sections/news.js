@@ -24,8 +24,6 @@ function init(){
     if(open){ e.preventDefault(); openStockInline(section(), 'News', Number(open.getAttribute('data-news-open'))); return; }
     const tab = t.closest('[data-news-tab]');
     if(tab){ view.tab = tab.getAttribute('data-news-tab') === 'events' ? 'events' : 'macro'; render(); return; }
-    const kind = t.closest('button[data-news-type]');
-    if(kind){ view.type = kind.getAttribute('data-news-type') || 'all'; render(); return; }
     const when = t.closest('[data-news-when]');
     if(when){ view.when = when.getAttribute('data-news-when') === 'recent' ? 'recent' : 'upcoming'; render(); return; }
     if(t.closest('[data-news-cal-all]')){ view.calAll = !view.calAll; render(); return; }
@@ -36,6 +34,7 @@ function init(){
     const t = /** @type {HTMLElement} */ (e.target); if(!t || !t.closest) return;
     const sel = /** @type {HTMLSelectElement} */ (t);
     if(t.matches('[data-news-strategy]')){ setPick(sel.value); render(); }
+    else if(t.matches('[data-news-type]')){ view.type = sel.value; render(); }
     else if(t.matches('[data-news-upto]')){ view.upto = +sel.value; render(); }
   });
   startNewsSync(true);

@@ -5,23 +5,23 @@
 .live-refresh-head{display:flex;align-items:baseline;gap:6px 12px;flex-wrap:wrap;}
 .live-refresh-toggle{background:none;border:none;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%;}
 .live-refresh-toggle:hover .live-refresh-title{color:var(--accent);}
-.live-refresh-caret{font-size:.8rem;color:var(--muted);width:12px;flex:none;}
-.live-refresh-chip{margin-left:auto;font-size:.74rem;font-weight:600;color:var(--accent);}
+.live-refresh-caret{font-size:var(--t-sm);color:var(--muted);width:12px;flex:none;}
+.live-refresh-chip{margin-left:auto;font-size:var(--t-sm);font-weight:600;color:var(--accent);}
 .live-refresh-chip.is-error{color:var(--avoid);}
 .live-refresh-chip:empty{display:none;}
 .live-refresh-grid[hidden]{display:none;}
-.live-refresh-title{font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text);}
+.live-refresh-title{font-size:var(--t-sm);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text);}
 .live-refresh-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;}
 .live-refresh-item{display:flex;flex-direction:column;gap:8px;min-width:0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);}
 .live-refresh-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .live-refresh-actions .refresh-btn:disabled{opacity:.6;cursor:progress;}
-.live-stop{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:.74rem;font-weight:600;cursor:pointer;}
+.live-stop{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:var(--t-sm);font-weight:600;cursor:pointer;}
 .live-stop:hover{color:var(--text);border-color:var(--muted);}
 .live-progress{height:8px;border-radius:4px;background:var(--panel2);overflow:hidden;border:1px solid var(--line);}
 .live-progress-fill{height:100%;width:0;background:var(--accent);transition:width .35s ease;}
 .live-progress-fill.is-ok{background:var(--buy);}
 .live-progress-fill.is-error{background:var(--avoid);}
-.live-status{font-size:.76rem;line-height:1.5;color:var(--muted);overflow-wrap:anywhere;}
+.live-status{font-size:var(--t-sm);line-height:1.5;color:var(--muted);overflow-wrap:anywhere;}
 .live-status.is-error{color:var(--avoid);}
 .live-refresh :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 @media (prefers-reduced-motion:reduce){
@@ -32,18 +32,18 @@
 .fund-research-list.pts li::marker{color:var(--muted);}
 .global-events{margin-top:14px;padding-top:12px;border-top:1px solid var(--border,rgba(128,128,128,.25));}
 .global-event{border-left:3px solid var(--hold,#c9a227);padding-left:10px;}
-.global-event .ev-tag{font-size:.72rem;font-weight:700;opacity:.8;margin-left:6px;}
+.global-event .ev-tag{font-size:var(--t-sm);font-weight:700;opacity:.8;margin-left:6px;}
 .analysis-toggles{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;}
 #detail .live-refresh{margin:0;border:0;}
 #detail .live-refresh + .val-panel{margin-top:0;}
-#detail .global-event{padding:2px 0 2px 10px;font-size:.86rem;line-height:1.4;}
-#detail .global-event strong{font-size:.9rem;}
-#detail .global-event > div{font-size:.82rem;color:var(--muted);display:block;margin-top:3px;}
+#detail .global-event{padding:2px 0 2px 10px;font-size:var(--t-sm);line-height:1.4;}
+#detail .global-event strong{font-size:var(--t-md);}
+#detail .global-event > div{font-size:var(--t-sm);color:var(--muted);display:block;margin-top:3px;}
 #detail .global-event .global-item-source{white-space:nowrap;}
 /* News items: the Helps / Hurts / Mixed tag comes first, then the headline, then the explanation on its own lines with the source after it. */
-#detail .global-event .ev-tag{display:inline-block;padding:0 7px;border-radius:999px;font-size:.66rem;text-transform:uppercase;letter-spacing:.03em;opacity:1;background:rgba(201,162,39,.18);color:var(--hold);margin:0 8px 0 0;vertical-align:1px;}
+#detail .global-event .ev-tag{display:inline-block;padding:0 7px;border-radius:999px;font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.03em;opacity:1;background:rgba(201,162,39,.18);color:var(--hold);margin:0 8px 0 0;vertical-align:1px;}
 #detail .val-panel,#detail .fund-panel,#detail .tech-panel,#detail .global-panel{padding-top:18px;margin-top:20px;}
 #detail .global-item .global-item-source{display:inline;margin:0 0 0 6px;white-space:nowrap;}
 #detail .global-events{margin-top:16px;padding-top:14px;}
 #detail .global-event .global-item-source{display:block;margin:3px 0 0;}
-#section-refreshlog :is(.refreshlog-freshness-summary,.refreshlog-freshness-row,.refreshlog-run-stats,.upload-hint,.fi-step,.fi-result,.fi-prompt-msg,.fi-pct,.live-status,.help-tab-link){font-size:.9rem;}
+#section-refreshlog :is(.refreshlog-freshness-summary,.refreshlog-freshness-row,.refreshlog-run-stats,.upload-hint,.fi-step,.fi-result,.fi-prompt-msg,.fi-pct,.live-status,.help-tab-link){font-size:var(--t-md);}

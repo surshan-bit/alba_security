@@ -6,10 +6,10 @@
 .strat-main{min-width:0;}
 .strat-main .strat-panel:first-child{margin-top:0;}
 .strat-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
-.strat-name{color:var(--text);flex:1;min-width:180px;font-size:1.05rem;font-weight:700;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 10px;}
-.strat-note{color:var(--text);width:100%;box-sizing:border-box;font-size:.82rem;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 10px;margin-bottom:14px;}
+.strat-name{color:var(--text);flex:1;min-width:180px;font-size:var(--t-md);font-weight:700;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 10px;}
+.strat-note{color:var(--text);width:100%;box-sizing:border-box;font-size:var(--t-sm);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 10px;margin-bottom:14px;}
 .strat-actions{display:flex;gap:6px;}
-.strat-btn{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 12px;font-size:.8rem;cursor:pointer;}
+.strat-btn{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 12px;font-size:var(--t-sm);cursor:pointer;}
 .strat-btn:hover{background:var(--panel2);}
 .strat-btn-danger{color:var(--avoid);border-color:var(--avoid);font-weight:600;}
 .strat-btn-danger:hover{background:var(--avoid);color:#fff;}
@@ -18,7 +18,7 @@
 /* Strategies rules: the rows have no outline any more, so they take no side padding and line up with the heading and the + Add a rule box. */
 .sr-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:0;border-radius:0;padding:6px 0;background:transparent;}
 @media (min-width:1000px){.sr-row,.sr-head{display:grid;grid-template-columns:340px 120px minmax(0,1fr) 110px 56px 34px;column-gap:10px;}.sr-row select{width:100%;}.sr-count{margin-left:0;text-align:right;}}
-.sr-row select,.sr-add,.sr-row input,.strat-why-input{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:.84rem;}
+.sr-row select,.sr-add,.sr-row input,.strat-why-input{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:var(--t-sm);}
 .sr-row select{color:var(--text);}
 .sr-add{color:var(--text);}
 .sr-row input{color:var(--text);}
@@ -26,9 +26,9 @@
 .sr-row input[type=number]{width:84px;}
 .sr-text{width:180px;}
 .sr-val{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-.sr-unit,.sr-and{color:var(--muted);font-size:.8rem;}
+.sr-unit,.sr-and{color:var(--muted);font-size:var(--t-sm);}
 .sr-opts{display:flex;gap:5px;flex-wrap:wrap;}
-.sr-opt{color:var(--muted);background:transparent;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:.78rem;cursor:pointer;}
+.sr-opt{color:var(--muted);background:transparent;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:var(--t-sm);cursor:pointer;}
 .sr-opt[aria-pressed="true"]{background:var(--panel2);color:var(--text);border-color:var(--muted);font-weight:700;}
 /* Coloured tags: each option carries a tone (data-tone). Unselected = tinted outline and text; selected = filled tint, bold. */
 .sr-opt[data-tone]{--tone:var(--muted);color:var(--tone);border-color:color-mix(in srgb,var(--tone) 38%,transparent);}
@@ -41,27 +41,27 @@
 .sr-opt[data-tone="none"]{--tone:var(--muted);border-style:dashed;}
 .sr-opt[data-tone][aria-pressed="true"]{background:color-mix(in srgb,var(--tone) 22%,transparent);color:var(--tone);border-color:var(--tone);}
 .sr-opt[data-tone="none"][aria-pressed="true"]{color:var(--text);}
-.sr-count{margin-left:auto;font-size:.76rem;color:var(--muted);font-variant-numeric:tabular-nums;}
+.sr-count{margin-left:auto;font-size:var(--t-sm);color:var(--muted);font-variant-numeric:tabular-nums;}
 .sr-incomplete{font-style:italic;}
 .sr-del{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;box-sizing:border-box;background:transparent;border:1px solid color-mix(in srgb,var(--avoid) 45%,transparent);border-radius:6px;color:var(--avoid);cursor:pointer;}
 .sr-del:hover,.sr-del:focus-visible{background:var(--avoid);border-color:var(--avoid);color:#fff;}
-.sr-head{display:none;padding:0 0 6px;border-bottom:1px solid var(--line);font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+.sr-head{display:none;padding:0 0 6px;border-bottom:1px solid var(--line);font-size:var(--t-sm);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
 .sr-head span:nth-child(4){text-align:right;}
 .sr-head span:nth-child(5){text-align:center;}
 @media (min-width:1000px){.sr-head{display:grid;}}
 @media (min-width:1000px){.sr-rules{gap:0;}.sr-row{padding:8px 0;}.sr-row + .sr-row{border-top:1px dotted color-mix(in srgb,var(--line) 55%,transparent);}.sr-row:last-child{border-bottom:1px solid var(--line);}}
 .sr-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;}
-.sr-total{font-size:.86rem;color:var(--muted);}
+.sr-total{font-size:var(--t-sm);color:var(--muted);}
 .sr-total b{color:var(--text);font-weight:700;}
-.sr-undo{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);font-size:.84rem;}
+.sr-undo{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);font-size:var(--t-sm);}
 .sr-undo-btn{background:transparent;border:0;color:var(--accent);font:inherit;font-weight:700;cursor:pointer;padding:0 4px;}
-.strat-empty{font-size:.82rem;color:var(--muted);padding:8px 2px;}
+.strat-empty{font-size:var(--t-sm);color:var(--muted);padding:8px 2px;}
 .strat-result-head{margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
-.strat-total{justify-content:flex-end;font-size:.82rem;color:var(--muted);}
+.strat-total{justify-content:flex-end;font-size:var(--t-sm);color:var(--muted);}
 .strat-result-title{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-right:auto;}
 .strat-result-title .analysis-panel-title{margin:0;}
-.strat-count{white-space:nowrap;font-size:.82rem;color:var(--muted);}
-.strat-total .strat-btn,.strat-total .sort-select{height:36px;box-sizing:border-box;border-radius:7px;font-size:.82rem;line-height:1;margin:0;}
+.strat-count{white-space:nowrap;font-size:var(--t-sm);color:var(--muted);}
+.strat-total .strat-btn,.strat-total .sort-select{height:36px;box-sizing:border-box;border-radius:7px;font-size:var(--t-sm);line-height:1;margin:0;}
 .strat-total .strat-btn{display:inline-flex;align-items:center;justify-content:center;padding:0 14px;white-space:nowrap;margin-right:0;}
 .strat-total .sort-select{padding:0 10px;}
 .strat-total .strat-sort{margin:0;}
@@ -74,8 +74,8 @@
      highlights) but must not change these basics. */
 .strat-table-wrap{overflow-x:auto;}
 /* Columns are as wide as their content (no stretching to the screen), so there is no empty space between columns. */
-.strat-table,.biz-table{width:max-content;min-width:0;border-collapse:collapse;font-size:.84rem;}
-.strat-table th,.biz-table > thead > tr > th{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:9px 8px;}
+.strat-table,.biz-table{width:max-content;min-width:0;border-collapse:collapse;font-size:var(--t-sm);}
+.strat-table th,.biz-table > thead > tr > th{font-size:var(--t-sm);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:9px 8px;}
 .strat-table th{text-align:left;font-weight:600;border-bottom:1px solid transparent;}
 .biz-table>thead>tr>th{text-align:left;font-weight:600;border-bottom:1px solid transparent;}
 .strat-table td,.biz-table > tbody > tr > td{padding:11px 8px;line-height:1.35;border-bottom:1px solid transparent;}
@@ -90,49 +90,49 @@
 .strat-table tbody tr:hover > td,.strat-row:focus > td,.biz-row:hover > td,.biz-row:focus > td,.help-table tbody tr:hover > td{background:var(--row-hover);}
 .biz-row:focus{outline:none;}
 .strat-why-input{width:100%;max-width:320px;box-sizing:border-box;margin:8px 0;}
-.strat-why-head{font-size:.88rem;margin:6px 0;}
+.strat-why-head{font-size:var(--t-sm);margin:6px 0;}
 .strat-yes{color:var(--buy);font-weight:700;}
 .strat-no{color:var(--avoid);font-weight:700;}
-.strat-why-list{list-style:none;margin:6px 0 0;padding:0;font-size:.84rem;}
+.strat-why-list{list-style:none;margin:6px 0 0;padding:0;font-size:var(--t-sm);}
 .strat-why-list li{padding:4px 0;}
 .strat-why-list .ok .strat-mark{color:var(--buy);}
 .strat-why-list .bad .strat-mark{color:var(--avoid);}
 .strat-mark{display:inline-block;width:1.2em;font-weight:700;}
 .strat-have{color:var(--muted);}
-.strat-why-none{font-size:.82rem;color:var(--muted);}
+.strat-why-none{font-size:var(--t-sm);color:var(--muted);}
 /* ---- Strategies: goal, learned rules, tracking ---- */
-.strat-goal{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.9rem;margin-bottom:28px;}
-.strat-goal-in{color:var(--text);width:72px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:.9rem;font-weight:700;}
+.strat-goal{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--t-md);margin-bottom:28px;}
+.strat-goal-in{color:var(--text);width:72px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:var(--t-md);font-weight:700;}
 .strat-goal .strat-btn{margin-left:auto;}
-.learn-hint,.learn-note,.learn-meta{font-size:.78rem;color:var(--muted);line-height:1.5;margin:4px 0;}
-.learn-status{font-size:.84rem;margin:6px 0;color:var(--tech-sell);}
+.learn-hint,.learn-note,.learn-meta{font-size:var(--t-sm);color:var(--muted);line-height:1.5;margin:4px 0;}
+.learn-status{font-size:var(--t-sm);margin:6px 0;color:var(--tech-sell);}
 .learn-cards{display:flex;flex-direction:column;gap:8px;margin:8px 0;}
 .learn-card{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:8px;padding:10px 12px;}
 .learn-card.learn-ok{border-left-color:var(--buy);}
 .learn-card.learn-weak{border-left-color:var(--avoid);opacity:.85;}
-.learn-rules{margin:0 0 6px;padding-left:18px;font-size:.86rem;}
-.learn-stats{display:flex;flex-direction:column;gap:2px;font-size:.82rem;margin-bottom:8px;}
-.learn-sub{color:var(--muted);font-size:.76rem;}
+.learn-rules{margin:0 0 6px;padding-left:18px;font-size:var(--t-sm);}
+.learn-stats{display:flex;flex-direction:column;gap:2px;font-size:var(--t-sm);margin-bottom:8px;}
+.learn-sub{color:var(--muted);font-size:var(--t-sm);}
 .learn-verdict{font-weight:700;}
 .learn-ok .learn-verdict{color:var(--buy);}
 .learn-weak .learn-verdict{color:var(--avoid);}
-.strat-learned{font-size:.78rem;color:var(--muted);margin:-2px 0 8px;}
+.strat-learned{font-size:var(--t-sm);color:var(--muted);margin:-2px 0 8px;}
 .strat-btn:disabled{opacity:.45;cursor:default;}
-.trk-summary{font-size:.86rem;margin:6px 0 10px;}
+.trk-summary{font-size:var(--t-sm);margin:6px 0 10px;}
 .trk-run{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px;background:var(--panel);}
-.trk-run-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.82rem;}
-.trk-toggle{background:transparent;border:none;color:var(--text);font-weight:700;cursor:pointer;font-size:.86rem;padding:0;}
+.trk-run-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:var(--t-sm);}
+.trk-toggle{background:transparent;border:none;color:var(--text);font-weight:700;cursor:pointer;font-size:var(--t-sm);padding:0;}
 .trk-goal{color:var(--text);}
 .trk-goal b{color:var(--accent);}
-.trk-goalline{font-size:.86rem;line-height:1.5;margin:6px 0 10px;}
+.trk-goalline{font-size:var(--t-sm);line-height:1.5;margin:6px 0 10px;}
 .trk-goalline b{color:var(--accent);}
-.trk-legend{font-size:.78rem;line-height:1.5;color:var(--muted);margin:8px 0 6px;}
+.trk-legend{font-size:var(--t-sm);line-height:1.5;color:var(--muted);margin:8px 0 6px;}
 .trk-legend b{color:var(--text);}
 .trk-chips{display:flex;gap:5px;align-items:center;}
 .trk-state{margin-left:auto;color:var(--muted);}
-.trk-del{background:transparent;border:none;color:var(--muted);font-size:1.2rem;line-height:1;cursor:pointer;}
+.trk-del{background:transparent;border:none;color:var(--muted);font-size:var(--t-lg);line-height:1;cursor:pointer;}
 .trk-del:hover{color:var(--avoid);}
-.trk-status{border-radius:999px;padding:1px 9px;font-size:.74rem;font-weight:700;border:1px solid var(--line);}
+.trk-status{border-radius:999px;padding:1px 9px;font-size:var(--t-sm);font-weight:700;border:1px solid var(--line);}
 .trk-hit{color:var(--buy);}
 .trk-open{color:var(--muted);}
 .trk-miss{color:var(--avoid);}
@@ -141,16 +141,16 @@
 /* ---- Strategies: news ---- */
 .news-pos{color:var(--buy);font-weight:700;}
 .news-neg{color:var(--avoid);font-weight:700;}
-.trk-split{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;margin-top:4px;color:var(--muted);}
+.trk-split{display:flex;gap:14px;flex-wrap:wrap;font-size:var(--t-sm);margin-top:4px;color:var(--muted);}
 /* ---- Strategies: data refresh ---- */
 /* In-page confirmation box (see src/ui/confirm.js) */
 .alba-confirm{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px;}
 .alba-confirm-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;max-width:420px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.5);}
 
-.alba-confirm-msg{font-size:.95rem;line-height:1.5;margin-bottom:16px;}
+.alba-confirm-msg{font-size:var(--t-md);line-height:1.5;margin-bottom:16px;}
 .alba-confirm-btns{display:flex;justify-content:flex-end;gap:10px;}
 .alba-confirm-ok{background:var(--accent);color:#fff;border-color:var(--accent);}
-.strat-save-note{margin-left:10px;font-size:.72rem;font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted);}
+.strat-save-note{margin-left:10px;font-size:var(--t-sm);font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted);}
 .strat-save-ok{color:var(--buy);}
 .strat-save-warn{color:var(--hold);}
 .strat-save-bad{color:var(--avoid);}
@@ -158,9 +158,9 @@
 .learn-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
 .learn-modal-head .analysis-panel-title{margin:0;}
 .lm-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
-.lm-tab{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:.84rem;cursor:pointer;}
+.lm-tab{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:var(--t-sm);cursor:pointer;}
 .lm-tab.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}
-.lm-pane .pr-name{font-weight:700;font-size:.92rem;}
+.lm-pane .pr-name{font-weight:700;font-size:var(--t-md);}
 .lm-pane .pr-why{margin:2px 0 6px;}
 .lm-pane .pr-ask,.lm-pane #stratLearnRun{margin-top:8px;}
 .strat-pub{border-color:var(--muted);color:var(--muted);}
@@ -169,9 +169,9 @@
 .strat-fold{margin:0 0 6px;}
 .strat-fold > summary{cursor:pointer;list-style:none;align-items:baseline;gap:8px;margin-bottom:8px;display:flex;flex-wrap:wrap;}
 .strat-fold > summary::-webkit-details-marker{display:none;}
-.strat-fold>summary:before{content:"\25b8";color:var(--muted);font-size:.8rem;transition:transform .15s;}
+.strat-fold>summary:before{content:"\25b8";color:var(--muted);font-size:var(--t-sm);transition:transform .15s;}
 .strat-fold[open]>summary:before{transform:rotate(90deg);}
-.strat-fold-sum{font-size:.8rem;text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted);}
+.strat-fold-sum{font-size:var(--t-sm);text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted);}
 .strat-fold[open] > summary .strat-fold-sum{display:none;}
 .strat-fold:not([open])>summary{margin-bottom:2px;}
 /* Stack of panels in Strategies (the qualifying-stocks panel no longer has a title above its count), with room between them. */
@@ -182,7 +182,7 @@
 /* Analysis and Strategies: the Live Data Refresh line sits between two lines, as on the stock page. */
 .live-refresh.live-panel{margin:0;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);border-left:0;border-right:0;}
 #detail .live-refresh{padding:12px 0;}
-.pc-psum .badge{text-align:center;padding:2px 10px !important;font-size:.76rem !important;}
+.pc-psum .badge{text-align:center;padding:2px 10px !important;font-size:var(--t-sm) !important;}
 /* Peers grid: the Analysis grid's spacing (cells come from .strat-table); only a sticky header and the width are its own. */
 .peers-table.strat-table{width:100%;}
 .peers-table.strat-table th{border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:1;}
@@ -196,14 +196,14 @@
    The heading row lines up with the first strategy in the list; inside, each part is a label on the left and its controls on the right,
    with spacing instead of divider lines. */
 .strat-group > summary{align-items:center;gap:10px;margin:0 0 4px;padding:6px 0;min-height:30px;line-height:1.2;}
-.strat-group > summary::before{width:1em;font-size:1rem;text-align:center;line-height:1;flex:0 0 auto;}
+.strat-group > summary::before{width:1em;font-size:var(--t-md);text-align:center;line-height:1;flex:0 0 auto;}
 .strat-group[open] > summary .strat-fold-sum{display:none;}
-.strat-group > summary .strat-fold-sum{font-size:.84rem;}
+.strat-group > summary .strat-fold-sum{font-size:var(--t-sm);}
 .strat-group > summary .strat-save-note{margin-left:auto;}
 .strat-group > .strat-section{display:grid;grid-template-columns:72px minmax(0,1fr);gap:6px 16px;align-items:start;margin-top:12px;padding:0;border:0;}
 .strat-group > .strat-section > :not(.strat-section-title){grid-column:2;min-width:0;}
-.strat-section-title{grid-column:1;grid-row:1;font-size:.76rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin:0;padding-top:9px;}
-.strat-section-hint{display:block;text-transform:none;letter-spacing:0;font-weight:400;margin:2px 0 0;font-size:.74rem;line-height:1.3;}
+.strat-section-title{grid-column:1;grid-row:1;font-size:var(--t-sm);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin:0;padding-top:9px;}
+.strat-section-hint{display:block;text-transform:none;letter-spacing:0;font-weight:400;margin:2px 0 0;font-size:var(--t-sm);line-height:1.3;}
 @media (max-width:700px){
 .strat-group > .strat-section{grid-template-columns:minmax(0,1fr);gap:4px;}
 .strat-group > .strat-section > :not(.strat-section-title),.strat-section-title{grid-column:1;}
@@ -212,13 +212,13 @@
 .strat-group>summary{gap:2px 8px;padding:2px 0 4px;min-height:0;margin:0;}
 }
 @media (max-width:600px){
-.strat-group > summary::before{font-size:.9rem;}
-.strat-group > summary .strat-fold-sum{flex:1 0 100%;order:3;font-size:.78rem;line-height:1.35;}
+.strat-group > summary::before{font-size:var(--t-md);}
+.strat-group > summary .strat-fold-sum{flex:1 0 100%;order:3;font-size:var(--t-sm);line-height:1.35;}
 .strat-group > summary .strat-save-note{order:2;}
 .strat-group > summary .strat-save-note:empty{display:none;}
 .strat-group:not([open])>summary{margin-bottom:0;}
 .strat-group > .strat-section{margin-top:10px;}
-.strat-section-title{font-size:.72rem;}
+.strat-section-title{font-size:var(--t-sm);}
 }
 
 /* v1.282: "+ Add a rule" is a dashed-outline button (no underline), as wide as the Field column so its arrow lines up with the arrows above. */
@@ -244,7 +244,7 @@
 #stratList{margin:0 0 12px;}
 #stratList .dm-strat .dm-btn{max-width:100%;}
 #stratList .dm-strat .dm-btn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#stratList .dm-strat .strat-pick-n{border:1px solid var(--line);border-radius:999px;padding:0 7px;font-size:.72rem;font-variant-numeric:tabular-nums;}
+#stratList .dm-strat .strat-pick-n{border:1px solid var(--line);border-radius:999px;padding:0 7px;font-size:var(--t-sm);font-variant-numeric:tabular-nums;}
 #stratList .dm-pop{min-width:360px;max-height:60vh;overflow:auto;}
 #stratList #stratNew,#stratList #stratRestore{color:var(--accent);}
 #stratList #stratRestore{color:var(--muted);}

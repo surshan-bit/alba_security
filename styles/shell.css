@@ -6,8 +6,8 @@ header{margin-bottom:12px;}
 .app-section > header h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:0;}
 .app-section > header:not(:has(.sub)){display:none;}
 .app-section > header .sub{margin:0;}
-h1{margin:0 0 6px;font-size:1.55rem;font-weight:600;letter-spacing:.2px;}
-.sub{color:var(--muted);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.88rem;line-height:1.5;max-width:680px;}
+h1{margin:0 0 6px;font-size:var(--t-lg);font-weight:600;letter-spacing:.2px;}
+.sub{color:var(--muted);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-sm);line-height:1.5;max-width:680px;}
 /* ---- Top bar + sidebar navigation ---- */
 .topbar{padding-top:17px;padding-bottom:17px;padding-top:17px;padding-bottom:17px;display:flex;align-items:center;gap:14px;padding:11px 20px;margin-bottom:14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:20;padding-top:17px;padding-bottom:17px;}
 /* Top bar alignment (v1.113), all themes. The burger is drawn on whole pixels (three 2px bars, 6px apart, in a 36px square) so the middle bar
@@ -15,7 +15,7 @@ h1{margin:0 0 6px;font-size:1.55rem;font-weight:600;letter-spacing:.2px;}
 .menu-toggle{background:none;border:none;color:var(--text);cursor:pointer;border-radius:8px;flex-direction:column;justify-content:center;gap:4px;position:relative;display:block;width:36px;height:36px;padding:0;margin:-8px;flex-shrink:0;}
 .menu-toggle:hover{background:var(--panel2);}
 .menu-toggle span{display:block;background:currentColor;position:absolute;left:8px;width:20px;height:2px;border-radius:1px;}
-.topbar-title{font-size:1.15rem;font-weight:600;letter-spacing:.2px;display:flex;gap:8px;min-width:0;white-space:nowrap;align-items:center;line-height:1.2;}
+.topbar-title{font-size:var(--t-lg);font-weight:600;letter-spacing:.2px;display:flex;gap:8px;min-width:0;white-space:nowrap;align-items:center;line-height:1.2;}
 .topbar-brand{color:var(--muted);font-weight:600;font-size:inherit;}
 .topbar-sep{font-size:0;line-height:0;align-self:center;display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;}
 .topbar-section{overflow:hidden;text-overflow:ellipsis;}
@@ -25,11 +25,11 @@ h1{margin:0 0 6px;font-size:1.55rem;font-weight:600;letter-spacing:.2px;}
 .sidebar.open{transform:translateX(0);}
 .sidebar-brand{padding:0 8px;display:flex;align-items:center;gap:10px;}
 .brand-mark{flex-shrink:0;}
-.brand-title{font-size:1.2rem;font-weight:700;letter-spacing:.2px;line-height:1.15;white-space:nowrap;}
-.brand-version{display:inline-block;margin-left:8px;vertical-align:middle;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.62rem;font-weight:700;letter-spacing:.02em;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:2px 8px;}
+.brand-title{font-size:var(--t-lg);font-weight:700;letter-spacing:.2px;line-height:1.15;white-space:nowrap;}
+.brand-version{display:inline-block;margin-left:8px;vertical-align:middle;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-xs);font-weight:700;letter-spacing:.02em;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:2px 8px;}
 .sidebar-nav{display:flex;flex-direction:column;gap:2px;}
-.nav-section-label{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;padding:0 12px;margin:10px 0 4px;}
-.nav-item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:none;color:var(--text);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.92rem;padding:10px 12px;border-radius:8px;}
+.nav-section-label{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;padding:0 12px;margin:10px 0 4px;}
+.nav-item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:none;color:var(--text);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-md);padding:10px 12px;border-radius:8px;}
 .nav-item[hidden]{display:none !important;}   /* Explorer is out of the menu (its table now lives in Analysis > View); the page itself still opens from a stock search or a link */
 .nav-item:hover{background:var(--panel2);}
 .nav-item.active{background:var(--panel2);font-weight:600;}
@@ -37,7 +37,7 @@ h1{margin:0 0 6px;font-size:1.55rem;font-weight:600;letter-spacing:.2px;}
 .nav-item.active .nav-icon{color:var(--accent);}
 .app-section{display:none;}
 .app-section.active{display:block;}
-.section-load-error{display:flex;gap:12px;align-items:center;margin:12px 0;padding:10px 14px;border:1px solid var(--accent);border-radius:10px;background:var(--panel);color:var(--text);font-size:.85rem;}
+.section-load-error{display:flex;gap:12px;align-items:center;margin:12px 0;padding:10px 14px;border:1px solid var(--accent);border-radius:10px;background:var(--panel);color:var(--text);font-size:var(--t-sm);}
 .section-load-error button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;}
 /* A stock opened in place (Analysis, Strategies, Industry): the page's own content is hidden, not removed, so it is exactly as it was on Back. */
 .app-section.inline-detail-open > :not(.inline-detail-host){display:none !important;}

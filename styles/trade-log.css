@@ -2,14 +2,14 @@
 /* Trade Log. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
 .tl-head-actions{display:flex;gap:8px;align-items:center;}
 .tl-form{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;margin:10px 0 14px;}
-.tl-form-title{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:10px;}
+.tl-form-title{font-size:var(--t-sm);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:10px;}
 .tl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
-.tl-grid label{display:flex;flex-direction:column;gap:4px;font-size:.72rem;color:var(--muted);font-weight:600;}
-.tl-grid input{color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:.86rem;font-family:inherit;outline:none;min-width:0;}
+.tl-grid label{display:flex;flex-direction:column;gap:4px;font-size:var(--t-sm);color:var(--muted);font-weight:600;}
+.tl-grid input{color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:var(--t-sm);font-family:inherit;outline:none;min-width:0;}
 .tl-grid input:focus{border-color:var(--accent);}
 .tl-grid .tl-wide{grid-column:1/-1;}
 .tl-form-actions{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;}
-.tl-msg{font-size:.78rem;color:var(--muted);}
+.tl-msg{font-size:var(--t-sm);color:var(--muted);}
 .tl-msg.err{color:#e5484d;}
 .tl-btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);}
 .tl-btn-primary:hover{color:#fff;opacity:.9;}
@@ -17,31 +17,31 @@
 .tl-row-actions .refresh-btn{padding:3px 9px;}
 .tl-danger.armed{color:#e5484d;border-color:#e5484d;}
 .tl-view-toggle{display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:2px;}
-.tl-view-btn{background:transparent;border:none;border-radius:18px;padding:4px 11px;font-size:.74rem;font-weight:600;color:var(--muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.tl-view-btn{background:transparent;border:none;border-radius:18px;padding:4px 11px;font-size:var(--t-sm);font-weight:600;color:var(--muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
 .tl-view-btn.active{background:var(--accent);color:#fff;}
 #tradeLogPanelBody .chg-up{color:var(--buy);font-weight:700;}
 #tradeLogPanelBody .chg-down{color:var(--avoid);font-weight:700;}
 .tl-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;}
 .tl-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
 .tl-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
-.tl-card-name{font-size:.98rem;font-weight:700;line-height:1.25;}
-.tl-card-tk{font-size:.74rem;color:var(--muted);margin-top:2px;}
-.tl-card-retval{font-size:1.6rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;}
-.tl-card-retlbl{font-size:.74rem;color:var(--muted);margin-top:3px;}
+.tl-card-name{font-size:var(--t-md);font-weight:700;line-height:1.25;}
+.tl-card-tk{font-size:var(--t-sm);color:var(--muted);margin-top:2px;}
+.tl-card-retval{font-size:var(--t-lg);font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;}
+.tl-card-retlbl{font-size:var(--t-sm);color:var(--muted);margin-top:3px;}
 .tl-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:0;padding-top:10px;border-top:1px solid var(--line);}
-.tl-card-grid dt{font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 2px;font-weight:600;}
-.tl-card-grid dd{margin:0;font-size:.84rem;font-variant-numeric:tabular-nums;}
+.tl-card-grid dt{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 2px;font-weight:600;}
+.tl-card-grid dd{margin:0;font-size:var(--t-sm);font-variant-numeric:tabular-nums;}
 .tl-card .tl-row-actions{padding-top:10px;border-top:1px solid var(--line);}
-.pro-pill{margin-left:auto;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.6rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:10px;padding:1px 7px;line-height:1.5;}
+.pro-pill{margin-left:auto;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-xs);font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:10px;padding:1px 7px;line-height:1.5;}
 .biz-side .tl-view-toggle{display:flex;width:100%;box-sizing:border-box;}
 .biz-side .tl-view-toggle .tl-view-btn{flex:1;text-align:center;}
-.biz-toolbar .biz-match-toggle .tl-view-btn{height:28px;padding:0 14px;font-size:.78rem;}
+.biz-toolbar .biz-match-toggle .tl-view-btn{height:28px;padding:0 14px;font-size:var(--t-sm);}
 .biz-match-toggle .tl-view-btn:disabled{opacity:.45;cursor:not-allowed;}
 /* ---- Daily call on an open trade ---- */
-.tl-signal{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px;font-size:.82rem;}
+.tl-signal{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px;font-size:var(--t-sm);}
 .tl-signal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.tl-signal-label{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;}
-.tl-signal-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.72rem;font-weight:700;border:1px solid var(--line);}
+.tl-signal-label{color:var(--muted);font-size:var(--t-sm);text-transform:uppercase;letter-spacing:.06em;}
+.tl-signal-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:var(--t-sm);font-weight:700;border:1px solid var(--line);}
 .tl-sig-hold .tl-signal-badge,.tl-signal-badge.tl-sig-hold{background:rgba(120,140,160,.15);}
 .tl-sig-add .tl-signal-badge,.tl-signal-badge.tl-sig-add{background:rgba(60,180,110,.18);border-color:rgba(60,180,110,.5);}
 .tl-sig-trim .tl-signal-badge,.tl-signal-badge.tl-sig-trim{background:rgba(224,160,48,.2);border-color:rgba(224,160,48,.55);}
@@ -49,23 +49,23 @@
 .tl-signal-why{margin:0;padding-left:18px;}
 .tl-signal-why li{margin:2px 0;}
 .tl-signal-notes p{margin:4px 0;}
-.tl-signal-hist,.tl-signal-foot{color:var(--muted);font-size:.72rem;}
+.tl-signal-hist,.tl-signal-foot{color:var(--muted);font-size:var(--t-sm);}
 .tl-live{color:var(--accent);font-weight:700;text-transform:none;letter-spacing:0;}
 .tl-name-link{color:inherit;text-decoration:none;border-bottom:1px dotted var(--muted,#8a94a3);cursor:pointer;}
 .tl-name-link:hover{color:var(--accent);border-bottom-color:var(--accent);}
 .tl-ideas{margin-top:18px;}
-.tl-ideas-select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:.82rem;max-width:260px;}
+.tl-ideas-select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:var(--t-sm);max-width:260px;}
 .tl-ideas-bar{margin:0 0 10px;}
 .tl-idea-buy{background:rgba(60,180,110,.18);border-color:rgba(60,180,110,.5);}
 .tl-idea-hold{background:rgba(120,140,160,.15);}
 .tl-idea-sell{background:rgba(220,80,80,.18);border-color:rgba(220,80,80,.5);}
-.tl-idea-why{font-size:.76rem;color:var(--muted);min-width:220px;}
+.tl-idea-why{font-size:var(--t-sm);color:var(--muted);min-width:220px;}
 .tl-top5{margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);}
-.tl-top5-title{font-weight:700;font-size:.92rem;margin:0 0 8px;}
+.tl-top5-title{font-weight:700;font-size:var(--t-md);margin:0 0 8px;}
 .tl-top5 ol{list-style:none;margin:0;padding:0;display:grid;gap:10px;}
 .tl-top5 li{display:flex;gap:10px;align-items:flex-start;}
-.tl-top5-rank{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(60,180,110,.18);border:1px solid rgba(60,180,110,.5);font-size:.75rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
-.tl-top5-meta{font-size:.8rem;margin:2px 0;}
+.tl-top5-rank{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(60,180,110,.18);border:1px solid rgba(60,180,110,.5);font-size:var(--t-sm);font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
+.tl-top5-meta{font-size:var(--t-sm);margin:2px 0;}
 .tl-top5 .tl-idea-why{min-width:0;}
 .tl-ideas-progress{padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);}
 .tl-ideas-progress .fi-steps{margin-top:12px;}
@@ -76,11 +76,11 @@
 .tl-top5-body{flex:1;min-width:0;}
 .tl-top5-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
 .tl-top5-price{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
-.tl-top5-why{margin:6px 0 0;padding-left:18px;font-size:.8rem;color:var(--muted);}
+.tl-top5-why{margin:6px 0 0;padding-left:18px;font-size:var(--t-sm);color:var(--muted);}
 .tl-top5-why li{margin:2px 0;display:list-item;}
 
 /* News under each Buy / Sell idea (v1.294) */
-.tl-news{margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:.78rem;color:var(--muted);}
+.tl-news{margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:var(--t-sm);color:var(--muted);}
 .tl-news-head{margin-bottom:3px;}
 .tl-news-none{font-style:italic;}
 .tl-news-list{list-style:none;margin:0;padding:0;}
@@ -92,7 +92,7 @@
 .tl-news-meta{opacity:.75;white-space:nowrap;}
 
 /* A listed stock that is already a position (v1.296) */
-.tl-held-tag{margin-left:8px;padding:1px 8px;border-radius:999px;font-size:.68rem;font-weight:700;white-space:nowrap;border:1px solid var(--accent);color:var(--accent);}
+.tl-held-tag{margin-left:8px;padding:1px 8px;border-radius:999px;font-size:var(--t-xs);font-weight:700;white-space:nowrap;border:1px solid var(--accent);color:var(--accent);}
 
 /* Phone-only pieces of the Trade Log (shown by styles/phone.css up to 600px wide): the Positions / Ideas tabs, the short rows and the short "Processed" line. */
 .news-tabs.tl-tabs,.tl-phone,.tl-ideas-short{display:none;}

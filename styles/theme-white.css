@@ -7,7 +7,7 @@
 /* Top bar: white, no shadow. Brand on the left, menu links, search and bell on the right. */
 :root[data-theme="white"] .topbar{background:#fff;border-bottom:1px solid #e6e9f2;box-shadow:none;height:var(--tb-h);padding:0 24px;margin-bottom:20px;gap:18px;}
 :root[data-theme="white"] .topbar :is(.topbar-brand,.topbar-title){color:#1b1f2a;}
-:root[data-theme="white"] .topbar-brand{font-size:1.4rem;font-weight:500;letter-spacing:-.5px;}
+:root[data-theme="white"] .topbar-brand{font-size:var(--t-lg);font-weight:500;letter-spacing:-.5px;}
 :root[data-theme="white"] .topbar :is(.topbar-sep,.topbar-section){display:none;}
 :root[data-theme="white"] .topbar .topbar-search{position:relative;left:auto;top:auto;transform:none;margin:0 0 0 auto;width:260px;max-width:none;flex:0 1 260px;}
 @media (min-width:1400px){:root[data-theme="white"] .topbar .topbar-search{position:absolute;right:179px;top:50%;transform:translateY(-50%);margin:0;width:240px;}}
@@ -25,7 +25,7 @@
   :root[data-theme="white"] .sidebar{transform:none;position:fixed;top:0;left:330px;right:auto;bottom:auto;width:auto;max-width:none;height:var(--tb-h);padding:0;gap:0;background:transparent;border:0;box-shadow:none;flex-direction:row;align-items:center;overflow:visible;z-index:21;pointer-events:none;}
   :root[data-theme="white"] .sidebar-brand,:root[data-theme="white"] .nav-section-label,:root[data-theme="white"] .sidebar-overlay,:root[data-theme="white"] .nav-icon,:root[data-theme="white"] .pro-pill,:root[data-theme="white"] .sidebar :is(.brand-version,.sidebar-foot){display:none;}
   :root[data-theme="white"] .sidebar-nav{display:flex;flex-direction:row;align-items:center;gap:2px;padding:0;pointer-events:auto;}
-  :root[data-theme="white"] .nav-item{background:transparent;border:0;border-radius:6px;padding:10px 16px;font-size:1rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#3b4156;white-space:nowrap;box-shadow:none;width:auto;}
+  :root[data-theme="white"] .nav-item{background:transparent;border:0;border-radius:6px;padding:10px 16px;font-size:var(--t-md);font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#3b4156;white-space:nowrap;box-shadow:none;width:auto;}
   :root[data-theme="white"] .nav-item:hover{background:transparent;color:var(--accent);}
   :root[data-theme="white"] .nav-item.active{background:transparent;color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent);border-radius:0;}
 }
@@ -36,9 +36,9 @@
 :root[data-theme="white"] .analysis-leaderboard.lb-full .strat-table thead th{background:#fff;}
 :root[data-theme="white"] table tbody td{border-color:#eef0f6;}
 /* Buttons: outlined, uppercase, letter-spaced, as on the Screener. */
-@media (min-width:901px){:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main){text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;font-weight:600;border-radius:6px;color:#3b4156;}}
+@media (min-width:901px){:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main){text-transform:uppercase;letter-spacing:.1em;font-size:var(--t-sm);font-weight:600;border-radius:6px;color:#3b4156;}}
 :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main):hover{color:var(--accent);border-color:var(--accent);}
-@media (min-width:901px){:root[data-theme="white"] :is(.browse-btn,.tl-btn-primary,.alba-confirm-ok){text-transform:uppercase;letter-spacing:.1em;font-size:.76rem;font-weight:600;border-radius:6px;}}
+@media (min-width:901px){:root[data-theme="white"] :is(.browse-btn,.tl-btn-primary,.alba-confirm-ok){text-transform:uppercase;letter-spacing:.1em;font-size:var(--t-sm);font-weight:600;border-radius:6px;}}
 :root[data-theme="white"] .filters{border-radius:16px;}
 /* No side borders on the content panels and tables: only the top and bottom hairlines stay. */
 :root[data-theme="white"] :is(.analysis-panel,.strat-panel,.strat-fold,.filters,.strat-table-wrap,.upload-panel,.help-panel,.refreshlog-run){border-left-width:0;border-right-width:0;border-top-width:0;border-radius:0;box-shadow:none;}
@@ -48,31 +48,31 @@
 /* Tools drop-down (wide screens): Data Refresh, Help, Knowledge Base and Settings. */
 @media (min-width:1400px){
   :root[data-theme="white"] .nav-tools-group{display:block;position:relative;}
-  :root[data-theme="white"] .nav-tools-toggle{display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;border-radius:0;padding:10px 16px;font:inherit;font-size:1rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#3b4156;cursor:pointer;white-space:nowrap;}
+  :root[data-theme="white"] .nav-tools-toggle{display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;border-radius:0;padding:10px 16px;font:inherit;font-size:var(--t-md);font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#3b4156;cursor:pointer;white-space:nowrap;}
   :root[data-theme="white"] .nav-tools-toggle:hover,:root[data-theme="white"] .nav-tools-group.open .nav-tools-toggle,:root[data-theme="white"] .nav-tools-group:has(.nav-item.active) .nav-tools-toggle{color:var(--accent);}
   :root[data-theme="white"] .nav-tools-group:has(.nav-item.active) .nav-tools-toggle{box-shadow:inset 0 -2px 0 var(--accent);}
   :root[data-theme="white"] .nav-tools-menu{display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:300px;background:#fff;border:1px solid #e6e9f2;border-radius:12px;box-shadow:0 12px 32px rgba(27,31,42,.16);padding:8px;flex-direction:column;z-index:40;}
   :root[data-theme="white"] .nav-tools-group.open .nav-tools-menu{display:flex;}
-  :root[data-theme="white"] .nav-tools-menu .nav-item{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:12px 14px;border-radius:8px;font-size:1.05rem;letter-spacing:0;text-transform:none;font-weight:500;color:#1b1f2a;box-shadow:none;}
+  :root[data-theme="white"] .nav-tools-menu .nav-item{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:12px 14px;border-radius:8px;font-size:var(--t-md);letter-spacing:0;text-transform:none;font-weight:500;color:#1b1f2a;box-shadow:none;}
   :root[data-theme="white"] .nav-tools-menu .nav-item .nav-icon{display:inline-flex;width:40px;height:40px;align-items:center;justify-content:center;border-radius:10px;background:#f3f5fb;color:var(--accent);}
   :root[data-theme="white"] .nav-tools-menu .nav-item:hover,:root[data-theme="white"] .nav-tools-menu .nav-item.active{background:#f3f5fb;color:var(--accent);}
 }
 /* Larger type, closer to the Screener sample. */
-:root[data-theme="white"] .topbar .topbar-search-input{font-size:1.05rem;height:46px;}
-@media (min-width:901px){:root[data-theme="white"] .topbar .live-toggle{font-size:.9rem;}}
+:root[data-theme="white"] .topbar .topbar-search-input{font-size:var(--t-md);height:46px;}
+@media (min-width:901px){:root[data-theme="white"] .topbar .live-toggle{font-size:var(--t-md);}}
 @media (min-width:901px){
-:root[data-theme="white"] .strat-table,:root[data-theme="white"] .biz-table{font-size:1rem;}
-:root[data-theme="white"] .strat-table td{font-size:.98rem;padding:13px 6px;}
+:root[data-theme="white"] .strat-table,:root[data-theme="white"] .biz-table{font-size:var(--t-md);}
+:root[data-theme="white"] .strat-table td{font-size:var(--t-md);padding:13px 6px;}
 :root[data-theme="white"] .strat-table th{padding-left:6px;padding-right:6px;}   /* the same side padding as the cells, so a heading starts above its column's text */
-:root[data-theme="white"] .strat-table th,:root[data-theme="white"] .biz-table > thead > tr > th,:root[data-theme="white"] .strat-table th{font-size:.92rem;}
+:root[data-theme="white"] .strat-table th,:root[data-theme="white"] .biz-table > thead > tr > th,:root[data-theme="white"] .strat-table th{font-size:var(--t-md);}
 }
-@media (min-width:901px){:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,.browse-btn,.tl-btn-primary,.alba-confirm-ok){font-size:.82rem;}}
-@media (min-width:901px){:root[data-theme="white"] :is(.sub,.settings-row-sub,.upload-hint,.analysis-panel-sub){font-size:1rem;}}
-@media (min-width:901px){:root[data-theme="white"] :is(.settings-row-title,.analysis-panel-title){font-size:1.1rem;}}
-@media (min-width:901px){:root[data-theme="white"] .analysis-filters-panel :is(.filter-btn,.filter-group-title,.filter-group label){font-size:.95rem;}}
-@media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:2.1rem;}}
+@media (min-width:901px){:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,.browse-btn,.tl-btn-primary,.alba-confirm-ok){font-size:var(--t-sm);}}
+@media (min-width:901px){:root[data-theme="white"] :is(.sub,.settings-row-sub,.upload-hint,.analysis-panel-sub){font-size:var(--t-md);}}
+@media (min-width:901px){:root[data-theme="white"] :is(.settings-row-title,.analysis-panel-title){font-size:var(--t-md);}}
+@media (min-width:901px){:root[data-theme="white"] .analysis-filters-panel :is(.filter-btn,.filter-group-title,.filter-group label){font-size:var(--t-md);}}
+@media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:var(--t-xl);}}
 /* Data Refresh and Settings: one big white card on the lavender page, like Explorer, with flat rows split by hairlines. */
-  :root[data-theme="white"] :is(#section-refreshlog,#section-settings){background:#fff;border-radius:12px;box-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);padding:22px 28px 28px;}
+  :root[data-theme="white"] :is(#section-refreshlog,#section-settings){background:#fff;border-radius:12px;box-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);padding:22px var(--card-x) 28px;}
   /* Readable line length: the card is full width, the content inside is capped and centred, not stretched. */
   :root[data-theme="white"] :is(#section-refreshlog,#section-settings) > *{max-width:960px;margin-left:auto;margin-right:auto;}
   :root[data-theme="white"] :is(#section-refreshlog,#section-settings) :is(.refreshlog-panel,.settings-panel){max-width:960px;}
@@ -87,7 +87,7 @@
 /* Score and rating badges: black text for clarity (the tinted background still shows the verdict). */
 :root[data-theme="white"] .badge:is(.b-buy,.b-mbuy,.b-hold,.b-avoid){color:#000;font-weight:600;}
 /* Primary headings (Data Refresh jobs, Settings, Help and Knowledge Base sections): a topic icon before the title, a larger heavier face and a short accent bar. */
-  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon]){display:flex;align-items:center;gap:12px;font-size:1.6rem;font-weight:700;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;}
+  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon]){display:flex;align-items:center;gap:12px;font-size:var(--t-lg);font-weight:700;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;}
   :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon])::before{content:"";width:28px;height:28px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
   :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon])::after{content:"";position:absolute;left:0;bottom:0;width:56px;height:3px;border-radius:2px;background:var(--accent);}
   :root[data-theme="white"] h2[data-icon="bar"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='6' y1='20' x2='6' y2='11'/%3E%3Cline x1='12' y1='20' x2='12' y2='4'/%3E%3Cline x1='18' y1='20' x2='18' y2='14'/%3E%3C/svg%3E");}
@@ -110,32 +110,32 @@
   /* Header card */
   :root[data-theme="white"] #detail .detail-back-bar{position:static;display:flex;justify-content:flex-end;height:auto;margin:0 0 12px;pointer-events:auto;}
   :root[data-theme="white"] #detail .detail-top{background:#fff;border-radius:16px;box-shadow:var(--card-shadow);padding:26px 32px 22px;margin:0 0 14px;gap:8px 24px;align-items:flex-start;}
-  :root[data-theme="white"] #detail .detail-title .detail-name{font-size:2.7rem;font-weight:500;letter-spacing:-.02em;color:#1b1f2a;line-height:1.15;}
-  :root[data-theme="white"] #detail .detail-title .detail-ticker{font-size:1.05rem;color:#4a5163;margin-top:6px;}
-  :root[data-theme="white"] #detail .detail-star{font-size:1.6rem;color:var(--accent);margin-top:6px;}
+  :root[data-theme="white"] #detail .detail-title .detail-name{font-size:var(--t-xl);font-weight:500;letter-spacing:-.02em;color:#1b1f2a;line-height:1.15;}
+  :root[data-theme="white"] #detail .detail-title .detail-ticker{font-size:var(--t-md);color:#4a5163;margin-top:6px;}
+  :root[data-theme="white"] #detail .detail-star{font-size:var(--t-lg);color:var(--accent);margin-top:6px;}
   :root[data-theme="white"] #detail .detail-meta-links{display:flex;flex-wrap:wrap;gap:6px 28px;margin-top:10px;}
-  :root[data-theme="white"] #detail .detail-meta-links a{font-size:1.1rem;font-weight:500;color:var(--accent);display:inline-flex;align-items:center;gap:8px;text-decoration:none;}
+  :root[data-theme="white"] #detail .detail-meta-links a{font-size:var(--t-md);font-weight:500;color:var(--accent);display:inline-flex;align-items:center;gap:8px;text-decoration:none;}
   :root[data-theme="white"] #detail .detail-meta-links a:hover{text-decoration:underline;}
   :root[data-theme="white"] #detail .detail-meta-links .link-ico{width:18px;height:18px;}
   /* Tab bar (the Jump-to links), pinned under the top bar */
   :root[data-theme="white"] #detail .detail-jump{top:var(--tb-h);background:#fff;border-radius:12px;box-shadow:var(--card-shadow);padding:0 22px;gap:2px 8px;margin:0 0 14px;box-shadow:0 1px 2px rgba(27,31,42,.06);}
   :root[data-theme="white"] #detail .detail-jump-label{display:none;}
-  :root[data-theme="white"] #detail .detail-jump a{background:transparent;border-radius:0;padding:16px 18px;font-size:1.02rem;font-weight:500;color:#3b4156;border-bottom:3px solid transparent;}
+  :root[data-theme="white"] #detail .detail-jump a{background:transparent;border-radius:0;padding:16px 18px;font-size:var(--t-md);font-weight:500;color:#3b4156;border-bottom:3px solid transparent;}
   :root[data-theme="white"] #detail .detail-jump a:hover{color:var(--accent);border-bottom-color:var(--accent);background:transparent;}
-  :root[data-theme="white"] #detail .detail-jump a .jump-preview{font-size:.95rem;}
+  :root[data-theme="white"] #detail .detail-jump a .jump-preview{font-size:var(--t-md);}
   /* Section cards */
   :root[data-theme="white"] #detail :is(.val-panel,.global-panel,.fund-panel,.tech-panel){background:#fff;border:0;border-radius:16px;box-shadow:var(--card-shadow);padding:26px 32px 30px;margin-top:14px;}
   :root[data-theme="white"] #detail .tech-panel .pc-head{right:32px;}
-  :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title){font-size:1.55rem;font-weight:500;letter-spacing:-.01em;color:#1b1f2a;}
+  :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title){font-size:var(--t-lg);font-weight:500;letter-spacing:-.01em;color:#1b1f2a;}
   :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title) svg{color:var(--accent);width:24px;height:24px;}
-  :root[data-theme="white"] #detail :is(.global-panel-sub,.peers-sub,.fund-cell-note){font-size:1rem;color:#4a5163;}
+  :root[data-theme="white"] #detail :is(.global-panel-sub,.peers-sub,.fund-cell-note){font-size:var(--t-md);color:#4a5163;}
   /* Sub-sections: spaced uppercase labels, like ABOUT / KEY POINTS */
-  :root[data-theme="white"] #detail :is(.fund-subsection-title,.fund-pc-title){font-size:.95rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#1b1f2a;}
-  :root[data-theme="white"] #detail .fund-cell-label{font-size:.9rem;letter-spacing:.08em;color:#3b4156;}
-  :root[data-theme="white"] #detail .fund-cell-score{font-size:1.35rem;}
+  :root[data-theme="white"] #detail :is(.fund-subsection-title,.fund-pc-title){font-size:var(--t-md);font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#1b1f2a;}
+  :root[data-theme="white"] #detail .fund-cell-label{font-size:var(--t-md);letter-spacing:.08em;color:#3b4156;}
+  :root[data-theme="white"] #detail .fund-cell-score{font-size:var(--t-lg);}
   /* Metric rows: label left, value right, alternate rows shaded */
   :root[data-theme="white"] #detail .data-chips{gap:0;}
-  :root[data-theme="white"] #detail .data-chips > .data-chip{display:flex;justify-content:space-between;gap:16px;padding:9px 14px;border:0;border-radius:8px;font-size:1rem;background:transparent;}
+  :root[data-theme="white"] #detail .data-chips > .data-chip{display:flex;justify-content:space-between;gap:16px;padding:9px 14px;border:0;border-radius:8px;font-size:var(--t-md);background:transparent;}
   :root[data-theme="white"] #detail .data-chips > .data-chip:nth-child(odd){background:#f3f5fb;}
   :root[data-theme="white"] #detail .data-chips > .data-chip *{font-size:inherit;}
   /* v1.302: factor-card metric rows stay a grid in the White theme (label left, value, number, source icon at the right edge). */
@@ -145,7 +145,7 @@
   :root[data-theme="white"] #detail .peers-table tr.peers-self td{background:#eef0fd;}
   /* Period buttons: one bordered group, the chosen one tinted */
   :root[data-theme="white"] #detail .pc-pills{border:1px solid #dde2ee;border-radius:8px;overflow:hidden;gap:0;}
-  :root[data-theme="white"] #detail .pc-pill{border:0;border-radius:0;padding:8px 16px;font-size:.95rem;color:#3b4156;}
+  :root[data-theme="white"] #detail .pc-pill{border:0;border-radius:0;padding:8px 16px;font-size:var(--t-md);color:#3b4156;}
   :root[data-theme="white"] #detail .pc-pill:is(.on,.active,[aria-pressed="true"]){background:color-mix(in srgb,var(--accent) 10%,#fff);color:var(--accent);}
 }
 /* Detail screens: the tab bar goes to the very top, a full-width strip under the top bar, above the Back button and the header card (as on the Screener company page). */
@@ -161,7 +161,7 @@
   :root[data-theme="white"] #detail .detail-back-bar{order:-3;position:sticky;top:var(--tb-h);height:0;margin:-38px 0 38px;padding:0 max(24px,calc(50vw - 880px)) 0 0;width:100vw;margin-left:calc(50% - 50vw);box-sizing:border-box;z-index:8;pointer-events:none;}
   :root[data-theme="white"] #detail .detail-back-bar .detail-back{pointer-events:auto;}
   :root[data-theme="white"] #detail .detail-jump .detail-jump-who{display:flex;}
-  :root[data-theme="white"] #detail .detail-jump .detail-jump-name{font-size:1.02rem;font-weight:500;color:#3b4156;}
+  :root[data-theme="white"] #detail .detail-jump .detail-jump-name{font-size:var(--t-md);font-weight:500;color:#3b4156;}
   :root[data-theme="white"] #detail .detail-jump .detail-jump-ticker{display:none;}
   :root[data-theme="white"] #detail .detail-jump .detail-jump-who{align-self:stretch;align-items:center;padding:0 18px;border-bottom:3px solid transparent;}
   :root[data-theme="white"] #detail .detail-jump .detail-jump-who.is-current{border-bottom-color:var(--accent);}
@@ -170,18 +170,18 @@
 }
 /* Wordmark: lowercase rounded geometric type (Quicksand, added by src/ui/theme.js when White is in use) with the bar-chart mark in front, like the Screener logo. */
 :root[data-theme="white"] .topbar-brand{font-family:"Quicksand","Nunito","Varela Round",-apple-system,"Segoe UI",sans-serif;text-transform:lowercase;font-weight:700;letter-spacing:-.01em;}
-@media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:2.2rem;line-height:1;}}
+@media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:var(--t-xl);line-height:1;}}
 /* Strategies list (left): same type as the Analysis filter list: size, weight, spacing and count badges. */
 @media (min-width:901px){
 }
 /* Trade Log: Positions and Buy / Sell ideas get an icon and a bold title. */
-:root[data-theme="white"] #section-trackrecord .analysis-panel-head .analysis-panel-title{display:flex;align-items:center;gap:10px;font-size:1.25rem;font-weight:700;letter-spacing:.06em;color:#1b1f2a;}
+:root[data-theme="white"] #section-trackrecord .analysis-panel-head .analysis-panel-title{display:flex;align-items:center;gap:10px;font-size:var(--t-lg);font-weight:700;letter-spacing:.06em;color:#1b1f2a;}
 :root[data-theme="white"] #section-trackrecord .analysis-panel-head .analysis-panel-title::before{content:"";width:26px;height:26px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
 :root[data-theme="white"] #section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-title{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='7' width='20' height='14' rx='2'/%3E%3Cpath d='M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2'/%3E%3Cline x1='2' y1='13' x2='22' y2='13'/%3E%3C/svg%3E");}
 :root[data-theme="white"] #section-trackrecord .tl-ideas .analysis-panel-title{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6'/%3E%3Cpath d='M10 22h4'/%3E%3Cpath d='M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z'/%3E%3C/svg%3E");}
 /* Stock detail: the Refresh control reads like the links beside it (View on screener.in, Open chart, Share link). */
 @media (min-width:901px){
-  :root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn{background:transparent;border:0;padding:0;border-radius:0;font-size:1.1rem;font-weight:500;line-height:1.5;color:var(--accent);gap:8px;}
+  :root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn{background:transparent;border:0;padding:0;border-radius:0;font-size:var(--t-md);font-weight:500;line-height:1.5;color:var(--accent);gap:8px;}
   :root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn:hover{text-decoration:underline;color:var(--accent);}
   :root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn svg{width:18px;height:18px;}
 }
@@ -189,16 +189,16 @@
 @media (min-width:901px){:root[data-theme="white"] #detail .detail-top{margin-bottom:0;}}
 /* Detail pages: text in the Global & Macro lists, Strengths / Watch-outs and the factor cards is raised to the size of the metric rows (about 16px). */
 @media (min-width:901px){
-  :root[data-theme="white"] #detail :is(.global-item,.fund-pros li,.fund-cons li,.fund-pc-empty,.fund-cell-business,.val-cell-sub){font-size:1rem;line-height:1.55;}
-  :root[data-theme="white"] #detail .global-item .global-item-source{font-size:.86rem;}
-  :root[data-theme="white"] #detail .global-col-title{font-size:.95rem;letter-spacing:.1em;}
+  :root[data-theme="white"] #detail :is(.global-item,.fund-pros li,.fund-cons li,.fund-pc-empty,.fund-cell-business,.val-cell-sub){font-size:var(--t-md);line-height:1.55;}
+  :root[data-theme="white"] #detail .global-item .global-item-source{font-size:var(--t-sm);}
+  :root[data-theme="white"] #detail .global-col-title{font-size:var(--t-md);letter-spacing:.1em;}
   :root[data-theme="white"] #detail :is(.fund-pros li,.fund-cons li){margin-bottom:8px;}
 }
 @media (min-width:901px){:root[data-theme="white"] #detail .detail-back-bar .detail-back{position:relative;top:1px;}}
 /* Tab strip: the score and verdict beside Fundamental / Technical Score become a clear tinted pill with black text. */
 @media (min-width:901px){
-  :root[data-theme="white"] #detail .detail-jump .jump-preview{display:inline-flex;align-items:baseline;gap:6px;margin-left:10px;padding:3px 12px;border-radius:999px;font-size:.95rem;font-weight:600;color:#000;background:#eef0f6;}
-  :root[data-theme="white"] #detail .detail-jump .jump-preview b{font-size:1.15rem;font-weight:800;}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview{display:inline-flex;align-items:baseline;gap:6px;margin-left:10px;padding:3px 12px;border-radius:999px;font-size:var(--t-md);font-weight:600;color:#000;background:#eef0f6;}
+  :root[data-theme="white"] #detail .detail-jump .jump-preview b{font-size:var(--t-lg);font-weight:800;}
   :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-buy{background:rgba(31,122,84,.18);}
   :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-mbuy{background:rgba(86,111,41,.2);}
   :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-hold{background:rgba(201,162,39,.26);}
@@ -206,39 +206,39 @@
 }
 /* Tools screens (Data Refresh, Help, Knowledge Base, Settings): body text raised to about 16px, like the detail pages. */
 @media (min-width:901px){
-  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) :is(p,li,b,strong,i,em,a,td,code,.glossary-term,.help-disclaimer,.help-formula){font-size:1rem;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) :is(p,li,b,strong,i,em,a,td,code,.glossary-term,.help-disclaimer,.help-formula){font-size:var(--t-md);}
   :root[data-theme="white"] :is(#section-help,#section-knowledgebase) :is(li,p,td){line-height:1.6;}
-  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) .glossary-def{font-size:.95rem;line-height:1.55;}
-  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) th{font-size:.9rem;letter-spacing:.04em;}
-  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) h3{font-size:1.2rem;font-weight:700;color:#1b1f2a;}
-  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) .badge{font-size:.85rem;}
-  :root[data-theme="white"] #section-refreshlog :is(.refreshlog-freshness-label,.refreshlog-freshness-count,.refreshlog-freshness-summary,.select-mode-btn,.browse-btn,li,.fi-pct,.upload-hint){font-size:1rem;}
-  :root[data-theme="white"] #section-refreshlog .select-mode-btn,:root[data-theme="white"] #section-refreshlog .browse-btn{font-size:.82rem;}
-  :root[data-theme="white"] #section-refreshlog .refreshlog-sub-note{font-size:.92rem;}
-  :root[data-theme="white"] #section-settings .theme-toggle-btn{font-size:.92rem;padding:8px 16px;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) .glossary-def{font-size:var(--t-md);line-height:1.55;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) th{font-size:var(--t-md);letter-spacing:.04em;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) h3{font-size:var(--t-lg);font-weight:700;color:#1b1f2a;}
+  :root[data-theme="white"] :is(#section-help,#section-knowledgebase) .badge{font-size:var(--t-sm);}
+  :root[data-theme="white"] #section-refreshlog :is(.refreshlog-freshness-label,.refreshlog-freshness-count,.refreshlog-freshness-summary,.select-mode-btn,.browse-btn,li,.fi-pct,.upload-hint){font-size:var(--t-md);}
+  :root[data-theme="white"] #section-refreshlog .select-mode-btn,:root[data-theme="white"] #section-refreshlog .browse-btn{font-size:var(--t-sm);}
+  :root[data-theme="white"] #section-refreshlog .refreshlog-sub-note{font-size:var(--t-md);}
+  :root[data-theme="white"] #section-settings .theme-toggle-btn{font-size:var(--t-md);padding:8px 16px;}
 }
 /* Settings: "Themes" is a primary heading like "Claude controls": palette icon, large bold title, accent bar. */
-  :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title{display:flex;align-items:center;gap:12px;font-size:1.6rem;font-weight:700;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='13.5' cy='6.5' r='.5'/%3E%3Ccircle cx='17.5' cy='10.5' r='.5'/%3E%3Ccircle cx='8.5' cy='7.5' r='.5'/%3E%3Ccircle cx='6.5' cy='12.5' r='.5'/%3E%3Cpath d='M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.8 1.7-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.5-.7-.5-1.1 0-.9.8-1.7 1.7-1.7H16c3.3 0 6-2.7 6-6 0-4.9-4.5-8.4-10-8.4z'/%3E%3C/svg%3E");}
+  :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title{display:flex;align-items:center;gap:12px;font-size:var(--t-lg);font-weight:700;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='13.5' cy='6.5' r='.5'/%3E%3Ccircle cx='17.5' cy='10.5' r='.5'/%3E%3Ccircle cx='8.5' cy='7.5' r='.5'/%3E%3Ccircle cx='6.5' cy='12.5' r='.5'/%3E%3Cpath d='M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.8 1.7-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.5-.7-.5-1.1 0-.9.8-1.7 1.7-1.7H16c3.3 0 6-2.7 6-6 0-4.9-4.5-8.4-10-8.4z'/%3E%3C/svg%3E");}
   :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title::before{content:"";width:28px;height:28px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
   :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title::after{content:"";position:absolute;left:0;bottom:0;width:56px;height:3px;border-radius:2px;background:var(--accent);}
 /* Trade Log: text raised to the readable sizes used elsewhere in White (cards, summary rows, signals, ideas, form). */
 @media (min-width:901px){
-  :root[data-theme="white"] #section-trackrecord .data-chip{font-size:1rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-card-name{font-size:1.2rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-card-tk{font-size:.9rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-card-retval{font-size:2.1rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-card-retlbl{font-size:.95rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-card-grid dt{font-size:.82rem;letter-spacing:.06em;}
-  :root[data-theme="white"] #section-trackrecord .tl-card-grid dd{font-size:1.02rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-signal{font-size:1rem;line-height:1.55;}
-  :root[data-theme="white"] #section-trackrecord :is(.tl-signal-label,.tl-signal-badge,.tl-signal-foot,.tl-signal-hist,.tl-signal-notes){font-size:.88rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-signal-why{font-size:1rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-idea-why{font-size:.95rem;}
-  :root[data-theme="white"] #section-trackrecord :is(.tl-ideas-select,.tl-view-btn){font-size:.9rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-form-title{font-size:1rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-grid label{font-size:.85rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-grid input{font-size:1rem;}
-  :root[data-theme="white"] #section-trackrecord .tl-msg{font-size:.92rem;}
+  :root[data-theme="white"] #section-trackrecord .data-chip{font-size:var(--t-md);}
+  :root[data-theme="white"] #section-trackrecord .tl-card-name{font-size:var(--t-lg);}
+  :root[data-theme="white"] #section-trackrecord .tl-card-tk{font-size:var(--t-md);}
+  :root[data-theme="white"] #section-trackrecord .tl-card-retval{font-size:var(--t-xl);}
+  :root[data-theme="white"] #section-trackrecord .tl-card-retlbl{font-size:var(--t-md);}
+  :root[data-theme="white"] #section-trackrecord .tl-card-grid dt{font-size:var(--t-sm);letter-spacing:.06em;}
+  :root[data-theme="white"] #section-trackrecord .tl-card-grid dd{font-size:var(--t-md);}
+  :root[data-theme="white"] #section-trackrecord .tl-signal{font-size:var(--t-md);line-height:1.55;}
+  :root[data-theme="white"] #section-trackrecord :is(.tl-signal-label,.tl-signal-badge,.tl-signal-foot,.tl-signal-hist,.tl-signal-notes){font-size:var(--t-sm);}
+  :root[data-theme="white"] #section-trackrecord .tl-signal-why{font-size:var(--t-md);}
+  :root[data-theme="white"] #section-trackrecord .tl-idea-why{font-size:var(--t-md);}
+  :root[data-theme="white"] #section-trackrecord :is(.tl-ideas-select,.tl-view-btn){font-size:var(--t-md);}
+  :root[data-theme="white"] #section-trackrecord .tl-form-title{font-size:var(--t-md);}
+  :root[data-theme="white"] #section-trackrecord .tl-grid label{font-size:var(--t-sm);}
+  :root[data-theme="white"] #section-trackrecord .tl-grid input{font-size:var(--t-md);}
+  :root[data-theme="white"] #section-trackrecord .tl-msg{font-size:var(--t-md);}
   :root[data-theme="white"] #section-trackrecord .tl-card{padding:20px 22px;}
 }
 /* Top bar: equal visual spacing between the search box, the Live pill and the bell (24px each; the bell's icon is inset 11px inside its box). */
@@ -247,12 +247,12 @@
 @media (min-width:901px){
   :root[data-theme="white"] .activity-panel{width:min(440px,92vw);}
   :root[data-theme="white"] .activity-head{padding:14px 18px;}
-  :root[data-theme="white"] .activity-head-title{font-size:.95rem;letter-spacing:.1em;font-weight:700;}
-  :root[data-theme="white"] .activity-empty{font-size:1rem;line-height:1.55;padding:18px;}
-  :root[data-theme="white"] .activity-title{font-size:1rem;font-weight:600;}
-  :root[data-theme="white"] .activity-text{font-size:.95rem;line-height:1.5;}
-  :root[data-theme="white"] .activity-time{font-size:.85rem;}
-  :root[data-theme="white"] .activity-btn{font-size:.85rem;}
+  :root[data-theme="white"] .activity-head-title{font-size:var(--t-md);letter-spacing:.1em;font-weight:700;}
+  :root[data-theme="white"] .activity-empty{font-size:var(--t-md);line-height:1.55;padding:18px;}
+  :root[data-theme="white"] .activity-title{font-size:var(--t-md);font-weight:600;}
+  :root[data-theme="white"] .activity-text{font-size:var(--t-md);line-height:1.5;}
+  :root[data-theme="white"] .activity-time{font-size:var(--t-sm);}
+  :root[data-theme="white"] .activity-btn{font-size:var(--t-sm);}
 }
 /* Trade Log, Help and Knowledge Base: no intro line under the top bar. */
 :root[data-theme="white"] :is(#section-trackrecord,#section-help,#section-knowledgebase) > header .sub{display:none;}
@@ -260,9 +260,9 @@
 /* Segmented switches (Table / Heat map, period, grouping, All / Matched, size, Cards / Table, themes): one taller, readable size everywhere. */
 @media (min-width:901px){
   :root[data-theme="white"] :is(.tl-view-toggle,.theme-toggle){box-sizing:border-box;height:42px;padding:3px;align-items:stretch;border-radius:999px;}
-  :root[data-theme="white"] :is(.tl-view-toggle .tl-view-btn,.theme-toggle .theme-toggle-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;height:auto;padding:0 18px;font-size:.92rem;font-weight:600;border-radius:999px;white-space:nowrap;}
+  :root[data-theme="white"] :is(.tl-view-toggle .tl-view-btn,.theme-toggle .theme-toggle-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;height:auto;padding:0 18px;font-size:var(--t-md);font-weight:600;border-radius:999px;white-space:nowrap;}
   :root[data-theme="white"] .biz-side .tl-view-toggle .tl-view-btn{padding:0 8px;}
-  :root[data-theme="white"] :is(#tradeAddBtn,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main){height:42px;display:inline-flex;align-items:center;font-size:.85rem;}
+  :root[data-theme="white"] :is(#tradeAddBtn,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main){height:42px;display:inline-flex;align-items:center;font-size:var(--t-sm);}
 }
 /* Phones: a visible menu button, no logo and no Live pill in the top bar, so the search box gets the room. */
 @media (max-width:900px){
@@ -272,7 +272,7 @@
   :root[data-theme="white"] .topbar .topbar-title{display:none;}
   :root[data-theme="white"] .topbar .live-toggle,:root[data-theme="white"] .topbar .live-px{display:none;}
   :root[data-theme="white"] .topbar .topbar-search{margin:0;flex:1 1 auto;min-width:0;width:auto;max-width:none;}
-  :root[data-theme="white"] .topbar .topbar-search-input{width:100%;font-size:1rem;}
+  :root[data-theme="white"] .topbar .topbar-search-input{width:100%;font-size:var(--t-md);}
 }
 /* Settings: no intro line either (the first header only; "Claude controls" keeps its own description). */
 :root[data-theme="white"] #section-settings > header:first-child{display:none;}
@@ -298,9 +298,9 @@
 /* Grids: the Analysis table look (plain dark header with a hairline, roomy rows, every other row tinted) for the remaining tables:
    Help, Knowledge Base, Trade Log positions (table view) and Buy / Sell ideas. Explorer's own industry table keeps its own look. */
 @media (min-width:901px){
-  :root[data-theme="white"] .help-table{font-size:1rem;border-collapse:separate;border-spacing:0;}
-  :root[data-theme="white"] .help-table th{color:#1b1f2a;font-size:.92rem;font-weight:500;text-transform:none;letter-spacing:0;padding:12px 14px;border-bottom:1px solid #e6e9f2;background:transparent;}
-  :root[data-theme="white"] .help-table td{font-size:1rem;line-height:1.45;padding:14px;border-bottom:0;}
+  :root[data-theme="white"] .help-table{font-size:var(--t-md);border-collapse:separate;border-spacing:0;}
+  :root[data-theme="white"] .help-table th{color:#1b1f2a;font-size:var(--t-md);font-weight:500;text-transform:none;letter-spacing:0;padding:12px 14px;border-bottom:1px solid #e6e9f2;background:transparent;}
+  :root[data-theme="white"] .help-table td{font-size:var(--t-md);line-height:1.45;padding:14px;border-bottom:0;}
   :root[data-theme="white"] .help-table tbody tr:nth-child(odd) td{background:#f4f6fc;}
   :root[data-theme="white"] .help-table tbody tr:nth-child(odd) td:first-child{border-radius:8px 0 0 8px;}
   :root[data-theme="white"] .help-table tbody tr:nth-child(odd) td:last-child{border-radius:0 8px 8px 0;}
@@ -320,7 +320,7 @@
    Primary = filled indigo; secondary = white with a thin edge. Both: 40px tall, small spaced capitals, 6px corners. */
 @media (min-width:901px){
   :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel),
-  :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 20px;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
+  :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 20px;font-size:var(--t-sm);font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
   :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
   :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary):hover:not(:disabled){color:var(--accent);border-color:var(--accent);}
   :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn:not(.fi-btn-primary),.rk-main):disabled{color:#8a90a0;background:#f6f7fb;border-color:#e0e4ee;}
@@ -337,7 +337,7 @@
   :root[data-theme="white"] .wl-pick input[type=checkbox]{order:2;flex:none;width:20px;height:20px;margin:0;accent-color:var(--accent);cursor:pointer;}
   :root[data-theme="white"] .wl-pick input[type=checkbox]:disabled{cursor:not-allowed;opacity:.5;}
   :root[data-theme="white"] .wl-pick-text{display:flex;flex-direction:column;gap:2px;min-width:0;}
-  :root[data-theme="white"] .wl-pick-name{font-size:1rem;font-weight:700;color:#1b1f2a;}
+  :root[data-theme="white"] .wl-pick-name{font-size:var(--t-md);font-weight:700;color:#1b1f2a;}
   :root[data-theme="white"] #section-refreshlog .wl-help{margin:0 0 6px;}
   :root[data-theme="white"] #section-refreshlog #refreshWatchlistBtn{display:flex;width:fit-content;margin-left:auto;}
 /* Strategies: a single line under the closed setup bar, and the "+ Add a rule" box lined up with the rule fields above it. */
@@ -365,25 +365,25 @@
   /* Stock and industry pages */
   :root[data-theme="white"] #detail{padding:0;}
   :root[data-theme="white"] #detail .detail-top{background:#fff;border-radius:16px;box-shadow:var(--card-shadow);padding:18px 18px 16px;margin:0 0 12px;}
-  :root[data-theme="white"] #detail .detail-title .detail-name{font-size:1.7rem;font-weight:500;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;}
-  :root[data-theme="white"] #detail .detail-title .detail-ticker{font-size:.95rem;color:#4a5163;}
+  :root[data-theme="white"] #detail .detail-title .detail-name{font-size:var(--t-xl);font-weight:500;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;}
+  :root[data-theme="white"] #detail .detail-title .detail-ticker{font-size:var(--t-md);color:#4a5163;}
   :root[data-theme="white"] #detail .detail-meta-links{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;}
-  :root[data-theme="white"] #detail .detail-meta-links a,:root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn{font-size:1rem;font-weight:500;color:var(--accent);background:transparent;border:0;padding:0;}
+  :root[data-theme="white"] #detail .detail-meta-links a,:root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn{font-size:var(--t-md);font-weight:500;color:var(--accent);background:transparent;border:0;padding:0;}
   :root[data-theme="white"] #detail :is(.val-panel,.global-panel,.fund-panel,.tech-panel){background:#fff;border:0;border-radius:16px;box-shadow:var(--card-shadow);padding:18px 16px 20px;margin-top:12px;}
   :root[data-theme="white"] #detail .tech-panel .pc-head{right:16px;}
   :root[data-theme="white"] #detail .tech-panel .pc-panels{margin:0 -8px;}
-  :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title){font-size:1.25rem;font-weight:500;letter-spacing:-.01em;color:#1b1f2a;}
+  :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title){font-size:var(--t-lg);font-weight:500;letter-spacing:-.01em;color:#1b1f2a;}
   :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title) svg{color:var(--accent);}
   :root[data-theme="white"] #detail :is(.val-panel-head,.global-panel-head,.fund-panel-head,.tech-panel-head){margin-bottom:14px;}
-  :root[data-theme="white"] #detail :is(.fund-subsection-title,.fund-pc-title){font-size:.85rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#1b1f2a;}
+  :root[data-theme="white"] #detail :is(.fund-subsection-title,.fund-pc-title){font-size:var(--t-sm);font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#1b1f2a;}
   :root[data-theme="white"] #detail .data-chips > .data-chip:nth-child(odd){background:#f3f5fb;}
   :root[data-theme="white"] #detail .data-chips > .data-chip{border:0;border-radius:8px;}
   :root[data-theme="white"] #detail .peers-table tbody tr:nth-child(even) td{background:#f7f8fc;}
   :root[data-theme="white"] #detail .detail-back-bar{position:static;height:auto;margin:0 0 10px;}
   /* Data Refresh and Settings: one white card with flat rows */
-  :root[data-theme="white"] :is(#section-refreshlog,#section-settings){padding:16px 14px 22px;}
+  :root[data-theme="white"] :is(#section-refreshlog,#section-settings){padding:16px var(--card-x) 22px;}
   :root[data-theme="white"] :is(#section-refreshlog,#section-settings) :is(.refreshlog-job,.settings-subhead){margin-top:0;}
-  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title){font-size:1.3rem;gap:10px;margin-top:26px;margin-bottom:12px;padding-bottom:10px;}
+  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title){font-size:var(--t-lg);gap:10px;margin-top:26px;margin-bottom:12px;padding-bottom:10px;}
   :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title)::before{width:24px;height:24px;}
   :root[data-theme="white"] :is(.refreshlog-job-title,#section-help h2[data-icon],#section-knowledgebase h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title):first-child{margin-top:0;}
   :root[data-theme="white"] #section-refreshlog .refreshlog-job:first-of-type .refreshlog-job-title{margin-top:0;}
@@ -391,20 +391,20 @@
   :root[data-theme="white"] #section-settings .settings-row{align-items:flex-start;}
   /* Help and Knowledge Base */
   :root[data-theme="white"] .help-panel{border-radius:12px;box-shadow:var(--card-shadow);padding:16px 14px 22px;}
-  :root[data-theme="white"] #section-help h3,:root[data-theme="white"] #section-knowledgebase h3{font-size:1.1rem;font-weight:700;color:#1b1f2a;margin-top:22px;}
+  :root[data-theme="white"] #section-help h3,:root[data-theme="white"] #section-knowledgebase h3{font-size:var(--t-md);font-weight:700;color:#1b1f2a;margin-top:22px;}
   /* Page background and gutters */
   :root[data-theme="white"] .wrap{padding-left:10px;padding-right:10px;}
 }
 /* Logo at 80% of its size (wide screens): wordmark 2.2rem -> 1.76rem, mark 34px -> 27px; the menu moves left to follow. */
 @media (min-width:901px){
-  :root[data-theme="white"] .topbar-brand{font-size:1.76rem;gap:8px;}
+  :root[data-theme="white"] .topbar-brand{font-size:var(--t-xl);gap:8px;}
   :root[data-theme="white"] .topbar-brand::before{width:27px;height:27px;}
 }
 @media (min-width:1400px){:root[data-theme="white"] .sidebar{left:278px;}}
 /* Phones, Data Refresh: the same primary and secondary buttons as on the laptop.
    Primary (filled indigo): Import data, Refresh all stocks, Sync selected. Secondary (white, thin edge): Browse CSV. */
 @media (max-width:900px){
-  :root[data-theme="white"] #section-refreshlog :is(.browse-btn,.select-mode-btn){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 18px;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
+  :root[data-theme="white"] #section-refreshlog :is(.browse-btn,.select-mode-btn){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 18px;font-size:var(--t-sm);font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
   :root[data-theme="white"] #section-refreshlog :is(.browse-btn,.select-mode-btn:not(.fi-btn-primary)){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
   :root[data-theme="white"] #section-refreshlog .select-mode-btn.fi-btn-primary{color:#fff;background:var(--accent);border:1px solid var(--accent);}
   :root[data-theme="white"] #section-refreshlog .select-mode-btn.fi-btn-primary:disabled{color:#fff;background:color-mix(in srgb,var(--accent) 45%,#fff);border-color:transparent;cursor:not-allowed;}
@@ -424,16 +424,16 @@
 }
 /* Phones, grid screens (Explorer, Analysis, Strategies): the laptop type sizes and spacing for the tables, and the same primary / secondary buttons. */
 @media (max-width:900px){
-  :root[data-theme="white"] :is(.strat-table,.biz-table){font-size:.78rem;}
-  :root[data-theme="white"] :is(.strat-table td,.biz-table > tbody > tr > td){font-size:.78rem;padding:10px 4px;line-height:1.3;}
+  :root[data-theme="white"] :is(.strat-table,.biz-table){font-size:var(--t-sm);}
+  :root[data-theme="white"] :is(.strat-table td,.biz-table > tbody > tr > td){font-size:var(--t-sm);padding:10px 4px;line-height:1.3;}
   /* Every value in a grid cell is the same size and weight (scores, MoS, % changes, ratings, names, prices); only the colour and the pill tell them apart. */
-  :root[data-theme="white"] :is(.strat-table,.biz-table) td :is(a,span,b,button,.num){font-size:.78rem;font-weight:500;letter-spacing:0;}
+  :root[data-theme="white"] :is(.strat-table,.biz-table) td :is(a,span,b,button,.num){font-size:var(--t-sm);font-weight:500;letter-spacing:0;}
   :root[data-theme="white"] :is(.strat-table,.biz-table) td .badge{font-size:var(--t-sm) !important;font-weight:var(--w-reg);padding:2px 8px;}
   :root[data-theme="white"] :is(.strat-table,.biz-table) td{font-variant-numeric:tabular-nums;}
-  :root[data-theme="white"] :is(.strat-table th,.biz-table > thead > tr > th,.strat-table th){font-size:.72rem;font-weight:500;padding:8px 4px;text-transform:none;letter-spacing:0;white-space:nowrap;}
-  :root[data-theme="white"] :is(.strat-table,.biz-table) :is(.score-pill,.pill,.chip,.tl-chip){font-size:.78rem;padding:2px 8px;}
+  :root[data-theme="white"] :is(.strat-table th,.biz-table > thead > tr > th,.strat-table th){font-size:var(--t-sm);font-weight:500;padding:8px 4px;text-transform:none;letter-spacing:0;white-space:nowrap;}
+  :root[data-theme="white"] :is(.strat-table,.biz-table) :is(.score-pill,.pill,.chip,.tl-chip){font-size:var(--t-sm);padding:2px 8px;}
   /* One count line for Explorer, Analysis and Strategies: left aligned, same size, colour and spacing, straight above the grid. */
-  :root[data-theme="white"] :is(.biz-showing,.strat-count,.analysis-leaderboard-head .rk-headline){display:block;width:100%;margin:0;padding:0;text-align:left;font-size:.8rem;line-height:1.4;color:var(--muted);white-space:normal;overflow:visible;}
+  :root[data-theme="white"] :is(.biz-showing,.strat-count,.analysis-leaderboard-head .rk-headline){display:block;width:100%;margin:0;padding:0;text-align:left;font-size:var(--t-sm);line-height:1.4;color:var(--muted);white-space:normal;overflow:visible;}
   :root[data-theme="white"] .strat-count b{font-weight:inherit;}
   /* the same spacing on every grid screen: 10px under the Filters row, the count line, 10px above the grid */
   :root[data-theme="white"] .analysis-leaderboard-head{justify-content:flex-start !important;margin:5px 0 10px !important;}
@@ -453,10 +453,10 @@
   :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name,:root[data-theme="white"] .biz-table > thead > tr > th:first-child{padding-left:calc(4px + 2.6em);}
   :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name .biz-open{text-indent:0;}
   /* Buttons in the toolbars */
-  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,#section-business .biz-expand,#section-business .rk-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;height:auto;padding:0 14px;font-size:.76rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
+  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,#section-business .biz-expand,#section-business .rk-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;height:auto;padding:0 14px;font-size:var(--t-sm);font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
   :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,#section-business .biz-expand,#section-business .rk-btn):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
   :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;}
-  :root[data-theme="white"] .sort-select{min-height:40px;font-size:.92rem;border:1px solid #c9cfdf;background-color:#fff;color:#1b1f2a;}
+  :root[data-theme="white"] .sort-select{min-height:40px;font-size:var(--t-md);border:1px solid #c9cfdf;background-color:#fff;color:#1b1f2a;}
   :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{padding-right:22px;}
   /* Track these picks is a button like Refresh: outlined, same height */
   :root[data-theme="white"] #section-strategies #stratMain .strat-total #stratTrackBtn{border:1px solid #c9cfdf;background:#fff;color:#1b1f2a;min-height:40px;border-radius:6px;}
