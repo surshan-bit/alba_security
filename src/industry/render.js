@@ -61,7 +61,7 @@ function newsHtml(news){
 }
 
 // The stocks grid draws ROW_STEP rows at first and ROW_STEP more each time "Show more" is pressed (a big industry would otherwise be slow to draw).
-const ROW_STEP = 300;
+const ROW_STEP = 100;
 const stocksCols = () => stockGridColumnIds().filter(id => id !== 'industry');
 // The stocks grid starts with the best Fundamental score first; a click on a column header sorts by that column instead.
 const START_SORT = { col: 'score', dir: 'desc' };
