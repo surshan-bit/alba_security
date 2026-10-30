@@ -30,9 +30,6 @@
 .news-date{flex:0 0 58px;white-space:nowrap;font:700 .78rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--muted);}
 .news-text{flex:1;min-width:0;font-size:var(--t-sm);line-height:1.4;}
 .news-text small{display:block;font-size:var(--t-sm);color:var(--muted);margin-top:2px;}
-.news-imp{font:700 .6rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.04em;border-radius:8px;padding:1px 6px;vertical-align:middle;border:1px solid var(--line);color:var(--muted);}
-.news-hi{color:var(--avoid);border-color:var(--avoid);}
-.news-md{color:var(--hold);border-color:var(--hold);}
 .news-more{margin-top:8px;cursor:pointer;background:none;border:0;color:var(--accent);font:600 .78rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:4px 0;}
 .news-select{background:var(--panel2);border:1px solid var(--line);border-radius:20px;color:var(--text);font:600 .76rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:4px 10px;}
 .news-stock{font-weight:700;color:var(--text);text-decoration:none;}
@@ -75,10 +72,8 @@ a.news-stock:hover{color:var(--accent);}
 .news-bhead{flex:1;min-width:0;font-weight:700;font-size:var(--t-md);line-height:1.4;overflow-wrap:anywhere;}
 .news-bbody{padding:0 0 12px 20px;max-width:80ch;}
 .news-bbody p{margin:0;font-size:var(--t-sm);line-height:1.45;overflow-wrap:anywhere;}
-.news-bhead .news-tag,.news-text>.news-imp{margin-right:4px;}
+.news-bhead .news-tag,
 .news-bhead .news-tag{vertical-align:1px;}
-.news-events-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0;}
-.news-events-bar .news-hint{margin:0;}
 .ev-mark{display:inline-flex;align-items:center;margin-left:5px;color:var(--accent);vertical-align:middle;cursor:help;}
 .ev-sub{font-size:var(--t-sm);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:12px 0 4px;}
 #eventsPanel .news-row{padding:6px 0;}
@@ -104,4 +99,10 @@ a.news-stock:hover{color:var(--accent);}
 /* Stock events: one line per event (stock, kind of event, text cut at the end of the line) */
 .row-line .news-et{flex:none;margin:0;}
 .row-line .news-tag{flex:none;}
-.row-line .news-imp{flex:none;}
+.row-line .row-cc{flex:none;min-width:3.1em;font-weight:700;font-size:var(--t-sm);color:var(--text);}
+.news-flag{margin-right:4px;}
+/* Importance as a small circle: red up arrow = high, amber bar = medium, grey down arrow = low */
+.news-lvl{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:var(--t-xs);line-height:1;color:#fff;}
+.news-lvl-hi{background:var(--avoid);}
+.news-lvl-md{background:var(--hold);}
+.news-lvl-lo{background:var(--muted);}
