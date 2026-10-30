@@ -11,7 +11,7 @@
 /* White theme: the Screener look (pale lavender page, pure white cards, indigo accent). Same font as the other themes. */
 :root[data-theme="white"]{--bg:#eaedf7;--panel:#ffffff;--panel2:#f3f5fb;--line:#dde2ee;--text:#1b1f2a;--muted:#4a5163;--accent:#5b5fe0;--accent-soft:#5b5fe0;--hd:#5b5fe0;}
 *{box-sizing:border-box;}
-html{scroll-padding-top:env(safe-area-inset-top,0px);}
+html{scroll-padding-top:env(safe-area-inset-top,0px);scrollbar-gutter:stable;}   /* v1.323: room for the scrollbar is always kept, so a page tall enough to scroll does not shift the layout sideways next to a short one */
 body{margin:0;background:var(--bg);color:var(--text);font-family:"Iowan Old Style","Georgia",serif;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
 /* Dark theme: more prominent text (v1.118). Brighter body and secondary text (tokens in 01), placeholders at full strength (browsers dim
    them with opacity), and a clearer outline on the search and form fields. The Light theme sets its own placeholder colour and borders. */

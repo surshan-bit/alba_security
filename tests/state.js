@@ -29,6 +29,7 @@ async function scenario(name, cfg, docs, fn, allowedError){
     if(docs){ srv.seeds.set(name, JSON.stringify({ docs })); o.seedUrl = base + '/__seed/' + encodeURIComponent(name) + '.json'; }
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }), errs = [];
     s = { ctx, errs };
+    if(cfg && cfg.delayChunks) await ctx.route(/\/chunks\/(strategies|news|tradelog|refreshlog)-/, async r => { await new Promise(x => setTimeout(x, cfg.delayChunks)); r.continue(); });   // a slow download of the lazy pages
     const { page } = await openPage(ctx, base, o, name, errs);
     await page.waitForFunction(() => window.__alba && window.__alba.stocks && document.querySelector('.app-section.active'), null, { timeout: 20000 });
     await fn(page);
@@ -408,9 +409,27 @@ async function inactiveScenario(){
   });
 }
 
+// v1.323: the pages loaded on first use (Strategies, News, Trade Log, Data Refresh) are downloaded while the app is idle, so opening one draws it at once instead of
+// showing it empty or as "Loading…" until a download ends (the flicker); and room for the page scrollbar is always kept, so a page tall enough to scroll does not shift the
+// layout sideways next to a short one. Here each chunk takes 350 ms to arrive, as on a slow connection.
+async function lazyPagesScenario(){
+  await scenario('navigation: lazy pages draw at once on first open', { delayChunks: 350 }, null, async page => {
+    ok(await page.evaluate(() => getComputedStyle(document.documentElement).scrollbarGutter.startsWith('stable')), 'the page keeps room for its scrollbar');
+    await until(page, () => ['strategies', 'news', 'tradelog', 'refreshlog'].every(n => performance.getEntriesByType('resource').some(e => e.name.includes('/chunks/' + n + '-') && e.responseEnd > 0)), null, 'the four lazy pages are downloaded while idle, before they are opened');
+    for(const k of ['strategies', 'news', 'trackrecord', 'refreshlog']){
+      const blank = await page.evaluate(k => new Promise(res => {
+        let bad = 0; const t0 = performance.now();
+        document.querySelector('.nav-item[data-section="' + k + '"]').click();
+        requestAnimationFrame(function f(){ const a = document.querySelector('.app-section.active'), tx = a ? a.innerText.trim() : ''; if(!tx || /Loading…/.test(tx)) bad++; if(performance.now() - t0 < 300) requestAnimationFrame(f); else res(bad); });
+      }), k);
+      ok(blank === 0, 'first open of ' + k + ' is never empty or "Loading…" (' + blank + ' such frames)');
+    }
+  });
+}
+
 async function main(){
   base = await srv.listen(); browser = await chromium.launch();
-  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); await bulletsWithoutSourcesScenario(); } finally { await browser.close(); srv.close(); }
+  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); await bulletsWithoutSourcesScenario(); await lazyPagesScenario(); } finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('state tests FAILED (' + problems.length + ' problems, ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('state tests: ' + checks + ' checks passed');
 }
