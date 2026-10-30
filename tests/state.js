@@ -196,7 +196,9 @@ async function tradeScenarios(){
       await until(page, () => window.__store.has('data/users/u_SMOKE/ideasResults'), null, 'the result is written to the database');
       const kept = await page.evaluate(() => window.__store.get('data/users/u_SMOKE/ideasResults'));
       ok(kept && kept.v === 1 && /"starter-deep-value":\{"v":1,"at":"/.test(kept.json), 'the Process result is saved for the user, got ' + JSON.stringify(kept).slice(0, 120));
-      ok(/"ranks":\{"[^"]+":\[1,"/.test(kept.json), 'v1.321: the result keeps the call and rank of every stock for the Buy / Sell column');
+      ok(/"ranksUp":\{/.test(kept.json), 'v1.322: the result keeps the call and rank of the Upward-trend stocks for the Buy / Sell column');
+      const savedRes = JSON.parse(kept.json)['starter-deep-value'], upRanks = Object.values(savedRes.ranksUp || {}).map(e => e[0]).sort((x, y) => x - y);
+      ok(upRanks.length === savedRes.up && upRanks.every((v, i) => v === i + 1), 'v1.322: the ranks run 1 to the number of Upward stocks, got ' + JSON.stringify(upRanks) + ' for ' + savedRes.up);
       await page.selectOption('#tradeIdeasStrategy', 'starter-deep-value');
       await until(page, () => /Processed on .*\(today\)/.test((document.getElementById('tradeIdeasBody') || {}).textContent || '') && document.querySelectorAll('#tradeIdeasBody .tl-top5').length === 2 && document.getElementById('tradeIdeasRun').textContent === 'Process again', null, 'choosing the strategy again shows the kept result with its date stamp and offers Process again, without processing');
     } else ok(true, 'no stock qualifies in the fixtures for this strategy');
@@ -275,7 +277,7 @@ async function ideasFilterScenarios(){
     await until(page, n => document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row').length === n, all, 'All brings every stock back');
   });
   // v1.321: the Buy / Sell column shows the saved call and rank of each stock, sorts by rank, and stays empty for a stock the result does not hold
-  const ranked = Object.assign({}, snap, { ranks: { [symOf(U)]: [1, 'Buy', 0], [symOf(Dn)]: [2, 'Trim', 1] } });
+  const ranked = Object.assign({}, snap, { up: 2, ranksUp: { [symOf(U)]: [1, 'Buy', 0], [symOf(Dn)]: [2, 'Trim', 1] } });
   const rankDocs = { 'data/users/u_SMOKE/ideasResults': { v: 1, json: JSON.stringify({ 'starter-deep-value': ranked }), updatedAt: '2026-10-29T04:34:00.000Z' } };
   await scenario('analysis: Buy / Sell column', {}, rankDocs, async page => {
     await goto(page, 'analysis');

@@ -30,7 +30,7 @@ const ANALYSIS_LB_COLUMNS = [
   { id: 'monthRsi', label: 'M RSI', num: true },
   { id: 'techW', label: 'W Tech Rating' },
   { id: 'techM', label: 'M Tech Rating' },
-  { id: 'idea', label: 'Buy / Sell', sortName: 'Buy / Sell rank', title: 'Call and rank (1 is best) from the last Process in the Trade Log: the strategy chosen in Analysis, else the newest result' },
+  { id: 'idea', label: 'Buy / Sell', sortName: 'Buy / Sell rank', title: 'Call and rank (1 is best) among the Upward-trend stocks, from the last Process in the Trade Log: the strategy chosen in Analysis, else the newest result' },
   { id: 'news', label: 'News 14d', num: true, title: 'Positive and negative news items in the last 14 days' },
   { id: 'industry', label: 'Industry' },
   { id: 'triggered', label: 'Research done' },
@@ -130,7 +130,7 @@ const IDEA_BADGE = { 'Buy': 'b-buy', 'Add more': 'b-buy', 'Wait': 'b-hold', 'Hol
 function ideaCellHtml(s){
   const r = ideaRankOf(s, analysisFilters.strategyId);
   if(!r) return '<td class="analysis-lb-idea"></td>';
-  const title = `${r.label}${r.held ? ' (you hold it)' : ''}: rank ${r.rank} of ${r.n} in this strategy, processed ${ideasWhen(r.snap)}`;
+  const title = `${r.label}${r.held ? ' (you hold it)' : ''}: rank ${r.rank} of ${r.n} Upward-trend stocks in this strategy, processed ${ideasWhen(r.snap)}`;
   return `<td class="analysis-lb-idea" title="${escapeHtml(title)}"><span class="badge ${IDEA_BADGE[r.label] || 'b-hold'}" style="padding:1px 8px;font-size:.68rem;">${escapeHtml(r.label)}</span> ${r.rank}</td>`;
 }
 // Everything a row's cells need, shared by the Analysis leaderboard and the Strategies table so both show the same cells.
