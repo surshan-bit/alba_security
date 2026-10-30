@@ -5,19 +5,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Alba Securities - Stock Analyzer</title>
-<link rel="stylesheet" href="styles.css?v=f41ab805">
+<link rel="stylesheet" href="styles.css?v=f5e5ed01">
 <!--build:preload-->
-<link rel="modulepreload" href="app.js?v=f41ab805">
+<link rel="modulepreload" href="app.js?v=f5e5ed01">
 <link rel="modulepreload" href="chunks/chunk-HE66IFB4.js">
 <link rel="modulepreload" href="chunks/chunk-LWDZFE6T.js">
 <link rel="modulepreload" href="chunks/chunk-LDVI5725.js">
-<link rel="modulepreload" href="chunks/main-TSU33GHJ.js">
-<link rel="modulepreload" href="chunks/chunk-VDNRIWY5.js">
-<link rel="modulepreload" href="chunks/chunk-SVO4T3VI.js">
-<link rel="modulepreload" href="chunks/chunk-LX5CYVUK.js">
-<link rel="modulepreload" href="chunks/chunk-TS2ZATJI.js">
-<link rel="modulepreload" href="chunks/chunk-I57GLIOY.js">
-<link rel="modulepreload" href="chunks/chunk-6IBFEXH3.js">
+<link rel="modulepreload" href="chunks/main-3CJZBJKS.js">
+<link rel="modulepreload" href="chunks/chunk-GNJVAWSJ.js">
+<link rel="modulepreload" href="chunks/chunk-LEP6HIVG.js">
+<link rel="modulepreload" href="chunks/chunk-REX2DA5A.js">
+<link rel="modulepreload" href="chunks/chunk-JAGV2MX2.js">
+<link rel="modulepreload" href="chunks/chunk-VT4HI4Y7.js">
+<link rel="modulepreload" href="chunks/chunk-NCILOWDG.js">
 <!--/build:preload-->
 </head>
 <body>
@@ -62,7 +62,7 @@
       </g>
       <circle cx="100" cy="100" r="50" fill="url(#brandSunGrad)"/>
     </svg>
-    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.335 &mdash; tagged 2026-10-30">v1.335</span></div>
+    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.336 &mdash; tagged 2026-10-30">v1.336</span></div>
   </div>
   <div class="sidebar-nav">
     <div class="nav-section-label">Menu</div>
@@ -142,11 +142,11 @@
     <header>
       <h1>Analysis</h1>
     </header>
-    <div class="analysis-layout">
+    <div class="analysis-layout card">
       <div id="analysisGlobalFilters"></div>
       <div class="analysis-main">
         <div class="analysis-panel">
-          <div id="analysisPanelBody"></div>
+          <div id="analysisPanelBody" class="panel-body"></div>
         </div>
       </div>
     </div>
@@ -156,7 +156,7 @@
     <header>
       <h1>Strategies</h1>
     </header>
-    <div class="strat-layout">
+    <div class="strat-layout card">
       <div class="strat-side" id="stratList"></div>
       <div class="strat-main" id="stratMain"></div>
     </div>
@@ -166,7 +166,7 @@
     <header>
       <h1>Explorer</h1>
     </header>
-    <div class="analysis-panel">
+    <div class="analysis-panel card">
       <div id="businessBody" aria-live="polite"><p class="upload-hint">Loading…</p></div>
     </div>
   </section>
@@ -175,7 +175,7 @@
     <header>
       <h1>News</h1>
     </header>
-    <div class="analysis-panel">
+    <div class="analysis-panel card">
       <div id="newsBody" aria-live="polite"><p class="upload-hint">Loading…</p></div>
     </div>
   </section>
@@ -186,7 +186,7 @@
       <div class="sub">A running, real-money record of every position bought or sold.</div>
     </header>
     <div class="tabs tabs-top" role="tablist" aria-label="Trade Log"><button type="button" role="tab" class="tab on" data-tl-tab="positions" id="tlTabPositions">Positions</button><button type="button" role="tab" class="tab" data-tl-tab="ideas">Ideas</button></div>
-    <div class="analysis-panel">
+    <div class="analysis-panel card">
       <div class="analysis-panel-head">
         <div class="analysis-panel-title">Positions</div>
         <div class="tl-head-actions"><div class="tl-view-toggle" role="group" aria-label="Trade view"><button type="button" class="tl-view-btn" data-tl-view="cards">Cards</button><button type="button" class="tl-view-btn" data-tl-view="table">Table</button></div><button type="button" class="refresh-btn tl-btn-primary" id="tradeAddBtn">+ Add trade</button></div>
@@ -194,7 +194,7 @@
       <div id="tradeFormHost"></div>
       <div id="tradeLogPanelBody" aria-live="polite"><p class="upload-hint">Loading…</p></div>
     </div>
-    <div class="analysis-panel tl-ideas">
+    <div class="analysis-panel card tl-ideas">
       <div class="analysis-panel-head">
         <div class="analysis-panel-title">Buy / Sell ideas</div>
         <div class="tl-head-actions"><select id="tradeIdeasStrategy" class="tl-ideas-select" aria-label="Strategy"></select><button type="button" class="refresh-btn tl-btn-primary" id="tradeIdeasRun" disabled>Process</button></div>
@@ -224,7 +224,7 @@
   <div class="boot-msg" style="font-size:.95rem;max-width:480px;line-height:1.5;"></div>
   <button type="button" class="boot-retry" hidden style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer;" onclick="location.reload()">Retry</button>
 </div>
-<script src="js/loader.js" data-entry="app.js?v=f41ab805"></script>
+<script src="js/loader.js" data-entry="app.js?v=f5e5ed01"></script>
 </body>
 </html>
 

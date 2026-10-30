@@ -175,9 +175,9 @@
 .strat-fold[open] > summary .strat-fold-sum{display:none;}
 .strat-fold:not([open])>summary{margin-bottom:2px;}
 /* Stack of panels in Strategies (the qualifying-stocks panel no longer has a title above its count), with room between them. */
-#stratMain .strat-panel{margin-top:12px;padding-top:8px;padding-bottom:8px;}
-#stratMain .strat-panel:first-child{margin-top:0;}
-#stratMain .strat-result-head{margin-bottom:12px;}
+.strat-main .strat-panel{margin-top:12px;padding-top:8px;padding-bottom:8px;}
+.strat-main .strat-panel:first-child{margin-top:0;}
+.strat-main .strat-result-head{margin-bottom:12px;}
 .analysis-panel,.upload-panel,.help-panel,.help-toc,.help-formula,.glossary-item,.settings-row,.sr-row,.strat-panel,.refreshlog-panel,.refreshlog-freshness,.fi-panel,.live-refresh.live-panel{border-color:transparent;}
 /* Analysis and Strategies: the Live Data Refresh line sits between two lines, as on the stock page. */
 .live-refresh.live-panel{margin:0;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);border-left:0;border-right:0;}
@@ -188,7 +188,7 @@
 .peers-table.strat-table th{border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:1;}
 .peers-table.strat-table td.analysis-lb-score{text-align:right;}
 /* Strategies screen: no filled panels; the page background shows through. */
-#section-strategies .analysis-panel,#section-strategies .strat-panel{background:transparent;}
+.strat-layout .analysis-panel,.strat-layout .strat-panel{background:transparent;}
 .analysis-lb-industry .ind-w{font-weight:700;font-variant-numeric:tabular-nums;margin-right:6px;}
 .analysis-lb-industry .chg-up{color:var(--buy);}
 .analysis-lb-industry .chg-down{color:var(--avoid);}
@@ -237,15 +237,15 @@
 .sr-foot .sr-add{background:transparent;border:0;border-radius:6px;color:var(--accent);font-weight:600;cursor:pointer;height:34px;padding:0 2px;appearance:none;-webkit-appearance:none;width:auto;}
 .sr-foot .sr-add:hover,.sr-foot .sr-add:focus-visible{text-decoration:underline;}
 @media (min-width:1000px){.sr-foot .sr-add{width:auto;}}
-#stratMain select.sr-add:not([multiple]):not([size]){background-image:none !important;padding-right:2px !important;}
+.strat-main select.sr-add:not([multiple]):not([size]){background-image:none !important;padding-right:2px !important;}
 
 /* The strategy picker: one drop-down above the setup, like View in Analysis, so the setup and the picks use the full width. */
 .strat-layout{display:block;}
-#stratList{margin:0 0 12px;}
-#stratList .dm-strat .dm-btn{max-width:100%;}
-#stratList .dm-strat .dm-btn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#stratList .dm-strat .strat-pick-n{border:1px solid var(--line);border-radius:999px;padding:0 7px;font-size:var(--t-sm);font-variant-numeric:tabular-nums;}
-#stratList .dm-pop{min-width:360px;max-height:60vh;overflow:auto;}
-#stratList #stratNew,#stratList #stratRestore{color:var(--accent);}
-#stratList #stratRestore{color:var(--muted);}
-:root[data-theme="white"] #stratList#stratList .dm-btn{height:36px;border:1px solid #c9cfdf;background:#fff;border-radius:6px;}
+.strat-side{margin:0 0 12px;}
+.strat-side .dm-strat .dm-btn{max-width:100%;}
+.strat-side .dm-strat .dm-btn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.strat-side .dm-strat .strat-pick-n{border:1px solid var(--line);border-radius:999px;padding:0 7px;font-size:var(--t-sm);font-variant-numeric:tabular-nums;}
+.strat-side .dm-pop{min-width:360px;max-height:60vh;overflow:auto;}
+.strat-side #stratNew,.strat-side #stratRestore{color:var(--accent);}
+.strat-side #stratRestore{color:var(--muted);}
+:root[data-theme="white"] .strat-side.strat-side .dm-btn{height:36px;border:1px solid #c9cfdf;background:#fff;border-radius:6px;}

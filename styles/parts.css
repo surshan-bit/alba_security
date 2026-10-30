@@ -2,7 +2,9 @@
    tabs        a row of two or three headings, the chosen one underlined (News, Trade Log); .tabs-top is the phone-only bar that forms the top of a white card
    choices     a row of small round buttons, one chosen (Upcoming / Recent, Open / Closed)
    day-head    a date heading with a count, above the rows of that date
-   row-line    one line per item: a name, a tag and a text cut at the end of the line */
+   row-line    one line per item: a name, a tag and a text cut at the end of the line
+   card        the white rounded block every screen's content sits in (its padding is --card-x / --card-y, see tokens.css) */
+.card{--bg:#fff;--panel:#fff;background:#fff;border-radius:12px;box-shadow:0 1px 2px rgba(25,55,100,.06),0 6px 20px rgba(25,55,100,.07);padding:var(--card-y) var(--card-x);}
 .tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--line);}
 .tab{cursor:pointer;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);font:600 .86rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:8px 12px;margin-bottom:-1px;}
 .tab.on{color:var(--accent);border-bottom-color:var(--accent);}

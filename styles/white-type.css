@@ -26,7 +26,7 @@
 :root[data-theme="white"] body :is(td,td *,.chg-up,.chg-down,.ind-w,.analysis-lb-name,.biz-open){font-weight:var(--w-reg) !important;}
 :root[data-theme="white"] body :is(td .badge,.badge,.completeness-badge,.tech-badge,.fund-cell-max,.analysis-lb-ticker,.filter-n,.sr-opt,.sr-unit,.sr-and,.sr-count,.help-tab-link,.data-chip){font-size:var(--t-sm) !important;font-weight:var(--w-reg) !important;}
 :root[data-theme="white"] body :is(.completeness-badge){font-weight:var(--w-strong) !important;}
-:root[data-theme="white"] body :is(.strat-count,.strat-empty,.biz-showing,#analysisLeaderboardCount,.filter-note,.strat-section-hint,.analysis-filter-label,.peers-hint){font-size:var(--t-sm) !important;}
+:root[data-theme="white"] body :is(.strat-count,.strat-empty,.biz-showing,.analysis-count,.filter-note,.strat-section-hint,.analysis-filter-label,.peers-hint){font-size:var(--t-sm) !important;}
 :root[data-theme="white"] body :is(.biz-showing,.strat-count,.strat-count b){font-weight:var(--w-reg) !important;}
 
 /* 4. Buttons, menus and choices */

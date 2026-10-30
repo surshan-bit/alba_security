@@ -54,7 +54,7 @@ function leaderboardHtml(chartBlock, viewHtml){
   return `<div class="analysis-leaderboard${lbFull ? ' lb-full' : ''}">
       <div class="analysis-leaderboard-head analysis-toolbar">
         ${viewHtml}
-        <div class="rk-headline"><p class="upload-hint biz-showing" style="margin:0"><span id="analysisLeaderboardCount"></span></p>${(defineAnalysisScope(), '')}</div>
+        <div class="rk-headline"><p class="upload-hint biz-showing" style="margin:0"><span id="analysisLeaderboardCount" class="analysis-count"></span></p>${(defineAnalysisScope(), '')}</div>
         <div class="analysis-actions">
           ${iconBtn('analysisColumnsBtn', 'columns', 'Columns', 'Columns: choose and reorder the grid columns', ` aria-pressed="${getAnalysisColumnsPanelOpen()}"`)}
           ${iconBtn('analysisChartToggle', 'chart', 'Show chart', 'Show chart', ' aria-expanded="false"')}

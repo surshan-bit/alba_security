@@ -13,7 +13,7 @@
 :root[data-theme="white"] .nav-item.active{color:var(--accent);}
 /* Cards: only the real cards get the soft shadow. The wrapper panels of the flat layout (filters, Analysis / Explorer / Strategies panels,
    the Settings and Data Refresh wrappers) are deliberately outline-free with no padding, so they must stay flat. */
-:root[data-theme="white"] :is(.help-panel,.settings-row,.upload-panel,.refreshlog-run,.activity-panel,.alba-confirm-card,#section-trackrecord .analysis-panel){box-shadow:0 1px 2px rgba(25,55,100,.06),0 6px 20px rgba(25,55,100,.07);}
+:root[data-theme="white"] :is(.help-panel,.settings-row,.upload-panel,.refreshlog-run,.activity-panel,.alba-confirm-card){box-shadow:0 1px 2px rgba(25,55,100,.06),0 6px 20px rgba(25,55,100,.07);}
 /* Text that was too faint: muted is now a darker grey, and small labels, hints and headers use it at full strength. */
 :root[data-theme="white"] :is(.upload-hint,.analysis-panel-sub,.settings-row-sub,.sub){color:#3d444e;}
 /* Links and company names in the accent colour, as on the Screener. */
@@ -71,18 +71,12 @@
    content side by side, so their whole layout becomes the one white card and the panels inside it are flat (Strategies' panels are told
    apart by a thin line). Inside a white card the page colour (--bg) and card colour (--panel) are white, so the sticky first columns, sticky
    headings, full-screen view and heat-map edges match the white without further rules. */
-:root[data-theme="white"] :is(#section-business .analysis-panel,#section-trackrecord .analysis-panel,#section-analysis .analysis-layout,#section-strategies .strat-layout){--bg:#fff;--panel:#fff;background:#fff;border-radius:12px;box-shadow:0 1px 2px rgba(25,55,100,.06),0 6px 20px rgba(25,55,100,.07);}
-:root[data-theme="white"] :is(#section-analysis .analysis-layout,#section-strategies .strat-layout){padding:var(--card-y) var(--card-x);}
-:root[data-theme="white"] :is(#section-analysis .analysis-main > .analysis-panel,#section-strategies .strat-main .strat-panel){background:transparent;box-shadow:none;border-radius:0;padding:0;margin-top:0;}
-:root[data-theme="white"] #section-strategies .strat-main .strat-panel + .strat-panel{border-top:0;padding-top:0;margin-top:20px;}
-:root[data-theme="white"] #section-strategies .strat-main .strat-panel:first-child + .strat-panel{border-top:1px solid #dde8f4;padding-top:14px;margin-top:10px;}
+:root[data-theme="white"] .card :is(.analysis-main > .analysis-panel,.strat-main .strat-panel){background:transparent;box-shadow:none;border-radius:0;padding:0;margin-top:0;}
+:root[data-theme="white"] .card .strat-main .strat-panel + .strat-panel{border-top:0;padding-top:0;margin-top:20px;}
+:root[data-theme="white"] .card .strat-main .strat-panel:first-child + .strat-panel{border-top:1px solid #dde8f4;padding-top:14px;margin-top:10px;}
 :root[data-theme="white"] .analysis-panel :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea),:root[data-theme="white"] .strat-layout :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){background:#fff;}
 :root[data-theme="white"] .strat-table tbody tr:nth-child(odd) > td{background:#f4f8fd;}
-@media (max-width:600px){
-:root[data-theme="white"] :is(#section-business .analysis-panel,#section-trackrecord .analysis-panel,#section-analysis .analysis-layout,#section-strategies .strat-layout){padding:var(--card-y) var(--card-x);}
-/* The Analysis filter column starts at the card's own padding, in line with the Strategies list and the Explorer controls. */
-}
-:root[data-theme="white"] #section-analysis .analysis-layout .filters.analysis-filters-panel{padding:0;}
+:root[data-theme="white"] .analysis-layout .filters.analysis-filters-panel{padding:0;}
 /* Heavier grid text on every theme (v1.115). Thin strokes read poorly, so grid cells use a medium weight and column headings a bold one.
    Applies at every screen width (the phone layout uses the same grids). Weights are for all themes; the darker text colours are Light only. */
 :is(.biz-table,.strat-table) > tbody > tr > td,.biz-table > tbody > .biz-row > .biz-name{font-weight:500;}
@@ -99,7 +93,7 @@
 /* White theme: the shared Light rules above also apply; swap the blue-grey edges and shadows for neutral ones. */
 :root[data-theme="white"] .sidebar{box-shadow:0 0 40px rgba(27,31,42,.14);}
 :root[data-theme="white"] .sidebar-overlay{background:rgba(27,31,42,.35);}
-:root[data-theme="white"] :is(.help-panel,.settings-row,.upload-panel,.refreshlog-run,.activity-panel,.alba-confirm-card,#section-trackrecord .analysis-panel){box-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);}
+:root[data-theme="white"] :is(.help-panel,.settings-row,.upload-panel,.refreshlog-run,.activity-panel,.alba-confirm-card){box-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);}
 :root[data-theme="white"] :is(.upload-hint,.analysis-panel-sub,.settings-row-sub,.sub){color:#4a5163;}
 :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.sort-select,.detail-back,.lm-tab):not(.tl-btn-primary):not(.on){background:#fff;border-color:#c9cfdf;}
 :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.lm-tab):not(.tl-btn-primary):not(.on):hover{background:color-mix(in srgb,var(--accent) 6%,#fff);}

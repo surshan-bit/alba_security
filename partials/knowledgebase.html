@@ -251,6 +251,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.336 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>One card for every screen:</strong> Analysis, Strategies, Explorer, News and Trade Log now all sit in the same white rounded card (same corners, shadow and side padding), set in one place (<code>styles/parts.css</code>). News used to be the odd one out with square corners. A rule that only applied to one screen is now a rule for the card, so the same fix works everywhere.</li>
+              <li><strong>Less screen-specific CSS:</strong> 164 places where a style was tied to one screen by an element id (672 down to 508) now apply by class instead (the Strategies and Analysis panels, the Explorer toolbar and the cards), without any change on screen.</li>
+            </ul>
             <h3>v1.335 &middot; 2026-10-30</h3>
             <ul>
               <li><strong>One design:</strong> the Dark and Light themes are retired and the Themes choice is gone from Settings, so there is one look (the White design) to get completely right. Everything on screen looks the same as before. A saved Dark or Light choice is simply ignored.</li>

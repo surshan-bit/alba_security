@@ -53,7 +53,7 @@
 .strat-row.peers-self > td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
 .strat-row.peers-self .analysis-lb-name::after{font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);content:"This stock";margin-left:10px;padding:1px 7px;border:1px solid var(--accent);border-radius:999px;font-size:var(--t-xs);vertical-align:1px;}
 /* Industry screen: no filled panel; the page background shows through. The sticky first column uses the page colour so scrolled cells still hide behind it. */
-#section-business .analysis-panel,#section-business .biz-expand{background:transparent;}
+.biz-expand{background:transparent;}
 .biz-table > tbody > .biz-row > .biz-name,.biz-table > thead > tr > th:first-child{background:var(--bg);}
 .biz-news-head{margin-top:16px!important;}
 .biz-table > tbody > .biz-row:hover > .biz-name,.biz-table > tbody > .biz-row:focus > .biz-name{background:linear-gradient(var(--row-hover),var(--row-hover)),var(--bg);}
