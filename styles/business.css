@@ -113,7 +113,7 @@ a.stock-link{color:inherit;text-decoration:none;}
 @media (max-width:760px){.biz-news .biz-nrow{grid-template-columns:48px 10px minmax(0,1fr);}.biz-news .biz-nrow .biz-news-meta{display:none;}}
 
 /* Industry detail: name and count on top, four summary cards, then the short stock table. */
-.biz-dname{font-size:var(--t-md) !important;font-weight:600;text-transform:none !important;letter-spacing:0 !important;color:var(--text) !important;margin:0;}
+.biz-dname{font-weight:600;text-transform:none !important;letter-spacing:0 !important;color:var(--text) !important;margin:0;}
 .biz-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 12px;}
 .biz-kpi{background:var(--panel2);border-radius:8px;padding:8px 12px;min-width:0;}
 .biz-kpi small{display:block;color:var(--muted);font-size:var(--t-sm);}
@@ -124,4 +124,4 @@ a.stock-link{color:inherit;text-decoration:none;}
 .biz-colsnote .biz-colsbtn{margin-left:0;}
 @media (max-width:760px){.biz-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}}
 .biz-detail-box .biz-lean .strat-table{width:100%;}
-.biz-detail-box .biz-ft{display:block;color:var(--muted) !important;font-size:var(--t-sm) !important;font-weight:400 !important;}
+.biz-detail-box .biz-ft{display:block;color:var(--muted) !important;}
