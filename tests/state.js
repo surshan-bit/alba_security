@@ -476,6 +476,8 @@ async function phoneLayoutScenarios(){
     ok(m.periodTop === m.showTop && m.periodTop > m.viewTop, 'the Period and Show menus share the second row, got ' + JSON.stringify(m));
     ok(m.minRow >= 36.5 && m.minRow <= 38.5, 'the Industry rows are 37px tall, got ' + m.minRow);
     ok(m.showing.every(d => d === 'none'), 'the "Matched n of m stocks" line is gone (the filter carries the count)');
+    await page.evaluate(() => document.querySelector('.analysis-industry .dm-more .dm-btn').click());
+    ok(await page.evaluate(() => { const it = document.querySelector('[data-biz-view="heat"]'), r = it.getBoundingClientRect(), e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!e && !!e.closest('.dm-pop'); }), 'the "..." menu opens on top of the grid and can be clicked (the buttons row does not clip it)');
   });
   await scenario('wide screen: Strategies keeps its picker in the list and no phone row', {}, null, async page => {
     await goto(page, 'strategies');

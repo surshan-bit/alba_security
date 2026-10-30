@@ -216,7 +216,7 @@ html{font-size:112.5%;}
 :root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-actions{min-width:0;flex:0 1 auto;}
 :root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-controls > .dm:first-child .dm-btn small{display:none;}   /* "1 month" says it is the period */
 :root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-showing{display:none;}
-:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-actions{order:5;margin-left:auto;display:flex;gap:6px;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-actions{order:5;margin-left:auto;display:flex;gap:6px;overflow:visible;}   /* (the "..." menu opens below it) */
 :root:root:root #analysisPanelBody:has(> .analysis-industry) .analysis-toolbar .filter-groups{order:50;}
 :root:root:root .biz-embedded > .biz-main:not(.biz-full) > :not(.biz-toolbar){flex:1 1 100%;min-width:0;order:60;}
 
