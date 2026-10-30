@@ -188,23 +188,38 @@ html{font-size:112.5%;}
   .sheet-done{flex:1;height:46px;border:0;border-radius:8px;background:var(--accent);color:#0f1720;font:inherit;font-weight:700;cursor:pointer;}
 }
 
-/* v1.324 Phones: the Analysis and Strategies screens use the screen better. The View menu and the Filters chip share one row, with the count inside the chip; the Strategies
-   picker, Setup, Track and refresh and Select share one row; the tick boxes wait for Select; a stock's ticker sits under its name instead of beside it (or hidden), so the Stock
-   column is narrower and more columns fit. Rows stay 37px tall. */
+/* v1.324 Phones: the stock grids use the screen better, and all of them follow one pattern. Every grid row is 37px tall with the same slim padding and no stock code (the name is enough);
+   Analysis: the View menu and the Filters chip share one row, with the count inside the chip (the Industry view follows the same pattern); Strategies: the picker, Setup, Track and refresh
+   and Select share one row, the setup card is a one-line summary and the tick boxes wait for Select. */
 @media (max-width:600px){
 :root:root:root .analysis-leaderboard-head{gap:6px !important;margin-bottom:6px !important;}
 :root:root:root .analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle{flex:1 1 0;min-width:0;}
 :root:root:root .analysis-toolbar .analysis-view-bar{flex:0 0 auto;}
 :root:root:root .analysis-toolbar .rk-headline{display:none;}
 :root:root:root .analysis-filters-panel .filters-toggle .ft-count{display:inline;flex:none;color:var(--muted);font-size:.7rem;white-space:nowrap;}
-:root:root:root .analysis-leaderboard .strat-table:not(.peers-table) td,:root:root:root #stratResults .strat-table:not(.peers-table) td{padding:4.5px 4px;line-height:1.15;}
-:root:root:root .analysis-leaderboard .strat-table:not(.peers-table) th,:root:root:root #stratResults .strat-table:not(.peers-table) th{padding:7px 4px;}
-:root:root:root .analysis-leaderboard .analysis-lb-ticker,:root:root:root #stratResults .analysis-lb-ticker{display:block;margin:1px 0 0;font-size:.58rem;line-height:1.1;}
-:root:root:root .analysis-leaderboard .analysis-lb-name,:root:root:root #stratResults .analysis-lb-name{display:block;max-width:132px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.15;}
+:root:root:root :is(.strat-table,.biz-table) > tbody > tr > td{height:37px;padding:0 4px;line-height:1.15;vertical-align:middle;box-sizing:border-box;}
+:root:root:root :is(.strat-table,.biz-table) > thead > tr > th{padding:7px 4px;}
+:root:root:root :is(.strat-table,.biz-table,.help-table) td .analysis-lb-ticker{display:none;}   /* the stock code is left out on a phone: the name is enough */
+:root:root:root :is(.strat-table,.biz-table) td .analysis-lb-name{display:inline-block;max-width:132px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;line-height:1.15;}
 :root:root:root .analysis-leaderboard td:has(> .pin-btn){width:22px;padding-left:2px;padding-right:0;}
 :root:root:root .analysis-leaderboard th:first-child:not(.analysis-lb-rank){width:22px;}
 :root:root:root .analysis-leaderboard .pin-btn{padding:0;}
 :root:root:root .analysis-leaderboard td.analysis-lb-rank,:root:root:root #stratResults td.analysis-lb-rank{padding-left:2px;padding-right:6px;}
+/* the Industry view: the View menu and the filter chip share a row (count inside the chip), then Period, Show and the buttons; the same pattern as the Stocks view */
+:root:root:root #analysisPanelBody:has(> .analysis-industry){display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:4px;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) > .analysis-toolbar,:root:root:root #analysisPanelBody:has(> .analysis-industry) > .analysis-industry,:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded,:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full),:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full) > .biz-toolbar,:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-controls{display:contents;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) .analysis-view-bar{order:1;flex:0 0 auto;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) .analysis-filters-panel .filters-toggle{order:2;flex:1 1 200px;min-width:0;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-controls > .dm{order:3;flex:0 0 auto;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) :is(.biz-controls > .dm .dm-btn,.biz-actions .dm-btn,.biz-actions .rk-toolbtn,.biz-actions .rk-main){padding:0 8px;font-size:.72rem;gap:4px;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-actions .dm-more .dm-btn{width:32px;padding:0;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-actions{min-width:0;flex:0 1 auto;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-controls > .dm:first-child .dm-btn small{display:none;}   /* "1 month" says it is the period */
+:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-showing{display:none;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-actions{order:5;margin-left:auto;display:flex;gap:6px;}
+:root:root:root #analysisPanelBody:has(> .analysis-industry) .analysis-toolbar .filter-groups{order:50;}
+:root:root:root .biz-embedded > .biz-main:not(.biz-full) > :not(.biz-toolbar){flex:1 1 100%;min-width:0;order:60;}
+
 /* Strategies */
 :root:root:root #stratList:empty{display:none;}
 :root:root:root .strat-phonebar{display:flex;align-items:center;gap:6px;margin:4px 0 6px;}
