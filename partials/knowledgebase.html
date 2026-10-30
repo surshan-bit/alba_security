@@ -251,6 +251,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.326 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>News shows its saved data again:</strong> in v1.325 the News page could open empty (no market tiles, briefings or calendar, and &ldquo;No upcoming events saved yet&rdquo;) even though the data was saved. The page now listens again when News opens and restarts a listener that has not delivered, so the saved data always shows.</li>
+              <li><strong>Refresh events now finds dividend dates:</strong> TradingView only answers dividend questions for a whole market, not for named stocks, so the first version found nothing. It now reads the next 90 days of Indian dividend dates in one call and keeps those of the stocks in your strategy. TradingView has no results or board-meeting dates for Indian stocks, so those still come from a research session.</li>
+            </ul>
             <h3>v1.325 &middot; 2026-10-30</h3>
             <ul>
               <li><strong>Refresh events on News &rarr; Stock events:</strong> reads the upcoming dividend dates (and results dates where TradingView has them) for the stocks of the strategy you picked, and saves them beside the researched events. TradingView has no board-meeting dates and, for most Indian stocks, no results dates, so those still come from a research session.</li>
