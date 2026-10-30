@@ -300,8 +300,11 @@ html{font-size:112.5%;}
 :root:root:root #tradeIdeasBody .tl-top5-title{font-size:.92rem !important;font-weight:600 !important;margin:10px 0 4px;}
 :root:root:root #tradeIdeasBody .tl-top5 > .upload-hint{display:none;}
 :root:root:root #tradeIdeasBody .tl-top5 ol{gap:0;}
-:root:root:root #tradeIdeasBody .tl-top5 li{padding:11px 0;border-top:1px solid var(--line);}
-:root:root:root #tradeIdeasBody .tl-top5 li:first-child{border-top:0;}
+:root:root:root #tradeIdeasBody .tl-top5 ol > li{padding:11px 0;border-top:1px solid var(--line);}
+:root:root:root #tradeIdeasBody .tl-top5 ol > li:first-child{border-top:0;}
+:root:root:root #tradeIdeasBody .tl-top5-why li{padding:0;border:0;margin:2px 0;display:list-item;}
+:root:root:root #tradeIdeasBody .tl-top5-head > span:first-child{flex:1 1 0;min-width:0;}
+:root:root:root #tradeIdeasBody .tl-held-tag{display:table;margin:4px 0 0;padding:1px 8px;font-size:.68rem !important;font-weight:700 !important;}
 :root:root:root #tradeIdeasBody .tl-top5-head{flex-wrap:wrap;align-items:baseline;}
 :root:root:root #tradeIdeasBody .tl-top5-head > span:first-child{font-size:.96rem !important;font-weight:600 !important;}
 :root:root:root #tradeIdeasBody .tl-top5-price{font-size:.9rem !important;font-weight:600 !important;}
