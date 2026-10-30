@@ -106,3 +106,16 @@ a.news-stock:hover{color:var(--accent);}
 .news-lvl-hi{background:var(--avoid);}
 .news-lvl-md{background:var(--hold);}
 .news-lvl-lo{background:var(--muted);}
+
+/* Stock events filters: the shared drop-down menus, side by side */
+.news-menus{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
+/* Briefing sections: closed until opened, with how many briefings each holds */
+.news-grpbox>summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;}
+.news-grpbox>summary::-webkit-details-marker{display:none;}
+.news-grpbox>summary small{color:var(--muted);font-size:var(--t-sm);font-weight:500;}
+.news-grpbox>summary::after{content:"\2303";margin-left:auto;color:var(--muted);transition:transform .15s;}
+.news-grpbox:not([open])>summary::after{transform:rotate(180deg);}
+/* "Why it matters" lines: the bullet is green when the line helps Indian stocks, red when it hurts, orange when mixed */
+.news-why li.news-tone-positive::marker{color:var(--buy);}
+.news-why li.news-tone-negative::marker{color:var(--avoid);}
+.news-why li.news-tone-mixed::marker{color:var(--hold);}

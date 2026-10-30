@@ -3,10 +3,11 @@ import { escapeHtml, tickerSymbol } from '../core/util.js';
 import { stockByTickerSymbol, stockIndex, stocks } from '../core/stocks.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { publishedStrategies } from '../strategies/state.js';
-import { IMPORTANCE, EVENT_TYPES, calValue, filterItems, groupCalendar, nextBigEvents, recentItems, shortDate, tileView, typeTag, upcomingItems } from './model.js';
+import { readingTone, IMPORTANCE, EVENT_TYPES, calValue, filterItems, groupCalendar, nextBigEvents, recentItems, shortDate, tileView, typeTag, upcomingItems } from './model.js';
 import { news } from './store.js';
 import { getPulseRun } from './pulse.js';
 import { getEventsRun } from './stockevents.js';
+import { dropMenuHtml } from '../ui/dropmenu.js';
 import { allTrades } from '../core/store.js';
 import { isPinned } from '../core/pins.js';
 
@@ -22,7 +23,7 @@ const BRIEFING_GROUPS = [
 const SCOPE_STRATEGY = 'Positive MoS';
 
 /** The screen's own choices (kept only while the page is open). */
-const view = { strategy: '', tab: 'macro', when: 'upcoming', type: 'all', upto: 30, calAll: false };
+const view = { strategy: '', tab: 'macro', when: 'upcoming', type: 'all', upto: 30, calAll: false, openGroups: new Set() };
 
 const IST_MS = 19800000;
 const todayIst = () => new Date(Date.now() + IST_MS).toISOString().slice(0, 10);
@@ -68,7 +69,7 @@ function pulseHtml(){
   }
   const lines = p && Array.isArray(p.reading) ? p.reading : [];
   if(lines.length){
-    h += '<div class="news-why"><b class="news-why-h">Why it matters</b><ul>' + lines.map(l => `<li>${escapeHtml(l)}</li>`).join('') + '</ul><small>An informed guess from the numbers above, not a fact.</small></div>';
+    h += '<div class="news-why"><b class="news-why-h">Why it matters</b><ul>' + lines.map(l => `<li class="news-tone-${readingTone(l)}">${escapeHtml(l)}</li>`).join('') + '</ul><small>An informed guess from the numbers above, not a fact.</small></div>';
   }
   const next = nextBigEvents((news.macro && news.macro.calendar) || [], Date.now(), 1)[0];
   if(next) h += `<div class="news-watch"><b>Watch next:</b> ${escapeHtml(next.title)}, ${escapeHtml(shortDate(next.date))}</div>`;
@@ -86,7 +87,7 @@ function briefingsHtml(){
   BRIEFING_GROUPS.concat([{ id: '_other', label: 'Other' }]).forEach(g => {
     const rows = items.filter(b => (known.has(b.group) ? b.group : '_other') === g.id);
     if(!rows.length) return;
-    h += `<div class="news-grp">${escapeHtml(g.label)}</div>`;
+    h += `<details class="news-grpbox" data-news-grp="${g.id}"${view.openGroups.has(g.id) ? ' open' : ''}><summary class="news-grp">${escapeHtml(g.label)}<small>${rows.length}</small></summary>`;
     rows.forEach(b => {
       const links = (Array.isArray(b.links) ? b.links : []).map(l => link(l && l.label, l && l.url, l && l.kind === 'video' ? 'news-video' : '')).join('');
       const dot = b.impact === 'positive' || b.impact === 'negative' || b.impact === 'mixed' ? b.impact : 'none';
@@ -94,6 +95,7 @@ function briefingsHtml(){
       const body = (b.why ? `<p><b>Why it matters</b> ${escapeHtml(b.why)}</p>` : '') + (links ? `<div class="news-links">${links}</div>` : '');
       h += `<details class="news-brief" open><summary><i class="news-dot news-dot-${dot}"></i><span class="news-bhead">${escapeHtml(b.headline)}<small class="news-bmeta news-bm-${dot}">${meta}</small></span></summary>` + (body ? `<div class="news-bbody">${body}</div>` : '') + '</details>';
     });
+    h += '</details>';
   });
   return h;
 }
@@ -152,11 +154,12 @@ function groupedRows(rows){
 }
 function eventsTab(){
   const today = todayIst(), scope = scopeInfo(), inScope = new Set(scope.list.map(s => tickerSymbol(s)));
-  const typeOpts = '<option value="all">All types</option>' + EVENT_TYPES.map(t => `<option value="${t.id}"${view.type === t.id ? ' selected' : ''}>${escapeHtml(t.label)}</option>`).join('');
-  const rangeOpts = [[7, 'Next 7 days'], [30, 'Next 30 days'], [90, 'Next 90 days'], [0, 'Any date']].map(([v, l]) => `<option value="${v}"${view.upto === v ? ' selected' : ''}>${l}</option>`).join('');
-  const stratOpts = '<option value="all"' + (scope.pick === 'all' ? ' selected' : '') + '>All stocks</option>' + publishedStrategies().map(x => `<option value="${escapeHtml(x.id)}"${scope.pick === x.id ? ' selected' : ''}>${escapeHtml(x.name)}</option>`).join('');
-  let h = `<div class="choices"><button type="button" class="choice${view.when === 'upcoming' ? ' on' : ''}" data-news-when="upcoming">Upcoming</button><button type="button" class="choice${view.when === 'recent' ? ' on' : ''}" data-news-when="recent">Recent</button>` +
-    `<select class="news-select news-select-strategy" data-news-strategy aria-label="Strategy">${stratOpts}</select>` + `<select class="news-select" data-news-type aria-label="Event type">${typeOpts}</select>` + (view.when === 'upcoming' ? `<select class="news-select" data-news-upto aria-label="Date range">${rangeOpts}</select>` : '') + '</div>';
+  const stratItems = [{ attrs: 'data-news-strategy="all"', title: 'All stocks', current: scope.pick === 'all' }].concat(publishedStrategies().map(x => ({ attrs: `data-news-strategy="${escapeHtml(x.id)}"`, title: x.name, current: scope.pick === x.id })));
+  const typeItems = [{ id: 'all', label: 'All types' }].concat(EVENT_TYPES).map(t => ({ attrs: `data-news-type="${escapeHtml(t.id)}"`, title: t.label, current: view.type === t.id }));
+  const rangeItems = [[7, 'Next 7 days'], [30, 'Next 30 days'], [90, 'Next 90 days'], [0, 'Any date']].map(([v, l]) => ({ attrs: `data-news-upto="${v}"`, title: String(l), current: view.upto === v }));
+  const menu = (label, items, extra) => { const cur = items.find(i => i.current) || items[0]; return dropMenuHtml({ btnHtml: `<small>${label}</small> <b>${escapeHtml(cur.title)}</b> <span class="dm-caret" aria-hidden="true">&#9662;</span>`, label, items, extraClass: extra }); };
+  let h = `<div class="choices"><button type="button" class="choice${view.when === 'upcoming' ? ' on' : ''}" data-news-when="upcoming">Upcoming</button><button type="button" class="choice${view.when === 'recent' ? ' on' : ''}" data-news-when="recent">Recent</button></div>` +
+    '<div class="news-menus">' + menu('Strategy', stratItems, 'dm-news') + menu('Type', typeItems, 'dm-news') + (view.when === 'upcoming' ? menu('Range', rangeItems, 'dm-news') : '') + '</div>';
   heldNow = new Set(); for(const t of allTrades()){ if(t.status === 'closed' && t.sell) continue; const hs = stockByTickerSymbol.get(t.ticker); if(hs) heldNow.add(hs); }
   h += `<div class="news-hint">Covers ${scope.list.length.toLocaleString('en-IN')} stocks ${escapeHtml(scope.label)}.${view.when === 'upcoming' ? ' Dates come from TradingView and can change: check the source link.' : ''}</div>`;
   if(view.when === 'upcoming'){
