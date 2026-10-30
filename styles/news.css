@@ -99,3 +99,8 @@ a.news-stock:hover{color:var(--accent);}
 .news-bbody p{margin:0;font-size:.84rem;line-height:1.45;overflow-wrap:anywhere;}
 .news-bhead .news-tag,.news-text>.news-imp{margin-right:4px;}
 .news-bhead .news-tag{vertical-align:1px;}
+.news-events-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0;}
+.news-events-bar .news-hint{margin:0;}
+.ev-mark{display:inline-flex;align-items:center;margin-left:5px;color:var(--accent);vertical-align:middle;cursor:help;}
+.ev-sub{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:12px 0 4px;}
+#eventsPanel .news-row{padding:6px 0;}

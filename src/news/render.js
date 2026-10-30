@@ -7,6 +7,7 @@ import { publishedStrategies } from '../strategies/state.js';
 import { IMPORTANCE, EVENT_TYPES, calValue, filterItems, groupCalendar, nextBigEvents, recentItems, shortDate, tileView, typeTag, upcomingItems } from './model.js';
 import { news } from './store.js';
 import { getPulseRun } from './pulse.js';
+import { getEventsRun } from './stockevents.js';
 
 const BRIEFING_GROUPS = [
   { id: 'market', label: 'Market wrap' },
@@ -134,9 +135,11 @@ function eventsTab(){
     `<select class="news-select news-select-strategy" data-news-strategy aria-label="Strategy">${stratOpts}</select>` + `<select class="news-select" data-news-type aria-label="Event type">${typeOpts}</select>` + (view.when === 'upcoming' ? `<select class="news-select" data-news-upto aria-label="Date range">${rangeOpts}</select>` : '') + '</div>';
   h += `<div class="news-hint">Covers ${scope.list.length.toLocaleString('en-IN')} stocks ${escapeHtml(scope.label)}.</div>`;
   if(view.when === 'upcoming'){
+    const er = getEventsRun(), ev0 = news.events;
+    h += `<div class="news-events-bar"><button type="button" class="refresh-btn news-refresh" data-news-events-refresh${er.state === 'running' ? ' disabled' : ''}>${er.state === 'running' ? 'Refreshing…' : 'Refresh events'}</button><span class="news-hint">${escapeHtml(er.msg || (ev0 && ev0.tvAt ? 'Dividend dates from TradingView, ' + stamp(ev0.tvAt) + '.' : 'Reads dividend and results dates from TradingView for these stocks.'))}</span></div>`;
     const ev = news.events, all = ev && Array.isArray(ev.items) ? ev.items : [];
     const rows = filterItems(upcomingItems(all, today).filter(x => inScope.has(x.ticker)), { type: view.type, upto: view.upto }, today);
-    if(!all.length) return h + '<p class="news-empty">No upcoming events saved yet. They are researched from NSE and BSE announcements in a Claude session; ask Claude to refresh the news.</p>';
+    if(!all.length) return h + '<p class="news-empty">No upcoming events saved yet. Press <b>Refresh events</b> to read them from TradingView.</p>';
     if(ev && ev.asof) h += `<div class="news-hint">Researched ${escapeHtml(shortDate(ev.asof))}. Dates can change: check the source link.</div>`;
     if(!rows.length) return h + '<p class="news-empty">Nothing matches these filters.</p>';
     let last = '';
@@ -161,4 +164,4 @@ function newsHtml(){
   return head + (view.tab === 'events' ? eventsTab() : macroTab());
 }
 
-export { newsHtml, setPick, view };
+export { newsHtml, scopeInfo, setPick, view };

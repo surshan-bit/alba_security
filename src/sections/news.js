@@ -1,8 +1,10 @@
 // The News page: market pulse, briefings, economic calendar and stock events. Loads the first time the page is opened (see core/lazy.js).
 import { openStockInline } from '../ui/inlinedetail.js';
-import { newsHtml, setPick, view } from '../news/render.js';
+import { newsHtml, scopeInfo, setPick, view } from '../news/render.js';
 import { startNewsSync } from '../news/store.js';
 import { refreshPulse } from '../news/pulse.js';
+import { refreshStockEvents } from '../news/stockevents.js';
+import { newsChanged } from '../news/store.js';
 
 const section = () => /** @type {HTMLElement} */ (document.getElementById('section-news'));
 const body = () => document.getElementById('newsBody');
@@ -25,6 +27,7 @@ function init(){
     const when = t.closest('[data-news-when]');
     if(when){ view.when = when.getAttribute('data-news-when') === 'recent' ? 'recent' : 'upcoming'; render(); return; }
     if(t.closest('[data-news-cal-all]')){ view.calAll = !view.calAll; render(); return; }
+    if(t.closest('[data-news-events-refresh]')){ refreshStockEvents(scopeInfo().list, () => { render(); newsChanged(); }); return; }
     if(t.closest('[data-news-refresh]')) refreshPulse(render);
   });
   el.addEventListener('change', (e) => {

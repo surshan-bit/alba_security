@@ -1275,6 +1275,16 @@ test('trade call: history keeps one point a day and lists when the call changed'
     assert.deepStrictEqual(rec.map(x => [x.type, x.date]), [['news', '2026-10-22'], ['results', '2026-10-20']]);
     assert.strictEqual(N.shiftDate('2026-03-01', -1), '2026-02-28');
   });
+  test('news: TradingView dividend and results dates are built and merged without touching research items', () => {
+    const sym = new Map([['NSE:INFY', { ticker: 'INFY', name: 'Infosys' }]]);
+    const fresh = N.buildTvEvents([{ symbol: 'NSE:INFY', dividend_ex_date_upcoming: '2026-11-03', dividend_amount_upcoming: 26 }, { symbol: 'NSE:OTHER', dividend_ex_date_upcoming: '2026-11-03' }, { symbol: 'NSE:INFY', dividend_ex_date_upcoming: '2026-10-01' }], [{ symbol: 'NSE:INFY', release_next_date: '2027-01-15', next_date_confirmed: true }], sym, '2026-10-30');
+    assert.deepStrictEqual(fresh.map(x => [x.ticker, x.type, x.date]), [['INFY', 'dividend', '2026-11-03'], ['INFY', 'results', '2027-01-15']]);
+    assert.ok(/26/.test(fresh[0].text) && fresh.every(x => x.auto && x.src === 'TradingView'));
+    const saved = [{ ticker: 'INFY', type: 'dividend', date: '2026-10-31', auto: true }, { ticker: 'Z', type: 'results', date: '2026-11-05' }, { ticker: 'INFY', type: 'results', date: '2027-01-15', text: 'research' }, { ticker: 'OLD', type: 'dividend', date: '2026-10-01', auto: true }];
+    const out = N.mergeTvEvents(saved, new Set(['INFY']), fresh, '2026-10-30');
+    assert.deepStrictEqual(out.map(x => x.ticker + ' ' + x.type + ' ' + x.date), ['Z results 2026-11-05', 'INFY results 2027-01-15', 'INFY dividend 2026-11-03']);
+    assert.strictEqual(out[1].text, 'research');
+  });
 }
 
 // =========================================================== Banks, insurers and lenders (v1.313): Financial Health figures that do not describe them are left out

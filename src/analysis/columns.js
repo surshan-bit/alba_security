@@ -1,6 +1,7 @@
 // Analysis leaderboard column definitions, cells and the reorder-columns panel.
 import { stockShareLink } from '../ui/deeplink.js';
 import { industryMedianW } from '../core/industrystats.js';
+import { eventMark } from '../news/upcoming.js';
 import { daysSinceDate, escapeHtml, pctChangeSpan, screenerUrl, tickerIndustry, tickerSymbol } from '../core/util.js';
 import { analysisQueuePriceLoad, researchTriggerDone, getResearchTriggerKinds, getResearchTriggers, stockResearchAgeDays, stockResearchAsof } from '../research/status.js';
 import { getAnalysisColumnsPanelOpen, analysisFilters } from './state.js';
@@ -77,7 +78,7 @@ function analysisLbCellRaw(colId, ctx){
     }
     case 'pin': return `<td><button type="button" class="pin-btn${pinned ? ' pinned' : ''}" data-ticker="${escapeHtml(s.ticker)}" title="${pinned ? 'Unpin' : 'Pin to top'}">${pinned ? '★' : '☆'}</button></td>`;
     case 'rank': return `<td class="analysis-lb-rank">${i + 1}</td>`;
-    case 'stock': return `<td><a class="stock-link" href="${escapeHtml(stockShareLink(s))}"><span class="analysis-lb-name">${escapeHtml(s.name)}</span></a><span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}</span></td>`;
+    case 'stock': return `<td><a class="stock-link" href="${escapeHtml(stockShareLink(s))}"><span class="analysis-lb-name">${escapeHtml(s.name)}</span></a>${eventMark(s)}<span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}</span></td>`;
     case 'industry': {
       const m = industryMedianW(s);
       const chg = m === null ? '' : `<span class="ind-w ${m > 0 ? 'chg-up' : m < 0 ? 'chg-down' : ''}" title="Median weekly change of this industry">${m > 0 ? '+' : ''}${m.toFixed(1)}% W</span> `;

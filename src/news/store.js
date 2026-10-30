@@ -5,6 +5,11 @@ import { renderLoadedPart } from '../core/lazy.js';
 /** @type {{ pulse: any, macro: any, events: any, ready: boolean, noDb: boolean }} */
 const news = { pulse: null, macro: null, events: null, ready: false, noDb: false };
 let started = false;
+/** @type {null | (() => void)} */
+let onChange = null;
+// Called after every change of the saved news, so the grids and the stock page can show the event marks.
+const setNewsChangeHook = (fn) => { onChange = fn; };
+const newsChanged = () => { if(onChange) onChange(); };
 
 // Starts listening once. The page is redrawn (if it is open) on every change.
 async function startNewsSync(){
@@ -12,7 +17,7 @@ async function startNewsSync(){
   started = true;
   let db = null;
   try { db = await dbCapabilityPromise; } catch(e){ db = null; }
-  const done = () => { news.ready = true; renderLoadedPart('news'); };
+  const done = () => { news.ready = true; renderLoadedPart('news'); newsChanged(); };
   if(!db){ news.noDb = true; done(); return; }
   try {
     db.collection('news').onSnapshot(
@@ -27,4 +32,4 @@ async function startNewsSync(){
   } catch(e){ console.error('News unavailable', e); done(); }
 }
 
-export { news, startNewsSync };
+export { news, newsChanged, setNewsChangeHook, startNewsSync };

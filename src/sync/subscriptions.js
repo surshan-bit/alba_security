@@ -9,6 +9,7 @@ import { applyTech2Overlay } from '../overlays/techscore2.js';
 import { pinsRef, tradeCol } from '../identity/session.js';
 import { pinWritesInFlight } from '../core/pins.js';
 import { renderLoadedPart } from '../core/lazy.js';
+import { setNewsChangeHook, startNewsSync } from '../news/store.js';
 
 function init_sync_subscriptions(){
 // ---- Shared database bootstrap ----
@@ -20,6 +21,15 @@ function init_sync_subscriptions(){
   const db = await dbCapabilityPromise;
   if(!db) return; // capability not granted/available in this view — everything below stays session-only
   attachDb(db);
+
+  // The saved news/events list marks stocks that have something coming up (grids, stock page), so it is read from the start, not only when News opens.
+  setNewsChangeHook(() => {
+    rerenderDetail();
+    const a = document.getElementById('section-analysis');
+    if(a && a.classList.contains('active')) refreshAnalysisSoon();
+    renderLoadedPart('strategies');
+  });
+  startNewsSync();
 
   // Pins. The saved list is read two ways so one failure cannot leave every star empty: the live listener (restarted after an
   // error) and a one-time read at start-up that fills in if the listener has not delivered anything yet.
