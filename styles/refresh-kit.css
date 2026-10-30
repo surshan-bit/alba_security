@@ -82,7 +82,7 @@ tr:hover .rk-row-btn,.rk-row-btn:focus-visible,.rk-row-btn[aria-expanded="true"]
 .strat-layout{grid-template-columns:1fr;}
 }
 #stratMain .strat-panel:first-child{padding-top:19px;}
-:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) #section-strategies #stratMain .strat-panel:first-child{padding-top:3px;}
+:root[data-theme="white"] #section-strategies #stratMain .strat-panel:first-child{padding-top:3px;}
 .biz-news-bar .rk-choicebtn{margin-left:auto;}
 .biz-news-bar .rk-main{height:auto;}
 /* Explorer: the Refresh buttons inside an industry (stocks grid, news) share one green look. */
@@ -144,7 +144,7 @@ tr:hover .rk-row-btn,.rk-row-btn:focus-visible,.rk-row-btn[aria-expanded="true"]
 .settings-row{padding:12px;gap:12px;}
 .settings-row-title{font-size:var(--t-sm);}
 .settings-row-sub{font-size:var(--t-sm);}
-.theme-toggle-btn{font-size:var(--t-sm);min-height:36px;}
+
 /* Trade Log */
 #section-trackrecord .upload-hint{font-size:var(--t-sm);}
 #section-trackrecord .refresh-btn,#section-trackrecord .tl-view-btn{font-size:var(--t-sm);}

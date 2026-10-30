@@ -2,8 +2,9 @@
      --t-xl  page titles and the detail-page name        --t-lg  card, section and panel headings, big scores
      --t-md  body text, grid values, names, menus        --t-sm  grid headings, counts, buttons, pills, small labels
      --t-xs  the tiniest tags (version, Pro, key hints)
-   The Dark and Light themes use these values. The White theme sets its own (px) in white-type.css, which loads later and wins. */
-:root{--t-xl:1.8rem;--t-lg:1.25rem;--t-md:.95rem;--t-sm:.84rem;--t-xs:.66rem;}
+   There is one design (the White look), so there is one scale: laptop sizes, and smaller ones under 900 px. Weights: 500 for text and values, 700 for headings and the active choice. */
+:root{--t-xl:32px;--t-lg:20px;--t-md:16px;--t-sm:13px;--t-xs:11px;--w-reg:500;--w-strong:700;}
+@media (max-width:900px){:root{--t-xl:24px;--t-lg:17px;--t-md:13px;--t-sm:12px;--t-xs:10px;}}
 
 /* The central design system, part 2: the side padding. Every white card has the same padding inside it, so the text of every screen starts the
    same distance from the edge of the page: --card-x is the card's side padding, --card-y its top and bottom. */

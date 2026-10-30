@@ -107,12 +107,12 @@ function calendarHtml(){
   const shown = groups.filter(g => g.date >= today);
   if(!shown.length) return h + '<p class="news-empty">No upcoming events in the saved calendar. Ask Claude to refresh the news.</p>';
   shown.forEach(g => {
-    h += `<div class="news-day"><span>${escapeHtml(shortDate(g.date))}</span><span>${g.rows.length}</span></div>`;
+    h += `<div class="day-head"><span>${escapeHtml(shortDate(g.date))}</span><span>${g.rows.length}</span></div>`;
     g.rows.forEach(r => {
       const imp = IMPORTANCE[r.importance] || '', impCls = r.importance >= 1 ? 'news-hi' : r.importance === 0 ? 'news-md' : 'news-lo';
       const bits = [r.country, r.forecast !== undefined && r.forecast !== null ? 'forecast ' + calValue(r.forecast, r.unit) : '', r.previous !== undefined && r.previous !== null ? 'previous ' + calValue(r.previous, r.unit) : '', r.actual !== undefined && r.actual !== null ? 'actual ' + calValue(r.actual, r.unit) : ''].filter(Boolean).join(' \u00b7 ');
       const u = safeUrl(r.url), more = bits + (r.source ? ' \u00b7 ' + r.source : '');
-      h += `<div class="news-row news-ev"><span class="news-evname">${u ? `<a class="news-stock" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title)}</a>` : `<span class="news-stock">${escapeHtml(r.title)}</span>`}</span>${imp ? `<span class="news-imp ${impCls}">${escapeHtml(imp.toUpperCase())}</span>` : ''}<span class="news-evtext" title="${escapeHtml(more)}">${escapeHtml(bits)}</span></div>`;
+      h += `<div class="row-line"><span class="row-name">${u ? `<a class="news-stock" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title)}</a>` : `<span class="news-stock">${escapeHtml(r.title)}</span>`}</span>${imp ? `<span class="news-imp ${impCls}">${escapeHtml(imp.toUpperCase())}</span>` : ''}<span class="row-text" title="${escapeHtml(more)}">${escapeHtml(bits)}</span></div>`;
     });
   });
   h += `<button type="button" class="news-more" data-news-cal-all>${view.calAll ? 'Show only medium and high importance' : 'Show all'}</button>`;
@@ -132,20 +132,20 @@ function eventRowHtml(x){
   const text = x.text || x.src || '', u = safeUrl(x.url);
   const textHtml = u ? `<a class="news-link" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text || 'Source')}</a>` : escapeHtml(text);
   const tone = x.sentiment ? impactTag({ pos: 'positive', neg: 'negative', mix: 'mixed' }[x.sentiment]) : '';
-  return `<div class="news-row news-ev"><span class="news-evname">${nameHtml}</span><span class="news-et news-et-${escapeHtml(x.type)}">${escapeHtml(typeTag(x.type))}</span><span class="news-evtext" title="${escapeHtml(text)}">${textHtml}</span>${tone}</div>`;
+  return `<div class="row-line"><span class="row-name">${nameHtml}</span><span class="news-et news-et-${escapeHtml(x.type)}">${escapeHtml(typeTag(x.type))}</span><span class="row-text" title="${escapeHtml(text)}">${textHtml}</span>${tone}</div>`;
 }
 // The rows under one heading per date (the rows come sorted by date): the date is said once, with how many stocks have something on it.
 function groupedRows(rows){
   const days = [];
   rows.forEach(x => { const d = String(x.date).slice(0, 10), last = days[days.length - 1]; if(last && last.d === d) last.rows.push(x); else days.push({ d, rows: [x] }); });
-  return days.map(g => `<div class="news-day"><span>${escapeHtml(shortDate(g.d))}</span><span>${g.rows.length}</span></div>` + g.rows.map(eventRowHtml).join('')).join('');
+  return days.map(g => `<div class="day-head"><span>${escapeHtml(shortDate(g.d))}</span><span>${g.rows.length}</span></div>` + g.rows.map(eventRowHtml).join('')).join('');
 }
 function eventsTab(){
   const today = todayIst(), scope = scopeInfo(), inScope = new Set(scope.list.map(s => tickerSymbol(s)));
   const typeOpts = '<option value="all">All types</option>' + EVENT_TYPES.map(t => `<option value="${t.id}"${view.type === t.id ? ' selected' : ''}>${escapeHtml(t.label)}</option>`).join('');
   const rangeOpts = [[7, 'Next 7 days'], [30, 'Next 30 days'], [90, 'Next 90 days'], [0, 'Any date']].map(([v, l]) => `<option value="${v}"${view.upto === v ? ' selected' : ''}>${l}</option>`).join('');
   const stratOpts = '<option value="all"' + (scope.pick === 'all' ? ' selected' : '') + '>All stocks</option>' + publishedStrategies().map(x => `<option value="${escapeHtml(x.id)}"${scope.pick === x.id ? ' selected' : ''}>${escapeHtml(x.name)}</option>`).join('');
-  let h = `<div class="news-filters"><button type="button" class="news-pill${view.when === 'upcoming' ? ' on' : ''}" data-news-when="upcoming">Upcoming</button><button type="button" class="news-pill${view.when === 'recent' ? ' on' : ''}" data-news-when="recent">Recent</button>` +
+  let h = `<div class="choices"><button type="button" class="choice${view.when === 'upcoming' ? ' on' : ''}" data-news-when="upcoming">Upcoming</button><button type="button" class="choice${view.when === 'recent' ? ' on' : ''}" data-news-when="recent">Recent</button>` +
     `<select class="news-select news-select-strategy" data-news-strategy aria-label="Strategy">${stratOpts}</select>` + `<select class="news-select" data-news-type aria-label="Event type">${typeOpts}</select>` + (view.when === 'upcoming' ? `<select class="news-select" data-news-upto aria-label="Date range">${rangeOpts}</select>` : '') + '</div>';
   heldNow = new Set(); for(const t of allTrades()){ if(t.status === 'closed' && t.sell) continue; const hs = stockByTickerSymbol.get(t.ticker); if(hs) heldNow.add(hs); }
   h += `<div class="news-hint">Covers ${scope.list.length.toLocaleString('en-IN')} stocks ${escapeHtml(scope.label)}.</div>`;
@@ -170,7 +170,7 @@ function newsHtml(){
   const p = news.pulse, run = getPulseRun();
   const stampTxt = p && p.at ? 'Updated ' + stamp(p.at) : 'Not refreshed yet';
   const head = `<div class="news-head"><span class="news-stamp">${escapeHtml(stampTxt)}</span><button type="button" class="refresh-btn news-refresh" data-news-refresh${run.state === 'running' ? ' disabled' : ''}>${run.state === 'running' ? 'Refreshing…' : 'Refresh News'}</button></div>` +
-    `<div class="news-tabs" role="tablist"><button type="button" role="tab" class="news-tab${view.tab === 'macro' ? ' on' : ''}" aria-selected="${view.tab === 'macro'}" data-news-tab="macro">Global &amp; Macro</button><button type="button" role="tab" class="news-tab${view.tab === 'events' ? ' on' : ''}" aria-selected="${view.tab === 'events'}" data-news-tab="events">Stock events</button></div>`;
+    `<div class="tabs" role="tablist"><button type="button" role="tab" class="tab${view.tab === 'macro' ? ' on' : ''}" aria-selected="${view.tab === 'macro'}" data-news-tab="macro">Global &amp; Macro</button><button type="button" role="tab" class="tab${view.tab === 'events' ? ' on' : ''}" aria-selected="${view.tab === 'events'}" data-news-tab="events">Stock events</button></div>`;
   if(!news.ready) return head + '<p class="news-empty">Loading…</p>';
   return head + (view.tab === 'events' ? eventsTab() : macroTab());
 }

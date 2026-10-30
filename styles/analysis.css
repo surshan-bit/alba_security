@@ -50,7 +50,7 @@
 .analysis-col-grip:hover,.analysis-col-grip:focus-visible{color:var(--accent);border-color:var(--line);}
 .analysis-column-row.dragging .analysis-col-grip{cursor:grabbing;color:var(--accent);}
 /* Analysis "color dots by" toggle (added 2026-09-30): Weekly vs Monthly RSI, green if that
-     RSI is above 50, red otherwise. Same active/inactive visual pattern as .theme-toggle-btn. */
+     RSI is above 50, red otherwise.  */
 .analysis-color-toggle{display:flex;flex-direction:column;gap:8px;}
 .analysis-color-toggle-label{font-size:var(--t-sm);color:var(--muted);font-weight:600;}
 /* Segmented on/off toggle (2026-10-10): the two options share one rounded track, the selected one is
@@ -152,12 +152,7 @@ body.biz-full-open{overflow:hidden;}
    no box (display:contents), so each control becomes an item of the line that #analysisPanelBody draws; everything else (the filter groups, the table) takes a full line. */
 @media (min-width:901px){
   #analysisPanelBody:has(> .analysis-industry){display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-top:4px;}   /* the same top and row gap as the Stocks view's toolbar, so the grid does not move when View changes */
-  #analysisPanelBody:has(> .analysis-industry) > .analysis-toolbar,
-  #analysisPanelBody:has(> .analysis-industry) > .analysis-industry,
-  #analysisPanelBody:has(> .analysis-industry) .biz-embedded,
-  #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full),
-  #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full) > .biz-toolbar,
-  #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-controls{display:contents;}
+  #analysisPanelBody:has(> .analysis-industry) > .analysis-toolbar,#analysisPanelBody:has(> .analysis-industry) > .analysis-industry,#analysisPanelBody:has(> .analysis-industry) .biz-embedded,#analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full),#analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full) > .biz-toolbar,#analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-controls{display:contents;}
   #analysisPanelBody:has(> .analysis-industry) .analysis-view-bar{order:1;}
   #analysisPanelBody:has(> .analysis-industry) .analysis-filters-panel .filters-toggle{order:2;}
   #analysisPanelBody:has(> .analysis-industry) .biz-controls > .dm{order:3;}
@@ -209,8 +204,7 @@ body.biz-full-open{overflow:hidden;}
 /* v1.280: every control on the Analysis toolbar (View, Filters, Period, Matched only, ⋯, icon buttons, Refresh) shares one height, border, radius and type in all three themes, in the Stocks and Industry views alike. */
 #analysisPanelBody :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){height:36px;min-height:36px;box-sizing:border-box;border-radius:6px;}
 :root[data-theme="white"] #analysisPanelBody :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){border:1px solid #c9cfdf;background:#fff;}
-:root[data-theme="white"] #analysisPanelBody :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle):hover,
-:root[data-theme="white"] #analysisPanelBody :is(.dm-btn,.analysis-icon-btn)[aria-expanded="true"]{border-color:var(--accent);}
+:root[data-theme="white"] #analysisPanelBody :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle):hover,:root[data-theme="white"] #analysisPanelBody :is(.dm-btn,.analysis-icon-btn)[aria-expanded="true"]{border-color:var(--accent);}
 :root[data-theme="white"] #analysisPanelBody .biz-field select{border:0;background:transparent;}
 :root[data-theme="white"] body #analysisPanelBody#analysisPanelBody :is(.rk-toolbtn,.rk-main,.rk-barbtn){display:inline-flex;align-items:center;justify-content:center;height:36px;min-height:36px;padding:0 14px;font-size:var(--t-md) !important;font-weight:500 !important;letter-spacing:normal;text-transform:none;color:#1b1f2a;}
 :root[data-theme="white"] #analysisPanelBody :is(.rk-toolbtn,.rk-main):hover:not(:disabled){color:var(--accent);}

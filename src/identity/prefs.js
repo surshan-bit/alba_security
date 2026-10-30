@@ -1,5 +1,4 @@
-// Per-user preferences. localStorage stays as a fast per-browser mirror (the page's head script reads the theme from it to
-// avoid a flash); when someone is signed in the preferences are also saved to their own record, and that record wins when
+// Per-user preferences. localStorage stays as a fast per-browser mirror; when someone is signed in the preferences are also saved to their own record, and that record wins when
 // the page opens (see syncPrefs).
 import { PREFS_LOCAL_AT_KEY, PREFS_OWNER_KEY, PREF_FIELDS, STRAT_AT_KEY, STRAT_KEY, UISTATE_KEY } from './keys.js';
 import { getUid, userRef } from './session.js';
@@ -73,7 +72,6 @@ async function syncPrefs(){
     const dbAt = d ? (Date.parse(d.updatedAt) || 0) : 0;
     if(d && localAt > dbAt){
       const o = prefsObject(); o.updatedAt = new Date().toISOString();
-      const t = o.theme; if(t === 'light' || t === 'indigo' || t === 'white' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
       await ref.set(o);
       return;
     }
@@ -83,7 +81,6 @@ async function syncPrefs(){
         if(d[field] === undefined) continue;
         try { localStorage.setItem(k, kind === 'json' ? JSON.stringify(d[field]) : String(d[field])); } catch(e){ /* storage unavailable: the copy in the database still applies */ }
       }
-      if(d.theme === 'light' || d.theme === 'indigo' || d.theme === 'white' || d.theme === 'dark') document.documentElement.setAttribute('data-theme', d.theme);
     } else {
       const o = prefsObject();
       if(Object.keys(o).length > 1){ o.updatedAt = new Date().toISOString(); await ref.set(o); }

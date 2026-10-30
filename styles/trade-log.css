@@ -95,4 +95,4 @@
 .tl-held-tag{margin-left:8px;padding:1px 8px;border-radius:999px;font-size:var(--t-xs);font-weight:700;white-space:nowrap;border:1px solid var(--accent);color:var(--accent);}
 
 /* Phone-only pieces of the Trade Log (shown by styles/phone.css up to 600px wide): the Positions / Ideas tabs, the short rows and the short "Processed" line. */
-.news-tabs.tl-tabs,.tl-phone,.tl-ideas-short{display:none;}
+.tl-phone,.tl-ideas-short{display:none;}

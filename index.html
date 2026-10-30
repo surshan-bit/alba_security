@@ -1,40 +1,23 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="white">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Alba Securities - Stock Analyzer</title>
-<script>
-// The only inline script (everything else is a module in src/, started by js/loader.js).
-// Applied before the stylesheet paints, so a viewer who chose Light doesn't see a
-// flash of the default dark theme first. Kept deliberately tiny and defensive (storage can be
-// blocked or unavailable, e.g. a private window) — falls back to the default dark theme.
-// "light" is the retired Red theme; it is shown as the Light theme (key "indigo") from v1.113.
-(function(){
-  try {
-    const saved = localStorage.getItem('albaDashboard.theme.v1');
-    if(saved === 'light' || saved === 'indigo'){
-      document.documentElement.setAttribute('data-theme', 'indigo');
-    } else if(saved === 'white'){
-      document.documentElement.setAttribute('data-theme', 'white');
-    }
-  } catch(e){ /* storage unavailable — default (dark) theme applies */ }
-})();
-</script>
-<link rel="stylesheet" href="styles.css?v=5d4bd836">
+<link rel="stylesheet" href="styles.css?v=f41ab805">
 <!--build:preload-->
-<link rel="modulepreload" href="app.js?v=5d4bd836">
-<link rel="modulepreload" href="chunks/chunk-6CPUDTPB.js">
+<link rel="modulepreload" href="app.js?v=f41ab805">
+<link rel="modulepreload" href="chunks/chunk-HE66IFB4.js">
 <link rel="modulepreload" href="chunks/chunk-LWDZFE6T.js">
-<link rel="modulepreload" href="chunks/chunk-4AXKCZW4.js">
-<link rel="modulepreload" href="chunks/main-REMJN3TC.js">
-<link rel="modulepreload" href="chunks/chunk-BTXVPB4I.js">
-<link rel="modulepreload" href="chunks/chunk-FB4ZPBR2.js">
-<link rel="modulepreload" href="chunks/chunk-PJ6AYC3J.js">
-<link rel="modulepreload" href="chunks/chunk-HPO3UGEL.js">
-<link rel="modulepreload" href="chunks/chunk-5DZV4HI6.js">
-<link rel="modulepreload" href="chunks/chunk-5YX7JYNG.js">
+<link rel="modulepreload" href="chunks/chunk-LDVI5725.js">
+<link rel="modulepreload" href="chunks/main-TSU33GHJ.js">
+<link rel="modulepreload" href="chunks/chunk-VDNRIWY5.js">
+<link rel="modulepreload" href="chunks/chunk-SVO4T3VI.js">
+<link rel="modulepreload" href="chunks/chunk-LX5CYVUK.js">
+<link rel="modulepreload" href="chunks/chunk-TS2ZATJI.js">
+<link rel="modulepreload" href="chunks/chunk-I57GLIOY.js">
+<link rel="modulepreload" href="chunks/chunk-6IBFEXH3.js">
 <!--/build:preload-->
 </head>
 <body>
@@ -79,7 +62,7 @@
       </g>
       <circle cx="100" cy="100" r="50" fill="url(#brandSunGrad)"/>
     </svg>
-    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.334 &mdash; tagged 2026-10-30">v1.334</span></div>
+    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.335 &mdash; tagged 2026-10-30">v1.335</span></div>
   </div>
   <div class="sidebar-nav">
     <div class="nav-section-label">Menu</div>
@@ -113,7 +96,7 @@
       </span>
       Trade Log
     </button>
-    <!-- Tools: a drop-down in the White theme's top bar; in Dark and Light the group is invisible and the four items sit in the sidebar as before. -->
+    <!-- Tools: a drop-down in the top bar. -->
     <div class="nav-tools-group" id="navToolsGroup">
       <button type="button" class="nav-tools-toggle" id="navToolsToggle" aria-haspopup="true" aria-expanded="false" aria-controls="navToolsMenu">Tools <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
       <div class="nav-tools-menu" id="navToolsMenu">
@@ -202,7 +185,7 @@
       <h1>Trade Log</h1>
       <div class="sub">A running, real-money record of every position bought or sold.</div>
     </header>
-    <div class="news-tabs tl-tabs" role="tablist" aria-label="Trade Log"><button type="button" role="tab" class="news-tab on" data-tl-tab="positions" id="tlTabPositions">Positions</button><button type="button" role="tab" class="news-tab" data-tl-tab="ideas">Ideas</button></div>
+    <div class="tabs tabs-top" role="tablist" aria-label="Trade Log"><button type="button" role="tab" class="tab on" data-tl-tab="positions" id="tlTabPositions">Positions</button><button type="button" role="tab" class="tab" data-tl-tab="ideas">Ideas</button></div>
     <div class="analysis-panel">
       <div class="analysis-panel-head">
         <div class="analysis-panel-title">Positions</div>
@@ -225,35 +208,12 @@
   <section class="app-section" id="section-settings">
     <header>
       <h1>Settings</h1>
-      <div class="sub">Your display preferences. When you are signed in they are saved to your own account and follow you to any device; without a sign-in they are kept in this browser only.</div>
+      <div class="sub">Your preferences. When you are signed in they are saved to your own account and follow you to any device; without a sign-in they are kept in this browser only.</div>
     </header>
 
-    <div class="settings-panel">
-      <div class="settings-row">
-        <div class="settings-row-text">
-          <div class="settings-row-title">Themes</div>
-          <div class="settings-row-sub">Choose how the screener looks — Dark, Light or White. Saved to your account when you are signed in (otherwise to this browser only).</div>
-        </div>
-        <div class="theme-toggle" id="themeToggle" role="group" aria-label="Theme">
-          <button type="button" class="theme-toggle-btn" data-theme-choice="dark">
-            <span class="theme-swatch" style="background:#0f1720;border:1px solid #2a3441;"></span>
-            Dark
-          </button>
-          <button type="button" class="theme-toggle-btn" data-theme-choice="indigo">
-            <span class="theme-swatch" style="background:linear-gradient(135deg,#fafcff 50%,#4658b6 50%);border:1px solid #a9bdd3;"></span>
-            Light
-          </button>
-          <button type="button" class="theme-toggle-btn" data-theme-choice="white">
-            <span class="theme-swatch" style="background:linear-gradient(135deg,#ffffff 50%,#5b5fe0 50%);border:1px solid #d5dae6;"></span>
-            White
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <header class="settings-subhead">
+<header class="settings-subhead">
       <h2 data-icon="spark">Claude controls</h2>
-      <div class="sub">Choose which steps may send data to Claude. All are on by default. Switching one off skips only that step; the CSV import never uses Claude. Saved the same way as your theme.</div>
+      <div class="sub">Choose which steps may send data to Claude. All are on by default. Switching one off skips only that step; the CSV import never uses Claude. Saved the same way as your other preferences.</div>
     </header>
     <div class="settings-panel" id="claudeControls"></div>
   </section>
@@ -264,7 +224,7 @@
   <div class="boot-msg" style="font-size:.95rem;max-width:480px;line-height:1.5;"></div>
   <button type="button" class="boot-retry" hidden style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer;" onclick="location.reload()">Retry</button>
 </div>
-<script src="js/loader.js" data-entry="app.js?v=5d4bd836"></script>
+<script src="js/loader.js" data-entry="app.js?v=f41ab805"></script>
 </body>
 </html>
 

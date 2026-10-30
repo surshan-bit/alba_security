@@ -251,6 +251,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.335 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>One design:</strong> the Dark and Light themes are retired and the Themes choice is gone from Settings, so there is one look (the White design) to get completely right. Everything on screen looks the same as before. A saved Dark or Light choice is simply ignored.</li>
+              <li><strong>Shared parts, first set:</strong> the tabs (News, Trade Log), the round choice buttons (Upcoming / Recent, Open / Closed), the date heading with its count and the one-line event row now come from one shared style sheet (<code>styles/parts.css</code>) instead of each screen&rsquo;s own rules. The only visible change: the News tabs are bold, like the Trade Log tabs.</li>
+            </ul>
             <h3>v1.334 &middot; 2026-10-30</h3>
             <ul>
               <li><strong>One design system for text size and side padding (first step):</strong> every font size in the stylesheets is now one of five named sizes (title, heading, body, small, label) defined in one place, instead of 60 different numbers, so a size changes everywhere at once. The side padding of every white card is also one setting, so on a phone the text starts the same distance from the edge on News, Trade Log, Analysis, Strategies, Business, Help, Data Refresh and Settings (it was 16 px on News, 20 px on Trade Log and 24 px on Data Refresh). The News page had the smallest padding and now matches the others. A new check in the test run stops new screen-specific CSS from being added.</li>

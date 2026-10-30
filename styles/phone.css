@@ -242,11 +242,7 @@ html{font-size:112.5%;}
 /* ---- Trade Log on a phone (v1.329): Positions and Ideas as two tabs, one short row per trade, the add form as a bottom sheet. :root:root:root beats the White theme's type scale. ---- */
 @media (max-width:600px){
 :root:root:root #section-trackrecord{padding-bottom:76px;}
-:root:root:root #section-trackrecord .tl-tabs{display:flex;margin:0;padding:8px var(--card-x) 0;background:var(--panel);border-radius:14px 14px 0 0;border-bottom:0;position:relative;}   /* the tabs are the top of the white block, like News: the panel under them continues it */
-:root:root:root #section-trackrecord .tl-tabs::after{content:"";position:absolute;left:var(--card-x);right:var(--card-x);bottom:0;border-bottom:1px solid var(--line);}
-:root:root:root #section-trackrecord .tl-tabs .news-tab{border-bottom-width:2px;margin-bottom:0;position:relative;z-index:1;}
 :root:root:root #section-trackrecord .analysis-panel{margin-top:0;border-top-left-radius:0;border-top-right-radius:0;}
-:root:root:root #section-trackrecord .tl-tabs .news-tab{font-weight:700 !important;}
 /* Which panel shows */
 :root:root:root #section-trackrecord[data-tl-tab="ideas"] .analysis-panel:not(.tl-ideas){display:none;}
 :root:root:root #section-trackrecord[data-tl-tab="positions"] .tl-ideas{display:none;}

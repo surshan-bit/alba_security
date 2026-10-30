@@ -7,7 +7,7 @@
      are dark enough to read comfortably on cream; the verdict colours (buy/mbuy/hold/avoid/tech-sell) are the same
      as before, calibrated for a light background. The internal key stays "indigo" so saved choices and old links keep
      working; a browser or account that still has the retired Red theme ("light") gets this same Light look. */
-:root[data-theme="indigo"],:root[data-theme="light"],:root[data-theme="white"]{--bg:#eaf2fa;--panel:#fafcff;--panel2:#e6eff9;--line:#c9d8e8;--text:#0e1218;--muted:#434a54;--accent:#4658b6;--accent-soft:#4658b6;--buy:#1f7a54;--mbuy:#566f29;--hold:#8a6d0c;--avoid:#a83f38;--tech-sell:#a85a1b;}
+:root[data-theme="white"]{--bg:#eaf2fa;--panel:#fafcff;--panel2:#e6eff9;--line:#c9d8e8;--text:#0e1218;--muted:#434a54;--accent:#4658b6;--accent-soft:#4658b6;--buy:#1f7a54;--mbuy:#566f29;--hold:#8a6d0c;--avoid:#a83f38;--tech-sell:#a85a1b;}
 /* White theme: the Screener look (pale lavender page, pure white cards, indigo accent). Same font as the other themes. */
 :root[data-theme="white"]{--bg:#eaedf7;--panel:#ffffff;--panel2:#f3f5fb;--line:#dde2ee;--text:#1b1f2a;--muted:#4a5163;--accent:#5b5fe0;--accent-soft:#5b5fe0;--hd:#5b5fe0;}
 *{box-sizing:border-box;}
@@ -15,5 +15,5 @@ html{scroll-padding-top:env(safe-area-inset-top,0px);scrollbar-gutter:stable;}  
 body{margin:0;background:var(--bg);color:var(--text);font-family:"Iowan Old Style","Georgia",serif;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
 /* Dark theme: more prominent text (v1.118). Brighter body and secondary text (tokens in 01), placeholders at full strength (browsers dim
    them with opacity), and a clearer outline on the search and form fields. The Light theme sets its own placeholder colour and borders. */
-:root:not([data-theme="indigo"]):not([data-theme="light"]):not([data-theme="white"]) :is(input,select,textarea)::placeholder{color:#cdc6bb;opacity:1;}
-:root:not([data-theme="indigo"]):not([data-theme="light"]):not([data-theme="white"]) :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){color:var(--text);}
+
+
