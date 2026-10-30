@@ -1,5 +1,6 @@
 /* The stylesheet: tools/build.js bundles these files, in this order, into styles.css (minified).
    The order is part of the cascade: tools/css-snapshot.js proves a change did not alter the page. */
+@import "./phone-important.css" layer(phone-first);
 @import "./tokens.css" layer(legacy);
 @import "./base.css" layer(legacy);
 @import "./shell.css" layer(legacy);
@@ -24,6 +25,8 @@
 @import "./refresh-kit.css" layer(legacy);
 @import "./late-global.css" layer(legacy);
 @import "./filters-ondemand.css" layer(legacy);
-@import "./white-type.css";
+@import "./phone-boost.css" layer(phone);
+@import "./white-type.css" layer(type);
+/* Four layers, in the order they first appear in this file (the bundler drops an @layer order line), a later one wins whatever the selector says, except for !important, where an earlier one wins:
+   phone-first (the phone !important declarations), legacy (every screen file), phone (phone-boost.css) and type (white-type.css, the one type scale). */
 
-/* Every other file is in the layer "legacy"; white-type.css (the one type scale) is outside any layer, so its plain rules beat all of them without !important. */

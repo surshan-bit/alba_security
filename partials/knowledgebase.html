@@ -251,6 +251,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.340 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>Tidier styling underneath (nothing looks different):</strong> the page&rsquo;s styles are now arranged in layers (screen styles, the phone rules, and the one type scale on top), so a rule wins because of the layer it is in, not because it shouts louder. The forced <code>!important</code> rules fell from 179 to 103, the stacked <code>:root:root:root</code> overrides from 137 to none, and the type scale (<code>white-type.css</code>) no longer needs <code>!important</code> at all. Every element on every screen at phone, tablet and laptop width was compared before and after; the only change is that a button you reach with the keyboard now shows its focus ring.</li>
+              <li><strong>Inline font styles removed:</strong> a few headings, badges and banners carried their own font size or weight that the type scale was silently overriding; they now simply follow the type scale.</li>
+            </ul>
             <h3>v1.339 &middot; 2026-10-30</h3>
             <ul>
               <li><strong>Technical Score on a phone:</strong> the Change / RSI / Signal strip above each chart now fits inside the card instead of running past the right edge, and the Legend button sits on its own line instead of covering the score badge.</li>

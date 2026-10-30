@@ -22,11 +22,5 @@
 .row-line .row-text a{color:inherit;text-decoration:none;}
 .tabs-top{display:none;}
 .row-line{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line);white-space:nowrap;}
-:root:root:root .tab{font-weight:700 !important;}
-@media (max-width:600px){
-:root:root:root .tabs-top{display:flex;margin:0;padding:8px var(--card-x) 0;background:var(--panel);border-radius:14px 14px 0 0;border-bottom:0;position:relative;}
-:root:root:root .tabs-top::after{content:"";position:absolute;left:var(--card-x);right:var(--card-x);bottom:0;border-bottom:1px solid var(--line);}
-:root:root:root .tabs-top .tab{border-bottom-width:2px;margin-bottom:0;position:relative;z-index:1;}
-}
 /* field: every text box and drop-down is at least as tall as a toolbar control (36 px), so a row of controls lines up on any screen */
 :root :is(select,input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]),textarea:not([rows])){min-height:36px;box-sizing:border-box;}
