@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with: { version: 2.121.0 }
       - run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then echo "No SUPABASE_ACCESS_TOKEN secret yet: skipping the deploy."; exit 0; fi
