@@ -239,7 +239,7 @@ function buildTvEvents(divRows, earnRows, symOf, today){
   });
   (Array.isArray(earnRows) ? earnRows : []).forEach(r => {
     if(!r || !r.release_next_date) return;
-    add(r.symbol, 'results', r.release_next_date, r.next_date_confirmed ? 'Results date (confirmed)' : 'Results expected');
+    add(r.symbol, 'results', r.release_next_date, r.next_date_confirmed ? 'Results date (confirmed)' : 'Results expected (TradingView date, can change)');
   });
   return out;
 }
