@@ -1,7 +1,6 @@
 // The News page: a "Global & Macro" tab (market pulse, briefings, economic calendar) and a "Stock events" tab.
 import { escapeHtml, tickerSymbol } from '../core/util.js';
 import { stockByTickerSymbol, stockIndex, stocks } from '../core/stocks.js';
-import { scoreBand } from '../list/metrics.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { publishedStrategies } from '../strategies/state.js';
 import { IMPORTANCE, EVENT_TYPES, calValue, filterItems, groupCalendar, nextBigEvents, recentItems, shortDate, tileView, typeTag, upcomingItems } from './model.js';
@@ -117,33 +116,31 @@ function calendarHtml(){
 function macroTab(){ return pulseHtml() + briefingsHtml() + calendarHtml(); }
 
 // ---- Stock events ----
-const scoreBadges = (s) => {
-  const f = Number.isFinite(s.score) ? s.score : null, t = s.technical && Number.isFinite(s.technical.score) ? s.technical.score : null;
-  return (f !== null ? `<span class="news-score ${scoreBand(f)}" title="Fundamental score">F ${f.toFixed(1)}</span>` : '') +
-    (t !== null ? `<span class="news-score ${scoreBand(t)}" title="Technical score">T ${t.toFixed(1)}</span>` : '');
-};
 let heldNow = new Set();   // the stocks in an open trade, worked out once per draw
 const holdTags = (s) => (s && heldNow.has(s) ? '<span class="news-own news-held">HELD</span>' : '') + (s && isPinned(s) ? '<span class="news-own news-pinned">PINNED</span>' : '');
-function eventRowHtml(x, i, showDate){
+// One line per event: the stock, what kind of event, and its text (a link to the source when there is one; the whole text is the tooltip).
+function eventRowHtml(x){
   const s = stockByTickerSymbol.get(x.ticker), idx = s ? stockIndex.get(s) : undefined;
   const name = s ? s.name : (x.name || x.ticker);
   const nameHtml = (idx !== undefined ? `<a class="news-stock" href="#" data-news-open="${idx}">${escapeHtml(name)}</a>` : `<span class="news-stock">${escapeHtml(name)}</span>`) + holdTags(s);
-  const src = link(x.src || 'Source', x.url);
-  return `<div class="news-row">${showDate ? `<div class="news-date">${escapeHtml(shortDate(x.date))}</div>` : ''}<div class="news-text">${nameHtml} ${s ? scoreBadges(s) : ''}<small><span class="news-et news-et-${escapeHtml(x.type)}">${escapeHtml(typeTag(x.type))}</span>${escapeHtml(x.text || '')}${src ? ' &middot; ' + src : (x.src ? ' &middot; ' + escapeHtml(x.src) : '')}${x.sentiment ? ' ' + impactTag({ pos: 'positive', neg: 'negative', mix: 'mixed' }[x.sentiment]) : ''}</small></div></div>`;
+  const text = x.text || x.src || '', u = safeUrl(x.url);
+  const textHtml = u ? `<a class="news-link" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text || 'Source')}</a>` : escapeHtml(text);
+  const tone = x.sentiment ? impactTag({ pos: 'positive', neg: 'negative', mix: 'mixed' }[x.sentiment]) : '';
+  return `<div class="news-row news-ev"><span class="news-evname">${nameHtml}</span><span class="news-et news-et-${escapeHtml(x.type)}">${escapeHtml(typeTag(x.type))}</span><span class="news-evtext" title="${escapeHtml(text)}">${textHtml}</span>${tone}</div>`;
 }
 // The rows under one heading per date (the rows come sorted by date): the date is said once, with how many stocks have something on it.
 function groupedRows(rows){
   const days = [];
   rows.forEach(x => { const d = String(x.date).slice(0, 10), last = days[days.length - 1]; if(last && last.d === d) last.rows.push(x); else days.push({ d, rows: [x] }); });
-  return days.map(g => `<div class="news-day"><span>${escapeHtml(shortDate(g.d))}</span><span>${g.rows.length}</span></div>` + g.rows.map(x => eventRowHtml(x, 0, false)).join('')).join('');
+  return days.map(g => `<div class="news-day"><span>${escapeHtml(shortDate(g.d))}</span><span>${g.rows.length}</span></div>` + g.rows.map(eventRowHtml).join('')).join('');
 }
 function eventsTab(){
   const today = todayIst(), scope = scopeInfo(), inScope = new Set(scope.list.map(s => tickerSymbol(s)));
-  const typeChips = '<div class="news-filters news-types">' + [{ id: 'all', label: 'All' }].concat(EVENT_TYPES).map(t => `<button type="button" class="news-pill${view.type === t.id ? ' on' : ''}" data-news-type="${t.id}">${escapeHtml(t.label)}</button>`).join('') + '</div>';
+  const typeOpts = '<option value="all">All types</option>' + EVENT_TYPES.map(t => `<option value="${t.id}"${view.type === t.id ? ' selected' : ''}>${escapeHtml(t.label)}</option>`).join('');
   const rangeOpts = [[7, 'Next 7 days'], [30, 'Next 30 days'], [90, 'Next 90 days'], [0, 'Any date']].map(([v, l]) => `<option value="${v}"${view.upto === v ? ' selected' : ''}>${l}</option>`).join('');
   const stratOpts = '<option value="all"' + (scope.pick === 'all' ? ' selected' : '') + '>All stocks</option>' + publishedStrategies().map(x => `<option value="${escapeHtml(x.id)}"${scope.pick === x.id ? ' selected' : ''}>${escapeHtml(x.name)}</option>`).join('');
   let h = `<div class="news-filters"><button type="button" class="news-pill${view.when === 'upcoming' ? ' on' : ''}" data-news-when="upcoming">Upcoming</button><button type="button" class="news-pill${view.when === 'recent' ? ' on' : ''}" data-news-when="recent">Recent</button>` +
-    `<select class="news-select news-select-strategy" data-news-strategy aria-label="Strategy">${stratOpts}</select>` + (view.when === 'upcoming' ? `<select class="news-select" data-news-upto aria-label="Date range">${rangeOpts}</select>` : '') + '</div>' + typeChips;
+    `<select class="news-select news-select-strategy" data-news-strategy aria-label="Strategy">${stratOpts}</select>` + `<select class="news-select" data-news-type aria-label="Event type">${typeOpts}</select>` + (view.when === 'upcoming' ? `<select class="news-select" data-news-upto aria-label="Date range">${rangeOpts}</select>` : '') + '</div>';
   heldNow = new Set(); for(const t of allTrades()){ if(t.status === 'closed' && t.sell) continue; const hs = stockByTickerSymbol.get(t.ticker); if(hs) heldNow.add(hs); }
   h += `<div class="news-hint">Covers ${scope.list.length.toLocaleString('en-IN')} stocks ${escapeHtml(scope.label)}.</div>`;
   if(view.when === 'upcoming'){

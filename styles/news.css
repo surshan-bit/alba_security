@@ -43,11 +43,6 @@
 .news-select{background:var(--panel2);border:1px solid var(--line);border-radius:20px;color:var(--text);font:600 .76rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:4px 10px;}
 .news-stock{font-weight:700;color:var(--text);text-decoration:none;}
 a.news-stock:hover{color:var(--accent);}
-.news-score{display:inline-block;font:700 .62rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;border-radius:8px;padding:1px 6px;margin-left:4px;border:1px solid var(--line);color:var(--muted);vertical-align:middle;}
-.news-score.fs-buy{color:var(--buy);border-color:var(--buy);}
-.news-score.fs-mbuy{color:var(--mbuy);border-color:var(--mbuy);}
-.news-score.fs-hold{color:var(--hold);border-color:var(--hold);}
-.news-score.fs-avoid{color:var(--avoid);border-color:var(--avoid);}
 .news-et{display:inline-block;font:700 .6rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.04em;border:1px solid var(--line);border-radius:8px;padding:0 6px;margin-right:6px;}
 
 /* Layout like the stock page: flat sections, side padding, and nothing wider than the screen. */
@@ -124,3 +119,10 @@ a.news-stock:hover{color:var(--accent);}
 :root:root:root .news-bbody p b,:root:root:root .news-why-h{font-weight:700 !important;}
 :root:root:root .news-types{margin-bottom:4px;}
 .news-day + .news-row{border-top:0;}
+/* Stock events: one line per event (stock, kind of event, text cut at the end of the line) */
+.news-ev{align-items:center;gap:8px;padding:9px 0;white-space:nowrap;}
+.news-ev .news-evname{flex:0 1 auto;min-width:0;max-width:55%;overflow:hidden;text-overflow:ellipsis;}
+.news-ev .news-et{flex:none;margin:0;}
+.news-ev .news-evtext{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--muted);}
+.news-ev .news-evtext a{color:inherit;text-decoration:none;}
+.news-ev .news-tag{flex:none;}
