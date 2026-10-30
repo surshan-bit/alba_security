@@ -69,7 +69,7 @@
 .pc-tip .r span:first-child{opacity:.7;}
 /* MACD band under the volume (v1.259): blue MACD line, orange signal line, the gap between them as bars (blue above zero, orange below). */
 .pc-block{--pc-macd:#3987e5;--pc-sig:#d95926;}
-:root[data-theme="indigo"] .pc-block,:root[data-theme="white"] .pc-block{--pc-macd:#2a78d6;--pc-sig:#eb6834;}
+:root[data-theme="white"] .pc-block{--pc-macd:#2a78d6;--pc-sig:#eb6834;}
 .pc-legend i.pc-lm,.pc-legend i.pc-ls{height:3px;vertical-align:3px;}
 .pc-legend i.pc-lm{background:var(--pc-macd);}
 .pc-legend i.pc-ls{background:var(--pc-sig);}

@@ -2,7 +2,6 @@
 
 // localStorage key -> [field in the saved record, how it is stored]
 const PREF_FIELDS = {
-  'albaDashboard.theme.v1': ['theme', 'raw'],
   'albaDashboard.analysisFilters.v1': ['analysis', 'json'],
   'albaDashboard.tradeView.v1': ['tradeView', 'raw'],
   'albaDashboard.business.v1': ['industry', 'json'],   // Industry screen: view, period, grouping, strategy

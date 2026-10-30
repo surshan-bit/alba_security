@@ -72,24 +72,23 @@
 @media (min-width:901px){:root[data-theme="white"] .analysis-filters-panel :is(.filter-btn,.filter-group-title,.filter-group label){font-size:var(--t-md);}}
 @media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:var(--t-xl);}}
 /* Data Refresh and Settings: one big white card on the lavender page, like Explorer, with flat rows split by hairlines. */
-  :root[data-theme="white"] :is(#section-refreshlog,#section-settings){background:#fff;border-radius:12px;box-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);padding:22px var(--card-x) 28px;}
   /* Readable line length: the card is full width, the content inside is capped and centred, not stretched. */
-  :root[data-theme="white"] :is(#section-refreshlog,#section-settings) > *{max-width:960px;margin-left:auto;margin-right:auto;}
-  :root[data-theme="white"] :is(#section-refreshlog,#section-settings) :is(.refreshlog-panel,.settings-panel){max-width:960px;}
-  :root[data-theme="white"] :is(#section-refreshlog,#section-settings) :is(.refreshlog-freshness,.upload-panel,.refreshlog-run,.settings-row,.refreshlog-job,.live-refresh){background:transparent;border:0;border-radius:0;box-shadow:none;}
-  :root[data-theme="white"] :is(#section-refreshlog,#section-settings) :is(.upload-panel,.settings-row,.refreshlog-freshness,.refreshlog-job){border-bottom:1px solid #eef0f6;padding-left:0;padding-right:0;margin-bottom:0;}
+  :root[data-theme="white"] .card-narrow > *{max-width:960px;margin-left:0;margin-right:auto;}
+  :root[data-theme="white"] .card-narrow :is(.refreshlog-panel,.settings-panel){max-width:960px;}
+  :root[data-theme="white"] .card-narrow :is(.refreshlog-freshness,.upload-panel,.refreshlog-run,.settings-row,.refreshlog-job,.live-refresh){background:transparent;border:0;border-radius:0;box-shadow:none;}
+  :root[data-theme="white"] .card-narrow :is(.upload-panel,.settings-row,.refreshlog-freshness,.refreshlog-job){border-bottom:1px solid #eef0f6;padding-left:0;padding-right:0;margin-bottom:0;}
   :root[data-theme="white"] #section-settings .settings-row{padding-top:18px;padding-bottom:18px;}
   :root[data-theme="white"] #section-settings .settings-subhead{margin-top:28px;}
-  :root[data-theme="white"] :is(#section-refreshlog,#section-settings) .sub{max-width:none;}
-:root[data-theme="white"] #section-strategies #stratMain .strat-panel{border-top-width:0;}
+  :root[data-theme="white"] .card-narrow .sub{max-width:none;}
+:root[data-theme="white"] .strat-layout .strat-main .strat-panel{border-top-width:0;}
 /* Wide screens: the search box grows into the free space between the menu and the Live / bell buttons. */
 @media (min-width:1600px){:root[data-theme="white"] .topbar .topbar-search{width:calc(100vw - 1110px - 179px);max-width:600px;}}
 /* Score and rating badges: black text for clarity (the tinted background still shows the verdict). */
 :root[data-theme="white"] .badge:is(.b-buy,.b-mbuy,.b-hold,.b-avoid){color:#000;font-weight:600;}
 /* Primary headings (Data Refresh jobs, Settings, Help and Knowledge Base sections): a topic icon before the title, a larger heavier face and a short accent bar. */
-  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon]){display:flex;align-items:center;gap:12px;font-size:var(--t-lg);font-weight:700;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;}
-  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon])::before{content:"";width:28px;height:28px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
-  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon])::after{content:"";position:absolute;left:0;bottom:0;width:56px;height:3px;border-radius:2px;background:var(--accent);}
+  :root[data-theme="white"] :is(h2[data-icon]){display:flex;align-items:center;gap:12px;font-size:var(--t-lg);font-weight:700;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;}
+  :root[data-theme="white"] :is(h2[data-icon])::before{content:"";width:28px;height:28px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
+  :root[data-theme="white"] :is(h2[data-icon])::after{content:"";position:absolute;left:0;bottom:0;width:56px;height:3px;border-radius:2px;background:var(--accent);}
   :root[data-theme="white"] h2[data-icon="bar"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='6' y1='20' x2='6' y2='11'/%3E%3Cline x1='12' y1='20' x2='12' y2='4'/%3E%3Cline x1='18' y1='20' x2='18' y2='14'/%3E%3C/svg%3E");}
   :root[data-theme="white"] h2[data-icon="trend"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 7 13.5 15.5 8.5 10.5 2 17'/%3E%3Cpolyline points='16 7 22 7 22 13'/%3E%3C/svg%3E");}
   :root[data-theme="white"] h2[data-icon="sync"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.5 2v6h-6'/%3E%3Cpath d='M2.5 22v-6h6'/%3E%3Cpath d='M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8'/%3E%3Cpath d='M22 12.5a10 10 0 0 1-18.8 4.3L2.5 16'/%3E%3C/svg%3E");}
@@ -102,6 +101,7 @@
   :root[data-theme="white"] h2[data-icon="db"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cellipse cx='12' cy='5' rx='9' ry='3'/%3E%3Cpath d='M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5'/%3E%3Cpath d='M3 12c0 1.7 4 3 9 3s9-1.3 9-3'/%3E%3C/svg%3E");}
   :root[data-theme="white"] h2[data-icon="package"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 8l-9-5-9 5v8l9 5 9-5z'/%3E%3Cpolyline points='3 8 12 13 21 8'/%3E%3Cline x1='12' y1='13' x2='12' y2='22'/%3E%3C/svg%3E");}
   :root[data-theme="white"] h2[data-icon="clock"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolyline points='12 6 12 12 16 14'/%3E%3C/svg%3E");}
+  :root[data-theme="white"] h2[data-icon="calendar"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");}
   :root[data-theme="white"] h2[data-icon="spark"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'/%3E%3Cpath d='M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z'/%3E%3C/svg%3E");}
 /* Stock detail and Industry detail (they share one shell): the Screener company page. A white header card, a tab bar, white section cards,
    zebra-striped metric rows and a peer table with a median row. Wide screens only. */
@@ -172,8 +172,7 @@
 :root[data-theme="white"] .topbar-brand{font-family:"Quicksand","Nunito","Varela Round",-apple-system,"Segoe UI",sans-serif;text-transform:lowercase;font-weight:700;letter-spacing:-.01em;}
 @media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:var(--t-xl);line-height:1;}}
 /* Strategies list (left): same type as the Analysis filter list: size, weight, spacing and count badges. */
-@media (min-width:901px){
-}
+
 /* Trade Log: Positions and Buy / Sell ideas get an icon and a bold title. */
 :root[data-theme="white"] #section-trackrecord .analysis-panel-head .analysis-panel-title{display:flex;align-items:center;gap:10px;font-size:var(--t-lg);font-weight:700;letter-spacing:.06em;color:#1b1f2a;}
 :root[data-theme="white"] #section-trackrecord .analysis-panel-head .analysis-panel-title::before{content:"";width:26px;height:26px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
@@ -215,7 +214,7 @@
   :root[data-theme="white"] #section-refreshlog :is(.refreshlog-freshness-label,.refreshlog-freshness-count,.refreshlog-freshness-summary,.select-mode-btn,.browse-btn,li,.fi-pct,.upload-hint){font-size:var(--t-md);}
   :root[data-theme="white"] #section-refreshlog .select-mode-btn,:root[data-theme="white"] #section-refreshlog .browse-btn{font-size:var(--t-sm);}
   :root[data-theme="white"] #section-refreshlog .refreshlog-sub-note{font-size:var(--t-md);}
-  :root[data-theme="white"] #section-settings .theme-toggle-btn{font-size:var(--t-md);padding:8px 16px;}
+  
 }
 /* Settings: "Themes" is a primary heading like "Claude controls": palette icon, large bold title, accent bar. */
   :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row-title{display:flex;align-items:center;gap:12px;font-size:var(--t-lg);font-weight:700;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='13.5' cy='6.5' r='.5'/%3E%3Ccircle cx='17.5' cy='10.5' r='.5'/%3E%3Ccircle cx='8.5' cy='7.5' r='.5'/%3E%3Ccircle cx='6.5' cy='12.5' r='.5'/%3E%3Cpath d='M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.8 1.7-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.5-.7-.5-1.1 0-.9.8-1.7 1.7-1.7H16c3.3 0 6-2.7 6-6 0-4.9-4.5-8.4-10-8.4z'/%3E%3C/svg%3E");}
@@ -259,10 +258,10 @@
 :root[data-theme="white"] :is(#section-trackrecord,#section-help,#section-knowledgebase) > header{margin:0;}
 /* Segmented switches (Table / Heat map, period, grouping, All / Matched, size, Cards / Table, themes): one taller, readable size everywhere. */
 @media (min-width:901px){
-  :root[data-theme="white"] :is(.tl-view-toggle,.theme-toggle){box-sizing:border-box;height:42px;padding:3px;align-items:stretch;border-radius:999px;}
-  :root[data-theme="white"] :is(.tl-view-toggle .tl-view-btn,.theme-toggle .theme-toggle-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;height:auto;padding:0 18px;font-size:var(--t-md);font-weight:600;border-radius:999px;white-space:nowrap;}
+  :root[data-theme="white"] :is(.tl-view-toggle){box-sizing:border-box;height:42px;padding:3px;align-items:stretch;border-radius:999px;}
+  :root[data-theme="white"] :is(.tl-view-toggle .tl-view-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;height:auto;padding:0 18px;font-size:var(--t-md);font-weight:600;border-radius:999px;white-space:nowrap;}
   :root[data-theme="white"] .biz-side .tl-view-toggle .tl-view-btn{padding:0 8px;}
-  :root[data-theme="white"] :is(#tradeAddBtn,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main){height:42px;display:inline-flex;align-items:center;font-size:var(--t-sm);}
+  :root[data-theme="white"] :is(.biz-toolbar .biz-expand,.biz-toolbar .rk-btn,.biz-toolbar .rk-main){height:36px;display:inline-flex;align-items:center;font-size:var(--t-sm);}
 }
 /* Phones: a visible menu button, no logo and no Live pill in the top bar, so the search box gets the room. */
 @media (max-width:900px){
@@ -278,8 +277,8 @@
 :root[data-theme="white"] #section-settings > header:first-child{display:none;}
 /* Breathing room above headings: main headings 44px, sub-headings 28px (none when the heading is the first thing in its block). */
 @media (min-width:901px){
-  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon]){margin-top:44px;}
-  :root[data-theme="white"] :is(.refreshlog-job-title,#section-help h2[data-icon],#section-knowledgebase h2[data-icon]):first-child{margin-top:0;}
+  :root[data-theme="white"] :is(h2[data-icon]){margin-top:44px;}
+  :root[data-theme="white"] :is(h2[data-icon]):first-child{margin-top:0;}
   :root[data-theme="white"] #section-settings .settings-subhead{margin-top:0;}
   :root[data-theme="white"] :is(#section-help,#section-knowledgebase) h3{margin-top:28px;}
   :root[data-theme="white"] :is(#section-help,#section-knowledgebase) h3:first-child{margin-top:0;}
@@ -307,28 +306,27 @@
   :root[data-theme="white"] #section-trackrecord .help-table{width:100%;}
 }
 /* Strategies: fewer boxes, more free flow. Fields become underlined, the setup bar and secondary buttons lose their frames, and the list actions are plain links. */
-  :root[data-theme="white"] #section-strategies #stratMain :is(input:not([type=checkbox]):not([type=radio]),select,textarea){border:0;border-bottom:1px solid #c9cfdf;border-radius:0;background-color:transparent;box-shadow:none;padding-left:2px;padding-right:6px;}
-  :root[data-theme="white"] #section-strategies #stratMain :is(input,select,textarea):focus{border-bottom:2px solid var(--accent);box-shadow:none;outline:none;}
+  :root[data-theme="white"] .strat-layout .strat-main :is(input:not([type=checkbox]):not([type=radio]),select,textarea){border:0;border-bottom:1px solid #c9cfdf;border-radius:0;background-color:transparent;box-shadow:none;padding-left:2px;padding-right:6px;}
+  :root[data-theme="white"] .strat-layout .strat-main :is(input,select,textarea):focus{border-bottom:2px solid var(--accent);box-shadow:none;outline:none;}
   /* v1.282: a rule row already sits between two lines, so its fields carry no underline of their own; one appears on hover and focus. */
-  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-row :is(input,select){border-bottom-color:transparent;}
-  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-row :is(input,select):hover:not(:disabled){border-bottom-color:#c9cfdf;}
-  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-row :is(input,select):focus{border-bottom-color:var(--accent);}
-  :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{border:0;border-bottom:1px solid #e6e9f2;border-radius:0;background:transparent;padding:12px 0;}
-  :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;box-shadow:none;}
-  :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.on):hover{background:color-mix(in srgb,var(--accent) 8%,#fff);}
+  :root[data-theme="white"] .strat-layout .strat-main.strat-main .sr-row :is(input,select){border-bottom-color:transparent;}
+  :root[data-theme="white"] .strat-layout .strat-main.strat-main .sr-row :is(input,select):hover:not(:disabled){border-bottom-color:#c9cfdf;}
+  :root[data-theme="white"] .strat-layout .strat-main.strat-main .sr-row :is(input,select):focus{border-bottom-color:var(--accent);}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-fold > summary{border:0;border-bottom:1px solid #e6e9f2;border-radius:0;background:transparent;padding:12px 0;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;box-shadow:none;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-btn:not(.on):hover{background:color-mix(in srgb,var(--accent) 8%,#fff);}
 /* Buttons: one primary and one secondary style everywhere (wide screens).
    Primary = filled indigo; secondary = white with a thin edge. Both: 40px tall, small spaced capitals, 6px corners. */
 @media (min-width:901px){
-  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel),
-  :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 20px;font-size:var(--t-sm);font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
-  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
-  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,#section-business .biz-toolbar .biz-expand,#section-business .biz-toolbar .rk-btn,#section-business .biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary):hover:not(:disabled){color:var(--accent);border-color:var(--accent);}
+  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,.biz-toolbar .biz-expand,.biz-toolbar .rk-btn,.biz-toolbar .rk-main,.alba-confirm-cancel),:root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 20px;font-size:var(--t-sm);font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
+  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,.biz-toolbar .biz-expand,.biz-toolbar .rk-btn,.biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
+  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,.biz-toolbar .biz-expand,.biz-toolbar .rk-btn,.biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary):hover:not(:disabled){color:var(--accent);border-color:var(--accent);}
   :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn:not(.fi-btn-primary),.rk-main):disabled{color:#8a90a0;background:#f6f7fb;border-color:#e0e4ee;}
   :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary):disabled{color:#fff;background:color-mix(in srgb,var(--accent) 45%,#fff);border-color:transparent;cursor:not-allowed;}
   :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn){color:#fff;background:var(--accent);border:1px solid var(--accent);}
   :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary,.alba-confirm-ok,#tradeAddBtn):hover:not(:disabled){background:color-mix(in srgb,var(--accent) 88%,#000);}
   /* Strategies keeps its free-flow Duplicate / Delete / Suggested Rules as plain text buttons */
-  :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;}
 }
 /* Watchlist sync picker: rows like Settings > Claude controls (bold name, short description, tick box at the right, hairline between rows). */
   :root[data-theme="white"] #section-refreshlog .refreshlog-manual:has(#wlStrategyPicker){display:block;}
@@ -341,11 +339,11 @@
   :root[data-theme="white"] #section-refreshlog .wl-help{margin:0 0 6px;}
   :root[data-theme="white"] #section-refreshlog #refreshWatchlistBtn{display:flex;width:fit-content;margin-left:auto;}
 /* Strategies: a single line under the closed setup bar, and the "+ Add a rule" box lined up with the rule fields above it. */
-  :root[data-theme="white"] #section-strategies #stratMain .strat-fold:not([open]) > summary{border-bottom:0;}
-  :root[data-theme="white"] #section-strategies #stratMain#stratMain .sr-foot .sr-add{width:auto;max-width:100%;border:0;border-radius:6px;background:transparent;color:var(--accent);padding:0 2px;appearance:none;-webkit-appearance:none;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-fold:not([open]) > summary{border-bottom:0;}
+  :root[data-theme="white"] .strat-layout .strat-main.strat-main .sr-foot .sr-add{width:auto;max-width:100%;border:0;border-radius:6px;background:transparent;color:var(--accent);padding:0 2px;appearance:none;-webkit-appearance:none;}
 /* Explorer industry table: cell text centred vertically in every row (a two-line name no longer pushes the # or the numbers to the bottom). */
 @media (min-width:901px){
-  :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > td{vertical-align:middle;}
+  :root[data-theme="white"] .biz-table > tbody > .biz-row > td{vertical-align:middle;}
 }
 /* All data grids: cell text vertically centred in every row; the column headings and the data stay left-aligned. */
 @media (min-width:901px){
@@ -355,8 +353,8 @@
 /* Explorer industry table: the row number lives inside the name cell, so when a name wraps to two or more lines the number must sit in the
    middle of the name block, not on its last line. */
 @media (min-width:901px){
-  :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > .biz-name::before{vertical-align:middle;}
-  :root[data-theme="white"] #section-business .biz-table > tbody > .biz-row > .biz-name .biz-open{display:inline-block;vertical-align:middle;text-indent:0;}
+  :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{vertical-align:middle;}
+  :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name .biz-open{display:inline-block;vertical-align:middle;text-indent:0;}
 }
 /* Phones: the laptop card layout, scaled down. White cards on the lavender page for the detail pages and the Tools screens, topic icons and accent bars on
    the main headings, flat rows inside the cards, readable dark heading colours. */
@@ -381,11 +379,10 @@
   :root[data-theme="white"] #detail .peers-table tbody tr:nth-child(even) td{background:#f7f8fc;}
   :root[data-theme="white"] #detail .detail-back-bar{position:static;height:auto;margin:0 0 10px;}
   /* Data Refresh and Settings: one white card with flat rows */
-  :root[data-theme="white"] :is(#section-refreshlog,#section-settings){padding:16px var(--card-x) 22px;}
-  :root[data-theme="white"] :is(#section-refreshlog,#section-settings) :is(.refreshlog-job,.settings-subhead){margin-top:0;}
-  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title){font-size:var(--t-lg);gap:10px;margin-top:26px;margin-bottom:12px;padding-bottom:10px;}
-  :root[data-theme="white"] :is(.refreshlog-job-title,#section-settings .settings-subhead h2,#section-help h2[data-icon],#section-knowledgebase h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title)::before{width:24px;height:24px;}
-  :root[data-theme="white"] :is(.refreshlog-job-title,#section-help h2[data-icon],#section-knowledgebase h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title):first-child{margin-top:0;}
+  :root[data-theme="white"] .card-narrow :is(.refreshlog-job,.settings-subhead){margin-top:0;}
+  :root[data-theme="white"] :is(h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title){font-size:var(--t-lg);gap:10px;margin-top:26px;margin-bottom:12px;padding-bottom:10px;}
+  :root[data-theme="white"] :is(h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title)::before{width:24px;height:24px;}
+  :root[data-theme="white"] :is(h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title):first-child{margin-top:0;}
   :root[data-theme="white"] #section-refreshlog .refreshlog-job:first-of-type .refreshlog-job-title{margin-top:0;}
   :root[data-theme="white"] #section-settings .settings-panel:not(#claudeControls) .settings-row{padding:0;border:0;}
   :root[data-theme="white"] #section-settings .settings-row{align-items:flex-start;}
@@ -439,10 +436,10 @@
   :root[data-theme="white"] .analysis-leaderboard-head{justify-content:flex-start !important;margin:5px 0 10px !important;}
   :root[data-theme="white"] .strat-result-head{gap:0;margin:0 0 8px;}
   /* Strategies: less empty space between the setup line, the Filters row and the grid */
-  :root[data-theme="white"] #section-strategies #stratMain .strat-panel:has(.strat-result-head){margin-top:0;padding-top:0;}
-  :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{padding-top:8px;padding-bottom:8px;}
-  :root[data-theme="white"] #section-strategies #stratMain .strat-fold{margin-bottom:0;}
-  :root[data-theme="white"] #section-strategies #stratMain .strat-result-head{margin-bottom:10px;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-panel:has(.strat-result-head){margin-top:0;padding-top:0;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-fold > summary{padding-top:8px;padding-bottom:8px;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-fold{margin-bottom:0;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-result-head{margin-bottom:10px;}
   :root[data-theme="white"] :is(.strat-result-title,.analysis-leaderboard-head .rk-headline){flex:1 1 100%;margin:0;}
   :root[data-theme="white"] .strat-result-head .strat-result-title{margin-top:10px;}
   :root[data-theme="white"] .biz-main{margin-top:-18px;}
@@ -453,18 +450,18 @@
   :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name,:root[data-theme="white"] .biz-table > thead > tr > th:first-child{padding-left:calc(4px + 2.6em);}
   :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name .biz-open{text-indent:0;}
   /* Buttons in the toolbars */
-  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,#section-business .biz-expand,#section-business .rk-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;height:auto;padding:0 14px;font-size:var(--t-sm);font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
-  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,#section-business .biz-expand,#section-business .rk-btn):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
-  :root[data-theme="white"] #section-strategies #stratMain .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;}
+  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,.biz-expand,#section-business .rk-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;height:auto;padding:0 14px;font-size:var(--t-sm);font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
+  :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,.biz-expand,#section-business .rk-btn):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;}
   :root[data-theme="white"] .sort-select{min-height:40px;font-size:var(--t-md);border:1px solid #c9cfdf;background-color:#fff;color:#1b1f2a;}
-  :root[data-theme="white"] #section-strategies #stratMain .strat-fold > summary{padding-right:22px;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-fold > summary{padding-right:22px;}
   /* Track these picks is a button like Refresh: outlined, same height */
-  :root[data-theme="white"] #section-strategies #stratMain .strat-total #stratTrackBtn{border:1px solid #c9cfdf;background:#fff;color:#1b1f2a;min-height:40px;border-radius:6px;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-total #stratTrackBtn{border:1px solid #c9cfdf;background:#fff;color:#1b1f2a;min-height:40px;border-radius:6px;}
   /* the setup caret sits on the same right edge as the Filters caret below it */
-  :root[data-theme="white"] #section-strategies #stratMain .strat-group > summary.analysis-panel-title:before{right:0;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-group > summary.analysis-panel-title:before{right:0;}
 }
 /* The sort box above a results grid looks the same in Analysis and Strategies (boxed), not underlined like the form fields. */
-:root[data-theme="white"] #section-strategies #stratMain .sort-select{border:1px solid #c9cfdf;border-radius:8px;background-color:#fff;padding-left:10px;}
+:root[data-theme="white"] .strat-layout .strat-main .sort-select{border:1px solid #c9cfdf;border-radius:8px;background-color:#fff;padding-left:10px;}
 
 /* Score and rating pills in the grids (Fund, Tech, Tech 2, W / M Tech Rating, ...): black, regular weight; the pill colour carries the meaning. */
 :root[data-theme="white"] :is(.strat-table,.biz-table,.peers-table) td .badge{color:#000 !important;font-weight:var(--w-reg) !important;}
@@ -477,12 +474,12 @@
 :root[data-theme="white"] :is(.analysis-lb-rank,.strat-table td.analysis-lb-rank){font-weight:var(--w-reg) !important;}
 :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{font-weight:var(--w-reg) !important;}
 /* Strategies, all screen sizes: the Sort by box is boxed like the one in Analysis, and Track these picks is an outlined button like Refresh. */
-:root[data-theme="white"] #section-strategies #stratMain .strat-total #stratSort{border:1px solid #c9cfdf;border-radius:6px;background-color:#fff;padding:0 30px 0 10px;height:40px;min-height:40px;}
-:root[data-theme="white"] #section-strategies #stratMain .strat-total #stratTrackBtn{border:1px solid #c9cfdf;background:#fff;color:#1b1f2a;min-height:40px;border-radius:6px;}
-:root[data-theme="white"] #section-strategies #stratMain .strat-total #stratTrackBtn:disabled{opacity:.5;}
+:root[data-theme="white"] .strat-layout .strat-main .strat-total #stratSort{border:1px solid #c9cfdf;border-radius:6px;background-color:#fff;padding:0 30px 0 10px;height:40px;min-height:40px;}
+:root[data-theme="white"] .strat-layout .strat-main .strat-total #stratTrackBtn{border:1px solid #c9cfdf;background:#fff;color:#1b1f2a;min-height:40px;border-radius:6px;}
+:root[data-theme="white"] .strat-layout .strat-main .strat-total #stratTrackBtn:disabled{opacity:.5;}
 
 /* The Delete button stays a visible red outlined button (it was a plain text button and hard to spot). */
-:root[data-theme="white"] #section-strategies #stratMain .strat-btn.strat-btn-danger:not(.pub):not(.on){color:#a83f38;border:1px solid #a83f38;background:#fff;}
-:root[data-theme="white"] #section-strategies #stratMain .strat-btn.strat-btn-danger:not(.pub):not(.on):hover{color:#fff;background:#a83f38;border-color:#a83f38;}
-:root[data-theme="white"] #section-strategies #stratMain #stratDup.strat-btn:not(.pub):not(.on){color:#1b1f2a;border:1px solid #c9cfdf;background:#fff;}
-:root[data-theme="white"] #section-strategies #stratMain #stratDup.strat-btn:not(.pub):not(.on):hover{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,#fff);}
+:root[data-theme="white"] .strat-layout .strat-main .strat-btn.strat-btn-danger:not(.pub):not(.on){color:#a83f38;border:1px solid #a83f38;background:#fff;}
+:root[data-theme="white"] .strat-layout .strat-main .strat-btn.strat-btn-danger:not(.pub):not(.on):hover{color:#fff;background:#a83f38;border-color:#a83f38;}
+:root[data-theme="white"] .strat-layout .strat-main #stratDup.strat-btn:not(.pub):not(.on){color:#1b1f2a;border:1px solid #c9cfdf;background:#fff;}
+:root[data-theme="white"] .strat-layout .strat-main #stratDup.strat-btn:not(.pub):not(.on):hover{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,#fff);}

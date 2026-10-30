@@ -3,7 +3,7 @@
       <div class="sub">The stack behind this screener and where each section's data comes from. For how a score is calculated, see <a href="#help-f1">Help</a>.</div>
     </header>
 
-    <div class="help-panel">
+    <div class="help-panel card">
       <div class="help-toc">
         <a href="#kb-arch">1. Architecture at a glance</a>
         <a href="#kb-maintenance">2. How this screener stays up to date</a>
@@ -251,6 +251,27 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.338 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>Same cards on a laptop too:</strong> News, Trade Log, Explorer and Help had square corners (and a thin line along the bottom) on a laptop while Analysis and Strategies were rounded. Every screen&rsquo;s card is now the same: 12 px corners, the same soft shadow, no line.</li>
+              <li><strong>Same left edge on a laptop:</strong> on Data Refresh and Settings the text started 115 px further in than on the other screens (the content was centred in a narrow column). It now starts at the same left edge as everything else (the column is still limited to a readable width).</li>
+              <li><strong>Same field height:</strong> text boxes and drop-downs were between 31 and 40 px tall depending on the screen. All are at least 36 px, the same as the toolbar buttons.</li>
+            </ul>
+            <h3>v1.337 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>One section heading:</strong> the heading with a topic icon, a bold title and a short accent bar is now one shared style for every screen that uses it (Data Refresh, Settings, Help, Knowledge Base and now News). News used to carry its own slightly different copy, so its headings are a little larger and further apart, like the others. The heading on Settings no longer has an extra gap above it.</li>
+              <li><strong>Data Refresh and Settings use the same card:</strong> they are now the same white card as every other screen, with the same side padding and corners (their top and bottom padding was larger before).</li>
+            </ul>
+            <h3>v1.336 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>One card for every screen:</strong> Analysis, Strategies, Explorer, News and Trade Log now all sit in the same white rounded card (same corners, shadow and side padding), set in one place (<code>styles/parts.css</code>). News used to be the odd one out with square corners. A rule that only applied to one screen is now a rule for the card, so the same fix works everywhere.</li>
+              <li><strong>Less screen-specific CSS:</strong> 164 places where a style was tied to one screen by an element id (672 down to 508) now apply by class instead (the Strategies and Analysis panels, the Explorer toolbar and the cards), without any change on screen.</li>
+            </ul>
+            <h3>v1.335 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>One design:</strong> the Dark and Light themes are retired and the Themes choice is gone from Settings, so there is one look (the White design) to get completely right. Everything on screen looks the same as before. A saved Dark or Light choice is simply ignored.</li>
+              <li><strong>Shared parts, first set:</strong> the tabs (News, Trade Log), the round choice buttons (Upcoming / Recent, Open / Closed), the date heading with its count and the one-line event row now come from one shared style sheet (<code>styles/parts.css</code>) instead of each screen&rsquo;s own rules. The only visible change: the News tabs are bold, like the Trade Log tabs.</li>
+            </ul>
             <h3>v1.334 &middot; 2026-10-30</h3>
             <ul>
               <li><strong>One design system for text size and side padding (first step):</strong> every font size in the stylesheets is now one of five named sizes (title, heading, body, small, label) defined in one place, instead of 60 different numbers, so a size changes everywhere at once. The side padding of every white card is also one setting, so on a phone the text starts the same distance from the edge on News, Trade Log, Analysis, Strategies, Business, Help, Data Refresh and Settings (it was 16 px on News, 20 px on Trade Log and 24 px on Data Refresh). The News page had the smallest padding and now matches the others. A new check in the test run stops new screen-specific CSS from being added.</li>

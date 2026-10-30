@@ -244,7 +244,7 @@ html{scrollbar-color:var(--line) transparent;}
 #detail .fund-subsection .fund-cell:only-child > .fund-cell-head,#detail .fund-subsection .fund-cell:only-child > .fund-cell-bar{display:none;}
 /* Heading colour: every section and sub-section heading on the stock page is amber. */
 :root{--hd:#e0b04a;}
-:root[data-theme="light"],:root[data-theme="indigo"],:root[data-theme="white"]{--hd:#98680a;}
+:root[data-theme="white"]{--hd:#98680a;}
 #detail .val-panel-title,#detail .global-panel-title,#detail .fund-panel-title,#detail .tech-panel-title,#detail .fund-subsection-title{color:var(--hd);}
 .pc-psum{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;}
 .tech-fallback{display:flex;flex-direction:column;gap:6px;margin-top:6px;}

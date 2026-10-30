@@ -20,6 +20,7 @@
 @import "./phone.css";
 @import "./theme-light.css";
 @import "./theme-white.css";
+@import "./parts.css";
 @import "./refresh-kit.css";
 @import "./late-global.css";
 @import "./filters-ondemand.css";

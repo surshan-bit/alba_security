@@ -403,7 +403,6 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
   snap('s7u_strategies_news_effect', { out: html$('#stratLearnOut') });
   seededKeys.forEach(k => store.delete(k)); globalThis.__reads.length = readsBefore;
 
-  click($('.theme-toggle-btn[data-theme-choice="indigo"]')); await sleep(100);
   snap('s8_theme', { theme: win.document.documentElement.getAttribute('data-theme') });
   click($('.tl-view-btn[data-tl-view="table"]')); await sleep(100);
   snap('s8b_tradeview', { body: html$('#tradeLogPanelBody') });

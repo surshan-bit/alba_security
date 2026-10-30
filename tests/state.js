@@ -496,7 +496,7 @@ async function tradeLogPhoneScenarios(){
   await scenario('trade log phone: tabs, short rows, Open / Closed, bottom sheet', { section: 'trackrecord', viewport: { width: 390, height: 780 } }, docs, async page => {
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white'));
     await until(page, () => document.querySelectorAll('#tradeLogPanelBody .tl-prow').length === 2, null, 'the two open trades are listed as short rows');
-    ok(await vis(page, '.tl-tabs') && (await page.evaluate(() => document.getElementById('tlTabPositions').textContent)) === 'Positions 2', 'the Positions / Ideas tabs show, with the open count');
+    ok(await vis(page, '.tabs-top') && (await page.evaluate(() => document.getElementById('tlTabPositions').textContent)) === 'Positions 2', 'the Positions / Ideas tabs show, with the open count');
     ok(!(await vis(page, '.tl-ideas')) && await vis(page, '#tradeLogPanelBody .tl-phone'), 'the Positions tab shows the rows and hides the ideas');
     ok(!(await vis(page, '#tradeLogPanelBody .tl-card')), 'the tall cards are not shown on a phone');
     ok(/Invested/.test(await page.evaluate(() => document.querySelector('#tradeLogPanelBody .tl-pstrip').textContent)), 'the summary strip shows');
@@ -517,12 +517,12 @@ async function tradeLogPhoneScenarios(){
     ok(await page.evaluate(() => { const f = document.querySelector('#tradeFormHost .tl-form'), r = f.getBoundingClientRect(); return getComputedStyle(f).position === 'fixed' && Math.round(r.bottom) === innerHeight && r.left >= 0 && r.right <= innerWidth; }), 'the form is a bottom sheet inside the screen');
     ok(!(await vis(page, '#tradeAddBtn')), 'the Add trade button is hidden while the sheet is open');
     await page.evaluate(() => document.getElementById('tlCancel').click());
-    await page.evaluate(() => document.querySelector('.tl-tabs [data-tl-tab="ideas"]').click());
+    await page.evaluate(() => document.querySelector('.tabs-top [data-tl-tab="ideas"]').click());
     ok(await vis(page, '.tl-ideas') && !(await vis(page, '#tradeLogPanelBody .tl-phone')) && !(await vis(page, '#tradeAddBtn')), 'the Ideas tab shows the ideas and hides the positions and the Add button');
   });
   await scenario('trade log laptop: the cards stay and the phone pieces are hidden', { section: 'trackrecord', viewport: { width: 1280, height: 900 } }, docs, async page => {
     await until(page, () => document.querySelectorAll('#tradeLogPanelBody .tl-card').length === 3, null, 'the cards are listed');
-    ok(await vis(page, '#tradeLogPanelBody .tl-card') && !(await vis(page, '.tl-tabs')) && !(await vis(page, '#tradeLogPanelBody .tl-phone')) && await vis(page, '.tl-ideas') && await vis(page, '.tl-view-toggle'), 'laptop: cards, view switch and ideas show; the tabs and short rows do not');
+    ok(await vis(page, '#tradeLogPanelBody .tl-card') && !(await vis(page, '.tabs-top')) && !(await vis(page, '#tradeLogPanelBody .tl-phone')) && await vis(page, '.tl-ideas') && await vis(page, '.tl-view-toggle'), 'laptop: cards, view switch and ideas show; the tabs and short rows do not');
     ok(await page.evaluate(() => getComputedStyle(document.getElementById('tradeAddBtn')).position !== 'fixed'), 'laptop: the Add trade button is not pinned');
   });
 }

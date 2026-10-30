@@ -221,7 +221,7 @@ function tlPhoneRowHtml(m){
 function tlPhoneHtml(models){
   const open = models.filter(m => !m.isClosed), closed = models.filter(m => m.isClosed), closedView = tlStatus === 'closed';
   const list = closedView ? closed : open;
-  const seg = `<div class="news-filters tl-pseg" role="group" aria-label="Open or closed trades"><button type="button" data-tl-status="open" class="news-pill${closedView ? '' : ' on'}">Open ${open.length}</button><button type="button" data-tl-status="closed" class="news-pill${closedView ? ' on' : ''}">Closed ${closed.length}</button></div>`;
+  const seg = `<div class="choices tl-pseg" role="group" aria-label="Open or closed trades"><button type="button" data-tl-status="open" class="choice${closedView ? '' : ' on'}">Open ${open.length}</button><button type="button" data-tl-status="closed" class="choice${closedView ? ' on' : ''}">Closed ${closed.length}</button></div>`;
   return `<div class="tl-phone">${seg}${list.length ? tlStripHtml(list, closedView) + list.map(tlPhoneRowHtml).join('') : `<p class="upload-hint">No ${closedView ? 'closed' : 'open'} trades.</p>`}</div>`;
 }
 // Taps on the phone layout: the Positions / Ideas tabs, the Open / Closed switch and a row.
@@ -229,10 +229,10 @@ function init_tradelog_phone(){
   const sec = document.getElementById('section-trackrecord');
   if(!sec) return;
   sec.addEventListener('click', (e) => {
-    const tab = closestEl(e, '.tl-tabs [data-tl-tab]');
+    const tab = closestEl(e, '.tabs-top [data-tl-tab]');
     if(tab){
       sec.setAttribute('data-tl-tab', tab.getAttribute('data-tl-tab') || 'positions');
-      sec.querySelectorAll('.tl-tabs [data-tl-tab]').forEach(b => b.classList.toggle('on', b === tab));
+      sec.querySelectorAll('.tabs-top [data-tl-tab]').forEach(b => b.classList.toggle('on', b === tab));
       return;
     }
     const st = closestEl(e, '[data-tl-status]');
