@@ -17,12 +17,12 @@
 .biz-detail-box{position:sticky;left:0;box-sizing:border-box;width:100cqw;margin-right:-100cqw;padding:10px;}
 /* the negative right margin cancels the width, so an opened industry does not widen the columns above it; the box carries the shade, so it reaches the end of the grid inside it */
 /* an opened industry is as wide as the screen and stays in view while the table scrolls sideways; its grid scrolls on its own */
-.biz-detail h3{margin:0 0 6px;font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+.biz-detail h3{margin:0 0 6px;font-size:var(--t-sm);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
 .biz-news{list-style:none;margin:0;padding:0;}
-.biz-news-meta,.biz-news-date{color:var(--muted);font-size:.74rem;}
+.biz-news-meta,.biz-news-date{color:var(--muted);font-size:var(--t-sm);}
 .biz-news li{padding:5px 0;line-height:1.4;}
 .biz-news a{color:var(--text);}
-.biz-expand{background:var(--panel);border-radius:20px;padding:5px 14px;font-size:.74rem;font-weight:600;border:1px solid var(--line);color:var(--text);cursor:pointer;font-family:inherit;}
+.biz-expand{background:var(--panel);border-radius:20px;padding:5px 14px;font-size:var(--t-sm);font-weight:600;border:1px solid var(--line);color:var(--text);cursor:pointer;font-family:inherit;}
 .biz-expand:hover{border-color:var(--accent);}
 .biz-expand.on{border-color:var(--accent);color:var(--accent);}
 .biz-matchcount{color:var(--accent);}
@@ -51,7 +51,7 @@
 /* Peers use the Analysis / Strategies columns and grid look; the open stock is marked in its row. */
 .strat-row.peers-self > td{background:var(--panel2);}
 .strat-row.peers-self > td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
-.strat-row.peers-self .analysis-lb-name::after{font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);content:"This stock";margin-left:10px;padding:1px 7px;border:1px solid var(--accent);border-radius:999px;font-size:.6rem;vertical-align:1px;}
+.strat-row.peers-self .analysis-lb-name::after{font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);content:"This stock";margin-left:10px;padding:1px 7px;border:1px solid var(--accent);border-radius:999px;font-size:var(--t-xs);vertical-align:1px;}
 /* Industry screen: no filled panel; the page background shows through. The sticky first column uses the page colour so scrolled cells still hide behind it. */
 #section-business .analysis-panel,#section-business .biz-expand{background:transparent;}
 .biz-table > tbody > .biz-row > .biz-name,.biz-table > thead > tr > th:first-child{background:var(--bg);}
@@ -71,7 +71,7 @@
 .biz-detail-box .biz-news-bar .biz-newsbtn{background:transparent !important;border:1px solid var(--line) !important;color:var(--accent) !important;font-weight:600;height:30px;padding:0 14px;display:inline-flex;align-items:center;line-height:1;}
 .biz-detail-box .biz-news-bar .biz-newsbtn:hover:not(:disabled){border-color:var(--accent) !important;background:rgba(255,255,255,.04) !important;}
 .biz-detail-box .biz-news-bar .biz-newsbtn:disabled{opacity:.5;cursor:default;}
-.biz-news-bar .biz-newsstatus{margin:0;font-size:.8rem;}
+.biz-news-bar .biz-newsstatus{margin:0;font-size:var(--t-sm);}
 .pcs-chg.up{background:color-mix(in srgb,var(--buy) 13%,transparent);}
 .pcs-chg.up .pcs-val{color:var(--buy);}
 .pcs-chg.down{background:color-mix(in srgb,var(--avoid) 13%,transparent);}
@@ -84,7 +84,7 @@
 .pcs-sig.sig-avoid .pcs-val{color:var(--avoid);}
 /* Stock names are links (right-click -> open in a new tab) but look like plain text. */
 a.stock-link{color:inherit;text-decoration:none;}
-.biz-toolbar .biz-expand{margin:0;width:auto;height:36px;padding:8px 16px;box-sizing:border-box;border-radius:6px;font-size:.78rem;font-weight:400;}
+.biz-toolbar .biz-expand{margin:0;width:auto;height:36px;padding:8px 16px;box-sizing:border-box;border-radius:6px;font-size:var(--t-sm);font-weight:400;}
 .biz-main.biz-full .biz-scroll{flex:1 1 auto;min-height:360px;overflow:auto;}
 .biz-main.biz-full .biz-table thead th{position:sticky;top:0;z-index:2;background:var(--bg);}
 /* The industries grid spans the full width, so the button above it lines up with the grid's right edge. */
@@ -94,13 +94,13 @@ a.stock-link{color:inherit;text-decoration:none;}
 .biz-open{padding:0;border:0;background:none;color:var(--accent);font:inherit;text-align:left;cursor:pointer;}
 .biz-open:hover,.biz-open:focus-visible{color:var(--accent);text-decoration:underline;}
 .fund-verdicts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px;}
-.ind-timeline .pc-evk{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;font-size:.62rem;font-weight:700;color:#fff;vertical-align:middle;}
+.ind-timeline .pc-evk{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;font-size:var(--t-xs);font-weight:700;color:#fff;vertical-align:middle;}
 
 /* Expanded industries: the browser skips layout of a stocks grid until it nears the screen (row height ~38px, header ~40px). */
 .biz-detail-box .strat-table-wrap{content-visibility:auto;contain-intrinsic-block-size:auto calc(40px + var(--biz-rows,10) * 38px);}
 
 /* Industry detail, calmer: a short column set (All columns shows the rest), one-line news rows and a one-line news summary. */
-.biz-colsbtn{background:none;border:0;padding:0;margin-left:auto;font:inherit;font-size:.8rem;color:var(--accent);cursor:pointer;}
+.biz-colsbtn{background:none;border:0;padding:0;margin-left:auto;font:inherit;font-size:var(--t-sm);color:var(--accent);cursor:pointer;}
 .biz-colsbtn:hover{text-decoration:underline;}
 .biz-stocks-head .biz-colsbtn + .rk-bar{margin-left:0;}
 .biz-news-sum{margin:0;}
@@ -113,15 +113,15 @@ a.stock-link{color:inherit;text-decoration:none;}
 @media (max-width:760px){.biz-news .biz-nrow{grid-template-columns:48px 10px minmax(0,1fr);}.biz-news .biz-nrow .biz-news-meta{display:none;}}
 
 /* Industry detail: name and count on top, four summary cards, then the short stock table. */
-.biz-dname{font-size:1rem !important;font-weight:600;text-transform:none !important;letter-spacing:0 !important;color:var(--text) !important;margin:0;}
+.biz-dname{font-size:var(--t-md) !important;font-weight:600;text-transform:none !important;letter-spacing:0 !important;color:var(--text) !important;margin:0;}
 .biz-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 12px;}
 .biz-kpi{background:var(--panel2);border-radius:8px;padding:8px 12px;min-width:0;}
-.biz-kpi small{display:block;color:var(--muted);font-size:.72rem;}
-.biz-kpi span{font-size:1rem;font-weight:600;font-variant-numeric:tabular-nums;}
+.biz-kpi small{display:block;color:var(--muted);font-size:var(--t-sm);}
+.biz-kpi span{font-size:var(--t-md);font-weight:600;font-variant-numeric:tabular-nums;}
 .biz-kpi .biz-breadth{width:46px;vertical-align:middle;}
-.biz-ft{display:block;color:var(--muted);font-size:.72rem;margin-top:1px;}
+.biz-ft{display:block;color:var(--muted);font-size:var(--t-sm);margin-top:1px;}
 .biz-colsnote{margin:8px 0 0;}
 .biz-colsnote .biz-colsbtn{margin-left:0;}
 @media (max-width:760px){.biz-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}}
 .biz-detail-box .biz-lean .strat-table{width:100%;}
-.biz-detail-box .biz-ft{display:block;color:var(--muted) !important;font-size:.72rem !important;font-weight:400 !important;}
+.biz-detail-box .biz-ft{display:block;color:var(--muted) !important;font-size:var(--t-sm) !important;font-weight:400 !important;}

@@ -1,0 +1,11 @@
+/* The central design system, part 1: the type scale. Every font size in the app is one of these five names; no stylesheet writes a size of its own.
+     --t-xl  page titles and the detail-page name        --t-lg  card, section and panel headings, big scores
+     --t-md  body text, grid values, names, menus        --t-sm  grid headings, counts, buttons, pills, small labels
+     --t-xs  the tiniest tags (version, Pro, key hints)
+   The Dark and Light themes use these values. The White theme sets its own (px) in white-type.css, which loads later and wins. */
+:root{--t-xl:1.8rem;--t-lg:1.25rem;--t-md:.95rem;--t-sm:.84rem;--t-xs:.66rem;}
+
+/* The central design system, part 2: the side padding. Every white card has the same padding inside it, so the text of every screen starts the
+   same distance from the edge of the page: --card-x is the card's side padding, --card-y its top and bottom. */
+:root{--card-x:14px;--card-y:10px;}
+@media (min-width:601px){:root{--card-x:20px;--card-y:16px;}}

@@ -72,14 +72,14 @@
    apart by a thin line). Inside a white card the page colour (--bg) and card colour (--panel) are white, so the sticky first columns, sticky
    headings, full-screen view and heat-map edges match the white without further rules. */
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(#section-business .analysis-panel,#section-trackrecord .analysis-panel,#section-analysis .analysis-layout,#section-strategies .strat-layout){--bg:#fff;--panel:#fff;background:#fff;border-radius:12px;box-shadow:0 1px 2px rgba(25,55,100,.06),0 6px 20px rgba(25,55,100,.07);}
-:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(#section-analysis .analysis-layout,#section-strategies .strat-layout){padding:16px 18px;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(#section-analysis .analysis-layout,#section-strategies .strat-layout){padding:var(--card-y) var(--card-x);}
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(#section-analysis .analysis-main > .analysis-panel,#section-strategies .strat-main .strat-panel){background:transparent;box-shadow:none;border-radius:0;padding:0;margin-top:0;}
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) #section-strategies .strat-main .strat-panel + .strat-panel{border-top:0;padding-top:0;margin-top:20px;}
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) #section-strategies .strat-main .strat-panel:first-child + .strat-panel{border-top:1px solid #dde8f4;padding-top:14px;margin-top:10px;}
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .analysis-panel :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea),:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .strat-layout :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){background:#fff;}
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) .strat-table tbody tr:nth-child(odd) > td{background:#f4f8fd;}
 @media (max-width:600px){
-:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(#section-business .analysis-panel,#section-trackrecord .analysis-panel,#section-analysis .analysis-layout,#section-strategies .strat-layout){padding:10px;}
+:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) :is(#section-business .analysis-panel,#section-trackrecord .analysis-panel,#section-analysis .analysis-layout,#section-strategies .strat-layout){padding:var(--card-y) var(--card-x);}
 /* The Analysis filter column starts at the card's own padding, in line with the Strategies list and the Explorer controls. */
 }
 :root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) #section-analysis .analysis-layout .filters.analysis-filters-panel{padding:0;}

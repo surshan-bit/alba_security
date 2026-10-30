@@ -4,6 +4,9 @@
 //  3. no module-level declaration or export is unused                                    (catches dead code)
 //  4. no exported let/var and no set_x exports: shared state goes through accessors / named actions (catches the old pattern)
 //  5. no empty catch block without a comment saying why the error can be ignored                (catches silently swallowed errors)
+//  6. the stylesheet moves toward one central design system (styles/css-ratchet.json): the number of rules tied to one screen (an element id in the selector),
+//     of font sizes written as a literal instead of a --t-* size, and of !important / :root:root:root overrides may only go down. Fewer than the
+//     recorded number: lower it (node tools/lint.js --ratchet). More: the check fails.
 // Usage: node tools/lint.js
 const fs = require('fs'), path = require('path');
 const espree = require('espree'), escope = require('eslint-scope'), estraverse = require('estraverse');
@@ -86,6 +89,25 @@ for(const f of require('fs').readdirSync('styles').filter(x => x.endsWith('.css'
     let d = 0, bad = false;
     for(const c of m[1]){ if(c === '(') d++; else if(c === ')') d--; if(d < 0) bad = true; }
     if(bad || d !== 0) err('styles/' + f + ': unbalanced brackets in selector "' + m[1].trim().slice(0, 80) + '"');
+  }
+}
+// 6. the CSS ratchet
+{
+  const cssDir = path.join(root, 'styles'), file = path.join(cssDir, 'css-ratchet.json');
+  const css = fs.readdirSync(cssDir).filter(f => f.endsWith('.css')).map(f => ({ f, s: fs.readFileSync(path.join(cssDir, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '') }));
+  const count = (re, only) => css.reduce((n, c) => n + ((!only || only(c.f)) ? (c.s.match(re) || []).length : 0), 0);
+  const now = {
+    idSelectors: css.reduce((n, c) => n + c.s.replace(/\{[^{}]*\}/g, '{}').split('{').reduce((m, sel) => m + (sel.match(/(^|[\s,>+~(])#[a-zA-Z][\w-]*/g) || []).length, 0), 0),
+    literalFontSizes: count(/font-size:\s*[\d.]+(rem|px|em)/g, f => f !== 'white-type.css' && f !== 'tokens.css'),
+    important: count(/!important/g),
+    tripleRoot: count(/:root:root:root/g)
+  };
+  let saved = null;
+  try { saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch(e){ /* first run: nothing recorded yet */ }
+  if(process.argv.includes('--ratchet') || !saved){ fs.writeFileSync(file, JSON.stringify(now, null, 2) + '\n'); console.log('css ratchet written: ' + JSON.stringify(now)); }
+  else for(const k of Object.keys(now)){
+    if(now[k] > saved[k]) err('styles: ' + k + ' went up (' + saved[k] + ' -> ' + now[k] + '). New CSS must use the shared parts and --t-* sizes, not a rule for one screen.');
+    else if(now[k] < saved[k]) warn('styles: ' + k + ' is down to ' + now[k] + ' (was ' + saved[k] + '): run node tools/lint.js --ratchet to lock it in');
   }
 }
 console.log('lint: ' + mods.size + ' modules, ' + errors + ' errors, ' + warnings + ' warnings');

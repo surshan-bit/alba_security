@@ -1,9 +1,9 @@
 /* Analysis screen. */
 /* Analysis screen. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
-.analysis-panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-top:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.analysis-panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:var(--card-y) var(--card-x);margin-top:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
 .analysis-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
-.analysis-panel-title{font-size:.92rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;}
-.analysis-panel-sub{font-size:.78rem;color:var(--muted);margin:0 0 14px;line-height:1.5;}
+.analysis-panel-title{font-size:var(--t-md);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;}
+.analysis-panel-sub{font-size:var(--t-sm);color:var(--muted);margin:0 0 14px;line-height:1.5;}
 .analysis-chart-wrap{overflow-x:auto;}
 .analysis-chart-wrap svg{display:block;min-width:640px;}
 .analysis-dot{cursor:pointer;fill-opacity:.75;stroke:var(--panel);stroke-width:1;transition:fill-opacity .1s;}
@@ -21,7 +21,7 @@
      above updateAnalysisChart() for how the overlap trick works. */
 .analysis-filters{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;margin-bottom:16px;}
 .analysis-filter{flex:1 1 220px;min-width:200px;}
-.analysis-filter-label{font-size:.76rem;color:var(--muted);margin-bottom:10px;}
+.analysis-filter-label{font-size:var(--t-sm);color:var(--muted);margin-bottom:10px;}
 .analysis-filter-label span{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums;}
 .range-slider{position:relative;height:20px;}
 .range-track{position:absolute;left:8px;right:8px;top:50%;transform:translateY(-50%);height:4px;background:var(--line);border-radius:2px;}
@@ -32,19 +32,19 @@
 .range-slider input[type=range]::-moz-range-thumb{pointer-events:auto;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.4);cursor:pointer;}
 .range-slider input.range-min{z-index:1;}
 .range-slider input.range-max{z-index:2;}
-.analysis-reset-btn{border-radius:6px;height:36px;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:8px 16px;font-size:.78rem;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;flex:0 0 auto;}
+.analysis-reset-btn{border-radius:6px;height:36px;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:8px 16px;font-size:var(--t-sm);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;flex:0 0 auto;}
 .analysis-reset-btn:hover{border-color:var(--accent);color:var(--accent);}
 /* Leaderboard header: the shared label's bottom margin pushed the Sort select above the Columns button; give both the same height and a common centre line. */
 .analysis-leaderboard-head .analysis-filter-label{margin-bottom:0;white-space:nowrap;}
 .analysis-leaderboard-head .sort-select,.analysis-leaderboard-head .analysis-reset-btn{height:36px;box-sizing:border-box;border-radius:6px;}
 .analysis-leaderboard-head .sort-select{padding:0 10px;}
 .analysis-columns-panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px;}
-.analysis-columns-panel-title{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:10px;}
+.analysis-columns-panel-title{font-size:var(--t-sm);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:10px;}
 .analysis-columns-list{display:flex;flex-direction:column;gap:2px;margin-bottom:10px;user-select:none;}
 .analysis-column-row{display:flex;align-items:center;gap:12px;padding:6px 4px;border-radius:5px;}
 .analysis-column-row:hover{background:var(--bg);}
 .analysis-column-row.dragging{background:var(--panel2);box-shadow:0 0 0 1px var(--accent);position:relative;z-index:1;}
-.analysis-column-label{font-size:.82rem;color:var(--text);}
+.analysis-column-label{font-size:var(--t-sm);color:var(--text);}
 .analysis-columns-hint{text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px;opacity:.8;}
 .analysis-col-grip{background:transparent;border:1px solid transparent;color:var(--muted);border-radius:5px;width:30px;height:28px;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;flex:0 0 auto;}
 .analysis-col-grip:hover,.analysis-col-grip:focus-visible{color:var(--accent);border-color:var(--line);}
@@ -52,11 +52,11 @@
 /* Analysis "color dots by" toggle (added 2026-09-30): Weekly vs Monthly RSI, green if that
      RSI is above 50, red otherwise. Same active/inactive visual pattern as .theme-toggle-btn. */
 .analysis-color-toggle{display:flex;flex-direction:column;gap:8px;}
-.analysis-color-toggle-label{font-size:.76rem;color:var(--muted);font-weight:600;}
+.analysis-color-toggle-label{font-size:var(--t-sm);color:var(--muted);font-weight:600;}
 /* Segmented on/off toggle (2026-10-10): the two options share one rounded track, the selected one is
      a filled pill, the other is plain text — reads as a switch rather than two unrelated buttons. */
 .analysis-color-toggle-btns{background:var(--panel2);display:inline-flex;gap:0;padding:3px;align-self:flex-start;border:1px solid var(--line);border-radius:999px;}
-.analysis-color-btn{background:transparent;border:none;color:var(--muted);border-radius:999px;padding:7px 16px;font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;transition:background .15s,color .15s,box-shadow .15s;}
+.analysis-color-btn{background:transparent;border:none;color:var(--muted);border-radius:999px;padding:7px 16px;font-size:var(--t-sm);font-weight:600;cursor:pointer;white-space:nowrap;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;transition:background .15s,color .15s,box-shadow .15s;}
 .analysis-color-btn:hover{color:var(--text);}
 .analysis-color-btn.active{background:var(--accent);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);}
 .analysis-color-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
@@ -73,7 +73,7 @@ body.lb-full-open{overflow:hidden;}
 .analysis-lb-row{cursor:pointer;}
 .analysis-lb-rank{font-variant-numeric:tabular-nums;color:var(--muted);}
 .analysis-lb-name{font-weight:600;}
-.analysis-lb-ticker{color:var(--muted);font-size:.74rem;margin-left:6px;}
+.analysis-lb-ticker{color:var(--muted);font-size:var(--t-sm);margin-left:6px;}
 .ft-count{display:none;}   /* the count inside the Filters chip: phones only (phone.css) */
 .analysis-lb-mos{font-weight:700;font-variant-numeric:tabular-nums;}
 .analysis-lb-mos.mos-green{color:var(--buy);}
@@ -83,15 +83,15 @@ body.lb-full-open{overflow:hidden;}
 .analysis-lb-empty{color:var(--muted);font-style:italic;}
 .analysis-lb-row.pinned td{background:rgba(201,162,39,.08);}
 /* Multi-select research (added 2026-10-07): Select mode on the Analysis leaderboard. */
-.analysis-lb-industry{white-space:nowrap;color:var(--muted);font-size:.78rem;}
+.analysis-lb-industry{white-space:nowrap;color:var(--muted);font-size:var(--t-sm);}
 /* "Researched" column (added 2026-10-07): days since the stock's stockResearch document was saved,
      so already-researched stocks aren't researched again by mistake. */
-.analysis-lb-researched{white-space:nowrap;font-size:.78rem;font-variant-numeric:tabular-nums;}
+.analysis-lb-researched{white-space:nowrap;font-size:var(--t-sm);font-variant-numeric:tabular-nums;}
 .analysis-lb-researched.rs-fresh{color:var(--buy);font-weight:700;}
 .analysis-lb-researched.rs-aging{color:var(--hold);font-weight:700;}
 .analysis-lb-researched.rs-old{color:var(--avoid);font-weight:700;}
 .analysis-lb-researched.rs-none{color:var(--muted);}
-.analysis-lb-link{color:var(--accent);text-decoration:none;font-size:.78rem;white-space:nowrap;}
+.analysis-lb-link{color:var(--accent);text-decoration:none;font-size:var(--t-sm);white-space:nowrap;}
 .analysis-lb-link:hover{text-decoration:underline;}
 /* Pin/star highlighting (added 2026-09-30) — reuses the app's existing pin concept
      (isPinned()/togglePin(), the same star used on the detail panel;
@@ -102,13 +102,13 @@ body.lb-full-open{overflow:hidden;}
 /* Analysis dot tooltip (added 2026-09-30): a custom HTML tooltip (not the SVG native <title>,
      which only appears after a ~1s browser delay) that follows the cursor and shows stock
      details on hover, before the person decides whether to click through. */
-.analysis-tooltip{position:fixed;z-index:60;display:none;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.78rem;color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.35);min-width:180px;max-width:240px;}
+.analysis-tooltip{position:fixed;z-index:60;display:none;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-sm);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.35);min-width:180px;max-width:240px;}
 .analysis-tooltip.show{display:block;}
 .analysis-tooltip-name{font-weight:700;margin-bottom:2px;line-height:1.3;}
-.analysis-tooltip-ticker{color:var(--muted);font-size:.7rem;margin-bottom:8px;}
+.analysis-tooltip-ticker{color:var(--muted);font-size:var(--t-xs);margin-bottom:8px;}
 .analysis-tooltip-row{display:flex;justify-content:space-between;gap:14px;padding:2px 0;}
 .analysis-tooltip-row span:first-child{color:var(--muted);}
-.analysis-tooltip-hint{margin-top:8px;font-size:.7rem;color:var(--muted);font-style:italic;}
+.analysis-tooltip-hint{margin-top:8px;font-size:var(--t-xs);color:var(--muted);font-style:italic;}
 /* Analysis screen: no filled panel behind the chart, filters and leaderboard; the page background shows through. */
 #section-analysis .analysis-panel,#section-analysis .analysis-columns-panel{background:transparent;}
 #section-analysis .analysis-color-toggle-btns{background:transparent;}
@@ -117,7 +117,7 @@ body.lb-full-open{overflow:hidden;}
 .topbar-search-clear.show{display:block;}
 a.stock-link:hover .analysis-lb-name{text-decoration:underline;}
 body.biz-full-open{overflow:hidden;}
-.filter-note{margin:8px 0 0;font-size:.74rem;line-height:1.4;color:var(--muted);}
+.filter-note{margin:8px 0 0;font-size:var(--t-sm);line-height:1.4;color:var(--muted);}
 
 /* The Analysis toolbar: one row with the Filters chip, the View selector (Stocks / Industry / Industry Group), the count and the grid buttons.
    The filter panel is docked into it (filterpanel.js) and takes no box of its own: its chip is a toolbar item and its filter groups wrap onto the next line.
@@ -140,7 +140,7 @@ body.biz-full-open{overflow:hidden;}
 .analysis-icon-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:36px;height:36px;box-sizing:border-box;padding:0;flex:0 0 auto;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--text);cursor:pointer;}
 .analysis-icon-btn:hover,.analysis-icon-btn[aria-pressed="true"],.analysis-icon-btn[aria-expanded="true"]{border-color:var(--accent);color:var(--accent);}
 .analysis-btn-label{display:none;}
-.sheet-slot .analysis-icon-btn{width:auto;padding:0 12px;font-size:.78rem;}
+.sheet-slot .analysis-icon-btn{width:auto;padding:0 12px;font-size:var(--t-sm);}
 .sheet-slot .analysis-btn-label{display:inline;}
 .analysis-leaderboard.lb-full :is(.analysis-view-bar,.analysis-filters-panel){display:none;}
 @media (max-width:900px){
@@ -177,24 +177,24 @@ body.biz-full-open{overflow:hidden;}
 
 /* Drop-down menus (src/ui/dropmenu.js): the View menu and the "more" menu. */
 .dm{position:relative;display:inline-block;}
-.dm-btn{display:inline-flex;align-items:center;gap:6px;height:36px;box-sizing:border-box;padding:0 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--text);font:inherit;font-size:.86rem;cursor:pointer;white-space:nowrap;}
+.dm-btn{display:inline-flex;align-items:center;gap:6px;height:36px;box-sizing:border-box;padding:0 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--text);font:inherit;font-size:var(--t-sm);cursor:pointer;white-space:nowrap;}
 .dm-btn:hover,.dm-btn[aria-expanded="true"]{border-color:var(--accent);}
-.dm-btn small{color:var(--muted);font-size:.74rem;font-weight:400;}
+.dm-btn small{color:var(--muted);font-size:var(--t-sm);font-weight:400;}
 .dm-btn b{font-weight:600;}
-.dm-caret{font-size:.7rem;color:var(--muted);}
-.dm-more .dm-btn{width:36px;padding:0;justify-content:center;font-size:1.2rem;line-height:1;}
+.dm-caret{font-size:var(--t-xs);color:var(--muted);}
+.dm-more .dm-btn{width:36px;padding:0;justify-content:center;font-size:var(--t-lg);line-height:1;}
 .dm-pop{position:absolute;top:calc(100% + 4px);left:0;z-index:40;min-width:230px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 0;box-shadow:0 8px 24px rgba(0,0,0,.28);}
 .dm-pop[hidden]{display:none;}
 .dm-right .dm-pop{left:auto;right:0;min-width:190px;}
-.dm-item{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;box-sizing:border-box;padding:8px 14px;background:none;border:0;color:var(--text);font:inherit;font-size:.86rem;text-align:left;cursor:pointer;}
+.dm-item{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;box-sizing:border-box;padding:8px 14px;background:none;border:0;color:var(--text);font:inherit;font-size:var(--t-sm);text-align:left;cursor:pointer;}
 .dm-item:hover,.dm-item:focus-visible{background:var(--panel2);}
 .dm-item.current .dm-t{color:var(--accent);font-weight:600;}
-.dm-d{font-size:.74rem;color:var(--muted);}
+.dm-d{font-size:var(--t-sm);color:var(--muted);}
 /* A labelled select (Period) and a plain checkbox (Matched only) in the industry views' line. */
-.biz-field{display:inline-flex;align-items:center;gap:8px;height:36px;box-sizing:border-box;padding:0 4px 0 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:.86rem;}
-.biz-field small{color:var(--muted);font-size:.74rem;}
+.biz-field{display:inline-flex;align-items:center;gap:8px;height:36px;box-sizing:border-box;padding:0 4px 0 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:var(--t-sm);}
+.biz-field small{color:var(--muted);font-size:var(--t-sm);}
 .biz-field select{background:transparent;border:0;color:var(--text);font:inherit;font-weight:600;padding:0 4px;height:100%;cursor:pointer;}
-.biz-matched-only{display:inline-flex;align-items:center;gap:6px;font-size:.86rem;white-space:nowrap;cursor:pointer;}
+.biz-matched-only{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-sm);white-space:nowrap;cursor:pointer;}
 .biz-matched-only:has(input:disabled){opacity:.55;cursor:default;}
 /* v1.306: below the sticky top bar (z-index 20), so scrolling the page slides the View button under the bar like the rest of the toolbar instead of over it. Its pop-up still sits above the filters below. */
 .analysis-view-bar{position:relative;z-index:15;}
@@ -219,7 +219,7 @@ body.biz-full-open{overflow:hidden;}
 @media (min-width:901px){#analysisPanelBody:has(> .analysis-industry){display:flex;}}
 /* v1.281: Period and Show are drop-downs like View (the current choice is on the button and marked in the list). */
 .dm-btn small{margin-right:2px;}
-.dm-caret{font-size:.7rem;color:var(--muted);margin-left:2px;}
+.dm-caret{font-size:var(--t-xs);color:var(--muted);margin-left:2px;}
 .dm-item[disabled]{opacity:.5;cursor:default;}
 .dm-item.current .dm-t::after{content:" \2713";color:var(--accent);}
 
