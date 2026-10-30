@@ -11,24 +11,34 @@ let onChange = null;
 const setNewsChangeHook = (fn) => { onChange = fn; };
 const newsChanged = () => { if(onChange) onChange(); };
 
-// Starts listening once. The page is redrawn (if it is open) on every change.
-async function startNewsSync(){
-  if(started) return;
+// Starts listening once; `again` (the News page opening) listens afresh, so a boot-time listener that never delivered cannot leave the page empty.
+// A listener that errors is restarted a few times, and one that has delivered nothing after a few seconds is restarted once.
+/** @type {null | (() => void)} */
+let unsub = null;
+let heard = false, tries = 0;
+/** @param {boolean} [again] */
+async function startNewsSync(again){
+  if(started && !again) return;
   started = true;
   let db = null;
   try { db = await dbCapabilityPromise; } catch(e){ db = null; }
   const done = () => { news.ready = true; renderLoadedPart('news'); newsChanged(); };
   if(!db){ news.noDb = true; done(); return; }
+  if(unsub){ try { unsub(); } catch(e){ /* the old listener is already gone */ } unsub = null; }
+  heard = false;
+  const retry = () => { if(tries++ < 5) setTimeout(() => startNewsSync(true), 3000 * tries); };
   try {
-    db.collection('news').onSnapshot(
+    unsub = db.collection('news').onSnapshot(
       (snap) => {
         const seen = new Set();
         snap.docs.forEach(d => { if(d.exists && (d.id === 'pulse' || d.id === 'macro' || d.id === 'events')){ news[d.id] = d.data(); seen.add(d.id); } });
         ['pulse', 'macro', 'events'].forEach(k => { if(!seen.has(k)) news[k] = null; });
+        if(seen.size) heard = true;
         done();
       },
-      (err) => { console.error('News sync error', err); done(); }
+      (err) => { console.error('News sync error', err); done(); retry(); }
     );
+    setTimeout(() => { if(!heard) retry(); }, 8000);
   } catch(e){ console.error('News unavailable', e); done(); }
 }
 

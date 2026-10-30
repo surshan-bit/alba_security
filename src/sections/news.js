@@ -37,7 +37,7 @@ function init(){
     else if(t.matches('[data-news-type]')){ view.type = sel.value; render(); }
     else if(t.matches('[data-news-upto]')){ view.upto = +sel.value; render(); }
   });
-  startNewsSync();
+  startNewsSync(true);
   render();
 }
 
