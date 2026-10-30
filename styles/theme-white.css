@@ -73,7 +73,7 @@
 @media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:var(--t-xl);}}
 /* Data Refresh and Settings: one big white card on the lavender page, like Explorer, with flat rows split by hairlines. */
   /* Readable line length: the card is full width, the content inside is capped and centred, not stretched. */
-  :root[data-theme="white"] .card-narrow > *{max-width:960px;margin-left:auto;margin-right:auto;}
+  :root[data-theme="white"] .card-narrow > *{max-width:960px;margin-left:0;margin-right:auto;}
   :root[data-theme="white"] .card-narrow :is(.refreshlog-panel,.settings-panel){max-width:960px;}
   :root[data-theme="white"] .card-narrow :is(.refreshlog-freshness,.upload-panel,.refreshlog-run,.settings-row,.refreshlog-job,.live-refresh){background:transparent;border:0;border-radius:0;box-shadow:none;}
   :root[data-theme="white"] .card-narrow :is(.upload-panel,.settings-row,.refreshlog-freshness,.refreshlog-job){border-bottom:1px solid #eef0f6;padding-left:0;padding-right:0;margin-bottom:0;}
