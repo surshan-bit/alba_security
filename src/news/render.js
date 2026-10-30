@@ -129,16 +129,13 @@ function eventRowHtml(x, i, showDate){
   const name = s ? s.name : (x.name || x.ticker);
   const nameHtml = (idx !== undefined ? `<a class="news-stock" href="#" data-news-open="${idx}">${escapeHtml(name)}</a>` : `<span class="news-stock">${escapeHtml(name)}</span>`) + holdTags(s);
   const src = link(x.src || 'Source', x.url);
-  return `<div class="news-row"><div class="news-date">${showDate ? escapeHtml(shortDate(x.date)) : ''}</div><div class="news-text">${nameHtml} ${s ? scoreBadges(s) : ''}<small><span class="news-et news-et-${escapeHtml(x.type)}">${escapeHtml(typeTag(x.type))}</span>${escapeHtml(x.text || '')}${src ? ' &middot; ' + src : (x.src ? ' &middot; ' + escapeHtml(x.src) : '')}${x.sentiment ? ' ' + impactTag({ pos: 'positive', neg: 'negative', mix: 'mixed' }[x.sentiment]) : ''}</small></div></div>`;
+  return `<div class="news-row">${showDate ? `<div class="news-date">${escapeHtml(shortDate(x.date))}</div>` : ''}<div class="news-text">${nameHtml} ${s ? scoreBadges(s) : ''}<small><span class="news-et news-et-${escapeHtml(x.type)}">${escapeHtml(typeTag(x.type))}</span>${escapeHtml(x.text || '')}${src ? ' &middot; ' + src : (x.src ? ' &middot; ' + escapeHtml(x.src) : '')}${x.sentiment ? ' ' + impactTag({ pos: 'positive', neg: 'negative', mix: 'mixed' }[x.sentiment]) : ''}</small></div></div>`;
 }
-// "2026-11-02" a number of days on (or back).
-const dayShift = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
-const weekEnd = (today) => dayShift(today, 7);
-// The rows in groups (each row goes to the first group whose test it passes), each group headed by its name and a count.
-function groupedRows(rows, today, groups){
-  const out = groups.map(([label]) => ({ label, rows: [] }));
-  rows.forEach(x => { const k = groups.findIndex(([, test]) => test(String(x.date).slice(0, 10))); out[k < 0 ? out.length - 1 : k].rows.push(x); });
-  return out.filter(g => g.rows.length).map(g => `<div class="news-day"><span>${escapeHtml(g.label)}</span><span>${g.rows.length}</span></div>` + g.rows.map(x => eventRowHtml(x, 0, true)).join('')).join('');
+// The rows under one heading per date (the rows come sorted by date): the date is said once, with how many stocks have something on it.
+function groupedRows(rows){
+  const days = [];
+  rows.forEach(x => { const d = String(x.date).slice(0, 10), last = days[days.length - 1]; if(last && last.d === d) last.rows.push(x); else days.push({ d, rows: [x] }); });
+  return days.map(g => `<div class="news-day"><span>${escapeHtml(shortDate(g.d))}</span><span>${g.rows.length}</span></div>` + g.rows.map(x => eventRowHtml(x, 0, false)).join('')).join('');
 }
 function eventsTab(){
   const today = todayIst(), scope = scopeInfo(), inScope = new Set(scope.list.map(s => tickerSymbol(s)));
@@ -157,13 +154,13 @@ function eventsTab(){
     if(!all.length) return h + '<p class="news-empty">No upcoming events saved yet. Press <b>Refresh events</b> to read them from TradingView.</p>';
     if(ev && ev.asof) h += `<div class="news-hint">Researched ${escapeHtml(shortDate(ev.asof))}. Dates can change: check the source link.</div>`;
     if(!rows.length) return h + '<p class="news-empty">Nothing matches these filters.</p>';
-    return h + groupedRows(rows, today, [['Today', d => d <= today], ['This week', d => d <= weekEnd(today)], ['Later', () => true]]);
+    return h + groupedRows(rows);
   }
   const withEvents = scope.list.map(s => ({ ticker: tickerSymbol(s), name: s.name, events: Array.isArray(s.__events) ? s.__events : [] }));
   const rows = filterItems(recentItems(withEvents, today, 30), { type: view.type, upto: 0 }, today).slice(0, 60);
   h += '<div class="news-hint">The last 30 days, from the results, company events and news already saved on each stock.</div>';
   if(!rows.length) return h + '<p class="news-empty">No saved events in the last 30 days for these stocks.</p>';
-  return h + groupedRows(rows, today, [['Today', d => d >= today], ['Last 7 days', d => d >= dayShift(today, -7)], ['Earlier', () => true]]);
+  return h + groupedRows(rows);
 }
 
 function newsHtml(){
