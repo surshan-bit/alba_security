@@ -6,7 +6,7 @@ import { describeRule, evaluateStock, formatValue } from './rules.js';
 import { cleanSort } from '../analysis/state.js';
 import { analysisLbCell, analysisRowContext, columnHeaderHtml, compareByColumn, nextSort, sortLabelOf, stockGridColumnIds } from '../analysis/columns.js';
 
-const ROW_STEP = 300;   // rows drawn at first and added by each "Show more"
+const ROW_STEP = 100;   // rows drawn at first and added by each "Show more"
 let rowCap = ROW_STEP;
 const showMoreResults = () => { rowCap += ROW_STEP; };
 const resetResultsRows = () => { rowCap = ROW_STEP; };

@@ -27,7 +27,8 @@ function init_sync_subscriptions(){
     rerenderDetail();
     const a = document.getElementById('section-analysis');
     if(a && a.classList.contains('active')) refreshAnalysisSoon();
-    renderLoadedPart('strategies');
+    const st = document.getElementById('section-strategies');
+    if(st && st.classList.contains('active')) renderLoadedPart('strategies');
   });
   startNewsSync();
 
@@ -92,8 +93,9 @@ function init_sync_subscriptions(){
   watchCollection('liveSnapshot', applySnapshotOverlay, 'Live snapshot');
   // Completed-weeks technical blocks of Refresh all stocks: one record per 50 stocks, laid under each stock's own saved update.
   watchCollection('techBlocks', applyTechBlocksOverlay, 'Technical blocks');
-  // The recent weekly and monthly bars of Refresh all stocks (about 3 MB in all): W % chg and M % chg are worked out from them.
-  watchCollection('barsRecent', applyRecentBarsOverlay, 'Recent bars');
+  // The recent weekly and monthly bars of Refresh all stocks (the biggest record set, about 14 MB): W % chg and M % chg are worked out
+  // from them. Read after the first screen is up, so the launch is not spent downloading and processing it.
+  setTimeout(() => watchCollection('barsRecent', applyRecentBarsOverlay, 'Recent bars'), 3000);
   // Technical Score 2: one record per 250 stocks, saved by Refresh all stocks.
   watchCollection('techScore2', applyTech2Overlay, 'Technical Score 2');
 

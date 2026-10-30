@@ -11,7 +11,7 @@ import { getRefreshKit } from '../refresh/hook.js';
 import { closestEl } from '../core/evt.js';
 
 // Rows drawn at first and added by each "Show more": a table of thousands of rows is slow to lay out.
-const LB_STEP = 300;
+const LB_STEP = 100;
 let lbRows = LB_STEP;
 
 // ---- full screen ----

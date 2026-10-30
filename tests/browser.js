@@ -439,21 +439,21 @@ async function rowCapTests(browser){
   const rows = sel => page.evaluate(sel => document.querySelectorAll(sel).length, sel);
   const total = await page.evaluate(() => (document.getElementById('analysisLeaderboardCount').textContent.match(/Showing (\d+)/) || [])[1]);
   ok(Number(total) > 300, 'row cap: the test list should put more than 300 stocks in the Analysis range, got ' + total);
-  ok(await rows('#analysisLeaderboardBody tr') === 300, 'row cap: Analysis draws 300 rows first');
+  ok(await rows('#analysisLeaderboardBody tr') === 100, 'row cap: Analysis draws 100 rows first');
   { // the industry view lists industries, not stocks (no 300-row cap on stocks); back to Stocks the flat list is drawn again
     const setView = v => page.evaluate(v => { document.querySelector('[data-analysis-view="' + v + '"]').click(); }, v);
     await setView('industry'); await page.waitForTimeout(800);
     ok(await rows('#analysisLeaderboardBody tr') === 0 && await rows('#analysisIndustryBody .biz-row') > 1, 'row cap: the Industry view shows industry rows instead of the stock table');
     await setView('stocks'); await page.waitForTimeout(600);
-    ok(await rows('#analysisLeaderboardBody tr') === 300 && await rows('#analysisIndustryBody') === 0, 'row cap: View Stocks returns to the flat list');
+    ok(await rows('#analysisLeaderboardBody tr') === 100 && await rows('#analysisIndustryBody') === 0, 'row cap: View Stocks returns to the flat list');
   }
   await page.locator('[data-lb-more]').click(); await page.waitForTimeout(300);
-  ok(await rows('#analysisLeaderboardBody tr') === Math.min(600, Number(total)), 'row cap: Show more adds 300 Analysis rows');
+  ok(await rows('#analysisLeaderboardBody tr') === Math.min(200, Number(total)), 'row cap: Show more adds 100 Analysis rows');
   await goto(page, 'strategies'); await page.waitForTimeout(300);
   await page.evaluate(() => document.getElementById('stratNew').click()); await page.waitForTimeout(400);   // a new strategy has no rules: every stock qualifies
-  ok(await rows('#stratResults .strat-row') === 300, 'row cap: Strategies draws 300 rows first');
+  ok(await rows('#stratResults .strat-row') === 100, 'row cap: Strategies draws 100 rows first');
   await page.locator('[data-strat-more]').click(); await page.waitForTimeout(300);
-  ok(await rows('#stratResults .strat-row') === 600, 'row cap: Show more adds 300 Strategies rows');
+  ok(await rows('#stratResults .strat-row') === 200, 'row cap: Show more adds 100 Strategies rows');
   { // v1.283: the strategies are one Strategy drop-down (current ticked, New and Restore at the bottom); the setup uses the full width
     await page.locator('#stratList .dm-btn').click();
     ok(await page.locator('#stratList [data-strat-pick]').count() >= 3 && await page.locator('#stratList [data-strat-pick].current').count() === 1, 'strategy menu: lists the strategies and ticks the current one');
@@ -513,10 +513,10 @@ async function rowCapTests(browser){
   const big = await page.evaluate(() => { const n = {}; window.__alba.stocks.forEach(s => { const k = (s.ticker.split('\u00b7')[1] || '').trim(); n[k] = (n[k] || 0) + 1; }); const top = Object.entries(n).sort((a, b) => b[1] - a[1])[0]; return { name: top[0], count: top[1] }; });
   ok(big.count > 300, 'row cap: the test list should have an industry with more than 300 stocks, got ' + big.count);
   await page.evaluate(name => { Array.from(document.querySelectorAll('.biz-open')).find(b => b.dataset.bizOpen === name).click(); }, big.name); await page.waitForSelector('#jump-ind-stocks tbody tr', { timeout: 5000 });
-  ok(await rows('#jump-ind-stocks tbody tr') === 300, 'row cap: an industry page draws 300 stocks first');
+  ok(await rows('#jump-ind-stocks tbody tr') === 100, 'row cap: an industry page draws 100 stocks first');
   await page.locator('[data-ind-more]').click(); await page.waitForTimeout(300);
-  ok(await rows('#jump-ind-stocks tbody tr') === Math.min(600, big.count), 'row cap: Show more adds 300 stocks to an industry page');
-  await page.locator('#jump-ind-stocks tbody tr').nth(400).evaluate(tr => tr.click()); await page.waitForTimeout(400);
+  ok(await rows('#jump-ind-stocks tbody tr') === Math.min(200, big.count), 'row cap: Show more adds 100 stocks to an industry page');
+  await page.locator('#jump-ind-stocks tbody tr').nth(150).evaluate(tr => tr.click()); await page.waitForTimeout(400);
   ok(await page.evaluate(() => !!document.querySelector('#detail .detail-name') && !document.getElementById('jump-ind-stocks')), 'row cap: a row added by Show more opens its stock');
   ok(errs.length === 0, 'row cap: console errors: ' + errs.slice(0, 3).join(' | '));
   await page.close(); await ctx.close();
