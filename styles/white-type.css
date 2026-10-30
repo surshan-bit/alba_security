@@ -9,6 +9,11 @@
   :root[data-theme="white"]{--t-xl:24px;--t-lg:17px;--t-md:13px;--t-sm:12px;--t-xs:10px;}
 }
 
+/* Phones: a stock's ticker under its name in the Analysis and Strategies grids is the tiniest size, so the row stays 37px with two lines in it. */
+@media (max-width:600px){
+  :root[data-theme="white"] body :is(.analysis-leaderboard,#stratResults) .analysis-lb-ticker{font-size:var(--t-xs) !important;}
+}
+
 /* 1. Base: blocks and controls are body text. Inline words inherit from the block they sit in. */
 :root[data-theme="white"] body :is(p,li,td,div,label,button,summary,input,select,textarea,dd,dt,blockquote,pre){font-family:var(--ff-white) !important;font-size:var(--t-md) !important;font-weight:var(--w-reg) !important;}
 :root[data-theme="white"] body *{font-family:var(--ff-white) !important;}

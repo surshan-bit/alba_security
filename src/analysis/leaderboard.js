@@ -103,7 +103,12 @@ function leaderboardRowHtml(s, i, colOrder){
 function renderLeaderboardRows(filtered){
   const ranked = rankStocks(filtered);
   const lbCountEl = document.getElementById('analysisLeaderboardCount');
-  if(lbCountEl) lbCountEl.textContent = `Showing ${ranked.length} of ${stocks.length} stocks`;
+  if(lbCountEl){
+    lbCountEl.textContent = `Showing ${ranked.length} of ${stocks.length} stocks`;
+    lbCountEl.dataset.short = `${ranked.length} of ${stocks.length}`;
+    const chip = document.getElementById('analysisFiltersCount');   // a phone shows the count inside the Filters chip instead of on a line of its own (phone.css)
+    if(chip) chip.textContent = lbCountEl.dataset.short;
+  }
   const lbBody = document.getElementById('analysisLeaderboardBody');
   const colOrder = analysisColumnOrder(), colSpan = colOrder.length + (getRefreshKit() ? 1 : 0);
   let drawn = Math.min(ranked.length, lbRows), drawable = ranked.length, rowsHtml;

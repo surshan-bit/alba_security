@@ -43,7 +43,6 @@ html{font-size:112.5%;}
 /* Grids on a phone: sideways room is scarce (the grid scrolls), so the extra air is added above and below each row. */
 .strat-table:not(.peers-table) th{padding:9px 5px;font-size:.62rem;letter-spacing:.03em;}
 .strat-table:not(.peers-table) td{padding:12px 5px;font-size:.8rem;line-height:1.35;}
-.analysis-leaderboard .analysis-lb-ticker{display:none;}
 .analysis-leaderboard .pin-btn{padding:0 2px;}
 .app-section .analysis-main > .analysis-panel,.app-section > .analysis-panel{margin-top:8px;}
 .analysis-leaderboard{margin-top:0;}
@@ -187,4 +186,41 @@ html{font-size:112.5%;}
   .sheet-slot :is(#analysisFullscreenBtn,[data-biz-full]){display:none !important;}
   .sheet-foot{display:flex;position:sticky;bottom:0;margin-top:auto;padding:12px 0 calc(14px + env(safe-area-inset-bottom,0px));background:var(--panel);}
   .sheet-done{flex:1;height:46px;border:0;border-radius:8px;background:var(--accent);color:#0f1720;font:inherit;font-weight:700;cursor:pointer;}
+}
+
+/* v1.324 Phones: the Analysis and Strategies screens use the screen better. The View menu and the Filters chip share one row, with the count inside the chip; the Strategies
+   picker, Setup, Track and refresh and Select share one row; the tick boxes wait for Select; a stock's ticker sits under its name instead of beside it (or hidden), so the Stock
+   column is narrower and more columns fit. Rows stay 37px tall. */
+@media (max-width:600px){
+:root:root:root .analysis-leaderboard-head{gap:6px !important;margin-bottom:6px !important;}
+:root:root:root .analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle{flex:1 1 0;min-width:0;}
+:root:root:root .analysis-toolbar .analysis-view-bar{flex:0 0 auto;}
+:root:root:root .analysis-toolbar .rk-headline{display:none;}
+:root:root:root .analysis-filters-panel .filters-toggle .ft-count{display:inline;flex:none;color:var(--muted);font-size:.7rem;white-space:nowrap;}
+:root:root:root .analysis-leaderboard .strat-table:not(.peers-table) td,:root:root:root #stratResults .strat-table:not(.peers-table) td{padding:4.5px 4px;line-height:1.15;}
+:root:root:root .analysis-leaderboard .strat-table:not(.peers-table) th,:root:root:root #stratResults .strat-table:not(.peers-table) th{padding:7px 4px;}
+:root:root:root .analysis-leaderboard .analysis-lb-ticker,:root:root:root #stratResults .analysis-lb-ticker{display:block;margin:1px 0 0;font-size:.58rem;line-height:1.1;}
+:root:root:root .analysis-leaderboard .analysis-lb-name,:root:root:root #stratResults .analysis-lb-name{display:block;max-width:132px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.15;}
+:root:root:root .analysis-leaderboard td:has(> .pin-btn){width:22px;padding-left:2px;padding-right:0;}
+:root:root:root .analysis-leaderboard th:first-child:not(.analysis-lb-rank){width:22px;}
+:root:root:root .analysis-leaderboard .pin-btn{padding:0;}
+:root:root:root .analysis-leaderboard td.analysis-lb-rank,:root:root:root #stratResults td.analysis-lb-rank{padding-left:2px;padding-right:6px;}
+/* Strategies */
+:root:root:root #stratList:empty{display:none;}
+:root:root:root .strat-phonebar{display:flex;align-items:center;gap:6px;margin:4px 0 6px;}
+:root:root:root .strat-phone-pick{flex:1 1 0;min-width:0;display:block;}
+:root:root:root .strat-phone-pick .dm{display:block;}
+:root:root:root .strat-phone-pick .dm-btn{width:100%;justify-content:space-between;}
+:root:root:root .strat-phone-pick .dm-btn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+:root:root:root .strat-phonebar .strat-phone-btn{width:36px;padding:0;justify-content:center;flex:0 0 auto;}
+:root:root:root .strat-phonebar .strat-phone-btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);}
+:root:root:root .strat-phonebar ~ .strat-panel .strat-result-head > .biz-filters-toggle{display:none;}
+:root:root:root .strat-phonebar ~ .strat-panel .strat-result-title .strat-showing,:root:root:root .strat-phonebar ~ .strat-panel .strat-result-title .strat-sep{display:none;}
+:root:root:root .strat-phonebar ~ .strat-panel .strat-result-head:not(:has(.strat-ign)) .strat-result-title{display:none;}
+:root:root:root #section-strategies #stratMain > .strat-phonebar ~ .strat-panel:is(:has(> .strat-fold),:has(.strat-result-head)){margin-top:0 !important;padding-top:0 !important;}
+:root:root:root #section-strategies #stratMain > .strat-phonebar ~ .strat-panel .strat-result-head{margin:0;}
+:root:root:root .strat-phonebar ~ .strat-panel > .strat-fold:not([open]) > summary .strat-fold-lbl,:root:root:root .strat-fold-nm{display:none;}
+:root:root:root #section-strategies #stratMain > .strat-phonebar ~ .strat-panel > .strat-fold > summary{margin:0 0 2px;padding:2px 22px 2px 0;min-height:0;gap:4px;flex-wrap:nowrap;align-items:center;}
+:root:root:root .strat-phonebar ~ .strat-panel > .strat-fold > summary .strat-fold-sum{flex:1 1 auto;min-width:0;order:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+:root:root:root #stratResults:not(.selecting) .strat-selcell{display:none;}
 }
