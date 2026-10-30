@@ -242,7 +242,11 @@ html{font-size:112.5%;}
 /* ---- Trade Log on a phone (v1.329): Positions and Ideas as two tabs, one short row per trade, the add form as a bottom sheet. :root:root:root beats the White theme's type scale. ---- */
 @media (max-width:600px){
 :root:root:root #section-trackrecord{padding-bottom:76px;}
-:root:root:root #section-trackrecord .tl-tabs{display:flex;margin:0 0 12px;}
+:root:root:root #section-trackrecord .tl-tabs{display:flex;margin:0;padding:8px 10px 0;background:var(--panel);border-radius:14px 14px 0 0;border-bottom:0;position:relative;}   /* the tabs are the top of the white block, like News: the panel under them continues it */
+:root:root:root #section-trackrecord .tl-tabs::after{content:"";position:absolute;left:10px;right:10px;bottom:0;border-bottom:1px solid var(--line);}
+:root:root:root #section-trackrecord .tl-tabs .news-tab{border-bottom-width:2px;margin-bottom:0;position:relative;z-index:1;}
+:root:root:root #section-trackrecord .analysis-panel{margin-top:0;border-top-left-radius:0;border-top-right-radius:0;}
+:root:root:root #section-trackrecord .tl-tabs .news-tab{font-weight:700 !important;}
 /* Which panel shows */
 :root:root:root #section-trackrecord[data-tl-tab="ideas"] .analysis-panel:not(.tl-ideas){display:none;}
 :root:root:root #section-trackrecord[data-tl-tab="positions"] .tl-ideas{display:none;}
@@ -254,25 +258,25 @@ html{font-size:112.5%;}
 :root:root:root #tradeLogPanelBody .tl-pstrip{display:flex;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--text) 4%,transparent);margin:0 0 4px;}
 :root:root:root #tradeLogPanelBody .tl-pstrip>div{flex:1;padding:9px 12px;min-width:0;}
 :root:root:root #tradeLogPanelBody .tl-pstrip>div+div{border-left:1px solid var(--line);}
-:root:root:root #tradeLogPanelBody .tl-pstrip span{display:block;font-size:.6rem !important;font-weight:600 !important;text-transform:uppercase;letter-spacing:.05em;color:var(--muted) !important;}
-:root:root:root #tradeLogPanelBody .tl-pstrip b{display:block;font-size:1rem !important;font-weight:600 !important;margin-top:2px;}
+:root:root:root #tradeLogPanelBody .tl-pstrip span{display:block;font-size:10px !important;font-weight:600 !important;text-transform:uppercase;letter-spacing:.05em;color:var(--muted) !important;}
+:root:root:root #tradeLogPanelBody .tl-pstrip b{display:block;font-size:15px !important;font-weight:600 !important;margin-top:2px;}
 :root:root:root #tradeLogPanelBody .tl-prow{border-top:1px solid var(--line);padding:11px 0;cursor:pointer;}
 :root:root:root #tradeLogPanelBody .tl-pstrip + .tl-prow{border-top:0;}
 :root:root:root #tradeLogPanelBody .tl-prow-top,:root:root:root #tradeLogPanelBody .tl-prow-sub{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-:root:root:root #tradeLogPanelBody .tl-prow-name{font-size:.96rem !important;font-weight:600 !important;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-:root:root:root #tradeLogPanelBody .tl-prow-ret{font-size:1rem !important;font-weight:700 !important;white-space:nowrap;}
-:root:root:root #tradeLogPanelBody .tl-prow-sub{margin-top:3px;font-size:.8rem !important;color:var(--muted);}
-:root:root:root #tradeLogPanelBody .tl-prow-sub .tl-signal-badge{font-size:.7rem !important;padding:2px 9px;white-space:nowrap;}
+:root:root:root #tradeLogPanelBody .tl-prow-name{font-size:14px !important;font-weight:600 !important;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+:root:root:root #tradeLogPanelBody .tl-prow-ret{font-size:14px !important;font-weight:700 !important;white-space:nowrap;}
+:root:root:root #tradeLogPanelBody .tl-prow-sub{margin-top:3px;font-size:12px !important;color:var(--muted);}
+:root:root:root #tradeLogPanelBody .tl-prow-sub .tl-signal-badge{font-size:11px !important;padding:2px 9px;white-space:nowrap;}
 :root:root:root #tradeLogPanelBody .tl-sig-closed{background:color-mix(in srgb,var(--muted) 10%,transparent);}
-:root:root:root #tradeLogPanelBody .tl-prow-det{display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--text) 4%,transparent);font-size:.82rem !important;}
+:root:root:root #tradeLogPanelBody .tl-prow-det{display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--text) 4%,transparent);font-size:12px !important;}
 :root:root:root #tradeLogPanelBody .tl-prow.open .tl-prow-det{display:block;}
 :root:root:root #tradeLogPanelBody .tl-prow-det dl{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin:0 0 10px;}
-:root:root:root #tradeLogPanelBody .tl-prow-det dt{font-size:.6rem !important;font-weight:600 !important;text-transform:uppercase;letter-spacing:.05em;color:var(--muted) !important;}
-:root:root:root #tradeLogPanelBody .tl-prow-det dd{margin:1px 0 0;font-size:.84rem !important;font-weight:600 !important;}
-:root:root:root #tradeLogPanelBody .tl-prow-why{margin:0 0 10px;font-size:.8rem !important;line-height:1.4;}
+:root:root:root #tradeLogPanelBody .tl-prow-det dt{font-size:10px !important;font-weight:600 !important;text-transform:uppercase;letter-spacing:.05em;color:var(--muted) !important;}
+:root:root:root #tradeLogPanelBody .tl-prow-det dd{margin:1px 0 0;font-size:13px !important;font-weight:600 !important;}
+:root:root:root #tradeLogPanelBody .tl-prow-why{margin:0 0 10px;font-size:12px !important;line-height:1.4;}
 :root:root:root #tradeLogPanelBody .tl-prow-det .tl-row-actions{border:0;padding:0;}
 /* The add / sell form is a bottom sheet over a dimmed page; the Add trade button is pinned to the bottom of the Positions tab */
-:root:root:root #tradeAddBtn{position:fixed;left:12px;right:12px;bottom:12px;z-index:40;height:46px;width:auto;justify-content:center;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 40%,transparent);}
+:root:root:root #tradeAddBtn{position:fixed;left:12px;right:12px;bottom:12px;z-index:25;height:46px;width:auto;justify-content:center;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 40%,transparent);}
 :root:root:root #section-trackrecord[data-tl-tab="ideas"] #tradeAddBtn,:root:root:root #section-trackrecord:has(.tl-form) #tradeAddBtn{display:none;}
 :root:root:root #section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-head{display:block;height:0;overflow:visible;margin:0;padding:0;}
 :root:root:root #section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-head .analysis-panel-title{display:none;}
@@ -291,7 +295,7 @@ html{font-size:112.5%;}
 :root:root:root #section-trackrecord .tl-ideas .tl-ideas-select{flex:1;max-width:none;min-width:0;height:40px;}
 :root:root:root #section-trackrecord .tl-ideas #tradeIdeasRun{height:40px;white-space:nowrap;color:#fff !important;background:var(--accent) !important;font-size:.76rem !important;padding:0 14px;}
 :root:root:root #tradeIdeasBody .tl-top5{border:0;background:transparent;padding:0;margin:0 0 6px;}
-:root:root:root #tradeIdeasBody .tl-top5-title{font-size:.92rem !important;font-weight:600 !important;margin:10px 0 4px;}
+:root:root:root #tradeIdeasBody .tl-top5-title{font-size:14px !important;font-weight:600 !important;margin:10px 0 4px;}
 :root:root:root #tradeIdeasBody .tl-top5 > .upload-hint{display:none;}
 :root:root:root #tradeIdeasBody .tl-top5 ol{gap:0;}
 :root:root:root #tradeIdeasBody .tl-top5 ol > li{padding:11px 0;border-top:1px solid var(--line);}
@@ -300,10 +304,10 @@ html{font-size:112.5%;}
 :root:root:root #tradeIdeasBody .tl-top5-head > span:first-child{flex:1 1 0;min-width:0;}
 :root:root:root #tradeIdeasBody .tl-held-tag{display:table;margin:4px 0 0;padding:1px 8px;font-size:.68rem !important;font-weight:700 !important;}
 :root:root:root #tradeIdeasBody .tl-top5-head{flex-wrap:wrap;align-items:baseline;}
-:root:root:root #tradeIdeasBody .tl-top5-head > span:first-child{font-size:.96rem !important;font-weight:600 !important;}
-:root:root:root #tradeIdeasBody .tl-top5-price{font-size:.9rem !important;font-weight:600 !important;}
-:root:root:root #tradeIdeasBody .tl-top5-why{padding-left:0;list-style:none;font-size:.8rem !important;color:var(--text);}
-:root:root:root #tradeIdeasBody .tl-news{border:0;margin-top:5px;padding:0;font-size:.74rem !important;}
+:root:root:root #tradeIdeasBody .tl-top5-head > span:first-child{font-size:14px !important;font-weight:600 !important;}
+:root:root:root #tradeIdeasBody .tl-top5-price{font-size:13px !important;font-weight:600 !important;}
+:root:root:root #tradeIdeasBody .tl-top5-why{padding-left:0;list-style:none;font-size:12px !important;color:var(--text);}
+:root:root:root #tradeIdeasBody .tl-news{border:0;margin-top:5px;padding:0;font-size:11px !important;}
 :root:root:root #tradeIdeasBody .tl-news-list{display:none;}
 :root:root:root #tradeIdeasBody .tl-top5-down{border-top:1px solid var(--line);padding-top:4px;}
 :root:root:root #tradeIdeasBody .tl-top5-down .tl-top5-title{cursor:pointer;display:flex;justify-content:space-between;}

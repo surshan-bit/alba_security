@@ -507,6 +507,11 @@ async function tradeLogPhoneScenarios(){
     await page.evaluate(() => document.querySelector('[data-tl-status="closed"]').click());
     await until(page, () => document.querySelectorAll('#tradeLogPanelBody .tl-prow').length === 1 && /Realised/.test(document.querySelector('#tradeLogPanelBody .tl-pstrip').textContent), null, 'Closed shows the one closed trade with the realised strip');
     ok(await page.evaluate(() => getComputedStyle(document.getElementById('tradeAddBtn')).position === 'fixed'), 'Add trade is pinned to the bottom');
+    { // the side menu opens over the pinned button, not under it
+      await page.evaluate(() => document.getElementById('sidebar').classList.add('open')); await page.waitForTimeout(350);
+      ok(await page.evaluate(() => { const r = document.getElementById('tradeAddBtn').getBoundingClientRect(), e = document.elementFromPoint(r.left + 20, r.top + r.height / 2); return !!e && !e.closest('#tradeAddBtn'); }), 'the Add trade button does not show over the open side menu');
+      await page.evaluate(() => document.getElementById('sidebar').classList.remove('open'));
+    }
     await page.evaluate(() => document.getElementById('tradeAddBtn').click());
     await until(page, () => !!document.querySelector('#tradeFormHost .tl-form'), null, 'the add form opens');
     ok(await page.evaluate(() => { const f = document.querySelector('#tradeFormHost .tl-form'), r = f.getBoundingClientRect(); return getComputedStyle(f).position === 'fixed' && Math.round(r.bottom) === innerHeight && r.left >= 0 && r.right <= innerWidth; }), 'the form is a bottom sheet inside the screen');
