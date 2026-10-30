@@ -7,7 +7,7 @@ import { closeInlineDetail } from './inlinedetail.js';
 import { recordView } from './viewstack.js';
 import { uiStateSet } from '../identity/prefs.js';
 import { ensurePartial } from '../boot/partials.js';
-import { definePart, isPart, loadedPart, openPart } from '../core/lazy.js';
+import { definePart, isPart, loadedPart, openPart, warmParts } from '../core/lazy.js';
 import { closestEl } from '../core/evt.js';
 
 // ---- Sidebar / hamburger menu / section navigation ----
@@ -118,6 +118,7 @@ function wireJumpLinks(sectionEl, linkSelector, destOf){
 }
 
 function init_ui_navigation(){
+warmParts(['strategies', 'news', 'trackrecord', 'refreshlog']);
 // Sections are switched in a few places (menu, links, "Back to ..."), so follow the active class rather than each caller.
 const topbarObserver = new MutationObserver(updateTopbarSection);
 Object.values(appSections).forEach(el => { if(el) topbarObserver.observe(el, { attributes: true, attributeFilter: ['class'] }); });
