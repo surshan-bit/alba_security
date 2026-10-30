@@ -76,7 +76,7 @@ function analysisLbCellRaw(colId, ctx){
       const ts = s.technical && typeof s.technical.score === 'number' ? s.technical.score : null;
       return ts === null ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge b-${scoreBand(ts).replace('fs-', '')}" style="padding:1px 8px;font-size:.68rem;">${ts.toFixed(1)}</span></td>`;
     }
-    case 'pin': return `<td><button type="button" class="pin-btn${pinned ? ' pinned' : ''}" data-ticker="${escapeHtml(s.ticker)}" title="${pinned ? 'Unpin' : 'Pin to top'}">${pinned ? '★' : '☆'}</button></td>`;
+    case 'pin': return `<td class="pin-col"><button type="button" class="pin-btn${pinned ? ' pinned' : ''}" data-ticker="${escapeHtml(s.ticker)}" title="${pinned ? 'Unpin' : 'Pin to top'}">${pinned ? '★' : '☆'}</button></td>`;
     case 'rank': return `<td class="analysis-lb-rank">${i + 1}</td>`;
     case 'stock': return `<td><a class="stock-link" href="${escapeHtml(stockShareLink(s))}"><span class="analysis-lb-name">${escapeHtml(s.name)}</span></a>${eventMark(s)}<span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}</span></td>`;
     case 'industry': {
@@ -150,9 +150,9 @@ function analysisRowContext(s, i, idx){
   const scoreLabel = s.score != null ? s.score.toFixed(1) : '';
   return { s, i, idx, r, mosLabel, mosClass, price, pinned, scoreLabel, techWCell: techCell(s, 'weekMacd'), techMCell: techCell(s, 'monthMacd') };
 }
-// The columns of every other stock grid (Strategies, Explorer, a stock's peers): the Analysis "Columns" setting (its order), without the
-// pin column, which only the Analysis leaderboard has. Change the order once in Analysis and every grid follows.
-const stockGridColumnIds = () => analysisColumnOrder().filter(id => id !== 'pin');
+// The columns of every stock grid (Strategies, Industry, a stock's peers): the Analysis "Columns" setting, in its order, pin star included.
+// Change the order once in Analysis and every grid follows.
+const stockGridColumnIds = () => analysisColumnOrder();
 // ---- sorting by a column header ----
 // Every grid that draws its header with columnHeaderHtml(id, sort) gets clickable headers: a click sorts by that column, a second click reverses it.
 // `sort` is { col, dir } ('asc' | 'desc'). A stock with no figure for the column always goes last, whichever way the column is sorted.
@@ -208,6 +208,7 @@ function sortHeaderHtml(id, label, sort, extra){
 function columnHeaderHtml(id, sort){
   const c = ANALYSIS_LB_COLUMN_MAP.get(id);
   if(!c) return '';
+  if(id === 'pin') return '<th class="pin-col"></th>';
   const extra = (c.num ? ' class="num"' : '') + (c.title ? ` title="${escapeHtml(c.title)}"` : '');
   if(!sort || !isSortableColumn(id)) return `<th${extra}>${escapeHtml(c.label)}</th>`;
   return sortHeaderHtml(id, c.label, sort, extra);

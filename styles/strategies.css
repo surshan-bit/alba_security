@@ -183,18 +183,10 @@
 .live-refresh.live-panel{margin:0;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);border-left:0;border-right:0;}
 #detail .live-refresh{padding:12px 0;}
 .pc-psum .badge{text-align:center;padding:2px 10px !important;font-size:.76rem !important;}
-/* Peers grid: same text size, but even spacing, headers lined up with their cells, and a clear marker for the open stock. */
+/* Peers grid: the Analysis grid's spacing (cells come from .strat-table); only a sticky header and the width are its own. */
 .peers-table.strat-table{width:100%;}
-.peers-table.strat-table th,.peers-table.strat-table td{padding:10px 16px;vertical-align:middle;line-height:1.3;}
-.peers-table.strat-table th{border-bottom:1px solid var(--line);}
-.peers-table.strat-table th{background:var(--panel);position:sticky;top:0;z-index:1;}
-.peers-table.strat-table th:first-child,.peers-table.strat-table td:first-child{width:48px;padding-left:12px;padding-right:12px;}
-.peers-table.strat-table th:first-child{text-align:center;min-width:48px;}
-.peers-table.strat-table td:first-child{text-align:center;min-width:48px;}
-.peers-table.strat-table th.num,.peers-table.strat-table td.num{min-width:84px;}
+.peers-table.strat-table th{border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:1;}
 .peers-table.strat-table td.analysis-lb-score{text-align:right;}
-.peers-table.strat-table td:has(> .badge){min-width:96px;}
-.peers-table.strat-table .analysis-lb-ticker{margin-left:8px;}
 /* Strategies screen: no filled panels; the page background shows through. */
 #section-strategies .analysis-panel,#section-strategies .strat-panel{background:transparent;}
 .analysis-lb-industry .ind-w{font-weight:700;font-variant-numeric:tabular-nums;margin-right:6px;}

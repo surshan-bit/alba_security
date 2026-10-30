@@ -452,6 +452,15 @@ async function rowCapTests(browser){
   await goto(page, 'strategies'); await page.waitForTimeout(300);
   await page.evaluate(() => document.getElementById('stratNew').click()); await page.waitForTimeout(400);   // a new strategy has no rules: every stock qualifies
   ok(await rows('#stratResults .strat-row') === 100, 'row cap: Strategies draws 100 rows first');
+  { // every stock grid has the Analysis pin star: in Strategies it flips in place and does not open the stock
+    const pin = page.locator('#stratResults .strat-row .pin-btn').first();
+    ok(await pin.count() === 1 && (await rows('#stratResults thead th.pin-col')) === 1, 'pin grid: the Strategies grid has the pin star column');
+    const was = await pin.evaluate(b => b.classList.contains('pinned'));
+    await pin.evaluate(b => b.click()); await page.waitForTimeout(200);
+    ok(await page.locator('#stratResults .strat-row .pin-btn').first().evaluate(b => b.classList.contains('pinned')) === !was, 'pin grid: the star flips when pressed');
+    ok(await page.evaluate(() => document.getElementById('section-strategies').classList.contains('active')), 'pin grid: pressing the star does not open the stock');
+    await page.locator('#stratResults .strat-row .pin-btn').first().evaluate(b => b.click()); await page.waitForTimeout(200);
+  }
   await page.locator('[data-strat-more]').click(); await page.waitForTimeout(300);
   ok(await rows('#stratResults .strat-row') === 200, 'row cap: Show more adds 100 Strategies rows');
   { // v1.283: the strategies are one Strategy drop-down (current ticked, New and Restore at the bottom); the setup uses the full width

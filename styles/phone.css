@@ -41,9 +41,9 @@ html{font-size:112.5%;}
 .analysis-leaderboard-head .analysis-reset-btn{flex:1 1 0;padding:0 6px;font-size:.76rem;height:var(--ph-ctl-lg);white-space:nowrap;}
 .analysis-leaderboard-head .analysis-panel-title{font-size:.84rem;}
 /* Grids on a phone: sideways room is scarce (the grid scrolls), so the extra air is added above and below each row. */
-.strat-table:not(.peers-table) th{padding:9px 5px;font-size:.62rem;letter-spacing:.03em;}
-.strat-table:not(.peers-table) td{padding:12px 5px;font-size:.8rem;line-height:1.35;}
-.analysis-leaderboard .pin-btn{padding:0 2px;}
+.strat-table th{padding:9px 5px;font-size:.62rem;letter-spacing:.03em;}
+.strat-table td{padding:12px 5px;font-size:.8rem;line-height:1.35;}
+.strat-table .pin-btn{padding:0 2px;}
 .app-section .analysis-main > .analysis-panel,.app-section > .analysis-panel{margin-top:8px;}
 .analysis-leaderboard{margin-top:0;}
 .analysis-filters-panel,.analysis-filters-panel .filters-toggle{margin-bottom:0;}
@@ -201,10 +201,9 @@ html{font-size:112.5%;}
 :root:root:root :is(.strat-table,.biz-table) > thead > tr > th{padding:7px 4px;}
 :root:root:root :is(.strat-table,.biz-table,.help-table) td .analysis-lb-ticker{display:none;}   /* the stock code is left out on a phone: the name is enough */
 :root:root:root :is(.strat-table,.biz-table) td .analysis-lb-name{display:inline-block;max-width:132px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;line-height:1.15;}
-:root:root:root .analysis-leaderboard td:has(> .pin-btn){width:22px;padding-left:2px;padding-right:0;}
-:root:root:root .analysis-leaderboard th:first-child:not(.analysis-lb-rank){width:22px;}
-:root:root:root .analysis-leaderboard .pin-btn{padding:0;}
-:root:root:root .analysis-leaderboard td.analysis-lb-rank,:root:root:root #stratResults td.analysis-lb-rank{padding-left:2px;padding-right:6px;}
+:root:root:root .strat-table :is(td,th).pin-col{width:22px;padding-left:2px;padding-right:0;}
+:root:root:root .strat-table .pin-btn{padding:0;}
+:root:root:root .strat-table td.analysis-lb-rank{padding-left:2px;padding-right:6px;}
 /* the Industry view: the View menu and the filter chip share a row (count inside the chip), then Period, Show and the buttons; the same pattern as the Stocks view */
 :root:root:root #analysisPanelBody:has(> .analysis-industry){display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:4px;}
 :root:root:root #analysisPanelBody:has(> .analysis-industry) > .analysis-toolbar,:root:root:root #analysisPanelBody:has(> .analysis-industry) > .analysis-industry,:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded,:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full),:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full) > .biz-toolbar,:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-controls{display:contents;}
