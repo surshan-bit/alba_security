@@ -487,9 +487,44 @@ async function phoneLayoutScenarios(){
   });
 }
 
+// ---------------------------------------------------------------- Trade Log on a phone (v1.329): Positions / Ideas tabs, short rows, a bottom-sheet form; unchanged on a laptop
+async function tradeLogPhoneScenarios(){
+  const idC = sid('tl-c'), idD = sid('tl-d'), idE = sid('tl-e');
+  const closedTrade = (s, d, p, q, sd, sp) => Object.assign(openTrade(s, d, p, q), { status: 'closed', sell: { date: sd, price: sp, holdingDays: 50, snapshot: snapshotOf(s) } });
+  const docs = { [TRADES + '/' + idC]: openTrade(A, '2026-10-01', 100, 5), [TRADES + '/' + idD]: openTrade(B, '2026-09-01', 50, 10), [TRADES + '/' + idE]: closedTrade(C, '2026-07-01', 80, 4, '2026-09-20', 90) };
+  const vis = (page, sel) => page.evaluate(s => { const e = document.querySelector(s); return !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden'; }, sel);
+  await scenario('trade log phone: tabs, short rows, Open / Closed, bottom sheet', { section: 'trackrecord', viewport: { width: 390, height: 780 } }, docs, async page => {
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'white'));
+    await until(page, () => document.querySelectorAll('#tradeLogPanelBody .tl-prow').length === 2, null, 'the two open trades are listed as short rows');
+    ok(await vis(page, '.tl-tabs') && (await page.evaluate(() => document.getElementById('tlTabPositions').textContent)) === 'Positions 2', 'the Positions / Ideas tabs show, with the open count');
+    ok(!(await vis(page, '.tl-ideas')) && await vis(page, '#tradeLogPanelBody .tl-phone'), 'the Positions tab shows the rows and hides the ideas');
+    ok(!(await vis(page, '#tradeLogPanelBody .tl-card')), 'the tall cards are not shown on a phone');
+    ok(/Invested/.test(await page.evaluate(() => document.querySelector('#tradeLogPanelBody .tl-pstrip').textContent)), 'the summary strip shows');
+    ok(await page.evaluate(() => { const r = document.querySelector('#tradeLogPanelBody .tl-prow'); return r.getBoundingClientRect().height < 90; }), 'a row is short');
+    ok(!(await vis(page, '#tradeLogPanelBody .tl-prow-det')), 'details are folded');
+    await page.evaluate(() => document.querySelector('#tradeLogPanelBody .tl-prow-sub').click());
+    await until(page, () => { const d = document.querySelector('#tradeLogPanelBody .tl-prow.open .tl-prow-det'); return !!d && d.getClientRects().length > 0 && !!d.querySelector('[data-tl-sell]'); }, null, 'tapping a row shows its details with the Sell button');
+    await page.evaluate(() => document.querySelector('[data-tl-status="closed"]').click());
+    await until(page, () => document.querySelectorAll('#tradeLogPanelBody .tl-prow').length === 1 && /Realised/.test(document.querySelector('#tradeLogPanelBody .tl-pstrip').textContent), null, 'Closed shows the one closed trade with the realised strip');
+    ok(await page.evaluate(() => getComputedStyle(document.getElementById('tradeAddBtn')).position === 'fixed'), 'Add trade is pinned to the bottom');
+    await page.evaluate(() => document.getElementById('tradeAddBtn').click());
+    await until(page, () => !!document.querySelector('#tradeFormHost .tl-form'), null, 'the add form opens');
+    ok(await page.evaluate(() => { const f = document.querySelector('#tradeFormHost .tl-form'), r = f.getBoundingClientRect(); return getComputedStyle(f).position === 'fixed' && Math.round(r.bottom) === innerHeight && r.left >= 0 && r.right <= innerWidth; }), 'the form is a bottom sheet inside the screen');
+    ok(!(await vis(page, '#tradeAddBtn')), 'the Add trade button is hidden while the sheet is open');
+    await page.evaluate(() => document.getElementById('tlCancel').click());
+    await page.evaluate(() => document.querySelector('.tl-tabs [data-tl-tab="ideas"]').click());
+    ok(await vis(page, '.tl-ideas') && !(await vis(page, '#tradeLogPanelBody .tl-phone')) && !(await vis(page, '#tradeAddBtn')), 'the Ideas tab shows the ideas and hides the positions and the Add button');
+  });
+  await scenario('trade log laptop: the cards stay and the phone pieces are hidden', { section: 'trackrecord', viewport: { width: 1280, height: 900 } }, docs, async page => {
+    await until(page, () => document.querySelectorAll('#tradeLogPanelBody .tl-card').length === 3, null, 'the cards are listed');
+    ok(await vis(page, '#tradeLogPanelBody .tl-card') && !(await vis(page, '.tl-tabs')) && !(await vis(page, '#tradeLogPanelBody .tl-phone')) && await vis(page, '.tl-ideas') && await vis(page, '.tl-view-toggle'), 'laptop: cards, view switch and ideas show; the tabs and short rows do not');
+    ok(await page.evaluate(() => getComputedStyle(document.getElementById('tradeAddBtn')).position !== 'fixed'), 'laptop: the Add trade button is not pinned');
+  });
+}
+
 async function main(){
   base = await srv.listen(); browser = await chromium.launch();
-  try { await pinScenarios(); await tradeScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); await bulletsWithoutSourcesScenario(); await lazyPagesScenario(); await phoneLayoutScenarios(); } finally { await browser.close(); srv.close(); }
+  try { await pinScenarios(); await tradeScenarios(); await tradeLogPhoneScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); await bulletsWithoutSourcesScenario(); await lazyPagesScenario(); await phoneLayoutScenarios(); } finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('state tests FAILED (' + problems.length + ' problems, ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('state tests: ' + checks + ' checks passed');
 }

@@ -41,6 +41,7 @@ function ideasFor(strategyId){
 }
 
 let sid = '';
+let downOpen = false;   // phone layout: the Downward list is folded until its title is tapped
 // What the panel is doing: 'idle' (a strategy is chosen but Process has not been pressed), 'running' (reading weekly prices) or 'done' (results shown for `sid`).
 let phase = 'idle';
 try { sid = localStorage.getItem('albaDashboard.ideasStrategy.v1') || ''; } catch(e){ /* default */ }
@@ -132,7 +133,7 @@ function topHtml(snap){
   };
   return TOP_LISTS.map(([t, title, hint]) => {
     const top = (snap.lists && snap.lists[t]) || [];
-    return `<div class="tl-top5"><div class="tl-top5-title">${title} &middot; top ${TOP_N}</div><p class="upload-hint">${hint}</p>${top.length ? '<ol>' + top.map(item).join('') + '</ol>' : '<p class="upload-hint">No stock in this list is a Buy today.</p>'}</div>`;
+    return `<div class="tl-top5 tl-top5-${t}${t === 'down' && !downOpen ? ' tl-collapsed' : ''}"><div class="tl-top5-title">${title} &middot; top ${TOP_N}</div><p class="upload-hint">${hint}</p>${top.length ? '<ol>' + top.map(item).join('') + '</ol>' : '<p class="upload-hint">No stock in this list is a Buy today.</p>'}</div>`;
   }).join('');
 }
 function bodyHtml(){
@@ -145,7 +146,8 @@ function bodyHtml(){
   if(!snap.n) return `<p class="upload-hint tl-ideas-done">Processed on ${stampText(snap)}: no stock qualified for this strategy.</p>`;
   const other = snap.n - snap.up - snap.down - snap.mixed;
   return `<p class="upload-hint tl-ideas-done"><b>Processed on ${stampText(snap)}.</b> ${snap.n} stocks: ${snap.up} in an upward trend, ${snap.down} downward, ${snap.mixed} mixed (in neither list)${other ? ', ' + other + ' without a trend or enough price history' : ''}${snap.short ? '; ' + snap.short + ' recent listing' + (snap.short === 1 ? '' : 's') + ' (under 80 weeks of prices) included' : ''}. Prices as of ${snap.today}, counting that week so far. These results stay until you press <b>Process again</b>.</p>${topHtml(snap)}
-    <p class="upload-hint">The two-week score comes from a model trained and tested week by week on five years of weekly prices (about 294,000 stock-weeks, return two weeks later): it rates how likely a stock is to beat the median stock over the next two weeks. Stocks are split by trend (weekly and monthly MACD both above their signal lines is Upward, both below is Downward; a mix is neither list) and ranked within their own trend, because the two behave differently: in the tests the best five Upward stocks each week were higher after two weeks about 54% of the time (all Upward stocks 51%), the best five Downward ones about 51% (all Downward 45%), so a bounce-back is the weaker bet. <b>Higher after 2 weeks</b> is how often stocks of that trend that ranked like this each week were higher two weeks later in those tests. A stock needs at least 53 weeks of prices. Recent listings (53 to 79 weeks) carry a <b>Short history</b> note and their own, lower tested hit rates, because new listings fall more often than older stocks and the sample is small; they have no monthly MACD yet, so their trend uses the weekly MACD only (noted on the card). A stock is a Buy when it is in the top ${BUY_TOP}% of its trend, and is held back when its margin of safety is zero or below, its Fundamental verdict is Avoid, results are due within ${RESULTS_DAYS} days, trading is very thin (under &#8377;${THIN_LAKH} lakh a day) or recent news clearly leans negative. The edge is real but modest (so expect nearly half to lose), and it cannot see the market: when most stocks fall, the best of them usually falls too. It always uses today&rsquo;s prices, counting this week so far; the model was trained on whole weeks, so a Friday-after-the-close run is the cleanest reading and an early-week run rests on fewer days of this week&rsquo;s move. A stock you already hold is listed too and tagged <b>In Trade Log</b> with the call its Trade Log card gives. The results-date and news checks need the latest Refresh all stocks.</p>`;
+    <p class="tl-how-wrap"><a href="#" data-tl-how>How these are ranked &rsaquo;</a></p>
+    <p class="upload-hint tl-method">The two-week score comes from a model trained and tested week by week on five years of weekly prices (about 294,000 stock-weeks, return two weeks later): it rates how likely a stock is to beat the median stock over the next two weeks. Stocks are split by trend (weekly and monthly MACD both above their signal lines is Upward, both below is Downward; a mix is neither list) and ranked within their own trend, because the two behave differently: in the tests the best five Upward stocks each week were higher after two weeks about 54% of the time (all Upward stocks 51%), the best five Downward ones about 51% (all Downward 45%), so a bounce-back is the weaker bet. <b>Higher after 2 weeks</b> is how often stocks of that trend that ranked like this each week were higher two weeks later in those tests. A stock needs at least 53 weeks of prices. Recent listings (53 to 79 weeks) carry a <b>Short history</b> note and their own, lower tested hit rates, because new listings fall more often than older stocks and the sample is small; they have no monthly MACD yet, so their trend uses the weekly MACD only (noted on the card). A stock is a Buy when it is in the top ${BUY_TOP}% of its trend, and is held back when its margin of safety is zero or below, its Fundamental verdict is Avoid, results are due within ${RESULTS_DAYS} days, trading is very thin (under &#8377;${THIN_LAKH} lakh a day) or recent news clearly leans negative. The edge is real but modest (so expect nearly half to lose), and it cannot see the market: when most stocks fall, the best of them usually falls too. It always uses today&rsquo;s prices, counting this week so far; the model was trained on whole weeks, so a Friday-after-the-close run is the cleanest reading and an early-week run rests on fewer days of this week&rsquo;s move. A stock you already hold is listed too and tagged <b>In Trade Log</b> with the call its Trade Log card gives. The results-date and news checks need the latest Refresh all stocks.</p>`;
 }
 // The Process button and the strategy picker: both wait while the weekly prices are being read.
 function syncControls(){
@@ -176,6 +178,10 @@ function init_ideas(){
   window.addEventListener('alba-ideas-synced', () => { if(phase !== 'running') refreshIdeasBody(); });
   if(run) run.addEventListener('click', runIdeas);
   if(host) host.addEventListener('click', (e) => {
+    const how = /** @type {Element} */ (e.target).closest('a[data-tl-how]');
+    if(how){ e.preventDefault(); const box = host.closest('.tl-ideas'); if(box) box.classList.toggle('show-how'); return; }
+    const title = /** @type {Element} */ (e.target).closest('.tl-top5-down .tl-top5-title');
+    if(title){ downOpen = !downOpen; refreshIdeasBody(); return; }
     const a = /** @type {Element} */ (e.target).closest('a[data-idea-open]');
     if(a){ e.preventDefault(); const idx = Number(a.getAttribute('data-idea-open')); openStockInline(appSections.trackrecord, "Trade Log", idx); }
   });

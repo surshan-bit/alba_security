@@ -10,6 +10,7 @@ import { ymdOf } from '../history/scorehistory.js';
 import { refreshIdeasBody } from './ideas.js';
 import { compareBy, nextSort, sortHeaderHtml } from '../analysis/columns.js';
 import { addSignalPoint, callChanges, factsFor, tradeSignal } from './signals.js';
+import { closestEl } from '../core/evt.js';
 
 // Which view the panel shows: 'cards' or 'table'. Only this panel uses it, so it is kept here (the saved choice
 // is read once, when the page loads; the Cards / Table buttons change it).
@@ -189,6 +190,61 @@ function tlRowHtml(m){
         <td>${m.actions}</td>
       </tr>`;
 }
+// ---- Phone layout (up to 600px; hidden on wider screens): a summary strip, Open / Closed tabs and one short row per trade ----
+// The rows are an extra copy of the same trades, so the cards and the table stay as they are on a laptop. Tapping a row shows its details and the Sell / Remove buttons.
+let tlStatus = 'open';             // which trades the rows show: 'open' or 'closed'
+const tlExpanded = new Set();      // trade ids whose row is open
+const money = (n) => n == null || !isFinite(n) ? '—' : (n < 0 ? '−' : '') + (Math.abs(n) >= 1e7 ? '₹' + (Math.abs(n) / 1e7).toFixed(2) + ' Cr' : Math.abs(n) >= 1e5 ? '₹' + (Math.abs(n) / 1e5).toFixed(2) + ' L' : '₹' + Math.round(Math.abs(n)).toLocaleString('en-IN'));
+const signed = (n, f) => (n > 0 ? '+' : n < 0 ? '−' : '') + f(Math.abs(n));
+function tlStripHtml(list, closed){
+  const cell = (label, value, cls) => `<div><span>${label}</span><b${cls ? ' class="' + cls + '"' : ''}>${value}</b></div>`;
+  if(closed){
+    const pnl = list.reduce((a, m) => a + (m.pnl || 0), 0), wins = list.filter(m => m.pnl > 0).length, held = list.filter(m => m.held != null);
+    return `<div class="tl-pstrip">${cell('Realised', signed(pnl, money), pnl >= 0 ? 'chg-up' : 'chg-down')}${cell('Win rate', wins + ' of ' + list.length)}${cell('Avg held', held.length ? Math.round(held.reduce((a, m) => a + m.held, 0) / held.length) + ' d' : '—')}</div>`;
+  }
+  const priced = list.filter(m => m.invested != null && m.curPx != null);
+  const invested = list.reduce((a, m) => a + (m.invested || 0), 0), cost = priced.reduce((a, m) => a + m.invested, 0), value = priced.reduce((a, m) => a + m.curPx * (m.buy.quantity || 0), 0);
+  const ret = cost > 0 ? (value - cost) / cost * 100 : null;
+  return `<div class="tl-pstrip">${cell('Invested', money(invested))}${cell('Value now', priced.length ? money(value) : '—')}${cell('Return', ret == null ? '—' : (ret >= 0 ? '+' : '−') + Math.abs(ret).toFixed(1) + '%', ret == null ? '' : ret >= 0 ? 'chg-up' : 'chg-down')}</div>`;
+}
+function tlPhoneRowHtml(m){
+  const id = escapeHtml(m.t._id || ''), open = tlExpanded.has(m.t._id);
+  const chip = m.isClosed ? '<span class="tl-signal-badge tl-sig-closed">Closed</span>' : m.sig ? `<span class="tl-signal-badge tl-sig-${m.sig.call}">${escapeHtml(m.sig.label)}</span>` : '';
+  const why = !m.isClosed && m.sig && m.sig.reasons.length ? `<div class="tl-prow-why">${m.sig.reasons.slice(0, 2).map(escapeHtml).join(' ')}</div>` : '';
+  const sold = m.isClosed ? `<div><dt>Sold</dt><dd>${tlInr(m.curPx)}<br><span class="row-ticker">${escapeHtml(formatDate(m.sell.date))}</span></dd></div><div><dt>Exit score</dt><dd>${m.exitScore}</dd></div>` : `<div><dt>Current price</dt><dd>${tlInr(m.curPx)}</dd></div>`;
+  return `<div class="tl-prow${open ? ' open' : ''}" data-tl-row="${id}">
+      <div class="tl-prow-top"><span class="tl-prow-name">${m.name}</span><span class="tl-prow-ret">${m.returnCell}</span></div>
+      <div class="tl-prow-sub"><span>${m.qtyText} &times; ${tlInr(m.buy.price)} &middot; ${m.held != null ? m.held + ' days' : '—'}</span>${chip}</div>
+      <div class="tl-prow-det"><dl><div><dt>Invested</dt><dd>${tlInr(m.invested)}</dd></div>${sold}<div><dt>Bought</dt><dd>${m.boughtOn}</dd></div><div><dt>Entry score</dt><dd>${m.entryScore}</dd></div></dl>${why}${m.actions}</div>
+    </div>`;
+}
+function tlPhoneHtml(models){
+  const open = models.filter(m => !m.isClosed), closed = models.filter(m => m.isClosed), closedView = tlStatus === 'closed';
+  const list = closedView ? closed : open;
+  const seg = `<div class="tl-pseg" role="group" aria-label="Open or closed trades"><button type="button" data-tl-status="open" class="${closedView ? '' : 'on'}">Open ${open.length}</button><button type="button" data-tl-status="closed" class="${closedView ? 'on' : ''}">Closed ${closed.length}</button></div>`;
+  return `<div class="tl-phone">${seg}${list.length ? tlStripHtml(list, closedView) + list.map(tlPhoneRowHtml).join('') : `<p class="upload-hint">No ${closedView ? 'closed' : 'open'} trades.</p>`}</div>`;
+}
+// Taps on the phone layout: the Positions / Ideas tabs, the Open / Closed switch and a row.
+function init_tradelog_phone(){
+  const sec = document.getElementById('section-trackrecord');
+  if(!sec) return;
+  sec.addEventListener('click', (e) => {
+    const tab = closestEl(e, '.tl-tabs [data-tl-tab]');
+    if(tab){
+      sec.setAttribute('data-tl-tab', tab.getAttribute('data-tl-tab') || 'positions');
+      sec.querySelectorAll('.tl-tabs [data-tl-tab]').forEach(b => b.classList.toggle('on', b === tab));
+      return;
+    }
+    const st = closestEl(e, '[data-tl-status]');
+    if(st){ tlStatus = st.getAttribute('data-tl-status') === 'closed' ? 'closed' : 'open'; renderTradeLogPanel(); return; }
+    const row = closestEl(e, '[data-tl-row]');
+    if(row && !closestEl(e, 'a, button')){
+      const id = row.getAttribute('data-tl-row') || '';
+      if(tlExpanded.has(id)) tlExpanded.delete(id); else tlExpanded.add(id);
+      row.classList.toggle('open', tlExpanded.has(id));
+    }
+  });
+}
 function renderTradeLogPanel(){
   document.querySelectorAll('.tl-view-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-tl-view') === tlView));
   const el = document.getElementById('tradeLogPanelBody');
@@ -241,10 +297,12 @@ function renderTradeLogPanel(){
       </table>
     </div>`;
   }
-  keepScroll(el, () => { el.innerHTML = aggregateHtml + listHtml; });
+  keepScroll(el, () => { el.innerHTML = aggregateHtml + listHtml + tlPhoneHtml(models); });
+  const posTab = document.getElementById('tlTabPositions');
+  if(posTab) posTab.textContent = 'Positions ' + models.filter(m => !m.isClosed).length;
   syncSignals(models);
   refreshIdeasBody();
 }
 
 
-export { holdingDaysBetween, renderTradeLogPanel, tlSetView, tlSortBy };
+export { holdingDaysBetween, init_tradelog_phone, renderTradeLogPanel, tlSetView, tlSortBy };
