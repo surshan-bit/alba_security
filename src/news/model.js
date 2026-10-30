@@ -218,4 +218,38 @@ function filterItems(items, f, today){
   return items.filter(x => (f.type === 'all' || x.type === f.type) && (!limit || x.date <= limit || x.date < today));
 }
 
-export { BRIEFING_FEEDS, EVENT_TYPES, briefingsPrompt, buildCalendar, cleanBriefings, mergeHeadlines, IMPORTANCE, PULSE_SYMBOLS, buildTiles, calValue, cleanReading, filterItems, groupCalendar, nextBigEvents, readingPrompt, recentItems, shortDate, tileView, typeTag, upcomingItems };
+// ---- upcoming events fetched from TradingView (Refresh events) ----
+// Dividend rows (get-dividends-calendar) and earnings rows (get-earnings-calendar) -> upcoming items for the given stocks.
+// symOf: TradingView symbol -> { ticker, name }. TradingView has no Indian results dates, so the results rows are usually empty; board meetings are not offered at all.
+const money = (v) => (Number.isFinite(v) ? '\u20b9' + (Math.round(v * 100) / 100) : '');
+function buildTvEvents(divRows, earnRows, symOf, today){
+  const out = [], seen = new Set();
+  const add = (sym, type, date, text) => {
+    const who = symOf.get(sym), d = String(date || '').slice(0, 10);
+    if(!who || !/^\d{4}-\d{2}-\d{2}$/.test(d) || d < today) return;
+    const key = who.ticker + '|' + type + '|' + d;
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push({ ticker: who.ticker, name: who.name, type, date: d, text, src: 'TradingView', auto: true });
+  };
+  (Array.isArray(divRows) ? divRows : []).forEach(r => {
+    if(!r || !r.dividend_ex_date_upcoming) return;
+    const amt = money(r.dividend_amount_upcoming), pay = r.dividend_payment_date_upcoming ? ', paid ' + shortDate(r.dividend_payment_date_upcoming) : '';
+    add(r.symbol, 'dividend', r.dividend_ex_date_upcoming, 'Ex-dividend date' + (amt ? ': ' + amt + ' per share' : '') + pay);
+  });
+  (Array.isArray(earnRows) ? earnRows : []).forEach(r => {
+    if(!r || !r.release_next_date) return;
+    add(r.symbol, 'results', r.release_next_date, r.next_date_confirmed ? 'Results date (confirmed)' : 'Results expected');
+  });
+  return out;
+}
+// The saved list after a refresh: the refreshed stocks' earlier TradingView items are replaced, everything else (research items, other stocks) stays;
+// a fetched item the research list already has (same stock, type and date) is not added twice, and passed dates are dropped.
+function mergeTvEvents(saved, tickers, fresh, today){
+  const list = Array.isArray(saved) ? saved : [];
+  const keep = list.filter(x => x && !(x.auto && (tickers.has(x.ticker) || (x.date && x.date < today))));
+  const have = new Set(keep.map(x => x.ticker + '|' + x.type + '|' + String(x.date).slice(0, 10)));
+  return keep.concat(fresh.filter(x => !have.has(x.ticker + '|' + x.type + '|' + x.date)));
+}
+
+export { buildTvEvents, mergeTvEvents, BRIEFING_FEEDS, EVENT_TYPES, briefingsPrompt, buildCalendar, cleanBriefings, mergeHeadlines, IMPORTANCE, PULSE_SYMBOLS, buildTiles, calValue, cleanReading, filterItems, groupCalendar, nextBigEvents, readingPrompt, recentItems, shortDate, tileView, typeTag, upcomingItems };

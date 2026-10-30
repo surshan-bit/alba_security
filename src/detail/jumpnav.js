@@ -20,7 +20,7 @@ function jumpPreviewFor(id, s){
 }
 
 function renderDetailJumpNav(s){
-  const links = [['jump-val', 'Valuation'], ['jump-global', 'Global & Macro'], ['jump-fund', 'Fundamental Score'], ['jump-tech', 'Technical Score'], ['peersPanel', 'Peers']];
+  const links = [['jump-val', 'Valuation'], ['jump-global', 'Global & Macro'], ['jump-fund', 'Fundamental Score'], ['jump-tech', 'Technical Score'], ['eventsPanel', 'Events'], ['peersPanel', 'Peers']];
   // The stock's name and ticker stay in view while the page scrolls, so it is always clear which stock is open.
   const who = '<div class="detail-jump-who"><span class="detail-jump-name">' + escapeHtml(s.name) + '</span><span class="detail-jump-ticker">' + escapeHtml(s.ticker) + '</span></div>';
   return '<nav class="detail-jump" aria-label="Jump to section">' + who + '<span class="detail-jump-label">Jump to</span>' +

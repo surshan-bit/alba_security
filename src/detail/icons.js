@@ -4,6 +4,7 @@ const PATHS = {
   global: '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"></path>',
   fund: '<path d="M3 21h18"></path><path d="M5 21V10"></path><path d="M10 21V4"></path><path d="M15 21v-8"></path><path d="M20 21V7"></path>',
   tech: '<path d="M3 17l6-6 4 4 8-8"></path><path d="M15 7h6v6"></path>',
+  events: '<rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path>',
   peers: '<circle cx="9" cy="8" r="3.2"></circle><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"></path><circle cx="17.5" cy="9" r="2.5"></circle><path d="M17 14.2c2.4.3 4.2 2.3 4.2 4.8"></path>'
 };
 function panelIcon(name){

@@ -11,6 +11,7 @@ import { renderTvChart } from '../tv/links.js';
 import { renderTechPanel } from './technical.js';
 import { renderStockResearchBar } from './pending.js';
 import { renderGlobalFactorsPanel } from './globalfactors.js';
+import { renderEventsPanel } from './events.js';
 import { renderPeersPanel } from './peers.js';
 import { wireStockGridSort } from '../ui/gridsort.js';
 import { bindDetailJumpNav, renderDetailJumpNav } from './jumpnav.js';
@@ -64,6 +65,7 @@ function detailHtml(s, idx, pinned){
     ${renderGlobalFactorsPanel(s)}
     ${renderFundamentals(s)}
     ${renderTechPanel(s)}
+    ${renderEventsPanel(s)}
     ${renderPeersPanel(s, idx)}
   `;
 }
