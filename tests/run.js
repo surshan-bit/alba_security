@@ -290,10 +290,10 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
     snap('s7n_news_macro', { head: html$('#newsBody') });
     click($('[data-news-tab="events"]')); await sleep(100);
     snap('s7n_news_events_upcoming', { body: html$('#newsBody') });
-    const sel = $('[data-news-type]'); sel.value = 'results'; sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100);
+    click($('button[data-news-type="results"]')); await sleep(100);
     snap('s7n_news_events_results_only', { body: html$('#newsBody') });
     { const ss = $('[data-news-strategy]'); const opts = [...ss.options].map(o => o.textContent).join('|'); ss.value = 'all'; ss.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100); snap('s7n_news_events_all_stocks', { opts, hint: ($('.news-hint') || { textContent: '' }).textContent, saved: String(win.localStorage.getItem('albaDashboard.newsStrategy.v1')) }); }
-    { const s2 = $('[data-news-type]'); s2.value = 'all'; s2.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(100); }
+    click($('button[data-news-type="all"]')); await sleep(100);
     click($('[data-news-when="recent"]')); await sleep(100);
     snap('s7n_news_events_recent', { body: html$('#newsBody') });
   }
