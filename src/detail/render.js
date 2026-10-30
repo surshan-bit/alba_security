@@ -5,7 +5,7 @@ import { detailEl } from '../core/dom.js';
 import { stocks } from '../core/stocks.js';
 import { isPinned, togglePin } from '../core/pins.js';
 import { escapeHtml, screenerUrl } from '../core/util.js';
-import { renderValuationStrip } from './valuation.js';
+import { renderValuationPanel } from './valuation.js';
 import { CAP_NAME, capClass } from '../core/capclass.js';
 import { renderFundamentals } from './fundamentals.js';
 import { renderTvChart } from '../tv/links.js';
@@ -56,7 +56,6 @@ function detailHtml(s, idx, pinned){
         <button type="button" class="detail-star${pinned?' pinned':''}" id="detailPinBtn" aria-pressed="${pinned?'true':'false'}" aria-label="${pinned?'Unpin from top':'Pin to top'}" title="${pinned?'Pinned — click to unpin':'Pin to top'}">${pinned?'★':'☆'}</button>
         <div class="detail-title-text"><div class="detail-name-row"><div class="detail-name">${escapeHtml(s.name)}</div>${capTagHtml(s)}</div><div class="detail-ticker">${escapeHtml(s.ticker)}</div></div>
       </div>
-    ${renderValuationStrip(s)}
     <div class="detail-meta">
      <div class="detail-meta-row detail-meta-links">
       <a href="${screenerUrl(s)}" target="_blank" rel="noopener noreferrer">${LINK_ICON}<span>View on screener.in</span></a>
@@ -68,6 +67,7 @@ function detailHtml(s, idx, pinned){
     </div>
     ${renderDetailJumpNav(s)}
     ${renderStockResearchBar(s)}
+    ${renderValuationPanel(s)}
     ${renderGlobalFactorsPanel(s)}
     ${renderFundamentals(s)}
     ${renderTechPanel(s)}

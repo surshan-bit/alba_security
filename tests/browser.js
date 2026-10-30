@@ -121,24 +121,19 @@ const sticksOut = page => page.evaluate(() => {
   return { scrolls: document.documentElement.scrollWidth > W, scrollWidth: document.documentElement.scrollWidth, W, out };
 });
 // ---------------------------------------------------------------- 1b. markup in a stock name
-// The stock page's header card holds the valuation strip and the size tag beside the name (Large, Mid or Small cap from the market cap).
-async function stockCardTests(browser){
+// The stock page shows a size tag beside the name (Large, Mid or Small cap from the market cap), and none when the stock has no market cap.
+async function capTagTests(browser){
   const caps = [[200000, 'Large cap', 'dc-large'], [50000, 'Mid cap', 'dc-mid'], [5000, 'Small cap', 'dc-small'], [null, null, null]];
   const stocks = FIXTURE.map((s, i) => i >= 3 && i < 7 ? Object.assign({}, s, { liquidity: caps[i - 3][0] == null ? {} : { marketCap: caps[i - 3][0] } }) : s);
   const half = Math.ceil(stocks.length / 2);
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-  const { page } = await openPage(ctx, { chunks: [stocks.slice(0, half), stocks.slice(half)] }, 'stock card');
+  const { page } = await openPage(ctx, { chunks: [stocks.slice(0, half), stocks.slice(half)] }, 'cap tag');
   await appReady(page);
   for(let k = 0; k < caps.length; k++){
     await page.evaluate(c => { location.hash = c; }, FIXTURE[3 + k].ticker.split('·')[0].trim()); await page.waitForTimeout(500);
-    const got = await page.evaluate(() => { const t = document.querySelector('#detail .detail-top .dc-tag'); return t ? [t.textContent, t.className.split(' ').find(c => /^dc-(large|mid|small)$/.test(c))] : null; });
-    ok(caps[k][1] ? got && got[0] === caps[k][1] && got[1] === caps[k][2] : got === null, 'stock card: size tag for market cap ' + caps[k][0] + ' is ' + caps[k][1] + ' (got ' + JSON.stringify(got) + ')');
-    if(FIXTURE[3 + k].valuation && FIXTURE[3 + k].valuation.intrinsicValue != null){
-      const val = await page.evaluate(() => { const v = document.querySelector('#detail .detail-top .detail-val#jump-val'); return v ? { mos: v.querySelector('.dv-mos') && v.querySelector('.dv-mos').textContent, nums: v.querySelector('.dv-nums') && v.querySelector('.dv-nums').textContent, links: !!document.querySelector('#detail .detail-top .detail-meta-links a') && v.compareDocumentPosition(document.querySelector('#detail .detail-top .detail-meta')) === 4 } : null; });
-      ok(val && /%/.test(val.mos) && /Intrinsic value/.test(val.nums) && /Price/.test(val.nums) && val.links, 'stock card: the valuation strip sits inside the header card, above the links: ' + JSON.stringify(val));
-    }
+    const got = await page.evaluate(() => { const t = document.querySelector('#detail .detail-name-row .dc-tag'); return t ? [t.textContent, t.className.split(' ').find(c => /^dc-(large|mid|small)$/.test(c))] : null; });
+    ok(caps[k][1] ? got && got[0] === caps[k][1] && got[1] === caps[k][2] : got === null, 'cap tag: market cap ' + caps[k][0] + ' shows ' + caps[k][1] + ' (got ' + JSON.stringify(got) + ')');
   }
-  ok(await page.evaluate(() => !document.querySelector('#detail .val-panel')), 'stock card: no separate Valuation panel any more');
   await ctx.close();
 }
 
@@ -574,7 +569,7 @@ async function errorLogTests(browser){
 (async () => {
   base = await srv.listen();
   const browser = await chromium.launch();
-  try { await bootTests(browser); await markupNameTests(browser); await stockCardTests(browser); await businessTests(browser); await layoutTests(browser); await rowCapTests(browser); await escapeTests(browser); await errorLogTests(browser); }
+  try { await bootTests(browser); await markupNameTests(browser); await capTagTests(browser); await businessTests(browser); await layoutTests(browser); await rowCapTests(browser); await escapeTests(browser); await errorLogTests(browser); }
   finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('browser smoke test FAILED (' + problems.length + ' of ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('browser smoke test: ' + checks + ' checks passed');

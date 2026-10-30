@@ -1,3 +1,4 @@
+import { panelIcon } from './icons.js';
 import { marginOfSafety } from '../core/mos.js';
 // Valuation panel on the stock detail page.
 
@@ -27,19 +28,40 @@ function valGapMarkup(currentPrice, iv){
   return `Current price ₹${currentPrice.toLocaleString('en-IN')} is <span class="${gapBand}" style="font-weight:600;">${gapLabel}</span>.`;
 }
 
-// The valuation strip inside the stock header card: margin of safety, intrinsic value, price and the one-line reading.
-function renderValuationStrip(s){
+function renderValuationPanel(s){
   const v = s.valuation;
   if(!v) return '';
-  const mos = marginOfSafety(v.intrinsicValue, v.currentPrice), ivGap = valGapMarkup(v.currentPrice, v.intrinsicValue);
-  if(v.intrinsicValue == null || mos === null) return `<div class="detail-val" id="jump-val"><div class="dv-gap">No reliable intrinsic-value source found for this stock.</div></div>`;
-  const g = -mos, band = g > 15 ? 'avoid' : g > 0 ? 'hold' : g > -15 ? 'mbuy' : 'buy';
-  const sign = mos > 0 ? '+' : mos < 0 ? '−' : '';
-  return `<div class="detail-val" id="jump-val">
-    <div class="dv-mos fs-${band}" title="Margin of safety = (Intrinsic Value − Current Price) ÷ Intrinsic Value">${sign}${Math.abs(mos).toFixed(1)}%<small>Margin of safety</small></div>
-    <div class="dv-nums"><div><span>Intrinsic value</span><b>₹${v.intrinsicValue.toLocaleString('en-IN')}</b></div><div><span>Price</span><b>${typeof v.currentPrice === 'number' ? '₹' + v.currentPrice.toLocaleString('en-IN') : '–'}</b></div></div>
-    <div class="dv-gap">${ivGap || ''}</div>
-  </div>`;
+  const hasIv = v.intrinsicValue != null;
+  const ivGap = valGapMarkup(v.currentPrice, v.intrinsicValue);
+  // Margin of safety sits in the heading, written like the Fundamental Score's: "Valuation · +18.2%" with a tag after it.
+  let mosText = '', mosTag = '';
+  const mos = marginOfSafety(v.intrinsicValue, v.currentPrice);
+  if(mos !== null){
+    const g = -mos;
+    const band = g > 15 ? 'avoid' : g > 0 ? 'hold' : g > -15 ? 'mbuy' : 'buy';
+    mosText = ` &middot; ${mos > 0 ? '+' : mos < 0 ? '−' : ''}${Math.abs(mos).toFixed(1)}%`;
+    mosTag = `<span class="badge b-${band}" title="Margin of safety = (Intrinsic Value − Current Price) ÷ Intrinsic Value">Margin of safety</span>`;
+  }
+  return `
+    <div class="val-panel" id="jump-val">
+      <div class="val-panel-head">
+        <div class="val-panel-title">${panelIcon('val')}Valuation${mosText}</div>
+        ${mosTag}
+      </div>
+      <div class="val-grid">
+        <div class="val-cell">
+          ${hasIv ? `
+          <div class="val-row">
+            <div class="val-text">
+              <div class="val-cell-value val-iv">Intrinsic value ₹${v.intrinsicValue.toLocaleString('en-IN')}</div>
+              <div class="val-cell-sub">${ivGap || ''}</div>
+            </div>
+          </div>` : `
+          <div class="val-cell-sub">No reliable intrinsic-value source found for this stock.</div>`}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
-export { renderValuationStrip };
+export { renderValuationPanel };
