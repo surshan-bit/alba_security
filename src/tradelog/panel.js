@@ -210,7 +210,7 @@ function tlStripHtml(list, closed){
 function tlPhoneRowHtml(m){
   const id = escapeHtml(m.t._id || ''), open = tlExpanded.has(m.t._id);
   const chip = m.isClosed ? '<span class="tl-signal-badge tl-sig-closed">Closed</span>' : m.sig ? `<span class="tl-signal-badge tl-sig-${m.sig.call}">${escapeHtml(m.sig.label)}</span>` : '';
-  const why = !m.isClosed && m.sig && m.sig.reasons.length ? `<div class="tl-prow-why">${m.sig.reasons.slice(0, 2).map(escapeHtml).join(' ')}</div>` : '';
+  const why = !m.isClosed && m.sig && m.sig.reasons.length ? `<div class="tl-prow-why">${escapeHtml(m.sig.reasons[0])}</div>` : '';
   const sold = m.isClosed ? `<div><dt>Sold</dt><dd>${tlInr(m.curPx)}<br><span class="row-ticker">${escapeHtml(formatDate(m.sell.date))}</span></dd></div><div><dt>Exit score</dt><dd>${m.exitScore}</dd></div>` : `<div><dt>Current price</dt><dd>${tlInr(m.curPx)}</dd></div>`;
   return `<div class="tl-prow${open ? ' open' : ''}" data-tl-row="${id}">
       <div class="tl-prow-top"><span class="tl-prow-name">${m.name}</span><span class="tl-prow-ret">${m.returnCell}</span></div>
@@ -221,7 +221,7 @@ function tlPhoneRowHtml(m){
 function tlPhoneHtml(models){
   const open = models.filter(m => !m.isClosed), closed = models.filter(m => m.isClosed), closedView = tlStatus === 'closed';
   const list = closedView ? closed : open;
-  const seg = `<div class="tl-pseg" role="group" aria-label="Open or closed trades"><button type="button" data-tl-status="open" class="${closedView ? '' : 'on'}">Open ${open.length}</button><button type="button" data-tl-status="closed" class="${closedView ? 'on' : ''}">Closed ${closed.length}</button></div>`;
+  const seg = `<div class="news-filters tl-pseg" role="group" aria-label="Open or closed trades"><button type="button" data-tl-status="open" class="news-pill${closedView ? '' : ' on'}">Open ${open.length}</button><button type="button" data-tl-status="closed" class="news-pill${closedView ? ' on' : ''}">Closed ${closed.length}</button></div>`;
   return `<div class="tl-phone">${seg}${list.length ? tlStripHtml(list, closedView) + list.map(tlPhoneRowHtml).join('') : `<p class="upload-hint">No ${closedView ? 'closed' : 'open'} trades.</p>`}</div>`;
 }
 // Taps on the phone layout: the Positions / Ideas tabs, the Open / Closed switch and a row.
@@ -250,12 +250,12 @@ function renderTradeLogPanel(){
   const el = document.getElementById('tradeLogPanelBody');
   if(!el) return;
   if(!getTradeDb()){
-    el.innerHTML = `<p class="upload-hint">Your trade log needs a signed-in view — open this dashboard directly on claude.ai (signed in to your organization) to see and log your own trades.</p>`;
+    el.innerHTML = `<p class="upload-hint">The Trade Log needs a signed-in view: open this dashboard on claude.ai.</p>`;
     return;
   }
   const trades = allTrades();
   if(trades.length === 0){
-    el.innerHTML = `<p class="upload-hint">No trades logged yet. Use &ldquo;+ Add trade&rdquo; above to record a real position bought based on this dashboard's verdicts; its score, verdict and data completeness are frozen at that moment.</p>`;
+    el.innerHTML = `<p class="upload-hint">No trades yet. Use &ldquo;+ Add trade&rdquo; to log a position.</p>`;
     return;
   }
   const models = trades
