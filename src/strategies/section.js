@@ -86,12 +86,12 @@ function onSaveStatus(){
 function paintSaveNote(){ const el = document.getElementById('stratSaveNote'); if(el) el.innerHTML = saveNote(); }
 function listHtml(sel){
   const count = st => qualifyingStocks(stocks, st.rules).length;
-  /** @type {{ attrs: string, title: string, desc?: string, current?: boolean }[]} */
+  /** @type {{ attrs: string, title: string, desc?: string, current?: boolean, cls?: string }[]} */
   const items = strategies.map(st => {
     const n = count(st);
     return { attrs: `data-strat-pick="${escapeHtml(st.id)}"`, title: st.name, desc: `${n} ${n === 1 ? 'stock' : 'stocks'} qualify now \u00b7 ${st.published ? 'Published' : 'Not published'}`, current: !!sel && st.id === sel.id };
   });
-  items.push({ attrs: 'id="stratNew"', title: '+ New strategy' }, { attrs: 'id="stratRestore"', title: 'Restore starter strategies', desc: 'Bring back the starters, keeping your own' });
+  items.push({ attrs: 'id="stratNew"', cls: 'scope-strat-new', title: '+ New strategy' }, { attrs: 'id="stratRestore"', cls: 'scope-strat-restore', title: 'Restore starter strategies', desc: 'Bring back the starters, keeping your own' });
   const btn = sel
     ? `<small>Strategy</small> <b>${escapeHtml(sel.name)}</b> <small class="strat-pick-n" title="Stocks that qualify now">${count(sel)}</small> <span class="dm-caret" aria-hidden="true">&#9662;</span>`
     : `<small>Strategy</small> <b>None yet</b> <span class="dm-caret" aria-hidden="true">&#9662;</span>`;
@@ -110,7 +110,7 @@ function mainHtml(st){
           <input type="text" id="stratName" class="strat-name" value="${escapeHtml(st.name)}" aria-label="Strategy name" maxlength="60">
           <span class="strat-actions">
             <button type="button" class="strat-btn strat-pub${st.published ? ' on' : ''}" id="stratPub" aria-pressed="${st.published}" title="${st.published ? 'Shown in Explorer, Analysis and other screens. Click to unpublish.' : 'Hidden from Explorer, Analysis and other screens. Click to publish.'}">${st.published ? 'Published' : 'Unpublished'}</button>
-            <button type="button" class="strat-btn" id="stratDup">Duplicate</button>
+            <button type="button" class="strat-btn scope-strat-dup" id="stratDup">Duplicate</button>
             <button type="button" class="strat-btn strat-btn-danger" id="stratDel">Delete</button>
           </span>
         </div>
@@ -131,9 +131,9 @@ function mainHtml(st){
       <div class="strat-result-head strat-filters-panel${stratFiltersOpen ? '' : ' filters-collapsed'}">
         <button type="button" class="biz-filters-toggle" data-strat-filters="1" aria-expanded="${stratFiltersOpen}"><span class="ft-label" aria-label="Filters"></span><span class="ft-summary">Track and refresh</span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
         <div class="strat-result-title"><span class="strat-count" aria-label="Qualifying stocks"><span class="strat-showing">Showing <b id="stratCount">${matches.length}</b> of ${stocks.length} stocks</span>${ignored ? `<span class="strat-ign"><span class="strat-sep"> &middot; </span>${ignored} rule${ignored === 1 ? '' : 's'} not applied yet</span>` : ''}</span></div>
-        ${sheetFrame(`<div class="strat-total"><button type="button" class="strat-btn" id="stratTrackBtn"${matches.length ? '' : ' disabled'} title="Save the ticked picks (or all of today's list when none is ticked) with their prices and judge them against the goal later">${trackLabel(matches)}</button>${(kit.defineScope('strat', { label: 'picks', source: 'strat', selName: 'strat', stocks: () => refreshList(st) }), kit.barHtml('strat'))}</div>`)}
+        ${sheetFrame(`<div class="strat-total"><button type="button" class="strat-btn scope-strat-track-btn" id="stratTrackBtn"${matches.length ? '' : ' disabled'} title="Save the ticked picks (or all of today's list when none is ticked) with their prices and judge them against the goal later">${trackLabel(matches)}</button>${(kit.defineScope('strat', { label: 'picks', source: 'strat', selName: 'strat', stocks: () => refreshList(st) }), kit.barHtml('strat'))}</div>`)}
       </div>
-      <div id="stratResults">${resultsHtml(matches, selected)}</div>
+      <div class="scope-strat-results" id="stratResults">${resultsHtml(matches, selected)}</div>
       ${kit.selbarSlot('strat')}
     </div>
     ${trackPanelHtml()}

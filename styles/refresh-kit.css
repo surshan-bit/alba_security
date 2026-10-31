@@ -135,23 +135,14 @@ tr:hover .rk-row-btn,.rk-row-btn:focus-visible,.rk-row-btn[aria-expanded="true"]
 /* Phone type scale, one for every screen: screen description .8rem, card/section title .9rem, sub-heading .86rem, body .8rem, small print .76rem, buttons .76rem and 40px tall. */
 .app-section > header .sub{font-size:var(--t-sm);line-height:1.45;}
 /* Data Refresh */
-#section-refreshlog .refreshlog-job-title{font-size:var(--t-md);margin:0 0 6px;}
-#section-refreshlog :is(.upload-title,.refreshlog-runs-title,.refreshlog-freshness-title,.refreshlog-run-time){font-size:var(--t-sm);}
-#section-refreshlog :is(.refreshlog-freshness-summary,.refreshlog-freshness-row,.refreshlog-run-stats,.upload-hint,.fi-step,.fi-result,.fi-prompt-msg,.fi-pct,.live-status,.help-tab-link){font-size:var(--t-sm);}
-#section-refreshlog :is(.fi-detail,.fi-line-muted,.data-chip,.data-chip b,.refreshlog-run-status){font-size:var(--t-sm);}
-#section-refreshlog :is(.browse-btn,.refresh-btn,.strat-btn,.select-mode-btn){font-size:var(--t-sm);min-height:var(--ph-ctl-lg);box-sizing:border-box;}
+
 /* Settings */
 .settings-row{padding:12px;gap:12px;}
 .settings-row-title{font-size:var(--t-sm);}
 .settings-row-sub{font-size:var(--t-sm);}
 
 /* Trade Log */
-#section-trackrecord .upload-hint{font-size:var(--t-sm);}
-#section-trackrecord .refresh-btn,#section-trackrecord .tl-view-btn{font-size:var(--t-sm);}
-#section-refreshlog .refreshlog-job .upload-panel{margin-bottom:10px;}
-#section-refreshlog .refreshlog-freshness{margin:10px 0 10px;}
-#section-refreshlog .refreshlog-job + .refreshlog-job{margin-top:6px;}
-#section-refreshlog .refreshlog-divider{margin:10px 0;}
+
 /* Stock page: Refresh reads like the Share link next to it (plain accent-coloured text, no box). */
 }
 

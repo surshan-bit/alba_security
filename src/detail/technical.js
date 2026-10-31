@@ -57,11 +57,11 @@ function provisionalNote(t){
 function renderTechPanel(s){
   const t = s.technical;
   if(!t){
-    return `<div class="tech-panel" id="jump-tech"><div class="tech-panel-title">${panelIcon('tech')}Technical Score</div><div class="tech-empty">Not available for this stock.</div></div>`;
+    return `<div class="tech-panel scope-jump-tech" id="jump-tech"><div class="tech-panel-title">${panelIcon('tech')}Technical Score</div><div class="tech-empty">Not available for this stock.</div></div>`;
   }
   if(t.score == null){
     return `
-      <div class="tech-panel" id="jump-tech">
+      <div class="tech-panel scope-jump-tech" id="jump-tech">
         <div class="tech-panel-head">
           <div class="tech-panel-title">${panelIcon('tech')}Technical Score</div>
           <span class="tech-badge tb-insufficient_data">Insufficient Data</span>
@@ -76,7 +76,7 @@ function renderTechPanel(s){
   // With no price history on file there is no chart to carry the figures, so they are shown as plain lines instead.
   const chartHtml = renderPriceChartMount(s, sums);
   return `
-    <div class="tech-panel" id="jump-tech">
+    <div class="tech-panel scope-jump-tech" id="jump-tech">
       <div class="tech-panel-head">
         <div class="tech-panel-title">${panelIcon('tech')}Technical Score &middot; ${t.score.toFixed(2)}/10</div>
         <span class="badge b-${bandKey}">${verdictLabel[bandKey] || ''}</span>

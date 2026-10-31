@@ -4,9 +4,9 @@
 import { escapeHtml } from '../core/util.js';
 
 // `btnHtml` is the button's content (trusted markup); `items` = [{ attrs (data attributes, trusted), title, desc?, current? }]; `right` opens the list towards the left edge.
-/** @param {{ btnHtml: string, label?: string, items: { attrs: string, title: string, desc?: string, current?: boolean }[], right?: boolean, extraClass?: string }} opts */
+/** @param {{ btnHtml: string, label?: string, items: { attrs: string, title: string, desc?: string, current?: boolean, cls?: string }[], right?: boolean, extraClass?: string }} opts */
 function dropMenuHtml({ btnHtml, label, items, right, extraClass }){
-  const list = items.map(it => `<button type="button" role="menuitem" class="dm-item${it.current ? ' current' : ''}" ${it.attrs}><span class="dm-t">${escapeHtml(it.title)}</span>${it.desc ? `<span class="dm-d">${escapeHtml(it.desc)}</span>` : ''}</button>`).join('');
+  const list = items.map(it => `<button type="button" role="menuitem" class="dm-item${it.current ? ' current' : ''}${it.cls ? ' ' + it.cls : ''}" ${it.attrs}><span class="dm-t">${escapeHtml(it.title)}</span>${it.desc ? `<span class="dm-d">${escapeHtml(it.desc)}</span>` : ''}</button>`).join('');
   return `<div class="dm${right ? ' dm-right' : ''}${extraClass ? ' ' + extraClass : ''}"><button type="button" class="dm-btn" data-dm-toggle aria-haspopup="menu" aria-expanded="false"${label ? ` aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"` : ''}>${btnHtml}</button><div class="dm-pop" role="menu" hidden>${list}</div></div>`;
 }
 

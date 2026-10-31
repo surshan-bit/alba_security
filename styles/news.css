@@ -37,9 +37,7 @@ a.news-stock:hover{color:var(--accent);}
 .news-et{display:inline-block;font:700 .6rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.04em;border:1px solid var(--line);border-radius:8px;padding:0 6px;margin-right:6px;}
 
 /* Layout like the stock page: flat sections, side padding, and nothing wider than the screen. */
-#newsBody{padding:0 0 12px;min-width:0;max-width:100%;box-sizing:border-box;}
-#newsBody *{box-sizing:border-box;max-width:100%;}
-#newsBody :is(.news-text,.news-card,.news-why,.news-hint,.news-status,.news-empty,.news-watch,.news-link){overflow-wrap:anywhere;min-width:0;}
+
 .news-head{flex-wrap:wrap;padding:4px 0 8px;}
 .news-sec{margin:20px 0 10px;padding-top:14px;border-top:1px solid var(--line);font-size:var(--t-sm);color:var(--hd,var(--text));}
 .tabs + .news-sec{border-top:0;padding-top:0;margin-top:12px;}
@@ -75,7 +73,6 @@ a.news-stock:hover{color:var(--accent);}
 .news-bhead .news-tag,.news-bhead .news-tag{vertical-align:1px;}
 .ev-mark{display:inline-flex;align-items:center;margin-left:5px;color:var(--accent);vertical-align:middle;cursor:help;}
 .ev-sub{font-size:var(--t-sm);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:12px 0 4px;}
-#eventsPanel .news-row{padding:6px 0;}
 
 /* v1.333: Briefings, the summary and Stock events laid out like the phone mock-ups */
 .news-dot{flex:none;width:10px;height:10px;border-radius:50%;margin-top:6px;background:var(--line);}

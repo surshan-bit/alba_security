@@ -14,7 +14,7 @@
 .tl-prow-why{font-size:12px !important;}
 .tl-form{padding:18px 18px 22px !important;}
 .tl-form-actions .tl-btn-primary{color:#fff !important;background:var(--accent) !important;}
-#tradeIdeasRun{color:#fff !important;background:var(--accent) !important;font-size:var(--t-sm) !important;}
+.scope-trade-ideas-run{color:#fff !important;background:var(--accent) !important;font-size:var(--t-sm) !important;}
 .tl-top5-title{font-size:14px !important;font-weight:600 !important;}
 .tl-held-tag{font-size:var(--t-xs) !important;font-weight:700 !important;}
 .tl-top5-head > span:first-child{font-size:14px !important;font-weight:600 !important;}

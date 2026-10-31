@@ -63,7 +63,7 @@ const TABS = [['short', HORIZONS.short.label], ['medium', HORIZONS.medium.label]
 function modalBodyHtml(st){
   const tabs = TABS.map(([k, label]) => `<button type="button" class="lm-tab${k === tab ? ' on' : ''}" data-tab="${k}">${label}</button>`).join('');
   const body = tab === 'past'
-    ? (results.has(st.id) || running.has(st.id) ? learnOutHtml(st) : '') + `<button type="button" class="strat-btn" id="stratLearnRun">Search past prices for ${escapeHtml(goalText(st.goal))}</button>`
+    ? (results.has(st.id) || running.has(st.id) ? learnOutHtml(st) : '') + `<button type="button" class="strat-btn scope-strat-learn-run" id="stratLearnRun">Search past prices for ${escapeHtml(goalText(st.goal))}</button>`
     : practiceHtml(tab);
   return `<div class="lm-tabs">${tabs}</div><div class="lm-pane">${body}</div>`;
 }

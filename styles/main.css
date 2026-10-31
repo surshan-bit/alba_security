@@ -25,9 +25,10 @@
 @import "./refresh-kit.css" layer(legacy);
 @import "./late-global.css" layer(legacy);
 @import "./filters-ondemand.css" layer(legacy);
+@import "./scoped.css" layer(scoped);
 @import "./detail.css" layer(detail);
 @import "./phone-boost.css" layer(phone);
 @import "./white-type.css" layer(type);
-/* Four layers, in the order they first appear in this file (the bundler drops an @layer order line), a later one wins whatever the selector says, except for !important, where an earlier one wins:
-   phone-first (the phone !important declarations), legacy (every screen file), phone (phone-boost.css) and type (white-type.css, the one type scale). */
+/* Six layers, in the order they first appear in this file (the bundler drops an @layer order line; tools/lint.js checks the order): a later one wins whatever the selector says, except for !important, where an earlier one wins.
+   phone-first (the phone !important declarations), legacy (the screen files), scoped (rules for one screen or element), detail (the stock page), phone (phone-boost.css) and type (white-type.css, the one type scale). */
 

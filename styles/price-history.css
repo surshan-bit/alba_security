@@ -4,7 +4,7 @@
 .val-text{flex:1 1 260px;min-width:0;text-align:left;}
 .val-text .val-cell-sub{margin-top:6px;}
 .val-cell-value.val-iv{font-size:var(--t-md);}
-#glossary-data-proxy{grid-column:1/-1;}
+
 .glossary-def ul{margin:4px 0 0;padding-left:18px;}
 .glossary-def li{font-size:inherit;line-height:inherit;margin-bottom:3px;color:inherit;}
 /* ---- Price history chart inside the Technical Score panel (experimental) ---- */

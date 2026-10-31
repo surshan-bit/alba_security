@@ -183,7 +183,7 @@ html{font-size:112.5%;}
   .sheet-panel .strat-total :is(.strat-btn,.rk-bar,.rk-toolbtn){flex:1 1 calc(50% - 8px);min-width:max-content;}
   .sheet-panel .strat-total .rk-bar > *{width:100%;}
   .strat-result-head > .biz-filters-toggle{flex:1 1 100%;}
-  .sheet-slot :is(#analysisFullscreenBtn,[data-biz-full]){display:none !important;}
+  
   .sheet-foot{display:flex;position:sticky;bottom:0;margin-top:auto;padding:12px 0 calc(14px + env(safe-area-inset-bottom,0px));background:var(--panel);}
   .sheet-done{flex:1;height:46px;border:0;border-radius:8px;background:var(--accent);color:#0f1720;font:inherit;font-weight:700;cursor:pointer;}
 }

@@ -37,4 +37,3 @@
 
 /* News items: the Helps / Hurts / Mixed tag comes first, then the headline, then the explanation on its own lines with the source after it. */
 
-#section-refreshlog :is(.refreshlog-freshness-summary,.refreshlog-freshness-row,.refreshlog-run-stats,.upload-hint,.fi-step,.fi-result,.fi-prompt-msg,.fi-pct,.live-status,.help-tab-link){font-size:var(--t-md);}

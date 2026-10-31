@@ -43,7 +43,7 @@ h1{margin:0 0 6px;font-size:var(--t-lg);font-weight:600;letter-spacing:.2px;}
 .app-section.inline-detail-open > :not(.inline-detail-host){display:none !important;}
 .inline-detail-host{margin-top:6px;}
 /* Help and Knowledge Base: use the full page width, with a compact contents row, in a single column. */
-#section-help .sub,#section-knowledgebase .sub{max-width:none;}
+
 @media (max-width:600px){
 .topbar-title{display:none;}
 /* Grids everywhere: a line under the heading row only; no lines between the rows. */

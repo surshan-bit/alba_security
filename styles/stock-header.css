@@ -39,7 +39,7 @@
 .completeness-badge.incomplete{background:rgba(201,162,39,.18);color:var(--hold);}
 /* The Back button stays in view under the top bar while the stock page scrolls; the Jump-to bar and the jump targets sit below it. */
 .detail-back-bar ~ .detail-jump .detail-jump-who{padding-right:230px;box-sizing:border-box;min-height:34px;}
-.detail-back-bar ~ #jump-val,.detail-back-bar ~ #jump-global,.detail-back-bar ~ #jump-fund,.detail-back-bar ~ #jump-tech,.detail-back-bar ~ #peersPanel{scroll-margin-top:calc(var(--jump-top,64px) + 118px);}
+
 .detail-jump{gap:8px;padding:8px 0;position:sticky;top:var(--jump-top,64px);z-index:6;box-shadow:0 -10px 0 var(--bg);display:flex;flex-wrap:wrap;align-items:center;margin:0 0 4px;background:var(--bg);border-bottom:1px solid var(--line);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
 .detail-jump-who{flex:0 0 100%;display:none;align-items:center;gap:10px;min-width:0;}
 .detail-jump.show-who .detail-jump-who{display:flex;}
