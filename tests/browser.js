@@ -192,7 +192,7 @@ async function businessTests(browser){
   ok(/M RSI/i.test(await page.locator('.biz-detail .strat-table thead').innerText()) && /M Tech Rating/i.test(await page.locator('.biz-detail .strat-table thead').innerText()), 'business: the stocks use the same grid columns as Analysis and Strategies');
   await page.locator('.biz-detail [data-biz-cols]').click();
   await page.locator('.biz-detail .strat-row').first().click(); await page.waitForTimeout(300);
-  ok(await page.evaluate(() => { const b = document.getElementById('section-business'); return b.classList.contains('active') && b.contains(document.getElementById('detail')) && !!document.querySelector('#detail .detail-name'); }) && /Back to Explorer/.test(await page.locator('#detailBackBtn').innerText()), 'business: clicking a stock opens its detail right there with a way back');
+  ok(await page.evaluate(() => { const b = document.getElementById('section-business'); return b.classList.contains('active') && b.contains(document.getElementById('detail')) && !!document.querySelector('#detail .detail-name'); }) && /Back to Explorer/i.test(await page.locator('#detailBackBtn').innerText()), 'business: clicking a stock opens its detail right there with a way back');
   { // the stock page: its links keep their styling, and the Back button stays in view under the top bar while scrolling
     const linkColour = await page.evaluate(() => getComputedStyle(document.querySelector('#detail .detail-meta-links a')).color);
     ok(linkColour !== 'rgb(0, 0, 238)' && !/^rgb\(85, 26, 139\)/.test(linkColour), 'stock page: the links under the name are styled (' + linkColour + ')');
@@ -210,7 +210,7 @@ async function businessTests(browser){
     await page.locator('.biz-open').first().click(); await page.waitForTimeout(300);
     const got = await page.evaluate(() => ['jump-ind-factors', 'jump-ind-global', 'jump-ind-charts', 'jump-ind-news', 'jump-ind-stocks'].map(id => !!document.querySelector('#detail #' + id)));
     ok(got.every(Boolean) && (await page.locator('#detail .detail-name').innerText()) === name && (await page.locator('#detail .biz-row, .biz-detail').count()) === 0, 'industry page: opens with factors, global & macro, charts, news and stocks (' + name + ')');
-    ok((await page.locator('#detail #jump-ind-stocks .strat-row').count()) >= 1 && /Back to Explorer/.test(await page.locator('#detailBackBtn').innerText()), 'industry page: lists its stocks and has a way back');
+    ok((await page.locator('#detail #jump-ind-stocks .strat-row').count()) >= 1 && /Back to Explorer/i.test(await page.locator('#detailBackBtn').innerText()), 'industry page: lists its stocks and has a way back');
     await page.locator('#jump-ind-stocks .strat-row').first().click(); await page.waitForTimeout(300);
     ok((await page.locator('#detail .detail-jump-ticker').count()) >= 1, 'industry page: clicking a stock opens its page');
     await page.locator('#detailBackBtn').click(); await page.waitForTimeout(300);
@@ -244,9 +244,9 @@ async function businessTests(browser){
   }
   await page.locator('[data-biz-all]').click();
   const nRows = await page.locator('.biz-row').count();
-  ok((await page.locator('.biz-detail').count()) === nRows && /Collapse all/.test(await page.locator('[data-biz-all]').innerText()), 'business: Expand all opens every industry (' + nRows + ') and the button becomes Collapse all');
+  ok((await page.locator('.biz-detail').count()) === nRows && /Collapse all/i.test(await page.locator('[data-biz-all]').innerText()), 'business: Expand all opens every industry (' + nRows + ') and the button becomes Collapse all');
   await page.locator('[data-biz-all]').click();
-  ok((await page.locator('.biz-detail').count()) === 0 && /Expand all/.test(await page.locator('[data-biz-all]').innerText()), 'business: Collapse all closes them again');
+  ok((await page.locator('.biz-detail').count()) === 0 && /Expand all/i.test(await page.locator('[data-biz-all]').innerText()), 'business: Collapse all closes them again');
   { const m = await page.evaluate(() => { const r = document.querySelector('.biz-row'); return { caret: !!document.querySelector('.biz-caret'), wrap: Math.round(r.children[0].getBoundingClientRect().height) <= 45 }; });
     ok(!m.caret && m.wrap, 'business: no arrow before the industry names, names stay on one line ' + JSON.stringify(m)); }
   { // columns fit their content, and opening an industry does not change their widths
@@ -276,7 +276,7 @@ async function businessTests(browser){
     await page.locator('.rk-menu [data-rk-act="choice-run"]:not([disabled])').first().click();
     await page.waitForFunction(() => /^Done|Could not/.test((document.getElementById('bizNewsStatus') || { textContent: '' }).textContent), null, { timeout: 60000 });
     const st = await page.locator('#bizNewsStatus').innerText();
-    ok(/^Done\. Looked at \d+ of \d+ stocks/.test(st) && /Refresh/.test(await page.locator('.biz-newsbtn').first().innerText()), 'business: Collect latest news runs and reports: ' + st.slice(0, 90));
+    ok(/^Done\. Looked at \d+ of \d+ stocks/.test(st) && /Refresh/i.test(await page.locator('.biz-newsbtn').first().innerText()), 'business: Collect latest news runs and reports: ' + st.slice(0, 90));
   }
   await page.locator('[data-biz-period="1W"]').click();
   ok(/Average 1W/i.test(await page.locator('.biz-table th').nth(2).innerText()), 'business: the period buttons change the figures');
@@ -389,13 +389,13 @@ async function layoutTests(browser){
     await page.fill('#globalSearch', FIXTURE[0].name); await page.waitForTimeout(250); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(500);
     const o = await sticksOut(page); ok(!o.scrolls && o.out.length === 0, `${w}px stock page: overflow ${o.out.join('; ')}`);
     if(w >= 1000){
-      // the short name line shows only after the big header has scrolled away
+      // the name tab of the jump bar is always there (it is the current one at the top of the page) and stays while scrolling
       const who = () => page.evaluate(() => getComputedStyle(document.querySelector('#detail .detail-jump-who')).display !== 'none');
-      ok(!(await who()), 'sticky name line is hidden at the top of the page');
+      ok(await who(), 'name tab is shown at the top of the page');
       await page.evaluate(() => window.scrollTo(0, 700)); await page.waitForTimeout(500);
-      ok(await who(), 'sticky name line shows after scrolling down');
+      ok(await who(), 'name tab stays after scrolling down');
       await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(500);
-      ok(!(await who()), 'sticky name line hides again at the top');
+      ok(await who(), 'name tab is still shown at the top again');
     }
     if(w <= 450){
       // phones: no Jump-to row on a stock's page
@@ -416,11 +416,11 @@ async function layoutTests(browser){
     ok(errs.length === 0, `${w}px layout run: console errors: ${errs.slice(0, 3).join(' | ')}`);
     await ctx.close();
   }
-  // the three themes: nothing sticks out and text is readable (text colour differs from its background)
-  for(const theme of ['dark', 'light', 'indigo', 'white']){
+  // the one design (White): nothing sticks out and text is readable (text colour differs from its background)
+  for(const theme of ['white']){
     const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
     const { page, errs } = await openPage(ctx, { theme }, 'theme ' + theme); await appReady(page); await page.waitForTimeout(500);
-    ok((await page.evaluate(() => document.documentElement.getAttribute('data-theme') || 'dark')) === theme, `theme ${theme}: applied`);
+    ok((await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === theme, `theme ${theme}: applied`);
     for(const k of ['analysis', 'strategies']){ await goto(page, k); await page.waitForTimeout(300); const o = await sticksOut(page); ok(!o.scrolls && o.out.length === 0, `theme ${theme} ${k}: overflow ${o.out.join('; ')}`); }
     const colours = await page.evaluate(() => { const b = getComputedStyle(document.body); return [b.color, b.backgroundColor]; });
     ok(colours[0] !== colours[1], `theme ${theme}: text and background colours differ (${colours.join(' on ')})`);

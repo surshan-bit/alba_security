@@ -13,7 +13,7 @@
   .analysis-layout:has(.analysis-filters-panel.filters-collapsed),.biz-layout:has(> .biz-side.filters-collapsed){grid-template-columns:minmax(0,1fr);gap:0;}
   .analysis-filters-panel.filters-collapsed .filters-toggle,.biz-side.filters-collapsed > .biz-filters-toggle{width:auto;max-width:100%;border-bottom:0;padding:0 0 6px;margin:0;}
   .analysis-filters-panel.filters-collapsed .filters-toggle .ft-caret,.biz-side.filters-collapsed > .biz-filters-toggle .ft-caret{transform:rotate(-90deg);}
-  :root:not([data-theme="indigo"]):not([data-theme="light"]):not([data-theme="white"]) #section-business .biz-side.filters-collapsed{margin:0;width:auto;}
+  
   /* Strategies: the sort and the Track / Refresh buttons above the picks */
   .strat-filters-panel > .biz-filters-toggle{display:flex;align-items:center;gap:10px;flex:0 0 auto;width:auto;max-width:100%;box-sizing:border-box;background:transparent;border:0;color:var(--text);font:inherit;font-size:var(--t-md);padding:0 0 6px;margin:0;cursor:pointer;text-align:left;}
   .strat-filters-panel > .biz-filters-toggle .ft-label{display:inline-flex;align-items:center;font-weight:700;}

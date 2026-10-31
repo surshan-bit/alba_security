@@ -57,6 +57,3 @@
 
 /* The size tag beside the stock's name. The prefix wins over the White theme's type scale. */
 #detail .detail-name-row{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;}
-:root:root:root #detail .dc-tag{font-size:var(--t-xs) !important;font-weight:700 !important;letter-spacing:.05em !important;text-transform:uppercase !important;padding:3px 9px;border-radius:999px;border:1px solid var(--line);white-space:nowrap;line-height:1.3 !important;color:var(--muted) !important;background:color-mix(in srgb,var(--muted) 10%,transparent);}
-:root:root:root #detail .dc-tag.dc-mid{color:var(--accent) !important;border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent);}
-:root:root:root #detail .dc-tag.dc-small{color:var(--hold) !important;border-color:color-mix(in srgb,var(--hold) 45%,transparent);background:color-mix(in srgb,var(--hold) 12%,transparent);}

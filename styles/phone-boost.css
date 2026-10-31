@@ -1,0 +1,114 @@
+/* Phone rules that must beat every screen file whatever its selector: they sit in the layer "phone" (see main.css), which wins over the screen files, so they need no :root:root:root. */
+@media (max-width:600px){
+.analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle{flex:1 1 0;min-width:0;}
+.analysis-toolbar .analysis-view-bar{flex:0 0 auto;}
+.analysis-toolbar .rk-headline{display:none;}
+.analysis-filters-panel .filters-toggle .ft-count{display:inline;flex:none;color:var(--muted);font-size:var(--t-xs);white-space:nowrap;}
+:is(.strat-table,.biz-table) > tbody > tr > td{height:37px;padding:0 4px;line-height:1.15;vertical-align:middle;box-sizing:border-box;}
+:is(.strat-table,.biz-table) > thead > tr > th{padding:7px 4px;}
+:is(.strat-table,.biz-table,.help-table) td .analysis-lb-ticker{display:none;}   /* the stock code is left out on a phone: the name is enough */
+:is(.strat-table,.biz-table) td .analysis-lb-name{display:inline-block;max-width:132px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;line-height:1.15;}
+.strat-table :is(td,th).pin-col{width:22px;padding-left:2px;padding-right:0;}
+.strat-table .pin-btn{padding:0;}
+.strat-table td.analysis-lb-rank{padding-left:2px;padding-right:6px;}
+.panel-body:has(> .analysis-industry){display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:4px;}
+.panel-body:has(> .analysis-industry) > .analysis-toolbar,.panel-body:has(> .analysis-industry) > .analysis-industry,.panel-body:has(> .analysis-industry) .biz-embedded,.panel-body:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full),.panel-body:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full) > .biz-toolbar,.panel-body:has(> .analysis-industry) .biz-embedded > .biz-controls{display:contents;}
+.panel-body:has(> .analysis-industry) .analysis-view-bar{order:1;flex:0 0 auto;}
+.panel-body:has(> .analysis-industry) .analysis-filters-panel .filters-toggle{order:2;flex:1 1 200px;min-width:0;}
+.panel-body:has(> .analysis-industry) .biz-controls > .dm{order:3;flex:0 0 auto;}
+.panel-body:has(> .analysis-industry) :is(.biz-controls > .dm .dm-btn,.biz-actions .dm-btn,.biz-actions .rk-toolbtn,.biz-actions .rk-main){padding:0 8px;font-size:var(--t-sm);gap:4px;}
+.panel-body:has(> .analysis-industry) .biz-actions .dm-more .dm-btn{width:32px;padding:0;}
+.panel-body:has(> .analysis-industry) .biz-actions{min-width:0;flex:0 1 auto;}
+.panel-body:has(> .analysis-industry) .biz-controls > .dm:first-child .dm-btn small{display:none;}   /* "1 month" says it is the period */
+.panel-body:has(> .analysis-industry) .biz-showing{display:none;}
+.panel-body:has(> .analysis-industry) .biz-actions{order:5;margin-left:auto;display:flex;gap:6px;overflow:visible;}   /* (the "..." menu opens below it) */
+.panel-body:has(> .analysis-industry) .analysis-toolbar .filter-groups{order:50;}
+.biz-embedded > .biz-main:not(.biz-full) > :not(.biz-toolbar){flex:1 1 100%;min-width:0;order:60;}
+.strat-side:empty{display:none;}
+.strat-phonebar{display:flex;align-items:center;gap:6px;margin:4px 0 6px;}
+.strat-phone-pick{flex:1 1 0;min-width:0;display:block;}
+.strat-phone-pick .dm{display:block;}
+.strat-phone-pick .dm-btn{width:100%;justify-content:space-between;}
+.strat-phone-pick .dm-btn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.strat-phonebar .strat-phone-btn{width:36px;padding:0;justify-content:center;flex:0 0 auto;}
+.strat-phonebar .strat-phone-btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);}
+.strat-phonebar ~ .strat-panel .strat-result-head > .biz-filters-toggle{display:none;}
+.strat-phonebar ~ .strat-panel .strat-result-title .strat-showing,.strat-phonebar ~ .strat-panel .strat-result-title .strat-sep{display:none;}
+.strat-phonebar ~ .strat-panel .strat-result-head:not(:has(.strat-ign)) .strat-result-title{display:none;}
+.strat-layout .strat-main > .strat-phonebar ~ .strat-panel .strat-result-head{margin:0;}
+.strat-phonebar ~ .strat-panel > .strat-fold:not([open]) > summary .strat-fold-lbl,.strat-fold-nm{display:none;}
+.strat-layout .strat-main > .strat-phonebar ~ .strat-panel > .strat-fold > summary{margin:0 0 2px;padding:2px 22px 2px 0;min-height:0;gap:4px;flex-wrap:nowrap;align-items:center;}
+.strat-phonebar ~ .strat-panel > .strat-fold > summary .strat-fold-sum{flex:1 1 auto;min-width:0;order:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#stratResults:not(.selecting) .strat-selcell{display:none;}
+#section-trackrecord{padding-bottom:76px;}
+#section-trackrecord .analysis-panel{margin-top:0;border-top-left-radius:0;border-top-right-radius:0;}
+#section-trackrecord[data-tl-tab="ideas"] .analysis-panel:not(.tl-ideas){display:none;}
+#section-trackrecord[data-tl-tab="positions"] .tl-ideas{display:none;}
+#section-trackrecord .tl-ideas{margin-top:0;}
+#section-trackrecord .tl-view-toggle,#tradeLogPanelBody .tl-cards,#tradeLogPanelBody .help-table-wrap,#tradeLogPanelBody .data-chips{display:none;}
+#tradeLogPanelBody .tl-phone{display:block;}
+#tradeLogPanelBody .tl-pseg{margin:2px 0 12px;}
+#tradeLogPanelBody .tl-pstrip{display:flex;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--text) 4%,transparent);margin:0 0 4px;}
+#tradeLogPanelBody .tl-pstrip>div{flex:1;padding:9px 12px;min-width:0;}
+#tradeLogPanelBody .tl-pstrip>div+div{border-left:1px solid var(--line);}
+#tradeLogPanelBody .tl-pstrip span{display:block;text-transform:uppercase;letter-spacing:.05em;}
+#tradeLogPanelBody .tl-pstrip b{display:block;margin-top:2px;}
+#tradeLogPanelBody .tl-prow{border-top:1px solid var(--line);padding:11px 0;cursor:pointer;}
+#tradeLogPanelBody .tl-pstrip + .tl-prow{border-top:0;}
+#tradeLogPanelBody .tl-prow-top,#tradeLogPanelBody .tl-prow-sub{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+#tradeLogPanelBody .tl-prow-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#tradeLogPanelBody .tl-prow-ret{white-space:nowrap;}
+#tradeLogPanelBody .tl-prow-sub{margin-top:3px;color:var(--muted);}
+#tradeLogPanelBody .tl-prow-sub .tl-signal-badge{padding:2px 9px;white-space:nowrap;}
+#tradeLogPanelBody .tl-sig-closed{background:color-mix(in srgb,var(--muted) 10%,transparent);}
+#tradeLogPanelBody .tl-prow-det{display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--text) 4%,transparent);}
+#tradeLogPanelBody .tl-prow.open .tl-prow-det{display:block;}
+#tradeLogPanelBody .tl-prow-det dl{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin:0 0 10px;}
+#tradeLogPanelBody .tl-prow-det dt{text-transform:uppercase;letter-spacing:.05em;}
+#tradeLogPanelBody .tl-prow-det dd{margin:1px 0 0;}
+#tradeLogPanelBody .tl-prow-why{margin:0 0 10px;line-height:1.4;}
+#tradeLogPanelBody .tl-prow-det .tl-row-actions{border:0;padding:0;}
+#tradeAddBtn{position:fixed;left:12px;right:12px;bottom:12px;z-index:25;width:auto;justify-content:center;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 40%,transparent);}
+#section-trackrecord[data-tl-tab="ideas"] #tradeAddBtn,#section-trackrecord:has(.tl-form) #tradeAddBtn{display:none;}
+#section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-head{display:block;height:0;overflow:visible;margin:0;padding:0;}
+#section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-head .analysis-panel-title{display:none;}
+#tradeFormHost:has(.tl-form)::before{content:"";position:fixed;inset:0;background:rgba(20,25,50,.4);z-index:60;}
+#tradeFormHost .tl-form{position:fixed;left:0;right:0;bottom:0;z-index:61;box-sizing:border-box;width:100%;max-width:100vw;margin:0;border-radius:20px 20px 0 0;border-width:1px 0 0;max-height:88vh;overflow:auto;background:var(--panel);box-shadow:0 -8px 30px rgba(20,25,50,.25);}
+#tradeFormHost .tl-grid > *{min-width:0;}
+#tradeFormHost .tl-grid input,#tradeFormHost .tl-grid .search-box{width:100%;box-sizing:border-box;}
+#tradeFormHost .tl-form-actions .tl-btn-primary{flex:1;}
+#tradeFormHost .tl-grid{grid-template-columns:1fr 1fr;}
+#tradeFormHost .tl-form-actions{flex-direction:row-reverse;flex-wrap:wrap;}
+#tradeFormHost .tl-msg{flex-basis:100%;}
+#section-trackrecord .tl-ideas .analysis-panel-head{display:block;margin:0 0 8px;}
+#section-trackrecord .tl-ideas .analysis-panel-title{display:none;}
+#section-trackrecord .tl-ideas .tl-head-actions{width:100%;}
+#section-trackrecord .tl-ideas .tl-ideas-select{flex:1;max-width:none;min-width:0;height:40px;}
+#section-trackrecord .tl-ideas #tradeIdeasRun{height:40px;white-space:nowrap;padding:0 14px;}
+#tradeIdeasBody .tl-top5{border:0;background:transparent;padding:0;margin:0 0 6px;}
+#tradeIdeasBody .tl-top5-title{margin:10px 0 4px;}
+#tradeIdeasBody .tl-top5 > .upload-hint{display:none;}
+#tradeIdeasBody .tl-top5 ol{gap:0;}
+#tradeIdeasBody .tl-top5 ol > li{padding:11px 0;border-top:1px solid var(--line);}
+#tradeIdeasBody .tl-top5 ol > li:first-child{border-top:0;}
+#tradeIdeasBody .tl-top5-why li{padding:0;border:0;margin:2px 0;display:list-item;}
+#tradeIdeasBody .tl-top5-head > span:first-child{flex:1 1 0;min-width:0;}
+#tradeIdeasBody .tl-held-tag{display:table;margin:4px 0 0;padding:1px 8px;}
+#tradeIdeasBody .tl-top5-head{flex-wrap:wrap;align-items:baseline;}
+#tradeIdeasBody .tl-top5-why{padding-left:0;list-style:none;color:var(--text);}
+#tradeIdeasBody .tl-news{border:0;margin-top:5px;padding:0;}
+#tradeIdeasBody .tl-news-list{display:none;}
+#tradeIdeasBody .tl-top5-early{border-top:1px solid var(--line);padding-top:4px;}
+#tradeIdeasBody .tl-top5-early .tl-top5-title{cursor:pointer;display:flex;justify-content:space-between;}
+#tradeIdeasBody .tl-top5-early .tl-top5-title::after{content:"\203A";transform:rotate(90deg);color:var(--muted);}
+#tradeIdeasBody .tl-top5-early.tl-collapsed .tl-top5-title::after{transform:none;}
+#tradeIdeasBody .tl-top5-early.tl-collapsed > :not(.tl-top5-title){display:none;}
+#tradeIdeasBody .tl-method,#tradeIdeasBody .tl-ideas-done{display:none;}
+#tradeIdeasBody .tl-ideas-short{display:block;margin:0 0 6px;color:var(--muted);}
+#tradeFormHost .tl-msg:not(.err){display:none;}
+#section-trackrecord > header .sub{display:none;}
+.biz-table > tbody > .biz-row > .biz-name,.biz-table > thead > tr > th:first-child{padding-left:calc(4px + 2.6em);}
+.tabs-top{display:flex;margin:0;padding:8px var(--card-x) 0;background:var(--panel);border-radius:14px 14px 0 0;border-bottom:0;position:relative;}
+.tabs-top::after{content:"";position:absolute;left:var(--card-x);right:var(--card-x);bottom:0;border-bottom:1px solid var(--line);}
+.tabs-top .tab{border-bottom-width:2px;margin-bottom:0;position:relative;z-index:1;}
+}

@@ -81,8 +81,8 @@ tr:hover .rk-row-btn,.rk-row-btn:focus-visible,.rk-row-btn[aria-expanded="true"]
 @media (max-width:760px){
 .strat-layout{grid-template-columns:1fr;}
 }
-#stratMain .strat-panel:first-child{padding-top:19px;}
-:root:is([data-theme="indigo"],[data-theme="light"],[data-theme="white"]) #section-strategies #stratMain .strat-panel:first-child{padding-top:3px;}
+.strat-main .strat-panel:first-child{padding-top:19px;}
+:root[data-theme="white"] .strat-layout .strat-main .strat-panel:first-child{padding-top:3px;}
 .biz-news-bar .rk-choicebtn{margin-left:auto;}
 .biz-news-bar .rk-main{height:auto;}
 /* Explorer: the Refresh buttons inside an industry (stocks grid, news) share one green look. */
@@ -119,8 +119,8 @@ tr:hover .rk-row-btn,.rk-row-btn:focus-visible,.rk-row-btn[aria-expanded="true"]
 .analysis-leaderboard-head .analysis-reset-btn,.analysis-leaderboard-head .rk-main{padding:0 3px;font-size:var(--t-sm);}
 .analysis-leaderboard-head .analysis-reset-btn{min-width:0;}
 /* Phone: tighter vertical spacing on Strategies. */
-#stratMain .strat-panel:first-child{padding-top:2px !important;margin-top:0 !important;}
-#stratMain .strat-panel{margin-top:8px !important;padding-top:2px;padding-bottom:2px;}
+.strat-main .strat-panel:first-child{padding-top:2px !important;margin-top:0 !important;}
+.strat-main .strat-panel{margin-top:8px !important;padding-top:2px;padding-bottom:2px;}
 .strat-group > summary.analysis-panel-title{margin-bottom:0;}
 .strat-result-head > p{margin:0;}
 /* Phone: one vertical rhythm on the list screens. Block above to "Showing…" text 16px, text to controls 10px, between control rows 8px, controls to grid 12px. */
@@ -144,7 +144,7 @@ tr:hover .rk-row-btn,.rk-row-btn:focus-visible,.rk-row-btn[aria-expanded="true"]
 .settings-row{padding:12px;gap:12px;}
 .settings-row-title{font-size:var(--t-sm);}
 .settings-row-sub{font-size:var(--t-sm);}
-.theme-toggle-btn{font-size:var(--t-sm);min-height:36px;}
+
 /* Trade Log */
 #section-trackrecord .upload-hint{font-size:var(--t-sm);}
 #section-trackrecord .refresh-btn,#section-trackrecord .tl-view-btn{font-size:var(--t-sm);}

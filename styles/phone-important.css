@@ -1,0 +1,25 @@
+/* The phone declarations that must also beat a screen file's own !important: the layer "phone-first" is the one !important declarations win in, over every later layer. */
+@media (max-width:600px){
+.analysis-leaderboard-head{gap:6px !important;margin-bottom:6px !important;}
+.strat-layout .strat-main > .strat-phonebar ~ .strat-panel:is(:has(> .strat-fold),:has(.strat-result-head)){margin-top:0 !important;padding-top:0 !important;}
+.tl-pstrip span{font-size:10px !important;font-weight:600 !important;color:var(--muted) !important;}
+.tl-pstrip b{font-size:15px !important;font-weight:600 !important;}
+.tl-prow-name{font-size:14px !important;font-weight:600 !important;}
+.tl-prow-ret{font-size:14px !important;font-weight:700 !important;}
+.tl-prow-sub{font-size:12px !important;}
+.tl-prow-sub .tl-signal-badge{font-size:11px !important;}
+.tl-prow-det{font-size:12px !important;}
+.tl-prow-det dt{font-size:10px !important;font-weight:600 !important;color:var(--muted) !important;}
+.tl-prow-det dd{font-size:13px !important;font-weight:600 !important;}
+.tl-prow-why{font-size:12px !important;}
+.tl-form{padding:18px 18px 22px !important;}
+.tl-form-actions .tl-btn-primary{color:#fff !important;background:var(--accent) !important;}
+#tradeIdeasRun{color:#fff !important;background:var(--accent) !important;font-size:var(--t-sm) !important;}
+.tl-top5-title{font-size:14px !important;font-weight:600 !important;}
+.tl-held-tag{font-size:var(--t-xs) !important;font-weight:700 !important;}
+.tl-top5-head > span:first-child{font-size:14px !important;font-weight:600 !important;}
+.tl-top5-price{font-size:13px !important;font-weight:600 !important;}
+.tl-top5-why{font-size:12px !important;}
+.tl-news{font-size:11px !important;}
+.tl-ideas-short{font-size:var(--t-sm) !important;}
+}

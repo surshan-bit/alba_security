@@ -3,7 +3,7 @@
       <div class="sub">The stack behind this screener and where each section's data comes from. For how a score is calculated, see <a href="#help-f1">Help</a>.</div>
     </header>
 
-    <div class="help-panel">
+    <div class="help-panel card">
       <div class="help-toc">
         <a href="#kb-arch">1. Architecture at a glance</a>
         <a href="#kb-maintenance">2. How this screener stays up to date</a>
@@ -251,10 +251,46 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
-            <h3>v1.335 &middot; 2026-10-30</h3>
+            <h3>v1.341 &middot; 2026-10-31</h3>
             <ul>
               <li><strong>Buy / Sell ideas: a new Early trend list, and the Downward list is gone:</strong> the second Top 5 list now shows stocks whose <b>weekly</b> trend is up but whose <b>monthly</b> trend has not turned yet (the Upward list still needs both). They are ranked by the two-week score among themselves and go through the same checks (results, margin of safety, Fundamental verdict, thin trading, news, falling profits). The five-year tests did not cover this group, so its cards say there is no tested record and the list is a watch list, less confirmed than the Upward one. Stocks with both trends down, a rebound bet, are no longer listed.</li>
               <li><strong>Analysis filter:</strong> the Buy / Sell ideas filter now offers <b>Upward Trend</b> and <b>Early Trend</b> (it replaces Downward Trend; a saved Downward choice is ignored). The Buy / Sell column still ranks Upward stocks only. Press <b>Process again</b> in the Trade Log to build the Early list for a strategy; results saved earlier show an empty Early list until then.</li>
+            </ul>
+            <h3>v1.340 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>Tidier styling underneath (nothing looks different):</strong> the page&rsquo;s styles are now arranged in layers (screen styles, the phone rules, and the one type scale on top), so a rule wins because of the layer it is in, not because it shouts louder. The forced <code>!important</code> rules fell from 179 to 103, the stacked <code>:root:root:root</code> overrides from 137 to none, and the type scale (<code>white-type.css</code>) no longer needs <code>!important</code> at all. Every element on every screen at phone, tablet and laptop width was compared before and after; the only change is that a button you reach with the keyboard now shows its focus ring.</li>
+              <li><strong>Inline font styles removed:</strong> a few headings, badges and banners carried their own font size or weight that the type scale was silently overriding; they now simply follow the type scale.</li>
+            </ul>
+            <h3>v1.339 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>Technical Score on a phone:</strong> the Change / RSI / Signal strip above each chart now fits inside the card instead of running past the right edge, and the Legend button sits on its own line instead of covering the score badge.</li>
+              <li><strong>Economic calendar:</strong> dates are bold; each row starts with a flag and country code (US, IN) followed by a circle for importance (red up arrow = high, amber bar = medium, grey down arrow = low); the old HIGH / MEDIUM labels are gone.</li>
+              <li><strong>Stock events:</strong> Strategy, Type and Range use the same drop-down as Analysis and Strategies. The &ldquo;TradingView date, can change&rdquo; text is no longer repeated on every row; it is said once above the list. The refresh bar matches the one at the top of News, and dates are bold.</li>
+              <li><strong>Why it matters:</strong> each bullet is green when it helps Indian stocks, red when it hurts and orange when it is mixed (worked out from the words in the line).</li>
+              <li><strong>Briefings:</strong> the sections (Market wrap, India policy &amp; RBI, &hellip;) are closed until you open them, with the number of briefings on each. Sections you open stay open.</li>
+              <li><strong>Events on a stock page:</strong> one line per event with a bold date heading, the same as News.</li>
+              <li><strong>Industry view numbers:</strong> on a phone the # column in Analysis&rsquo;s Industry view was cut off at its left edge, so the first nine rows showed no number and later rows lost their first digit. Every row now shows its full number.</li>
+            </ul>
+            <h3>v1.338 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>Same cards on a laptop too:</strong> News, Trade Log, Explorer and Help had square corners (and a thin line along the bottom) on a laptop while Analysis and Strategies were rounded. Every screen&rsquo;s card is now the same: 12 px corners, the same soft shadow, no line.</li>
+              <li><strong>Same left edge on a laptop:</strong> on Data Refresh and Settings the text started 115 px further in than on the other screens (the content was centred in a narrow column). It now starts at the same left edge as everything else (the column is still limited to a readable width).</li>
+              <li><strong>Same field height:</strong> text boxes and drop-downs were between 31 and 40 px tall depending on the screen. All are at least 36 px, the same as the toolbar buttons.</li>
+            </ul>
+            <h3>v1.337 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>One section heading:</strong> the heading with a topic icon, a bold title and a short accent bar is now one shared style for every screen that uses it (Data Refresh, Settings, Help, Knowledge Base and now News). News used to carry its own slightly different copy, so its headings are a little larger and further apart, like the others. The heading on Settings no longer has an extra gap above it.</li>
+              <li><strong>Data Refresh and Settings use the same card:</strong> they are now the same white card as every other screen, with the same side padding and corners (their top and bottom padding was larger before).</li>
+            </ul>
+            <h3>v1.336 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>One card for every screen:</strong> Analysis, Strategies, Explorer, News and Trade Log now all sit in the same white rounded card (same corners, shadow and side padding), set in one place (<code>styles/parts.css</code>). News used to be the odd one out with square corners. A rule that only applied to one screen is now a rule for the card, so the same fix works everywhere.</li>
+              <li><strong>Less screen-specific CSS:</strong> 164 places where a style was tied to one screen by an element id (672 down to 508) now apply by class instead (the Strategies and Analysis panels, the Explorer toolbar and the cards), without any change on screen.</li>
+            </ul>
+            <h3>v1.335 &middot; 2026-10-30</h3>
+            <ul>
+              <li><strong>One design:</strong> the Dark and Light themes are retired and the Themes choice is gone from Settings, so there is one look (the White design) to get completely right. Everything on screen looks the same as before. A saved Dark or Light choice is simply ignored.</li>
+              <li><strong>Shared parts, first set:</strong> the tabs (News, Trade Log), the round choice buttons (Upcoming / Recent, Open / Closed), the date heading with its count and the one-line event row now come from one shared style sheet (<code>styles/parts.css</code>) instead of each screen&rsquo;s own rules. The only visible change: the News tabs are bold, like the Trade Log tabs.</li>
             </ul>
             <h3>v1.334 &middot; 2026-10-30</h3>
             <ul>

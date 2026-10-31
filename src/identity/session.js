@@ -2,7 +2,7 @@
 // the organization) gets no uid and keeps browser-only settings.
 //  * Collection `users/<uid>` (shared, admin-readable): one small record per user {v, firstSeenAt, lastSeenAt}. Ids only,
 //    never names or emails.
-//  * Private to each user (nobody else can read it, not even the owner): data/users/<uid>/prefs (theme, filters and
+//  * Private to each user (nobody else can read it, not even the owner): data/users/<uid>/prefs (filters and
 //    sort, analysis filters, trade view), data/users/<uid>/pins, data/users/<uid>/strategies, and the trade log in
 //    data/users/<uid>/portfolio/trades/<TICKER>-<date>.
 

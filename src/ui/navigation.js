@@ -146,7 +146,7 @@ navItems.forEach(btn=>{
     closeSidebar();
   });
 });
-// White theme: the Tools drop-down in the top bar (hidden in the other themes, where its items stay in the sidebar).
+// The Tools drop-down in the top bar.
 const toolsGroup = document.getElementById('navToolsGroup'), toolsToggle = document.getElementById('navToolsToggle');
 const setToolsOpen = (open) => { toolsGroup.classList.toggle('open', open); toolsToggle.setAttribute('aria-expanded', String(open)); };
 toolsToggle.addEventListener('click', (e)=>{ e.stopPropagation(); setToolsOpen(!toolsGroup.classList.contains('open')); });

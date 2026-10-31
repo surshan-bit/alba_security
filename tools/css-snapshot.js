@@ -1,12 +1,12 @@
 // Style snapshot and compare: proves a CSS change did not change what the page looks like.
 //
 //   node tools/css-snapshot.js snap <outdir> [--quick] [--states]
-//       Opens the app (real Chromium, stand-in database, fixture stocks) in the Dark and Light themes at a set of screen widths, walks
+//       Opens the app (real Chromium, stand-in database, fixture stocks) in the White theme at a set of screen widths, walks
 //       through every screen and a number of open states (menus, forms, stock page...), and records for EVERY element (and its ::before,
 //       ::after, ::placeholder, ::marker) the resolved style of every property plus its box. --quick uses three widths; the default adds
 //       both sides of every @media breakpoint found in styles.css. --states also forces :hover, :focus, :active and :focus-visible on one
 //       element of each kind and records the styles that result.
-//       --only=dark-1280 limits the run to one theme and width.
+//       --only=white-1280 limits the run to one theme and width.
 //   node tools/css-snapshot.js compare <dirA> <dirB>
 //       Lists every element whose resolved style or box differs between two snapshots (exit 1 if any), with the properties that changed.
 //
@@ -240,14 +240,13 @@ function installSnap(){
     await ev(() => { document.querySelectorAll('details.strat-group').forEach(d => { d.open = true; }); }); await wait(250); await snap('strat-groups-open');
     const cardsN = (await ev(() => document.querySelectorAll('.strat-card').length)) || 0;
     for(let i = 0; i < Math.min(cardsN, 3); i++){ await ev(i => { const c = document.querySelectorAll('.strat-card')[i]; if(c) c.click(); }, i); await wait(500); await snap('strat-card-' + i); }
-    await goto('settings'); await wait(300); await click('[data-theme-choice="' + (theme === 'dark' ? 'indigo' : 'dark') + '"]'); await wait(400); await snap('settings-other-theme');
     if(errs.length) problems.push(tag + ' console errors: ' + errs.slice(0, 2).join(' | '));
     await ctx.close();
   }
 
   try {
-    const only = (process.argv.find(a => a.startsWith('--only=')) || '').slice(7);   // e.g. --only=dark-1280: one theme and width (fast check while editing)
-    for(const theme of ['dark', 'indigo']) for(const w of widths){
+    const only = (process.argv.find(a => a.startsWith('--only=')) || '').slice(7);   // e.g. --only=white-1280: one theme and width (fast check while editing)
+    for(const theme of ['white']) for(const w of widths){
       if(only && only !== theme + '-' + w) continue;
       const t = Date.now();
       await runCombo(theme, w);

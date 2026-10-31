@@ -9,7 +9,7 @@
 html{font-size:112.5%;}
 .wrap{padding:0 10px 48px;}
 /* The panel behind each screen's content carried 18px of padding and a border on each side: on a phone the grids use that width instead. */
-.app-section .analysis-panel{padding:4px 0;border-width:0;}
+.app-section .analysis-panel{border-width:0;}
 /* The boxed panels of Trade Log, Data Refresh, Help and the Knowledge Base keep their frame but with less inside padding. */
 .app-section .upload-panel,.app-section .refreshlog-freshness,.app-section .help-panel{padding:var(--card-y) var(--card-x);}
 .help-toc{padding-left:10px;padding-right:10px;}
@@ -51,7 +51,7 @@ html{font-size:112.5%;}
 .biz-showing{margin:12px 0;font-size:var(--t-sm);line-height:1.4;}
 .app-section .biz-toolbar{margin:8px 0 14px;}
 .app-section .biz-side{margin-bottom:0;}
-.app-section .biz-layout,.app-section .analysis-layout{gap:0;row-gap:8px;}
+.app-section .biz-layout{gap:0;row-gap:8px;}
 .app-section .analysis-filters-panel{margin-bottom:0;}
 .analysis-leaderboard.lb-full{padding:8px 8px 12px;}
 .biz-main.biz-full{padding:8px 8px 12px;}
@@ -105,8 +105,8 @@ html{font-size:112.5%;}
 .trk-del{grid-area:del;padding:0 2px;font-size:var(--t-md);}
 .trk-goal{grid-area:goal;color:var(--muted);}
 .trk-state{grid-area:state;margin-left:0;font-size:var(--t-sm);}
-#stratMain .strat-panel{margin-top:10px;padding-top:4px;padding-bottom:4px;}
-#stratMain .strat-panel+.strat-panel{margin-top:18px;}
+.strat-main .strat-panel{margin-top:10px;padding-top:4px;padding-bottom:4px;}
+.strat-main .strat-panel+.strat-panel{margin-top:18px;}
 /* Explorer on phones: the controls fold into one "Filters" line (closed at first, like the Analysis filters); the toolbar and grid are tighter. */
 }
 .biz-filters-toggle{display:none;}
@@ -192,130 +192,15 @@ html{font-size:112.5%;}
    Analysis: the View menu and the Filters chip share one row, with the count inside the chip (the Industry view follows the same pattern); Strategies: the picker, Setup, Track and refresh
    and Select share one row, the setup card is a one-line summary and the tick boxes wait for Select. */
 @media (max-width:600px){
-:root:root:root .analysis-leaderboard-head{gap:6px !important;margin-bottom:6px !important;}
-:root:root:root .analysis-layout .analysis-toolbar > .analysis-filters-panel .filters-toggle{flex:1 1 0;min-width:0;}
-:root:root:root .analysis-toolbar .analysis-view-bar{flex:0 0 auto;}
-:root:root:root .analysis-toolbar .rk-headline{display:none;}
-:root:root:root .analysis-filters-panel .filters-toggle .ft-count{display:inline;flex:none;color:var(--muted);font-size:var(--t-xs);white-space:nowrap;}
-:root:root:root :is(.strat-table,.biz-table) > tbody > tr > td{height:37px;padding:0 4px;line-height:1.15;vertical-align:middle;box-sizing:border-box;}
-:root:root:root :is(.strat-table,.biz-table) > thead > tr > th{padding:7px 4px;}
-:root:root:root :is(.strat-table,.biz-table,.help-table) td .analysis-lb-ticker{display:none;}   /* the stock code is left out on a phone: the name is enough */
-:root:root:root :is(.strat-table,.biz-table) td .analysis-lb-name{display:inline-block;max-width:132px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;line-height:1.15;}
-:root:root:root .strat-table :is(td,th).pin-col{width:22px;padding-left:2px;padding-right:0;}
-:root:root:root .strat-table .pin-btn{padding:0;}
-:root:root:root .strat-table td.analysis-lb-rank{padding-left:2px;padding-right:6px;}
 /* the Industry view: the View menu and the filter chip share a row (count inside the chip), then Period, Show and the buttons; the same pattern as the Stocks view */
-:root:root:root #analysisPanelBody:has(> .analysis-industry){display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:4px;}
-:root:root:root #analysisPanelBody:has(> .analysis-industry) > .analysis-toolbar,:root:root:root #analysisPanelBody:has(> .analysis-industry) > .analysis-industry,:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded,:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full),:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full) > .biz-toolbar,:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-controls{display:contents;}
-:root:root:root #analysisPanelBody:has(> .analysis-industry) .analysis-view-bar{order:1;flex:0 0 auto;}
-:root:root:root #analysisPanelBody:has(> .analysis-industry) .analysis-filters-panel .filters-toggle{order:2;flex:1 1 200px;min-width:0;}
-:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-controls > .dm{order:3;flex:0 0 auto;}
-:root:root:root #analysisPanelBody:has(> .analysis-industry) :is(.biz-controls > .dm .dm-btn,.biz-actions .dm-btn,.biz-actions .rk-toolbtn,.biz-actions .rk-main){padding:0 8px;font-size:var(--t-sm);gap:4px;}
-:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-actions .dm-more .dm-btn{width:32px;padding:0;}
-:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-actions{min-width:0;flex:0 1 auto;}
-:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-controls > .dm:first-child .dm-btn small{display:none;}   /* "1 month" says it is the period */
-:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-showing{display:none;}
-:root:root:root #analysisPanelBody:has(> .analysis-industry) .biz-actions{order:5;margin-left:auto;display:flex;gap:6px;overflow:visible;}   /* (the "..." menu opens below it) */
-:root:root:root #analysisPanelBody:has(> .analysis-industry) .analysis-toolbar .filter-groups{order:50;}
-:root:root:root .biz-embedded > .biz-main:not(.biz-full) > :not(.biz-toolbar){flex:1 1 100%;min-width:0;order:60;}
 
 /* Strategies */
-:root:root:root #stratList:empty{display:none;}
-:root:root:root .strat-phonebar{display:flex;align-items:center;gap:6px;margin:4px 0 6px;}
-:root:root:root .strat-phone-pick{flex:1 1 0;min-width:0;display:block;}
-:root:root:root .strat-phone-pick .dm{display:block;}
-:root:root:root .strat-phone-pick .dm-btn{width:100%;justify-content:space-between;}
-:root:root:root .strat-phone-pick .dm-btn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-:root:root:root .strat-phonebar .strat-phone-btn{width:36px;padding:0;justify-content:center;flex:0 0 auto;}
-:root:root:root .strat-phonebar .strat-phone-btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);}
-:root:root:root .strat-phonebar ~ .strat-panel .strat-result-head > .biz-filters-toggle{display:none;}
-:root:root:root .strat-phonebar ~ .strat-panel .strat-result-title .strat-showing,:root:root:root .strat-phonebar ~ .strat-panel .strat-result-title .strat-sep{display:none;}
-:root:root:root .strat-phonebar ~ .strat-panel .strat-result-head:not(:has(.strat-ign)) .strat-result-title{display:none;}
-:root:root:root #section-strategies #stratMain > .strat-phonebar ~ .strat-panel:is(:has(> .strat-fold),:has(.strat-result-head)){margin-top:0 !important;padding-top:0 !important;}
-:root:root:root #section-strategies #stratMain > .strat-phonebar ~ .strat-panel .strat-result-head{margin:0;}
-:root:root:root .strat-phonebar ~ .strat-panel > .strat-fold:not([open]) > summary .strat-fold-lbl,:root:root:root .strat-fold-nm{display:none;}
-:root:root:root #section-strategies #stratMain > .strat-phonebar ~ .strat-panel > .strat-fold > summary{margin:0 0 2px;padding:2px 22px 2px 0;min-height:0;gap:4px;flex-wrap:nowrap;align-items:center;}
-:root:root:root .strat-phonebar ~ .strat-panel > .strat-fold > summary .strat-fold-sum{flex:1 1 auto;min-width:0;order:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-:root:root:root #stratResults:not(.selecting) .strat-selcell{display:none;}
 }
 
 /* ---- Trade Log on a phone (v1.329): Positions and Ideas as two tabs, one short row per trade, the add form as a bottom sheet. :root:root:root beats the White theme's type scale. ---- */
 @media (max-width:600px){
-:root:root:root #section-trackrecord{padding-bottom:76px;}
-:root:root:root #section-trackrecord .tl-tabs{display:flex;margin:0;padding:8px var(--card-x) 0;background:var(--panel);border-radius:14px 14px 0 0;border-bottom:0;position:relative;}   /* the tabs are the top of the white block, like News: the panel under them continues it */
-:root:root:root #section-trackrecord .tl-tabs::after{content:"";position:absolute;left:var(--card-x);right:var(--card-x);bottom:0;border-bottom:1px solid var(--line);}
-:root:root:root #section-trackrecord .tl-tabs .news-tab{border-bottom-width:2px;margin-bottom:0;position:relative;z-index:1;}
-:root:root:root #section-trackrecord .analysis-panel{margin-top:0;border-top-left-radius:0;border-top-right-radius:0;}
-:root:root:root #section-trackrecord .tl-tabs .news-tab{font-weight:700 !important;}
 /* Which panel shows */
-:root:root:root #section-trackrecord[data-tl-tab="ideas"] .analysis-panel:not(.tl-ideas){display:none;}
-:root:root:root #section-trackrecord[data-tl-tab="positions"] .tl-ideas{display:none;}
-:root:root:root #section-trackrecord .tl-ideas{margin-top:0;}
 /* Positions: the cards, the table and the Cards / Table switch give way to the short rows */
-:root:root:root #section-trackrecord .tl-view-toggle,:root:root:root #tradeLogPanelBody .tl-cards,:root:root:root #tradeLogPanelBody .help-table-wrap,:root:root:root #tradeLogPanelBody .data-chips{display:none;}
-:root:root:root #tradeLogPanelBody .tl-phone{display:block;}
-:root:root:root #tradeLogPanelBody .tl-pseg{margin:2px 0 12px;}
-:root:root:root #tradeLogPanelBody .tl-pstrip{display:flex;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--text) 4%,transparent);margin:0 0 4px;}
-:root:root:root #tradeLogPanelBody .tl-pstrip>div{flex:1;padding:9px 12px;min-width:0;}
-:root:root:root #tradeLogPanelBody .tl-pstrip>div+div{border-left:1px solid var(--line);}
-:root:root:root #tradeLogPanelBody .tl-pstrip span{display:block;font-size:10px !important;font-weight:600 !important;text-transform:uppercase;letter-spacing:.05em;color:var(--muted) !important;}
-:root:root:root #tradeLogPanelBody .tl-pstrip b{display:block;font-size:15px !important;font-weight:600 !important;margin-top:2px;}
-:root:root:root #tradeLogPanelBody .tl-prow{border-top:1px solid var(--line);padding:11px 0;cursor:pointer;}
-:root:root:root #tradeLogPanelBody .tl-pstrip + .tl-prow{border-top:0;}
-:root:root:root #tradeLogPanelBody .tl-prow-top,:root:root:root #tradeLogPanelBody .tl-prow-sub{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-:root:root:root #tradeLogPanelBody .tl-prow-name{font-size:14px !important;font-weight:600 !important;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-:root:root:root #tradeLogPanelBody .tl-prow-ret{font-size:14px !important;font-weight:700 !important;white-space:nowrap;}
-:root:root:root #tradeLogPanelBody .tl-prow-sub{margin-top:3px;font-size:12px !important;color:var(--muted);}
-:root:root:root #tradeLogPanelBody .tl-prow-sub .tl-signal-badge{font-size:11px !important;padding:2px 9px;white-space:nowrap;}
-:root:root:root #tradeLogPanelBody .tl-sig-closed{background:color-mix(in srgb,var(--muted) 10%,transparent);}
-:root:root:root #tradeLogPanelBody .tl-prow-det{display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--text) 4%,transparent);font-size:12px !important;}
-:root:root:root #tradeLogPanelBody .tl-prow.open .tl-prow-det{display:block;}
-:root:root:root #tradeLogPanelBody .tl-prow-det dl{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin:0 0 10px;}
-:root:root:root #tradeLogPanelBody .tl-prow-det dt{font-size:10px !important;font-weight:600 !important;text-transform:uppercase;letter-spacing:.05em;color:var(--muted) !important;}
-:root:root:root #tradeLogPanelBody .tl-prow-det dd{margin:1px 0 0;font-size:13px !important;font-weight:600 !important;}
-:root:root:root #tradeLogPanelBody .tl-prow-why{margin:0 0 10px;font-size:12px !important;line-height:1.4;}
-:root:root:root #tradeLogPanelBody .tl-prow-det .tl-row-actions{border:0;padding:0;}
 /* The add / sell form is a bottom sheet over a dimmed page; the Add trade button is pinned to the bottom of the Positions tab */
-:root:root:root #tradeAddBtn{position:fixed;left:12px;right:12px;bottom:12px;z-index:25;height:46px;width:auto;justify-content:center;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 40%,transparent);}
-:root:root:root #section-trackrecord[data-tl-tab="ideas"] #tradeAddBtn,:root:root:root #section-trackrecord:has(.tl-form) #tradeAddBtn{display:none;}
-:root:root:root #section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-head{display:block;height:0;overflow:visible;margin:0;padding:0;}
-:root:root:root #section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-head .analysis-panel-title{display:none;}
-:root:root:root #tradeFormHost:has(.tl-form)::before{content:"";position:fixed;inset:0;background:rgba(20,25,50,.4);z-index:60;}
-:root:root:root #tradeFormHost .tl-form{position:fixed;left:0;right:0;bottom:0;z-index:61;box-sizing:border-box;width:100%;max-width:100vw;margin:0;border-radius:20px 20px 0 0;border-width:1px 0 0;max-height:88vh;overflow:auto;padding:18px 18px 22px !important;background:var(--panel);box-shadow:0 -8px 30px rgba(20,25,50,.25);}
-:root:root:root #tradeFormHost .tl-grid > *{min-width:0;}
-:root:root:root #tradeFormHost .tl-grid input,:root:root:root #tradeFormHost .tl-grid .search-box{width:100%;box-sizing:border-box;}
-:root:root:root #tradeFormHost .tl-form-actions .tl-btn-primary{flex:1;color:#fff !important;background:var(--accent) !important;}
-:root:root:root #tradeFormHost .tl-grid{grid-template-columns:1fr 1fr;}
-:root:root:root #tradeFormHost .tl-form-actions{flex-direction:row-reverse;flex-wrap:wrap;}
-:root:root:root #tradeFormHost .tl-msg{flex-basis:100%;}
 /* Ideas: a picker row, ranked rows, the Downward list folded, the method text behind a link */
-:root:root:root #section-trackrecord .tl-ideas .analysis-panel-head{display:block;margin:0 0 8px;}
-:root:root:root #section-trackrecord .tl-ideas .analysis-panel-title{display:none;}
-:root:root:root #section-trackrecord .tl-ideas .tl-head-actions{width:100%;}
-:root:root:root #section-trackrecord .tl-ideas .tl-ideas-select{flex:1;max-width:none;min-width:0;height:40px;}
-:root:root:root #section-trackrecord .tl-ideas #tradeIdeasRun{height:40px;white-space:nowrap;color:#fff !important;background:var(--accent) !important;font-size:var(--t-sm) !important;padding:0 14px;}
-:root:root:root #tradeIdeasBody .tl-top5{border:0;background:transparent;padding:0;margin:0 0 6px;}
-:root:root:root #tradeIdeasBody .tl-top5-title{font-size:14px !important;font-weight:600 !important;margin:10px 0 4px;}
-:root:root:root #tradeIdeasBody .tl-top5 > .upload-hint{display:none;}
-:root:root:root #tradeIdeasBody .tl-top5 ol{gap:0;}
-:root:root:root #tradeIdeasBody .tl-top5 ol > li{padding:11px 0;border-top:1px solid var(--line);}
-:root:root:root #tradeIdeasBody .tl-top5 ol > li:first-child{border-top:0;}
-:root:root:root #tradeIdeasBody .tl-top5-why li{padding:0;border:0;margin:2px 0;display:list-item;}
-:root:root:root #tradeIdeasBody .tl-top5-head > span:first-child{flex:1 1 0;min-width:0;}
-:root:root:root #tradeIdeasBody .tl-held-tag{display:table;margin:4px 0 0;padding:1px 8px;font-size:var(--t-xs) !important;font-weight:700 !important;}
-:root:root:root #tradeIdeasBody .tl-top5-head{flex-wrap:wrap;align-items:baseline;}
-:root:root:root #tradeIdeasBody .tl-top5-head > span:first-child{font-size:14px !important;font-weight:600 !important;}
-:root:root:root #tradeIdeasBody .tl-top5-price{font-size:13px !important;font-weight:600 !important;}
-:root:root:root #tradeIdeasBody .tl-top5-why{padding-left:0;list-style:none;font-size:12px !important;color:var(--text);}
-:root:root:root #tradeIdeasBody .tl-news{border:0;margin-top:5px;padding:0;font-size:11px !important;}
-:root:root:root #tradeIdeasBody .tl-news-list{display:none;}
-:root:root:root #tradeIdeasBody .tl-top5-early{border-top:1px solid var(--line);padding-top:4px;}
-:root:root:root #tradeIdeasBody .tl-top5-early .tl-top5-title{cursor:pointer;display:flex;justify-content:space-between;}
-:root:root:root #tradeIdeasBody .tl-top5-early .tl-top5-title::after{content:"\203A";transform:rotate(90deg);color:var(--muted);}
-:root:root:root #tradeIdeasBody .tl-top5-early.tl-collapsed .tl-top5-title::after{transform:none;}
-:root:root:root #tradeIdeasBody .tl-top5-early.tl-collapsed > :not(.tl-top5-title){display:none;}
-:root:root:root #tradeIdeasBody .tl-method,:root:root:root #tradeIdeasBody .tl-ideas-done{display:none;}
-:root:root:root #tradeIdeasBody .tl-ideas-short{display:block;margin:0 0 6px;font-size:var(--t-sm) !important;color:var(--muted);}
-:root:root:root #tradeFormHost .tl-msg:not(.err){display:none;}
-:root:root:root #section-trackrecord > header .sub{display:none;}
 }

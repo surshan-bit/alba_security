@@ -15,7 +15,7 @@ function tooltipContent(s){
   return `
       <div class="analysis-tooltip-name">${escapeHtml(s.name)}${isPinned(s) ? ' <span style="color:var(--hold);">&#9733; Pinned</span>' : ''}</div>
       <div class="analysis-tooltip-ticker">${escapeHtml(s.ticker)}</div>
-      <div class="analysis-tooltip-row"><span>Verdict</span><span class="badge b-${s.verdict}" style="padding:1px 8px;font-size:.68rem;">${verdictLabel[s.verdict]}</span></div>
+      <div class="analysis-tooltip-row"><span>Verdict</span><span class="badge b-${s.verdict}" style="padding:1px 8px;">${verdictLabel[s.verdict]}</span></div>
       <div class="analysis-tooltip-row"><span>Score</span><span>${s.score != null ? s.score.toFixed(1) : '—'}</span></div>
       <div class="analysis-tooltip-row"><span>W RSI</span><span>${r.weekRsi.toFixed(1)}</span></div>
       <div class="analysis-tooltip-row"><span>M RSI</span><span>${r.monthRsi.toFixed(1)}</span></div>

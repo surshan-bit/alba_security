@@ -1,26 +1,32 @@
 /* The stylesheet: tools/build.js bundles these files, in this order, into styles.css (minified).
    The order is part of the cascade: tools/css-snapshot.js proves a change did not alter the page. */
-@import "./tokens.css";
-@import "./base.css";
-@import "./shell.css";
-@import "./filters-header.css";
-@import "./stock-page.css";
-@import "./analysis.css";
-@import "./stock-header.css";
-@import "./data-refresh.css";
-@import "./help.css";
-@import "./trade-log.css";
-@import "./price-history.css";
-@import "./import-progress.css";
-@import "./live-data.css";
-@import "./strategies.css";
-@import "./business.css";
-@import "./news.css";
-@import "./activity.css";
-@import "./phone.css";
-@import "./theme-light.css";
-@import "./theme-white.css";
-@import "./refresh-kit.css";
-@import "./late-global.css";
-@import "./filters-ondemand.css";
-@import "./white-type.css";
+@import "./phone-important.css" layer(phone-first);
+@import "./tokens.css" layer(legacy);
+@import "./base.css" layer(legacy);
+@import "./shell.css" layer(legacy);
+@import "./filters-header.css" layer(legacy);
+@import "./stock-page.css" layer(legacy);
+@import "./analysis.css" layer(legacy);
+@import "./stock-header.css" layer(legacy);
+@import "./data-refresh.css" layer(legacy);
+@import "./help.css" layer(legacy);
+@import "./trade-log.css" layer(legacy);
+@import "./price-history.css" layer(legacy);
+@import "./import-progress.css" layer(legacy);
+@import "./live-data.css" layer(legacy);
+@import "./strategies.css" layer(legacy);
+@import "./business.css" layer(legacy);
+@import "./news.css" layer(legacy);
+@import "./activity.css" layer(legacy);
+@import "./phone.css" layer(legacy);
+@import "./theme-light.css" layer(legacy);
+@import "./theme-white.css" layer(legacy);
+@import "./parts.css" layer(legacy);
+@import "./refresh-kit.css" layer(legacy);
+@import "./late-global.css" layer(legacy);
+@import "./filters-ondemand.css" layer(legacy);
+@import "./phone-boost.css" layer(phone);
+@import "./white-type.css" layer(type);
+/* Four layers, in the order they first appear in this file (the bundler drops an @layer order line), a later one wins whatever the selector says, except for !important, where an earlier one wins:
+   phone-first (the phone !important declarations), legacy (every screen file), phone (phone-boost.css) and type (white-type.css, the one type scale). */
+

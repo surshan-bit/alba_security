@@ -21,10 +21,10 @@ function showUpdateBanner(){
   if(document.getElementById('dataUpdateBanner')) return;
   const b = document.createElement('div');
   b.id = 'dataUpdateBanner';
-  b.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:80;background:var(--panel);color:var(--text);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;font:600 .82rem -apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.35);display:flex;gap:12px;align-items:center;';
+  b.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:80;background:var(--panel);color:var(--text);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;box-shadow:0 6px 20px rgba(0,0,0,.35);display:flex;gap:12px;align-items:center;';
   const t = document.createElement('span'); t.textContent = 'Stock data was updated.';
   const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = 'Reload';
-  btn.style.cssText = 'background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;';
+  btn.style.cssText = 'background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;';
   btn.addEventListener('click', () => location.reload());
   b.appendChild(t); b.appendChild(btn); document.body.appendChild(b);
 }

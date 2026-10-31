@@ -50,7 +50,7 @@
 .analysis-col-grip:hover,.analysis-col-grip:focus-visible{color:var(--accent);border-color:var(--line);}
 .analysis-column-row.dragging .analysis-col-grip{cursor:grabbing;color:var(--accent);}
 /* Analysis "color dots by" toggle (added 2026-09-30): Weekly vs Monthly RSI, green if that
-     RSI is above 50, red otherwise. Same active/inactive visual pattern as .theme-toggle-btn. */
+     RSI is above 50, red otherwise.  */
 .analysis-color-toggle{display:flex;flex-direction:column;gap:8px;}
 .analysis-color-toggle-label{font-size:var(--t-sm);color:var(--muted);font-weight:600;}
 /* Segmented on/off toggle (2026-10-10): the two options share one rounded track, the selected one is
@@ -110,8 +110,8 @@ body.lb-full-open{overflow:hidden;}
 .analysis-tooltip-row span:first-child{color:var(--muted);}
 .analysis-tooltip-hint{margin-top:8px;font-size:var(--t-xs);color:var(--muted);font-style:italic;}
 /* Analysis screen: no filled panel behind the chart, filters and leaderboard; the page background shows through. */
-#section-analysis .analysis-panel,#section-analysis .analysis-columns-panel{background:transparent;}
-#section-analysis .analysis-color-toggle-btns{background:transparent;}
+.analysis-layout .analysis-panel,.analysis-layout .analysis-columns-panel{background:transparent;}
+.analysis-layout .analysis-color-toggle-btns{background:transparent;}
 /* The RSI Quadrant (sliders, axis choices, chart) lives inside the leaderboard and shows when "Show chart" is opened. */
 .analysis-leaderboard.chart-hidden .analysis-chart-block{display:none;}
 .topbar-search-clear.show{display:block;}
@@ -123,7 +123,7 @@ body.biz-full-open{overflow:hidden;}
    The filter panel is docked into it (filterpanel.js) and takes no box of its own: its chip is a toolbar item and its filter groups wrap onto the next line.
    The industry views reuse Explorer's table (see business/panel.js). */
 /* The filters no longer have a column of their own, so the page is always one column wide (the empty host keeps no room). */
-#section-analysis .analysis-layout{grid-template-columns:minmax(0,1fr);gap:0;}
+.analysis-layout{grid-template-columns:minmax(0,1fr);gap:0;}
 #analysisGlobalFilters:empty{display:none;}
 .analysis-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;margin:0 0 12px;}
 .analysis-leaderboard-head.analysis-toolbar{margin:0 0 8px;}
@@ -149,21 +149,16 @@ body.biz-full-open{overflow:hidden;}
 }
 .biz-embedded{display:block;}
 /* Wide screens, an industry view: the View menu, the Filters chip, the Period menu, the count and the buttons share one line. The wrappers between them take
-   no box (display:contents), so each control becomes an item of the line that #analysisPanelBody draws; everything else (the filter groups, the table) takes a full line. */
+   no box (display:contents), so each control becomes an item of the line that .panel-body draws; everything else (the filter groups, the table) takes a full line. */
 @media (min-width:901px){
-  #analysisPanelBody:has(> .analysis-industry){display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-top:4px;}   /* the same top and row gap as the Stocks view's toolbar, so the grid does not move when View changes */
-  #analysisPanelBody:has(> .analysis-industry) > .analysis-toolbar,
-  #analysisPanelBody:has(> .analysis-industry) > .analysis-industry,
-  #analysisPanelBody:has(> .analysis-industry) .biz-embedded,
-  #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full),
-  #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full) > .biz-toolbar,
-  #analysisPanelBody:has(> .analysis-industry) .biz-embedded > .biz-controls{display:contents;}
-  #analysisPanelBody:has(> .analysis-industry) .analysis-view-bar{order:1;}
-  #analysisPanelBody:has(> .analysis-industry) .analysis-filters-panel .filters-toggle{order:2;}
-  #analysisPanelBody:has(> .analysis-industry) .biz-controls > .dm{order:3;}
-  #analysisPanelBody:has(> .analysis-industry) .biz-showing{order:4;margin:0;white-space:nowrap;}
-  #analysisPanelBody:has(> .analysis-industry) .biz-actions{order:5;margin-left:auto;}
-  #analysisPanelBody:has(> .analysis-industry) .analysis-toolbar .filter-groups{order:50;}
+  .panel-body:has(> .analysis-industry){display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-top:4px;}   /* the same top and row gap as the Stocks view's toolbar, so the grid does not move when View changes */
+  .panel-body:has(> .analysis-industry) > .analysis-toolbar,.panel-body:has(> .analysis-industry) > .analysis-industry,.panel-body:has(> .analysis-industry) .biz-embedded,.panel-body:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full),.panel-body:has(> .analysis-industry) .biz-embedded > .biz-main:not(.biz-full) > .biz-toolbar,.panel-body:has(> .analysis-industry) .biz-embedded > .biz-controls{display:contents;}
+  .panel-body:has(> .analysis-industry) .analysis-view-bar{order:1;}
+  .panel-body:has(> .analysis-industry) .analysis-filters-panel .filters-toggle{order:2;}
+  .panel-body:has(> .analysis-industry) .biz-controls > .dm{order:3;}
+  .panel-body:has(> .analysis-industry) .biz-showing{order:4;margin:0;white-space:nowrap;}
+  .panel-body:has(> .analysis-industry) .biz-actions{order:5;margin-left:auto;}
+  .panel-body:has(> .analysis-industry) .analysis-toolbar .filter-groups{order:50;}
   .biz-embedded > .biz-main:not(.biz-full) > :not(.biz-toolbar){flex:1 1 100%;min-width:0;order:60;}
 }
 .biz-embedded > .biz-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px;}
@@ -202,21 +197,20 @@ body.biz-full-open{overflow:hidden;}
 
 /* The industry table inside Analysis: the "#" slot of the first column has a fixed width (not em, which differs between the heading and the cells), so the
    heading "Industry" starts exactly above the names; every cell is centred vertically so a long name that wraps does not push the number or the figures to the bottom. */
-#analysisIndustryBody .biz-table{--bn:2.6rem;}
-#analysisIndustryBody .biz-table > thead > tr > th:first-child,#analysisIndustryBody .biz-table > tbody > .biz-row > .biz-name{padding-left:calc(8px + var(--bn));text-indent:calc(-1 * var(--bn));}
-#analysisIndustryBody .biz-table > thead > tr > th:first-child::before,#analysisIndustryBody .biz-table > tbody > .biz-row > .biz-name::before{width:calc(var(--bn) - 6px);margin-right:6px;text-indent:0;vertical-align:middle;}
-#analysisIndustryBody .biz-table > tbody > .biz-row > td,#analysisIndustryBody .biz-table > tbody > .biz-row > .biz-name .biz-open{vertical-align:middle;}
+.analysis-industry .biz-table{--bn:2.6em;}
+.analysis-industry .biz-table > thead > tr > th:first-child,.analysis-industry .biz-table > tbody > .biz-row > .biz-name{padding-left:calc(8px + var(--bn));text-indent:calc(-1 * var(--bn));}
+.analysis-industry .biz-table > thead > tr > th:first-child::before,.analysis-industry .biz-table > tbody > .biz-row > .biz-name::before{width:calc(var(--bn) - 6px);margin-right:6px;text-indent:0;vertical-align:middle;}
+.analysis-industry .biz-table > tbody > .biz-row > td,.analysis-industry .biz-table > tbody > .biz-row > .biz-name .biz-open{vertical-align:middle;}
 /* v1.280: every control on the Analysis toolbar (View, Filters, Period, Matched only, ⋯, icon buttons, Refresh) shares one height, border, radius and type in all three themes, in the Stocks and Industry views alike. */
-#analysisPanelBody :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){height:36px;min-height:36px;box-sizing:border-box;border-radius:6px;}
-:root[data-theme="white"] #analysisPanelBody :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){border:1px solid #c9cfdf;background:#fff;}
-:root[data-theme="white"] #analysisPanelBody :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle):hover,
-:root[data-theme="white"] #analysisPanelBody :is(.dm-btn,.analysis-icon-btn)[aria-expanded="true"]{border-color:var(--accent);}
-:root[data-theme="white"] #analysisPanelBody .biz-field select{border:0;background:transparent;}
-:root[data-theme="white"] body #analysisPanelBody#analysisPanelBody :is(.rk-toolbtn,.rk-main,.rk-barbtn){display:inline-flex;align-items:center;justify-content:center;height:36px;min-height:36px;padding:0 14px;font-size:var(--t-md) !important;font-weight:500 !important;letter-spacing:normal;text-transform:none;color:#1b1f2a;}
-:root[data-theme="white"] #analysisPanelBody :is(.rk-toolbtn,.rk-main):hover:not(:disabled){color:var(--accent);}
-#analysisIndustryBody .biz-showing,#analysisLeaderboardCount,.analysis-toolbar .rk-headline{display:inline-flex;align-items:center;min-height:36px;}
-#analysisPanelBody{display:flow-root;}   /* the first block's top margin stays inside, so Stocks and Industry start at the same height */
-@media (min-width:901px){#analysisPanelBody:has(> .analysis-industry){display:flex;}}
+.panel-body :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){height:36px;min-height:36px;box-sizing:border-box;border-radius:6px;}
+:root[data-theme="white"] .panel-body :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){border:1px solid #c9cfdf;background:#fff;}
+:root[data-theme="white"] .panel-body :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle):hover,:root[data-theme="white"] .panel-body :is(.dm-btn,.analysis-icon-btn)[aria-expanded="true"]{border-color:var(--accent);}
+:root[data-theme="white"] .panel-body .biz-field select{border:0;background:transparent;}
+:root[data-theme="white"] body .panel-body.panel-body :is(.rk-toolbtn,.rk-main,.rk-barbtn){display:inline-flex;align-items:center;justify-content:center;height:36px;min-height:36px;padding:0 14px;font-size:var(--t-md) !important;font-weight:500 !important;letter-spacing:normal;text-transform:none;color:#1b1f2a;}
+:root[data-theme="white"] .panel-body :is(.rk-toolbtn,.rk-main):hover:not(:disabled){color:var(--accent);}
+.analysis-industry .biz-showing,.analysis-count,.analysis-toolbar .rk-headline{display:inline-flex;align-items:center;min-height:36px;}
+.panel-body{display:flow-root;}   /* the first block's top margin stays inside, so Stocks and Industry start at the same height */
+@media (min-width:901px){.panel-body:has(> .analysis-industry){display:flex;}}
 /* v1.281: Period and Show are drop-downs like View (the current choice is on the button and marked in the list). */
 .dm-btn small{margin-right:2px;}
 .dm-caret{font-size:var(--t-xs);color:var(--muted);margin-left:2px;}
