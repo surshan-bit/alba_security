@@ -124,7 +124,7 @@ body.biz-full-open{overflow:hidden;}
    The industry views reuse Explorer's table (see business/panel.js). */
 /* The filters no longer have a column of their own, so the page is always one column wide (the empty host keeps no room). */
 .analysis-layout{grid-template-columns:minmax(0,1fr);gap:0;}
-#analysisGlobalFilters:empty{display:none;}
+
 .analysis-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;margin:0 0 12px;}
 .analysis-leaderboard-head.analysis-toolbar{margin:0 0 8px;}
 .analysis-toolbar > .analysis-filters-panel{display:contents;}

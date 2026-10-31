@@ -36,7 +36,7 @@ function renderFundamentals(s){
   setFundRenderStock(s);
   const m = s.fundamentals;
   if(!m){
-    return `<div class="fund-panel" id="jump-fund"><div class="fund-panel-title">${panelIcon('fund')}Fundamental Score</div><div class="tech-empty">The fundamentals breakdown hasn't been added for this stock yet.</div></div>`;
+    return `<div class="fund-panel scope-jump-fund" id="jump-fund"><div class="fund-panel-title">${panelIcon('fund')}Fundamental Score</div><div class="tech-empty">The fundamentals breakdown hasn't been added for this stock yet.</div></div>`;
   }
   const sb = m.scoringBreakdown;
   const hasCategories = sb && m.factors.some(f => f.category && FUND_CATEGORY_META[f.category]);
@@ -67,7 +67,7 @@ function renderFundamentals(s){
   }
 
   return `
-    <div class="fund-panel" id="jump-fund">
+    <div class="fund-panel scope-jump-fund" id="jump-fund">
       <div class="fund-panel-head">
         <div class="fund-panel-title">${panelIcon('fund')}Fundamental Score &middot; ${s.score.toFixed(2)}/10</div>
         <div class="fund-panel-head-right">

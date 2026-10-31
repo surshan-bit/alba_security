@@ -43,7 +43,7 @@ function renderValuationPanel(s){
     mosTag = `<span class="badge b-${band}" title="Margin of safety = (Intrinsic Value − Current Price) ÷ Intrinsic Value">Margin of safety</span>`;
   }
   return `
-    <div class="val-panel" id="jump-val">
+    <div class="val-panel scope-jump-val" id="jump-val">
       <div class="val-panel-head">
         <div class="val-panel-title">${panelIcon('val')}Valuation${mosText}</div>
         ${mosTag}

@@ -110,5 +110,16 @@ for(const f of require('fs').readdirSync('styles').filter(x => x.endsWith('.css'
     else if(now[k] < saved[k]) warn('styles: ' + k + ' is down to ' + now[k] + ' (was ' + saved[k] + '): run node tools/lint.js --ratchet to lock it in');
   }
 }
+// 7. the layer order of the built stylesheet: the bundler drops an @layer order line, so the order is the order the layers first appear in styles/main.css.
+{
+  const want = ['phone-first', 'legacy', 'scoped', 'detail', 'phone', 'type'];
+  let built = '';
+  try { built = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); } catch(e){ /* not built yet */ }
+  if(built){
+    const seen = [];
+    for(const m of built.matchAll(/@layer ([a-z-]+)\s*\{/g)) if(!seen.includes(m[1])) seen.push(m[1]);
+    if(seen.join(',') !== want.join(',')) err('styles.css: the layers come in the order ' + seen.join(', ') + ' but must be ' + want.join(', ') + ' (change the order of the imports in styles/main.css)');
+  }
+}
 console.log('lint: ' + mods.size + ' modules, ' + errors + ' errors, ' + warnings + ' warnings');
 process.exit(errors || (process.argv.includes('--strict') && warnings) ? 1 : 0);

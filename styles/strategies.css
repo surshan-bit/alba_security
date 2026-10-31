@@ -162,7 +162,7 @@
 .lm-tab.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}
 .lm-pane .pr-name{font-weight:700;font-size:var(--t-md);}
 .lm-pane .pr-why{margin:2px 0 6px;}
-.lm-pane .pr-ask,.lm-pane #stratLearnRun{margin-top:8px;}
+.lm-pane .pr-ask{margin-top:8px;}
 .strat-pub{border-color:var(--muted);color:var(--muted);}
 .strat-pub.on{background:color-mix(in srgb,var(--buy) 18%,transparent);border-color:var(--buy);color:var(--buy);font-weight:700;}
 /* Goal and Rules fold away; both start closed */
@@ -246,6 +246,5 @@
 .strat-side .dm-strat .dm-btn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .strat-side .dm-strat .strat-pick-n{border:1px solid var(--line);border-radius:999px;padding:0 7px;font-size:var(--t-sm);font-variant-numeric:tabular-nums;}
 .strat-side .dm-pop{min-width:360px;max-height:60vh;overflow:auto;}
-.strat-side #stratNew,.strat-side #stratRestore{color:var(--accent);}
-.strat-side #stratRestore{color:var(--muted);}
+
 :root[data-theme="white"] .strat-side.strat-side .dm-btn{height:36px;border:1px solid #c9cfdf;background:#fff;border-radius:6px;}

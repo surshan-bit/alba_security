@@ -14,7 +14,7 @@ function renderGlobalFactorsPanel(s){
   const item = (f) => `<li class="global-item">${safeText(f.text)}${f.source ? `<span class="global-item-source">Source: ${srcHtml(f)}</span>` : ''}</li>`;
   if(!hasContent){
     return `
-      <div class="global-panel" id="jump-global">
+      <div class="global-panel scope-jump-global" id="jump-global">
         <div class="global-panel-head">
           <div class="global-panel-title">${panelIcon('global')}Global &amp; Macro Information</div>
         </div>
@@ -23,7 +23,7 @@ function renderGlobalFactorsPanel(s){
     `;
   }
   return `
-    <div class="global-panel" id="jump-global">
+    <div class="global-panel scope-jump-global" id="jump-global">
       <div class="global-panel-head">
         <div class="global-panel-title">${panelIcon('global')}Global &amp; Macro Information</div>
       </div>

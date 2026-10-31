@@ -31,7 +31,7 @@ function renderEventsPanel(s){
   const past = (Array.isArray(s.__events) ? s.__events : []).filter(e => e && TYPE_OF_SAVED[e.k] && e.d >= from && e.d <= today).slice(0, RECENT_MAX);
   const upHtml = up.length ? grouped(up.map(x => ({ d: String(x.date).slice(0, 10), type: x.type, text: x.text, src: x.src, url: x.url }))) : '<p class="peers-empty">Nothing coming up is saved for this stock. Use Refresh events on the News page.</p>';
   const pastHtml = past.length ? grouped(past.map(e => ({ d: e.d, type: TYPE_OF_SAVED[e.k], text: e.t, src: e.src, url: e.url, s: e.s }))) : '<p class="peers-empty">No results, company events or news saved in the last 90 days. Refresh Fundamental Info saves them.</p>';
-  return `<div class="tech-panel" id="eventsPanel"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('events')}Events</div>${up.length ? `<span class="completeness-badge complete">${up.length} coming up</span>` : ''}</div>
+  return `<div class="tech-panel scope-events-panel" id="eventsPanel"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('events')}Events</div>${up.length ? `<span class="completeness-badge complete">${up.length} coming up</span>` : ''}</div>
     <div class="ev-sub">Coming up</div>${upHtml}<div class="ev-sub">Last ${RECENT_DAYS} days</div>${pastHtml}</div>`;
 }
 

@@ -47,16 +47,16 @@
 :root[data-theme="white"] body .hm-name{font-weight:var(--w-strong);}
 
 /* Trade Log cards: smaller type inside the card so the labels and values fit on fewer lines. */
-:root[data-theme="white"] body #section-trackrecord .tl-card :is(div,dd,li,p,span):not(.tl-card-name):not(.tl-card-retval):not(.tl-card-retval *){font-size:var(--t-sm);}
-:root[data-theme="white"] body #section-trackrecord .tl-card :is(.tl-card-grid dt,.tl-signal-label,.tl-card-retlbl){font-size:var(--t-xs);}
-:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-name{font-size:var(--t-md);font-weight:var(--w-strong);}
-:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-retval{font-size:var(--t-lg);font-weight:var(--w-strong);}
-:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-grid dt{font-weight:var(--w-strong);text-transform:uppercase;}
-:root[data-theme="white"] #section-trackrecord .tl-card{padding:16px 18px;}
-:root[data-theme="white"] body #section-trackrecord .tl-card .tl-card-retval *{font-size:inherit;font-weight:inherit;}
+:root[data-theme="white"] body .scope-section-trackrecord .tl-card :is(div,dd,li,p,span):not(.tl-card-name):not(.tl-card-retval):not(.tl-card-retval *){font-size:var(--t-sm);}
+:root[data-theme="white"] body .scope-section-trackrecord .tl-card :is(.tl-card-grid dt,.tl-signal-label,.tl-card-retlbl){font-size:var(--t-xs);}
+:root[data-theme="white"] body .scope-section-trackrecord .tl-card .tl-card-name{font-size:var(--t-md);font-weight:var(--w-strong);}
+:root[data-theme="white"] body .scope-section-trackrecord .tl-card .tl-card-retval{font-size:var(--t-lg);font-weight:var(--w-strong);}
+:root[data-theme="white"] body .scope-section-trackrecord .tl-card .tl-card-grid dt{font-weight:var(--w-strong);text-transform:uppercase;}
+:root[data-theme="white"] .scope-section-trackrecord .tl-card{padding:16px 18px;}
+:root[data-theme="white"] body .scope-section-trackrecord .tl-card .tl-card-retval *{font-size:inherit;font-weight:inherit;}
 
 /* Trade Log panel titles (Positions, Buy / Sell ideas) are written like the other panel titles (Fundamental Score): same size and weight, not uppercase, no letter spacing. */
-:root[data-theme="white"] body #section-trackrecord .analysis-panel-head .analysis-panel-title{text-transform:none;letter-spacing:0;}
+:root[data-theme="white"] body .scope-section-trackrecord .analysis-panel-head .analysis-panel-title{text-transform:none;letter-spacing:0;}
 
 /* Words that stay bold or medium inside a block that is regular: the News briefing headlines, the tab labels, the stock size tag. */
 :root[data-theme="white"] body .tab{font-weight:var(--w-strong);}

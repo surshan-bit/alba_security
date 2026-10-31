@@ -157,11 +157,7 @@
 .detail-jump .jump-preview.fs-hold{color:var(--hold);}
 .detail-jump .jump-preview.fs-avoid{color:var(--avoid);}
 .detail-jump .jump-preview.fs-pending{color:var(--muted);}
-#jump-val{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
-#jump-fund{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
-#jump-global{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
-#jump-tech{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
-#peersPanel{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
+
 .filter-label{min-width:0;overflow:hidden;text-overflow:ellipsis;}
 /* Flat, list-style stock page (all widths). The boxes inside boxes (panel > factor card > metric chips) are replaced by
    hairline dividers and larger section headings, so the information gets the width. On wide screens the stock page keeps its one
@@ -204,7 +200,7 @@
    (buttons, inputs, chips, toggles) keep their outline. ---- */
 html{scrollbar-color:var(--line) transparent;}
 *{scrollbar-width:thin;}
-#section-analysis table th,#section-analysis table td,#section-strategies table th,#section-strategies table td,#section-help table th,#section-help table td,#section-knowledgebase table th,#section-knowledgebase table td,#section-trackrecord table th,#section-trackrecord table td{border-color:transparent;}
+
 /* the quick links sit on their own line under the title, clear of the Back button */
 
 /* Critical news & world events: items sit in columns (as many as fit), the Helps / Hurts / Mixed tag is coloured, the explanation is smaller, and the source goes on the same line as it. */

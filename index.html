@@ -5,19 +5,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Alba Securities - Stock Analyzer</title>
-<link rel="stylesheet" href="styles.css?v=c7d7ae52">
+<link rel="stylesheet" href="styles.css?v=ff0a10ba">
 <!--build:preload-->
-<link rel="modulepreload" href="app.js?v=c7d7ae52">
+<link rel="modulepreload" href="app.js?v=ff0a10ba">
 <link rel="modulepreload" href="chunks/chunk-ADXICG4Q.js">
 <link rel="modulepreload" href="chunks/chunk-LWDZFE6T.js">
 <link rel="modulepreload" href="chunks/chunk-LDVI5725.js">
-<link rel="modulepreload" href="chunks/main-O3JJPBIX.js">
-<link rel="modulepreload" href="chunks/chunk-VN647JIC.js">
-<link rel="modulepreload" href="chunks/chunk-COLSSW7Y.js">
-<link rel="modulepreload" href="chunks/chunk-WHSRTPLM.js">
-<link rel="modulepreload" href="chunks/chunk-SXVYYJZ5.js">
-<link rel="modulepreload" href="chunks/chunk-HMDDG4KS.js">
-<link rel="modulepreload" href="chunks/chunk-C5XZTTA7.js">
+<link rel="modulepreload" href="chunks/main-6RLLJTSL.js">
+<link rel="modulepreload" href="chunks/chunk-JELPL5A6.js">
+<link rel="modulepreload" href="chunks/chunk-FDEYZLC5.js">
+<link rel="modulepreload" href="chunks/chunk-A5DDCSHY.js">
+<link rel="modulepreload" href="chunks/chunk-YB6J52NZ.js">
+<link rel="modulepreload" href="chunks/chunk-TVX63N7D.js">
+<link rel="modulepreload" href="chunks/chunk-44MI2KRN.js">
 <!--/build:preload-->
 </head>
 <body>
@@ -62,7 +62,7 @@
       </g>
       <circle cx="100" cy="100" r="50" fill="url(#brandSunGrad)"/>
     </svg>
-    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.344 &mdash; tagged 2026-10-31">v1.344</span></div>
+    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.345 &mdash; tagged 2026-10-31">v1.345</span></div>
   </div>
   <div class="sidebar-nav">
     <div class="nav-section-label">Menu</div>
@@ -134,16 +134,16 @@
   <!-- Resting place of the shared stock detail panel; it is moved into the page that opens a stock. -->
   <div id="detailHome" hidden><div class="detail" id="detail"></div></div>
 
-  <section class="app-section" id="section-help" data-partial="partials/help.html"></section>
+  <section class="app-section scope-section-help" id="section-help" data-partial="partials/help.html"></section>
 
-  <section class="app-section card card-narrow" id="section-refreshlog" data-partial="partials/refreshlog.html"></section>
+  <section class="app-section card card-narrow scope-section-refreshlog" id="section-refreshlog" data-partial="partials/refreshlog.html"></section>
 
-  <section class="app-section" id="section-analysis">
+  <section class="app-section scope-section-analysis" id="section-analysis">
     <header>
       <h1>Analysis</h1>
     </header>
     <div class="analysis-layout card">
-      <div id="analysisGlobalFilters"></div>
+      <div class="scope-analysis-global-filters" id="analysisGlobalFilters"></div>
       <div class="analysis-main">
         <div class="analysis-panel">
           <div id="analysisPanelBody" class="panel-body"></div>
@@ -152,7 +152,7 @@
     </div>
   </section>
 
-  <section class="app-section" id="section-strategies">
+  <section class="app-section scope-section-strategies" id="section-strategies">
     <header>
       <h1>Strategies</h1>
     </header>
@@ -162,7 +162,7 @@
     </div>
   </section>
 
-  <section class="app-section" id="section-business">
+  <section class="app-section scope-section-business" id="section-business">
     <header>
       <h1>Explorer</h1>
     </header>
@@ -176,11 +176,11 @@
       <h1>News</h1>
     </header>
     <div class="analysis-panel card">
-      <div id="newsBody" aria-live="polite"><p class="upload-hint">Loading…</p></div>
+      <div class="scope-news-body" id="newsBody" aria-live="polite"><p class="upload-hint">Loading…</p></div>
     </div>
   </section>
 
-  <section class="app-section" id="section-trackrecord" data-tl-tab="positions">
+  <section class="app-section scope-section-trackrecord" id="section-trackrecord" data-tl-tab="positions">
     <header>
       <h1>Trade Log</h1>
       <div class="sub">A running, real-money record of every position bought or sold.</div>
@@ -189,23 +189,23 @@
     <div class="analysis-panel card">
       <div class="analysis-panel-head">
         <div class="analysis-panel-title">Positions</div>
-        <div class="tl-head-actions"><div class="tl-view-toggle" role="group" aria-label="Trade view"><button type="button" class="tl-view-btn" data-tl-view="cards">Cards</button><button type="button" class="tl-view-btn" data-tl-view="table">Table</button></div><button type="button" class="refresh-btn tl-btn-primary" id="tradeAddBtn">+ Add trade</button></div>
+        <div class="tl-head-actions"><div class="tl-view-toggle" role="group" aria-label="Trade view"><button type="button" class="tl-view-btn" data-tl-view="cards">Cards</button><button type="button" class="tl-view-btn" data-tl-view="table">Table</button></div><button type="button" class="refresh-btn tl-btn-primary scope-trade-add-btn" id="tradeAddBtn">+ Add trade</button></div>
       </div>
-      <div id="tradeFormHost"></div>
-      <div id="tradeLogPanelBody" aria-live="polite"><p class="upload-hint">Loading…</p></div>
+      <div class="scope-trade-form-host" id="tradeFormHost"></div>
+      <div class="scope-trade-log-panel-body" id="tradeLogPanelBody" aria-live="polite"><p class="upload-hint">Loading…</p></div>
     </div>
     <div class="analysis-panel card tl-ideas">
       <div class="analysis-panel-head">
         <div class="analysis-panel-title">Buy / Sell ideas</div>
-        <div class="tl-head-actions"><select id="tradeIdeasStrategy" class="tl-ideas-select" aria-label="Strategy"></select><button type="button" class="refresh-btn tl-btn-primary" id="tradeIdeasRun" disabled>Process</button></div>
+        <div class="tl-head-actions"><select id="tradeIdeasStrategy" class="tl-ideas-select" aria-label="Strategy"></select><button type="button" class="refresh-btn tl-btn-primary scope-trade-ideas-run" id="tradeIdeasRun" disabled>Process</button></div>
       </div>
-      <div id="tradeIdeasBody" aria-live="polite"></div>
+      <div class="scope-trade-ideas-body" id="tradeIdeasBody" aria-live="polite"></div>
     </div>
   </section>
 
-  <section class="app-section" id="section-knowledgebase" data-partial="partials/knowledgebase.html"></section>
+  <section class="app-section scope-section-knowledgebase" id="section-knowledgebase" data-partial="partials/knowledgebase.html"></section>
 
-  <section class="app-section card card-narrow" id="section-settings">
+  <section class="app-section card card-narrow scope-section-settings" id="section-settings">
     <header>
       <h1>Settings</h1>
       <div class="sub">Your preferences. When you are signed in they are saved to your own account and follow you to any device; without a sign-in they are kept in this browser only.</div>
@@ -215,7 +215,7 @@
       <h2 data-icon="spark">Claude controls</h2>
       <div class="sub">Choose which steps may send data to Claude. All are on by default. Switching one off skips only that step; the CSV import never uses Claude. Saved the same way as your other preferences.</div>
     </header>
-    <div class="settings-panel" id="claudeControls"></div>
+    <div class="settings-panel scope-claude-controls" id="claudeControls"></div>
   </section>
 
 </div>
@@ -224,7 +224,7 @@
   <div class="boot-msg" style="max-width:480px;line-height:1.5;"></div>
   <button type="button" class="boot-retry" hidden style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;" onclick="location.reload()">Retry</button>
 </div>
-<script src="js/loader.js" data-entry="app.js?v=c7d7ae52"></script>
+<script src="js/loader.js" data-entry="app.js?v=ff0a10ba"></script>
 </body>
 </html>
 

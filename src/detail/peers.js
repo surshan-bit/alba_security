@@ -37,7 +37,7 @@ function renderPeersPanel(s, selfIdx){
   const group = s.industryGroup;
   const groupMembers = group ? (peerGroups().get(group) || []) : [];
   if(!group || groupMembers.length === 0){
-    return `<div class="tech-panel" id="peersPanel"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('peers')}Industry Peers</div></div><div class="peers-empty">Peer group not available for this stock.</div></div>`;
+    return `<div class="tech-panel scope-peers-panel" id="peersPanel"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('peers')}Industry Peers</div></div><div class="peers-empty">Peer group not available for this stock.</div></div>`;
   }
   // Shown peers = exact match on BOTH levels: same Industry Group AND same specific industry
   // (changed 2026-10-06 — previously the whole Industry Group was listed). The score itself still
@@ -61,7 +61,7 @@ function renderPeersPanel(s, selfIdx){
     ? `Stocks in the same industry (${escapeHtml(industry)}) and group (${escapeHtml(group)}). It sits #${rank} of ${members.length} here. Tap a row to open that stock.`
     : `No other stock shares the industry ${escapeHtml(industry)} in ${escapeHtml(group)}.`;
   return `
-    <div class="tech-panel" id="peersPanel">
+    <div class="tech-panel scope-peers-panel" id="peersPanel">
       <div class="tech-panel-head">
         <div class="tech-panel-title">${panelIcon('peers')}Industry Peers &middot; ${escapeHtml(industry)}</div>
         <span class="completeness-badge complete">${members.length} stock${members.length === 1 ? '' : 's'}</span>
