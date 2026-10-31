@@ -80,6 +80,6 @@
 .analysis-filters-panel.filters-collapsed .filter-groups{display:none;}
 }
 .filters.analysis-filters-panel{border-color:transparent;background:transparent;}
-#detail .fund-grid,#detail .val-grid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));column-gap:28px;}
+
 .biz-strategy-panel{margin-top:6px;padding:0;min-width:0;max-width:100%;position:static;}
 .biz-strategy-panel .filter-group{min-width:0;}

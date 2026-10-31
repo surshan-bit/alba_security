@@ -34,16 +34,7 @@
 .global-event{border-left:3px solid var(--hold,#c9a227);padding-left:10px;}
 .global-event .ev-tag{font-size:var(--t-sm);font-weight:700;opacity:.8;margin-left:6px;}
 .analysis-toggles{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;}
-#detail .live-refresh{margin:0;border:0;}
-#detail .live-refresh + .val-panel{margin-top:0;}
-#detail .global-event{padding:2px 0 2px 10px;font-size:var(--t-sm);line-height:1.4;}
-#detail .global-event strong{font-size:var(--t-md);}
-#detail .global-event > div{font-size:var(--t-sm);color:var(--muted);display:block;margin-top:3px;}
-#detail .global-event .global-item-source{white-space:nowrap;}
+
 /* News items: the Helps / Hurts / Mixed tag comes first, then the headline, then the explanation on its own lines with the source after it. */
-#detail .global-event .ev-tag{display:inline-block;padding:0 7px;border-radius:999px;font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.03em;opacity:1;background:rgba(201,162,39,.18);color:var(--hold);margin:0 8px 0 0;vertical-align:1px;}
-#detail .val-panel,#detail .fund-panel,#detail .tech-panel,#detail .global-panel{padding-top:18px;margin-top:20px;}
-#detail .global-item .global-item-source{display:inline;margin:0 0 0 6px;white-space:nowrap;}
-#detail .global-events{margin-top:16px;padding-top:14px;}
-#detail .global-event .global-item-source{display:block;margin:3px 0 0;}
+
 #section-refreshlog :is(.refreshlog-freshness-summary,.refreshlog-freshness-row,.refreshlog-run-stats,.upload-hint,.fi-step,.fi-result,.fi-prompt-msg,.fi-pct,.live-status,.help-tab-link){font-size:var(--t-md);}

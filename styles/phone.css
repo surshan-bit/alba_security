@@ -191,16 +191,6 @@ html{font-size:112.5%;}
 /* v1.324 Phones: the stock grids use the screen better, and all of them follow one pattern. Every grid row is 37px tall with the same slim padding and no stock code (the name is enough);
    Analysis: the View menu and the Filters chip share one row, with the count inside the chip (the Industry view follows the same pattern); Strategies: the picker, Setup, Track and refresh
    and Select share one row, the setup card is a one-line summary and the tick boxes wait for Select. */
-@media (max-width:600px){
-/* the Industry view: the View menu and the filter chip share a row (count inside the chip), then Period, Show and the buttons; the same pattern as the Stocks view */
-
-/* Strategies */
-}
 
 /* ---- Trade Log on a phone (v1.329): Positions and Ideas as two tabs, one short row per trade, the add form as a bottom sheet. :root:root:root beats the White theme's type scale. ---- */
-@media (max-width:600px){
-/* Which panel shows */
-/* Positions: the cards, the table and the Cards / Table switch give way to the short rows */
-/* The add / sell form is a bottom sheet over a dimmed page; the Add trade button is pinned to the bottom of the Positions tab */
-/* Ideas: a picker row, ranked rows, the Downward list folded, the method text behind a link */
-}
+

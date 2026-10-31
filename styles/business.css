@@ -46,7 +46,7 @@
 .biz-table > thead > tr > th:first-child{padding-left:calc(8px + 2.6em);text-indent:-2.6em;}
 }
 #section-help a,#section-knowledgebase a{color:var(--accent);}
-#detail .fund-cell-research .fund-research-list li{margin-bottom:6px;line-height:1.4;}
+
 /* Chip text is centred vertically: the small label and the bold value share the middle line. */
 /* Peers use the Analysis / Strategies columns and grid look; the open stock is marked in its row. */
 .strat-row.peers-self > td{background:var(--panel2);}

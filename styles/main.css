@@ -25,6 +25,7 @@
 @import "./refresh-kit.css" layer(legacy);
 @import "./late-global.css" layer(legacy);
 @import "./filters-ondemand.css" layer(legacy);
+@import "./detail.css" layer(detail);
 @import "./phone-boost.css" layer(phone);
 @import "./white-type.css" layer(type);
 /* Four layers, in the order they first appear in this file (the bundler drops an @layer order line), a later one wins whatever the selector says, except for !important, where an earlier one wins:

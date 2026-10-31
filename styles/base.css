@@ -16,4 +16,3 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:"Iowan Old Styl
 /* Dark theme: more prominent text (v1.118). Brighter body and secondary text (tokens in 01), placeholders at full strength (browsers dim
    them with opacity), and a clearer outline on the search and form fields. The Light theme sets its own placeholder colour and borders. */
 
-
