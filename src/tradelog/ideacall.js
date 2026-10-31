@@ -60,10 +60,15 @@ const BUY_TOP = 10, AVOID_BOTTOM = 10, RESULTS_DAYS = 7, THIN_LAKH = 50, NEWS_MI
 
 // Risk checks for a stock you do not hold: { blocks: reasons a Buy is held back, notes: other news worth saying, cap, resultsIn }. `today` is YYYY-MM-DD in India.
 // A figure the stock has not been refreshed for yet (results date, volume, market cap, news) never blocks.
-function risksOf(stock, today, f, mos){
+function risksOf(stock, today, f, mos, early){
   const blocks = [], notes = [];
   if(f && f.verdict === 'avoid') blocks.push('its Fundamental verdict is Avoid');
-  if(mos != null && mos <= 0) blocks.push('it trades at or above fair value (margin of safety ' + fixedOrNull(mos) + '%)');
+  // v1.343: for the Early list a price above fair value is a note, not a block. The check removed nearly every rising stock (Screener rates momentum names above fair value), leaving
+  // only cheap stocks that were falling; the Early list is a watch list for rising stocks, so it shows how far above fair value the price is and leaves the call to you.
+  if(mos != null && mos <= 0){
+    if(early) notes.push('Priced ' + fixedOrNull(-mos, 0) + '% above its fair value (margin of safety below zero), so it is not cheap');
+    else blocks.push('it trades at or above fair value (margin of safety ' + fixedOrNull(mos) + '%)');
+  }
   const lq = (stock && stock.liquidity) || {};
   const resultsIn = today ? daysUntil(lq.nextResults, today) : null;
   if(resultsIn != null && resultsIn <= RESULTS_DAYS) blocks.push('results due ' + (resultsIn === 0 ? 'today' : 'in ' + resultsIn + ' day' + (resultsIn === 1 ? '' : 's')) + ' (' + lq.nextResults + ')');
@@ -97,8 +102,8 @@ function valueLine(mos){ return mos != null && mos > 0 ? 'Priced ' + fixedOrNull
 function ideaCall(stock, trade, read, today){
   const f = factsFor(trade || {}, stock);
   const mos = marginOfSafety(f.intrinsic, f.price);
-  const r = read || null, o = risksOf(stock, today, f, mos);
-  const base = { short: !!(r && r.short), blocked: o.blocks.length > 0, weeklyOnly: weeklyOnly(stock), trend: r ? r.trend || null : null, base: r ? r.base : null, mos, cap: o.cap, resultsIn: o.resultsIn, p: r ? r.p : null, pct: r ? r.pct : null, topPct: r ? r.topPct : null, up: r ? r.up : null, beat: r ? r.beat : null };
+  const r = read || null, o = risksOf(stock, today, f, mos, !!(r && r.trend === 'early'));
+  const base = { short: !!(r && r.short), blocked: o.blocks.length > 0, month: r ? r.facts.month : null, half: r ? r.facts.half : null, weeklyOnly: weeklyOnly(stock), trend: r ? r.trend || null : null, base: r ? r.base : null, mos, cap: o.cap, resultsIn: o.resultsIn, p: r ? r.p : null, pct: r ? r.pct : null, topPct: r ? r.topPct : null, up: r ? r.up : null, beat: r ? r.beat : null };
   if(trade){
     const sig = tradeSignal(f);
     const call = sig.call === 'add' ? 'buy' : sig.call === 'hold' ? 'hold' : 'sell';
@@ -140,7 +145,11 @@ function rankIdeas(items){
 function topBuys(ranked, trend, n = 5){ return ranked.filter(x => x.c.call === 'buy' && !x.c.held && x.c.trend === trend).slice(0, n); }
 
 // The Early trend list (v1.342): the best-ranked Early stocks that no risk check holds back, whatever their rank. The tests never covered this group, so the top-10% cutoff
-// has no meaning for it and a small group gave a single stock; each card states its rank instead. Avoid calls (the bottom tenth) are left out. `ranked` is already in score order.
-function topEarly(ranked, n = 5){ return ranked.filter(x => x.c.trend === 'early' && !x.c.held && !x.c.blocked && x.c.call !== 'sell' && typeof x.c.p === 'number').slice(0, n); }
+// has no meaning for it and a small group gave a single stock; each card states its rank instead. Avoid calls (the bottom tenth) are left out, and so is a stock whose price fell
+// over the last 4 or 26 weeks (v1.343): a weekly MACD above its signal line also happens in a bounce inside a long decline (one pick was down 59% in 26 weeks), and the list is meant
+// to find early uptrends, not rebounds. `ranked` is already in score order.
+function topEarly(ranked, n = 5){
+  return ranked.filter(x => x.c.trend === 'early' && !x.c.held && !x.c.blocked && x.c.call !== 'sell' && typeof x.c.p === 'number' && x.c.month > 0 && x.c.half > 0).slice(0, n);
+}
 
 export { BUY_TOP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys, topEarly, trendOf };
