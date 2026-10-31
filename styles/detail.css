@@ -1,4 +1,4 @@
-/* The stock page (#detail, class "detail"): every rule scoped to it. It sits in its own layer above the screen files (see main.css), which is what the id used to do: these rules win over any rule that is not scoped to the stock page. */
+/* The stock page (the element with class "detail"): every rule scoped to it. It sits in its own layer above the screen files (see main.css), which is what the id used to do: these rules win over any rule that is not scoped to the stock page. */
 .detail .detail-top .detail-meta{flex:0 0 100%;margin:0;}
 .detail .detail-meta-links{font-size:var(--t-sm);gap:6px 26px;padding-left:2px;}
 .detail .val-panel-title,.detail .fund-panel-title,.detail .tech-panel-title,.detail .global-panel-title{font-size:var(--t-md);}
