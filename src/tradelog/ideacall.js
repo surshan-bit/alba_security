@@ -4,7 +4,7 @@
 //   Buy    the stock is in the top BUY_TOP percent of two-week scores and none of the checks holds it back;
 //   Avoid  it is in the bottom AVOID_BOTTOM percent (stocks like that lagged the market in the tests);
 //   Wait   anything else, including a Buy held back by a check (the reason is shown in the row).
-// The checks are not part of the model: quality (a margin of safety above zero and a Fundamental verdict that is not Avoid), results due within RESULTS_DAYS days
+// The checks are not part of the model: quality (a Fundamental verdict that is not Avoid; a price above fair value is only a note since v1.343), results due within RESULTS_DAYS days
 // (an earnings gap decides the fortnight), very thin trading (average daily traded value under THIN_LAKH lakh rupees, hard to enter and leave) and clearly
 // negative recent news. Fixed rules on the dashboard's own numbers, so the
 // same data always gives the same answer. A reference for your own decision, not an order, and it cannot see the market: when every stock falls together,
@@ -56,19 +56,16 @@ function fiiNote(stock){
 // worse holds a Buy back; a smaller fall of PROFIT_NOTE percent or worse is a note. Cheap-looking stocks with shrinking profits are the usual trap here: the margin of safety
 // rests on older earnings. Like the other quality checks it could not be tested over the past years (no history of quarterly figures is kept), so it is a judgement.
 const PROFIT_BLOCK = -25, PROFIT_NOTE = -10;
-const BUY_TOP = 10, AVOID_BOTTOM = 10, RESULTS_DAYS = 7, THIN_LAKH = 50, NEWS_MIN = 2;
+const EARLY_MAX_FALL = 10, BUY_TOP = 10, AVOID_BOTTOM = 10, RESULTS_DAYS = 7, THIN_LAKH = 50, NEWS_MIN = 2;
 
 // Risk checks for a stock you do not hold: { blocks: reasons a Buy is held back, notes: other news worth saying, cap, resultsIn }. `today` is YYYY-MM-DD in India.
 // A figure the stock has not been refreshed for yet (results date, volume, market cap, news) never blocks.
-function risksOf(stock, today, f, mos, early){
+function risksOf(stock, today, f, mos){
   const blocks = [], notes = [];
   if(f && f.verdict === 'avoid') blocks.push('its Fundamental verdict is Avoid');
-  // v1.343: for the Early list a price above fair value is a note, not a block. The check removed nearly every rising stock (Screener rates momentum names above fair value), leaving
-  // only cheap stocks that were falling; the Early list is a watch list for rising stocks, so it shows how far above fair value the price is and leaves the call to you.
-  if(mos != null && mos <= 0){
-    if(early) notes.push('Priced ' + fixedOrNull(-mos, 0) + '% above its fair value (margin of safety below zero), so it is not cheap');
-    else blocks.push('it trades at or above fair value (margin of safety ' + fixedOrNull(mos) + '%)');
-  }
+  // v1.343: a price above fair value never holds a Buy back, in either list. Value is the strategy's job (the Positive MoS strategy already needs a green or orange rating), and as a
+  // block here it removed nearly every rising stock. The card says how far above fair value the price is and leaves the call to you.
+  if(mos != null && mos <= 0) notes.push('Priced ' + fixedOrNull(-mos, 0) + '% above its fair value (margin of safety below zero), so it is not cheap');
   const lq = (stock && stock.liquidity) || {};
   const resultsIn = today ? daysUntil(lq.nextResults, today) : null;
   if(resultsIn != null && resultsIn <= RESULTS_DAYS) blocks.push('results due ' + (resultsIn === 0 ? 'today' : 'in ' + resultsIn + ' day' + (resultsIn === 1 ? '' : 's')) + ' (' + lq.nextResults + ')');
@@ -102,7 +99,7 @@ function valueLine(mos){ return mos != null && mos > 0 ? 'Priced ' + fixedOrNull
 function ideaCall(stock, trade, read, today){
   const f = factsFor(trade || {}, stock);
   const mos = marginOfSafety(f.intrinsic, f.price);
-  const r = read || null, o = risksOf(stock, today, f, mos, !!(r && r.trend === 'early'));
+  const r = read || null, o = risksOf(stock, today, f, mos);
   const base = { short: !!(r && r.short), blocked: o.blocks.length > 0, month: r ? r.facts.month : null, half: r ? r.facts.half : null, weeklyOnly: weeklyOnly(stock), trend: r ? r.trend || null : null, base: r ? r.base : null, mos, cap: o.cap, resultsIn: o.resultsIn, p: r ? r.p : null, pct: r ? r.pct : null, topPct: r ? r.topPct : null, up: r ? r.up : null, beat: r ? r.beat : null };
   if(trade){
     const sig = tradeSignal(f);
@@ -146,10 +143,11 @@ function topBuys(ranked, trend, n = 5){ return ranked.filter(x => x.c.call === '
 
 // The Early trend list (v1.342): the best-ranked Early stocks that no risk check holds back, whatever their rank. The tests never covered this group, so the top-10% cutoff
 // has no meaning for it and a small group gave a single stock; each card states its rank instead. Avoid calls (the bottom tenth) are left out, and so is a stock whose price fell
-// over the last 4 or 26 weeks (v1.343): a weekly MACD above its signal line also happens in a bounce inside a long decline (one pick was down 59% in 26 weeks), and the list is meant
-// to find early uptrends, not rebounds. `ranked` is already in score order.
+// over the last 4 weeks, or by more than EARLY_MAX_FALL percent over the last 26 (v1.343): a weekly MACD above its signal line also happens in a bounce inside a long decline (one
+// pick was down 59% in 26 weeks), and the list is meant to find early uptrends, not rebounds. A flat or slightly lower 26 weeks is fine, because a stock that has just turned up
+// often still sits a little below where it was half a year ago. `ranked` is already in score order.
 function topEarly(ranked, n = 5){
-  return ranked.filter(x => x.c.trend === 'early' && !x.c.held && !x.c.blocked && x.c.call !== 'sell' && typeof x.c.p === 'number' && x.c.month > 0 && x.c.half > 0).slice(0, n);
+  return ranked.filter(x => x.c.trend === 'early' && !x.c.held && !x.c.blocked && x.c.call !== 'sell' && typeof x.c.p === 'number' && x.c.month > 0 && x.c.half > -EARLY_MAX_FALL).slice(0, n);
 }
 
 export { BUY_TOP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys, topEarly, trendOf };
