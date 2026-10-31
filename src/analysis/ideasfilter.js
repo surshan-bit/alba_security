@@ -1,4 +1,4 @@
-// The Analysis "Buy / Sell ideas" filter (v1.295): narrows the table to the stocks in the Upward trend or Downward trend list that Process
+// The Analysis "Buy / Sell ideas" filter (v1.295): narrows the table to the stocks in the Upward trend or Early trend list that Process
 // made in the Trade Log, so the header Refresh button works on just that shortlist. It reads the saved Process result (identity/ideasresults.js)
 // of the strategy chosen in Analysis, or the newest result when no strategy is chosen. No result saved yet means no stock to show.
 import { stockByTickerSymbol } from '../core/stocks.js';
@@ -6,7 +6,7 @@ import { tickerSymbol } from '../core/util.js';
 import { ideasResultsGet } from '../identity/ideasresults.js';
 import { publishedStrategies } from '../strategies/state.js';
 
-const IDEAS_KINDS = new Set(['up', 'down']);
+const IDEAS_KINDS = new Set(['up', 'early']);
 const cleanIdeas = (v) => (Array.isArray(v) ? v : [v]).filter(k => IDEAS_KINDS.has(k));
 
 // -> { sid, name, snap }: the saved result that applies, or snap null when there is none.
@@ -31,13 +31,13 @@ function kindSet(kind, strategyId, source){
   setMemo.set(key, { snap: source.snap, set });
   return set;
 }
-// `kinds` is the chosen lists ('up', 'down', or both: the stocks of either list); none chosen means All.
+// `kinds` is the chosen lists ('up', 'early', or both: the stocks of either list); none chosen means All.
 function ideasStockSet(kinds, strategyId){
   const source = ideasSource(strategyId), chosen = cleanIdeas(kinds);
   if(!chosen.length) return { set: null, source };
   if(chosen.length === 1) return { set: kindSet(chosen[0], strategyId, source), source };
   const both = ideasBoth.get(strategyId || '');
-  const a = kindSet('up', strategyId, source), b = kindSet('down', strategyId, source);
+  const a = kindSet('up', strategyId, source), b = kindSet('early', strategyId, source);
   if(both && both.a === a && both.b === b) return { set: both.set, source };
   const set = new Set([...a, ...b]);
   ideasBoth.set(strategyId || '', { a, b, set });

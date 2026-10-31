@@ -187,7 +187,7 @@ async function tradeScenarios(){
     ok(await page.evaluate(() => !(window.__colGets || []).includes('priceHistory')), 'the whole price-history collection is not read for the ideas');
     ok(await page.evaluate(n => (window.__filteredGets || []).filter(x => /^priceHistory /.test(x)).length >= Math.min(n, 1), n), 'each listed stock\'s bars are read with a filtered read');
     if(n > 0){
-      // v1.290: two Top 5 lists (Upward, Downward); each holds at most five stocks
+      // v1.290: two Top 5 lists (Upward, Early since v1.335); each holds at most five stocks
       const top = await page.evaluate(() => ({ blocks: document.querySelectorAll('#tradeIdeasBody .tl-top5').length, over: Array.from(document.querySelectorAll('#tradeIdeasBody .tl-top5')).some(b => b.querySelectorAll('li').length > 5), first: document.querySelector('#tradeIdeasBody .tl-top5 a[data-idea-open]') ? true : false }));
       ok(await page.evaluate(() => { const n = document.querySelectorAll('#tradeIdeasBody .tl-top5 > ol > li').length; return n === document.querySelectorAll('#tradeIdeasBody .tl-top5 .tl-news').length; }), 'v1.294: every listed stock shows its news line');
       ok(top.blocks === 2 && !top.over, 'the two Top 5 lists hold at most five stocks each, got ' + JSON.stringify(top));
@@ -248,17 +248,17 @@ async function tradeScenarios(){
   }, /Trade log persistence unavailable/);
 }
 
-// v1.295: the Analysis "Buy / Sell ideas" filter shows only the stocks of the saved Upward / Downward trend list
+// v1.295: the Analysis "Buy / Sell ideas" filter shows only the stocks of the saved Upward / Early trend list (Early replaced Downward in v1.335)
 async function ideasFilterScenarios(){
   const U = FIXTURE[4], Dn = FIXTURE[3];
-  const snap = { v: 1, at: '2026-10-29T04:34:00.000Z', today: '2026-10-29', n: 2, up: 1, down: 1, mixed: 0, short: 0, lists: { up: [{ sym: symOf(U), name: U.name, cap: '', price: 100, reasons: ['x'] }], down: [{ sym: symOf(Dn), name: Dn.name, cap: '', price: 100, reasons: ['x'] }] } };
+  const snap = { v: 1, at: '2026-10-29T04:34:00.000Z', today: '2026-10-29', n: 2, up: 1, early: 1, down: 0, mixed: 0, short: 0, lists: { up: [{ sym: symOf(U), name: U.name, cap: '', price: 100, reasons: ['x'] }], early: [{ sym: symOf(Dn), name: Dn.name, cap: '', price: 100, reasons: ['x'] }] } };
   const docs = { 'data/users/u_SMOKE/ideasResults': { v: 1, json: JSON.stringify({ 'starter-deep-value': snap }), updatedAt: '2026-10-29T04:34:00.000Z' } };
   const rows = page => page.evaluate(() => Array.from(document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row')).map(r => r.textContent));
   const pick = (page, sel) => page.evaluate(sel => { const b = document.querySelector(sel); if(b) b.click(); return !!b; }, sel);
   await scenario('analysis: Buy / Sell ideas filter', {}, docs, async page => {
     await goto(page, 'analysis');
     await until(page, () => !!document.querySelector('#analysisIdeasFilter'), null, 'the Buy / Sell ideas filter is drawn');
-    ok(await page.evaluate(() => Array.from(document.querySelectorAll('#analysisIdeasFilter .filter-btn')).map(b => b.textContent.replace(/\d+$/, '').trim()).join('|') === 'All|Upward Trend|Downward Trend'), 'it offers All, Upward Trend and Downward Trend');
+    ok(await page.evaluate(() => Array.from(document.querySelectorAll('#analysisIdeasFilter .filter-btn')).map(b => b.textContent.replace(/\d+$/, '').trim()).join('|') === 'All|Upward Trend|Early Trend'), 'it offers All, Upward Trend and Early Trend');
     // v1.306: the View button sits below the sticky top bar, so scrolling slides it under the bar with the rest of the toolbar
     ok(await page.evaluate(() => { const z = e => parseInt(getComputedStyle(e).zIndex, 10); return z(document.querySelector('.analysis-view-bar')) < z(document.querySelector('.topbar')); }), 'the View button is layered below the top bar');
     await pick(page, '#analysisMosFilters [data-amos="all"]');
@@ -268,12 +268,12 @@ async function ideasFilterScenarios(){
     await until(page, n => { const r = document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row'); return r.length === 1 && r[0].textContent.includes(n); }, U.name, 'Upward Trend shows only the stock of the saved Upward list');
     ok(await page.evaluate(() => /processed 29 Oct 2026/.test((document.getElementById('analysisIdeasNote') || {}).textContent || '')), 'the note says when the list was processed');
     // v1.306: both lists can be chosen together (the stocks of either), and each button toggles on its own
-    await pick(page, '#analysisIdeasFilter [data-aideas="down"]');
-    await until(page, ([a, b]) => { const r = Array.from(document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row')).map(x => x.textContent); return r.length === 2 && r.some(t => t.includes(a)) && r.some(t => t.includes(b)); }, [U.name, Dn.name], 'Upward and Downward Trend together show the stocks of both lists');
-    ok(await page.evaluate(() => Array.from(document.querySelectorAll('#analysisIdeasFilter .filter-btn.active')).map(b => b.dataset.aideas).join() === 'up,down'), 'both buttons show as chosen');
+    await pick(page, '#analysisIdeasFilter [data-aideas="early"]');
+    await until(page, ([a, b]) => { const r = Array.from(document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row')).map(x => x.textContent); return r.length === 2 && r.some(t => t.includes(a)) && r.some(t => t.includes(b)); }, [U.name, Dn.name], 'Upward and Early Trend together show the stocks of both lists');
+    ok(await page.evaluate(() => Array.from(document.querySelectorAll('#analysisIdeasFilter .filter-btn.active')).map(b => b.dataset.aideas).join() === 'up,early'), 'both buttons show as chosen');
     ok(await page.evaluate(() => document.getElementById('analysisLeaderboardCount').textContent.startsWith('Showing 2 of')), 'the count follows the shortlist');
     await pick(page, '#analysisIdeasFilter [data-aideas="up"]');
-    await until(page, n => { const r = document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row'); return r.length === 1 && r[0].textContent.includes(n); }, Dn.name, 'switching Upward Trend off leaves only the stock of the Downward list');
+    await until(page, n => { const r = document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row'); return r.length === 1 && r[0].textContent.includes(n); }, Dn.name, 'switching Upward Trend off leaves only the stock of the Early list');
     await pick(page, '#analysisIdeasFilter [data-aideas="all"]');
     await until(page, n => document.querySelectorAll('#analysisLeaderboardBody tr.analysis-lb-row').length === n, all, 'All brings every stock back');
   });

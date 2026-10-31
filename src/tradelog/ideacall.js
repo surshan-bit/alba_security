@@ -17,7 +17,9 @@ import { factsFor, tradeSignal } from './signals.js';
 import { SHORT_HISTORY } from './nextweek.js';
 
 // The stock's trend from its weekly and monthly MACD against their signal lines (the dashboard's own technical figures): 'up' when both are above, 'down' when
-// both are below, 'mixed' when they disagree. The same definition the two-week tests were split by. A recent listing has no monthly MACD yet (it needs about three
+// both are below, 'early' when the weekly is above but the monthly is not (the weekly has turned up first, the slower monthly has not followed yet), 'mixed' for the
+// rest (weekly below, monthly above). Only 'up' and 'early' have a list (v1.335 dropped the Downward bounce-back list). The five-year tests were split into up and
+// down only, so 'early' has no tested hit rate of its own. A recent listing has no monthly MACD yet (it needs about three
 // years of prices), so from v1.292 the weekly MACD alone decides (weeklyOnly() says so): above its signal line is 'up', below is 'down'. null when the weekly figures are missing.
 const isNum = (x) => typeof x === 'number' && isFinite(x);
 const macdOf = (stock) => (stock && stock.technical && stock.technical.raw) || {};
@@ -30,7 +32,9 @@ function trendOf(stock){
   if(!isNum(r.weekMacdLevel) || !isNum(r.weekMacdSignal)) return null;
   if(weeklyOnly(stock)) return r.weekMacdLevel > r.weekMacdSignal ? 'up' : r.weekMacdLevel < r.weekMacdSignal ? 'down' : 'mixed';
   const w = r.weekMacdLevel > r.weekMacdSignal, m = r.monthMacdLevel > r.monthMacdSignal;
-  return w && m ? 'up' : !w && !m && r.weekMacdLevel < r.weekMacdSignal && r.monthMacdLevel < r.monthMacdSignal ? 'down' : 'mixed';
+  if(w && m) return 'up';
+  if(w) return 'early';
+  return r.weekMacdLevel < r.weekMacdSignal && r.monthMacdLevel < r.monthMacdSignal ? 'down' : 'mixed';
 }
 
 // FII selling or buying last quarter, from the Screener columns (FII holding, its change over the last quarter, and its change over 3 years): a note, never a
@@ -77,9 +81,10 @@ function risksOf(stock, today, f, mos){
 
 const sign = (x) => (x >= 0 ? '+' : '') + fixedOrNull(x, 1) + '%';
 // Short, plain lines for the row (one idea each; the screen shows them as bullets).
-const TREND_WORD = { up: 'Upward', down: 'Downward' };
+const TREND_WORD = { up: 'Upward', early: 'Early-trend' };
 function rankLine(r){ return 'Top ' + r.topPct + '% of the ' + (TREND_WORD[r.trend] || '') + ' stocks in this strategy today'; }
 function recordLine(r){
+  if(r.up == null && !r.short) return 'No tested record: the five-year tests covered stocks with both trends up or both down, not this group, so treat the rank as a watch-list signal';
   if(r.short) return 'New listing (' + r.weeks + ' weeks of prices): in 5 years of tests, recent listings ranked in the top 10% were higher after 2 weeks ' + fixedOrNull(SHORT_HISTORY.up, 0) + '% of the time (all recent listings: ' + fixedOrNull(SHORT_HISTORY.base, 0) + '%)';
   return 'In 5 years of tests, stocks ranked like this were higher after 2 weeks ' + fixedOrNull(r.up, 0) + '% of the time (all ' + (TREND_WORD[r.trend] || '') + ' stocks: ' + fixedOrNull(r.base, 0) + '%)'; }
 function moveLine(r){ const f = r.facts; return 'Price: last week ' + sign(f.week) + ', 4 weeks ' + sign(f.month) + ', 26 weeks ' + sign(f.half); }
@@ -101,9 +106,9 @@ function ideaCall(stock, trade, read, today){
   const reasons = [];
   let call = 'hold';
   if(!r) reasons.push('no weekly price history yet (53 weeks are needed), so the next two weeks cannot be judged');
-  else if(!r.trend || r.trend === 'mixed') reasons.push(r.trend ? 'Weekly and monthly trends disagree, so it is in neither list' : 'No MACD figures saved yet, so its trend is unknown (import the data)', moveLine(r));
+  else if(!r.trend || r.trend === 'mixed' || r.trend === 'down') reasons.push(r.trend ? (r.trend === 'down' ? 'The trend is down, so it is in neither list' : 'Weekly and monthly trends disagree, so it is in neither list') : 'No MACD figures saved yet, so its trend is unknown (import the data)', moveLine(r));
   else {
-    if(r.trend === 'down') o.notes.unshift('Bounce-back pick: ' + (base.weeklyOnly ? 'the weekly trend is down' : 'both trends are down') + ', so this bets on a rebound');
+    if(r.trend === 'early') o.notes.unshift('Early-trend pick: the weekly trend is up but the monthly trend has not turned yet, so it is less confirmed than an Upward stock');
     if(base.weeklyOnly) o.notes.unshift('Trend uses the weekly MACD only (no monthly figure yet)');
     if(r.short) o.notes.unshift('Short history: only ' + r.weeks + ' weeks of prices, so the score is less certain');
     if(r.pct >= 100 - BUY_TOP) { if(o.blocks.length) o.blocks.forEach(b => reasons.push('held back: ' + b)); else call = 'buy'; }
@@ -129,7 +134,7 @@ function rankIdeas(items){
   });
 }
 
-// The best Buy calls of one trend ('up' or 'down'), in ranked order (rankIdeas has already put the Buys first).
+// The best Buy calls of one trend ('up' or 'early'), in ranked order (rankIdeas has already put the Buys first).
 function topBuys(ranked, trend, n = 5){ return ranked.filter(x => x.c.call === 'buy' && !x.c.held && x.c.trend === trend).slice(0, n); }
 
 export { BUY_TOP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys, trendOf };

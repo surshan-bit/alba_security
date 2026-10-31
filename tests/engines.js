@@ -725,10 +725,11 @@ test('next week (v1.289): the in-app features and score match the Python that tr
 test('next week (v1.289): the ranking among a strategy\'s stocks, thin flag and too-little-history are handled; the forming week is left out', () => {
   const rr = NW.rankReads([{ p: 0.5 }, { p: 0.7 }, null, { p: 0.4 }, { p: 0.6 }], ['up', 'up', 'up', 'up', 'up']);
   assert.deepStrictEqual(rr.map(x => x && x.pct), [100 / 3, 100, null, 0, 200 / 3], 'rank among the four scored stocks, lowest 0 and highest 100');
-  const two = NW.rankReads([{ p: 0.5 }, { p: 0.7 }, { p: 0.4 }, { p: 0.6 }, { p: 0.9 }], ['up', 'down', 'up', 'down', 'mixed']);
+  const two = NW.rankReads([{ p: 0.5 }, { p: 0.7 }, { p: 0.4 }, { p: 0.6 }, { p: 0.9 }], ['up', 'early', 'up', 'early', 'mixed']);
   assert.deepStrictEqual(two.slice(0, 4).map(x => x.pct), [100, 100, 0, 0], 'each stock is ranked only against stocks of its own trend');
   assert.strictEqual(two[4].pct, undefined, 'a mixed trend has no rank'); assert.strictEqual(two[4].trend, 'mixed');
-  assert.ok(two[0].base > two[1].base, 'the Upward base rate is higher than the Downward one');
+  assert.ok(two[0].base > 0 && two[1].up === null && two[1].beat === null && two[1].base === null, 'v1.335: the Early group is ranked but the tests have no record for it, so it carries none');
+  assert.strictEqual(NW.rankReads([{ p: 0.5 }, { p: 0.7 }], ['down', 'down'])[0].pct, undefined, 'v1.335: a Downward stock has no rank, there is no Downward list');
   assert.strictEqual(rr[1].topPct, 1); assert.strictEqual(rr[3].topPct, 100);
   assert.ok(rr[1].up > rr[3].up && rr[1].beat > rr[3].beat, 'the top band rose and beat the median more often than the bottom one in the tests');
   assert.strictEqual(NW.rankReads([{ p: 0.5 }], ['up'])[0].pct, 50, 'one stock alone has no rank'); assert.deepStrictEqual(NW.rankReads([null], ['up']), [null]);
@@ -899,24 +900,29 @@ test('ideas (v1.289): ranking is Buy, then Wait, then Avoid; the highest score l
   const r = I.rankIdeas([mk('a', 'sell', 0.4), mk('b', 'hold', 0.5), mk('c', 'buy', 0.55), mk('d', 'buy', 0.6), mk('e', 'sell', 0.35), mk('f', 'hold', null), mk('g', 'hold', 0.52), mk('h', 'sell', null)]).map(x => x.s.name).join('');
   assert.strictEqual(r, 'dcgbfeah');
   const mt = (n, call, trend, held) => ({ s: { name: n }, c: { call, trend, held } });
-  const list = [mt('a', 'buy', 'up'), mt('b', 'buy', 'up', true), mt('c', 'hold', 'up'), mt('d', 'buy', 'up'), mt('e', 'buy', 'up'), mt('f', 'buy', 'up'), mt('g', 'buy', 'up'), mt('h', 'buy', 'up'), mt('i', 'buy', 'down'), mt('j', 'buy', 'down')];
+  const list = [mt('a', 'buy', 'up'), mt('b', 'buy', 'up', true), mt('c', 'hold', 'up'), mt('d', 'buy', 'up'), mt('e', 'buy', 'up'), mt('f', 'buy', 'up'), mt('g', 'buy', 'up'), mt('h', 'buy', 'up'), mt('i', 'buy', 'early'), mt('j', 'buy', 'early')];
   assert.strictEqual(I.topBuys(list, 'up').map(x => x.s.name).join(''), 'adefg', 'five Buys of the trend, skipping stocks you hold and non-Buys, in the order given');
-  assert.strictEqual(I.topBuys(list, 'down').map(x => x.s.name).join(''), 'ij', 'the Downward list has its own Buys');
+  assert.strictEqual(I.topBuys(list, 'early').map(x => x.s.name).join(''), 'ij', 'the Early list has its own Buys');
   assert.strictEqual(I.topBuys(list, 'up', 2).length, 2); assert.strictEqual(I.topBuys([], 'up').length, 0);
 });
-test('ideas (v1.289): the trend comes from weekly and monthly MACD; a mixed or unknown trend is never a Buy; a Downward Buy says it is a bounce', () => {
+test('ideas (v1.289): the trend comes from weekly and monthly MACD; a mixed, down or unknown trend is never a Buy; an Early Buy says it is less confirmed and untested', () => {
   const t = (wl, ws, ml, ms) => ({ technical: { raw: { weekMacdLevel: wl, weekMacdSignal: ws, monthMacdLevel: ml, monthMacdSignal: ms } } });
   assert.strictEqual(I.trendOf(t(2, 1, 5, 4)), 'up'); assert.strictEqual(I.trendOf(t(1, 2, 4, 5)), 'down');
-  assert.strictEqual(I.trendOf(t(2, 1, 4, 5)), 'mixed'); assert.strictEqual(I.trendOf(t(1, 2, 5, 4)), 'mixed');
+  assert.strictEqual(I.trendOf(t(2, 1, 4, 5)), 'early', 'v1.335: weekly above and monthly below is the Early trend'); assert.strictEqual(I.trendOf(t(1, 2, 5, 4)), 'mixed');
   assert.strictEqual(I.trendOf(t(1, 1, 4, 5)), 'mixed', 'level equal to signal is neither up nor down');
   assert.strictEqual(I.trendOf(t(null, 1, 4, 5)), null); assert.strictEqual(I.trendOf({}), null); assert.strictEqual(I.trendOf(null), null);
   const mixed = I.ideaCall(idea({}), null, nwr(97, { trend: 'mixed', up: undefined, beat: undefined }), TODAY);
   assert.strictEqual(mixed.call, 'hold'); assert.ok(mixed.reasons.some(x => /disagree/.test(x)));
   const unk = I.ideaCall(idea({}), null, nwr(97, { trend: null }), TODAY);
   assert.strictEqual(unk.call, 'hold'); assert.ok(unk.reasons.some(x => /trend is unknown/.test(x)));
-  const down = I.ideaCall(idea({}), null, nwr(97, { trend: 'down', base: 45.3 }), TODAY);
-  assert.strictEqual(down.call, 'buy'); assert.ok(down.reasons.some(x => /Bounce-back pick/.test(x)) && /Downward stocks/.test(down.reasons[1]));
-  assert.strictEqual(down.trend, 'down');
+  const down = I.ideaCall(idea({}), null, nwr(97, { trend: 'down', up: undefined, beat: undefined }), TODAY);
+  assert.strictEqual(down.call, 'hold', 'v1.335: a Downward stock is in neither list, however high its score'); assert.ok(down.reasons.some(x => /in neither list/.test(x)));
+  const early = I.ideaCall(idea({}), null, nwr(97, { trend: 'early', base: null, up: null, beat: null }), TODAY);
+  assert.strictEqual(early.call, 'buy'); assert.strictEqual(early.trend, 'early');
+  assert.ok(early.reasons.some(x => /Early-trend pick: the weekly trend is up but the monthly trend has not turned yet/.test(x)));
+  assert.ok(/Early-trend stocks/.test(early.reasons[0]) && /^No tested record/.test(early.reasons[1]), 'it says where it ranks and that there is no tested record, got ' + early.reasons.slice(0, 2).join(' | '));
+  const earlyHeld = I.ideaCall(idea({ liquidity: { nextResults: '2026-10-30' } }), null, nwr(97, { trend: 'early', base: null, up: null, beat: null }), TODAY);
+  assert.strictEqual(earlyHeld.call, 'hold', 'the same checks hold an Early Buy back'); assert.ok(earlyHeld.reasons.some(x => /held back: results due/.test(x)));
 });
 test('ideas (v1.292): profits that fell 25% or more over 12 months hold a Buy back; a fall of 10% or more is a note', () => {
   const pg = (v) => I.ideaCall(idea({ valuation: { currentPrice: 100, intrinsicValue: 160, profitGrowth: v } }), null, nwr(97), TODAY);
@@ -931,7 +937,7 @@ test('ideas (v1.292): a recent listing is scored with its own numbers; with no m
   const t = (wl, ws, ml, ms) => ({ technical: { raw: { weekMacdLevel: wl, weekMacdSignal: ws, monthMacdLevel: ml, monthMacdSignal: ms } } });
   assert.strictEqual(I.trendOf(t(2, 1, null, null)), 'up'); assert.strictEqual(I.trendOf(t(1, 2, null, null)), 'down'); assert.strictEqual(I.trendOf(t(1, 1, null, null)), 'mixed');
   assert.strictEqual(I.trendOf(t(2, 1, 5, null)), 'up', 'half a monthly pair counts as missing'); assert.strictEqual(I.trendOf(t(null, null, 5, 4)), null, 'no weekly figures, no trend');
-  assert.strictEqual(I.weeklyOnly(t(2, 1, null, null)), true); assert.strictEqual(I.weeklyOnly(t(2, 1, 5, 4)), false); assert.strictEqual(I.trendOf(t(2, 1, 4, 5)), 'mixed', 'with both figures the old rule is unchanged');
+  assert.strictEqual(I.weeklyOnly(t(2, 1, null, null)), true); assert.strictEqual(I.weeklyOnly(t(2, 1, 5, 4)), false); assert.strictEqual(I.trendOf(t(2, 1, 4, 5)), 'early', 'with both figures a weekly-up, monthly-down stock is Early, not Up');
   const sh = I.ideaCall(idea({ technical: { raw: { weekMacdLevel: 2, weekMacdSignal: 1 } } }), null, nwr(97, { short: true, weeks: 64 }), TODAY);
   assert.strictEqual(sh.call, 'buy'); assert.strictEqual(sh.short, true); assert.strictEqual(sh.weeklyOnly, true);
   assert.ok(sh.reasons.includes('Short history: only 64 weeks of prices, so the score is less certain') && sh.reasons.includes('Trend uses the weekly MACD only (no monthly figure yet)'));
@@ -947,7 +953,7 @@ test('ideas (v1.289): FII selling or buying last quarter is a note, never a bloc
   assert.strictEqual(I.fiiNote(v(55.65, 0.9, 1)), null, '0.9 points of 54.7 is under 10%');
   assert.strictEqual(I.fiiNote(v(0.71, -0.18, 0)), null, 'under 0.5 points');
   assert.ok(I.fiiNote(v(3, -0.5, 0)), 'the edge counts'); assert.strictEqual(I.fiiNote(v(5, null, 0)), null); assert.strictEqual(I.fiiNote({}), null); assert.strictEqual(I.fiiNote(v(1, 1, 0)), null, 'nothing was held before');
-  const c = I.ideaCall(idea({ valuation: { currentPrice: 100, intrinsicValue: 120, fiiHolding: 5.86, fiiChange: -1.17 } }), null, nwr(97, { trend: 'down', base: 45.3 }), TODAY);
+  const c = I.ideaCall(idea({ valuation: { currentPrice: 100, intrinsicValue: 120, fiiHolding: 5.86, fiiChange: -1.17 } }), null, nwr(97), TODAY);
   assert.strictEqual(c.call, 'buy', 'FII selling does not hold a Buy back'); assert.ok(c.reasons.some(x => /FII selling/.test(x)));
 });
 test('ideas: missing data never crashes', () => { assert.strictEqual(I.ideaCall({}, null, null).call, 'hold'); assert.strictEqual(I.ideaCall({}, null).call, 'hold'); });

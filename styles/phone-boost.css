@@ -98,11 +98,11 @@
 #tradeIdeasBody .tl-top5-why{padding-left:0;list-style:none;color:var(--text);}
 #tradeIdeasBody .tl-news{border:0;margin-top:5px;padding:0;}
 #tradeIdeasBody .tl-news-list{display:none;}
-#tradeIdeasBody .tl-top5-down{border-top:1px solid var(--line);padding-top:4px;}
-#tradeIdeasBody .tl-top5-down .tl-top5-title{cursor:pointer;display:flex;justify-content:space-between;}
-#tradeIdeasBody .tl-top5-down .tl-top5-title::after{content:"\203A";transform:rotate(90deg);color:var(--muted);}
-#tradeIdeasBody .tl-top5-down.tl-collapsed .tl-top5-title::after{transform:none;}
-#tradeIdeasBody .tl-top5-down.tl-collapsed > :not(.tl-top5-title){display:none;}
+#tradeIdeasBody .tl-top5-early{border-top:1px solid var(--line);padding-top:4px;}
+#tradeIdeasBody .tl-top5-early .tl-top5-title{cursor:pointer;display:flex;justify-content:space-between;}
+#tradeIdeasBody .tl-top5-early .tl-top5-title::after{content:"\203A";transform:rotate(90deg);color:var(--muted);}
+#tradeIdeasBody .tl-top5-early.tl-collapsed .tl-top5-title::after{transform:none;}
+#tradeIdeasBody .tl-top5-early.tl-collapsed > :not(.tl-top5-title){display:none;}
 #tradeIdeasBody .tl-method,#tradeIdeasBody .tl-ideas-done{display:none;}
 #tradeIdeasBody .tl-ideas-short{display:block;margin:0 0 6px;color:var(--muted);}
 #tradeFormHost .tl-msg:not(.err){display:none;}
