@@ -48,12 +48,10 @@
 .detail-jump{display:none;}
 }
 .detail-jump .jump-preview{margin-left:8px;padding-left:8px;border-left:0;font-size:var(--t-sm);font-weight:600;}
-#detail .detail-jump{margin-bottom:0;padding:10px 0;gap:8px;}
+
 /* Stock page, compact: less padding and spacing everywhere, so more fits on screen and the page scrolls less. Same content, same order. */
-#detail .detail-top{gap:4px 22px;margin-bottom:14px;row-gap:10px;}
-#detail .detail-title .detail-ticker{margin-top:8px;}
-#detail .detail-jump a{padding:5px 12px;}
+
 .pc-psum .badge{min-width:0;}
 
 /* The size tag beside the stock's name. The prefix wins over the White theme's type scale. */
-#detail .detail-name-row{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;}
+

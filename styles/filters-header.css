@@ -65,5 +65,5 @@
 /* Late overrides: the flat, one-look styling across screens (these must stay last). Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
 #analysisStrategyFilter .filter-btn,#strategyFilterRow .filter-btn{white-space:nowrap;}
 /* room for the sticky Jump to bar's 10px cover above it, which otherwise clips the ticker line */
-#detail .detail-top .detail-meta{flex:0 0 100%;margin:0;}
+
 .topbar-search .search-suggest{top:calc(100% + 6px);text-align:left;left:0;right:0;width:auto;max-width:none;max-height:min(520px,calc(100vh - 90px));}

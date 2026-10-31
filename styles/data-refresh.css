@@ -29,9 +29,6 @@ footer{margin-top:26px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",s
 .claude-ctl-box{width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;}
 .claude-ctl-box:disabled{cursor:not-allowed;}
 
-
-
-
 .refreshlog-panel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:720px;}
 .refreshlog-job-title{font-size:var(--t-md);font-weight:700;color:var(--text);margin:0 0 6px;}
 .refreshlog-divider{height:1px;border:none;margin:28px 0 24px;background:transparent;}
@@ -63,9 +60,9 @@ footer{margin-top:26px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",s
 .refreshlog-freshness-count{flex:0 0 auto;min-width:64px;text-align:right;color:var(--text);font-weight:600;}
 .data-integrity-banner{background:rgba(193,82,74,.14);color:var(--avoid);border-bottom:1px solid rgba(193,82,74,.35);font-size:var(--t-sm);line-height:1.5;padding:8px 16px;}
 .data-chip.chip-na{border-style:solid;}
-#detail .data-chip{padding:5px 0;}
+
 /* Factor cards: metric rows flow into as many columns as fit (label left, value right) instead of one long column; research bullets (neutral / positive / negative) sit side by side. */
-#detail .data-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));column-gap:32px;}
+
 /* Data Refresh screen type sizes (v1.113). Matches the Help page: section titles 1.2rem, sub-headings 1.05rem (the size of a Help heading),
    body text 0.9rem, small print 0.82rem, so nothing on this screen is set smaller than it can be read comfortably. All themes. */
 #section-refreshlog .refreshlog-job-title{font-size:var(--t-lg);}

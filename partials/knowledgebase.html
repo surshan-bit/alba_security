@@ -251,6 +251,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.344 &middot; 2026-10-31</h3>
+            <ul>
+              <li><strong>Stock page styling in one place (nothing looks different):</strong> the 170 style rules that belong to the stock page now live in one file (<code>detail.css</code>) instead of being spread over twelve, and they no longer use the page&rsquo;s element id. Every element on every screen at phone, tablet and laptop width was compared before and after: no differences. Rules tied to a single element id fell from 454 to 251.</li>
+            </ul>
             <h3>v1.343 &middot; 2026-10-31</h3>
             <ul>
               <li><strong>A price above fair value no longer holds a Buy back, in either list:</strong> the check removed nearly every rising stock (LTTS, HCL Tech, TCS, Persistent and similar), because Screener rates them above fair value, and left cheap stocks that were falling. Value is now only the strategy&rsquo;s job (for example Positive MoS needs a green or orange rating). The card still says so when a price is above fair value (&ldquo;Priced 29% above its fair value&rdquo;). A Fundamental verdict of Avoid, results within 7 days, thin trading, negative news and falling profits still hold a stock back.</li>

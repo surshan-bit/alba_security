@@ -17,23 +17,9 @@ select:not([multiple]):not([size]):disabled{opacity:.55;}
 /* v1.309: Stock page factor cards. Every card shows its metric rows first and the explanation after them.
    A card with written points takes the whole row (metrics on the left, points on the right); the others go two to a row
    (metrics on top, the sentence under them); a lone one takes the row. Phones: one column, metrics first. */
-#detail .fund-subsection .fund-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 44px;align-items:start;}
-#detail .fund-subsection .fund-grid>.fund-cell-wide{grid-column:1 / -1;}
-#detail .fund-cell-cols{display:flex;flex-direction:column;align-items:stretch;gap:12px;}
-#detail .fund-cell-cols>.data-chips{order:1;}
-#detail .fund-cell-cols>.fund-cell-exp{order:2;min-width:0;}
-#detail .fund-cell-cols>.data-chips:empty{display:none;}
-@media (min-width:1000px){
-  #detail .fund-cell-wide>.fund-cell-cols{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);column-gap:44px;align-items:start;}
-  #detail .fund-cell-wide>.fund-cell-cols>.data-chips{grid-column:1;}
-  #detail .fund-cell-wide>.fund-cell-cols>.fund-cell-exp{grid-column:2;}
-  #detail .fund-cell-wide>.fund-cell-cols>.data-chips:empty+.fund-cell-exp{grid-column:1 / -1;}
-}
-@media (max-width:900px){#detail .fund-subsection .fund-grid{grid-template-columns:minmax(0,1fr);}}
+
 /* The research points share one list with the Strengths and Watch-outs lines; those two carry a green or red dot. */
 .fr-plain .fr-bul{background:var(--buy);}
 .fr-plain.fr-neg .fr-bul{background:var(--avoid);}
 /* v1.309: inside a factor card the metric rows are one column and the points are one block (the older multi-column rules no longer apply). */
-#detail .fund-cell .data-chips{grid-template-columns:minmax(0,1fr);column-gap:0;}
-#detail .fund-cell .fund-cell-research{display:block;padding:0;margin:0 0 10px;border-top:0;}
-#detail .fund-cell .fund-cell-research .fund-research-sources{margin-top:6px;}
+

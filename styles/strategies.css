@@ -181,7 +181,7 @@
 .analysis-panel,.upload-panel,.help-panel,.help-toc,.help-formula,.glossary-item,.settings-row,.sr-row,.strat-panel,.refreshlog-panel,.refreshlog-freshness,.fi-panel,.live-refresh.live-panel{border-color:transparent;}
 /* Analysis and Strategies: the Live Data Refresh line sits between two lines, as on the stock page. */
 .live-refresh.live-panel{margin:0;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);border-left:0;border-right:0;}
-#detail .live-refresh{padding:12px 0;}
+
 .pc-psum .badge{text-align:center;padding:2px 10px !important;font-size:var(--t-sm) !important;}
 /* Peers grid: the Analysis grid's spacing (cells come from .strat-table); only a sticky header and the width are its own. */
 .peers-table.strat-table{width:100%;}

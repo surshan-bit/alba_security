@@ -105,69 +105,11 @@
   :root[data-theme="white"] h2[data-icon="spark"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'/%3E%3Cpath d='M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z'/%3E%3C/svg%3E");}
 /* Stock detail and Industry detail (they share one shell): the Screener company page. A white header card, a tab bar, white section cards,
    zebra-striped metric rows and a peer table with a median row. Wide screens only. */
-@media (min-width:901px){
-  :root[data-theme="white"] #detail{--card-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);}
-  /* Header card */
-  :root[data-theme="white"] #detail .detail-back-bar{position:static;display:flex;justify-content:flex-end;height:auto;margin:0 0 12px;pointer-events:auto;}
-  :root[data-theme="white"] #detail .detail-top{background:#fff;border-radius:16px;box-shadow:var(--card-shadow);padding:26px 32px 22px;margin:0 0 14px;gap:8px 24px;align-items:flex-start;}
-  :root[data-theme="white"] #detail .detail-title .detail-name{font-size:var(--t-xl);font-weight:500;letter-spacing:-.02em;color:#1b1f2a;line-height:1.15;}
-  :root[data-theme="white"] #detail .detail-title .detail-ticker{font-size:var(--t-md);color:#4a5163;margin-top:6px;}
-  :root[data-theme="white"] #detail .detail-star{font-size:var(--t-lg);color:var(--accent);margin-top:6px;}
-  :root[data-theme="white"] #detail .detail-meta-links{display:flex;flex-wrap:wrap;gap:6px 28px;margin-top:10px;}
-  :root[data-theme="white"] #detail .detail-meta-links a{font-size:var(--t-md);font-weight:500;color:var(--accent);display:inline-flex;align-items:center;gap:8px;text-decoration:none;}
-  :root[data-theme="white"] #detail .detail-meta-links a:hover{text-decoration:underline;}
-  :root[data-theme="white"] #detail .detail-meta-links .link-ico{width:18px;height:18px;}
-  /* Tab bar (the Jump-to links), pinned under the top bar */
-  :root[data-theme="white"] #detail .detail-jump{top:var(--tb-h);background:#fff;border-radius:12px;box-shadow:var(--card-shadow);padding:0 22px;gap:2px 8px;margin:0 0 14px;box-shadow:0 1px 2px rgba(27,31,42,.06);}
-  :root[data-theme="white"] #detail .detail-jump-label{display:none;}
-  :root[data-theme="white"] #detail .detail-jump a{background:transparent;border-radius:0;padding:16px 18px;font-size:var(--t-md);font-weight:500;color:#3b4156;border-bottom:3px solid transparent;}
-  :root[data-theme="white"] #detail .detail-jump a:hover{color:var(--accent);border-bottom-color:var(--accent);background:transparent;}
-  :root[data-theme="white"] #detail .detail-jump a .jump-preview{font-size:var(--t-md);}
-  /* Section cards */
-  :root[data-theme="white"] #detail :is(.val-panel,.global-panel,.fund-panel,.tech-panel){background:#fff;border:0;border-radius:16px;box-shadow:var(--card-shadow);padding:26px 32px 30px;margin-top:14px;}
-  :root[data-theme="white"] #detail .tech-panel .pc-head{right:32px;}
-  :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title){font-size:var(--t-lg);font-weight:500;letter-spacing:-.01em;color:#1b1f2a;}
-  :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title) svg{color:var(--accent);width:24px;height:24px;}
-  :root[data-theme="white"] #detail :is(.global-panel-sub,.peers-sub,.fund-cell-note){font-size:var(--t-md);color:#4a5163;}
-  /* Sub-sections: spaced uppercase labels, like ABOUT / KEY POINTS */
-  :root[data-theme="white"] #detail :is(.fund-subsection-title,.fund-pc-title){font-size:var(--t-md);font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#1b1f2a;}
-  :root[data-theme="white"] #detail .fund-cell-label{font-size:var(--t-md);letter-spacing:.08em;color:#3b4156;}
-  :root[data-theme="white"] #detail .fund-cell-score{font-size:var(--t-lg);}
-  /* Metric rows: label left, value right, alternate rows shaded */
-  :root[data-theme="white"] #detail .data-chips{gap:0;}
-  :root[data-theme="white"] #detail .data-chips > .data-chip{display:flex;justify-content:space-between;gap:16px;padding:9px 14px;border:0;border-radius:8px;font-size:var(--t-md);background:transparent;}
-  :root[data-theme="white"] #detail .data-chips > .data-chip:nth-child(odd){background:#f3f5fb;}
-  :root[data-theme="white"] #detail .data-chips > .data-chip *{font-size:inherit;}
-  /* v1.302: factor-card metric rows stay a grid in the White theme (label left, value, number, source icon at the right edge). */
-  :root[data-theme="white"] #detail .fund-cell .data-chips > .data-chip{display:grid;grid-template-columns:10px minmax(0,1fr) auto;column-gap:10px;align-items:baseline;justify-content:stretch;}
-  /* Peer table */
-  :root[data-theme="white"] #detail .peers-table tbody tr:nth-child(even) td{background:#f7f8fc;}
-  :root[data-theme="white"] #detail .peers-table tr.peers-self td{background:#eef0fd;}
-  /* Period buttons: one bordered group, the chosen one tinted */
-  :root[data-theme="white"] #detail .pc-pills{border:1px solid #dde2ee;border-radius:8px;overflow:hidden;gap:0;}
-  :root[data-theme="white"] #detail .pc-pill{border:0;border-radius:0;padding:8px 16px;font-size:var(--t-md);color:#3b4156;}
-  :root[data-theme="white"] #detail .pc-pill:is(.on,.active,[aria-pressed="true"]){background:color-mix(in srgb,var(--accent) 10%,#fff);color:var(--accent);}
-}
+
 /* Detail screens: the tab bar goes to the very top, a full-width strip under the top bar, above the Back button and the header card (as on the Screener company page). */
-@media (min-width:901px){
-  :root[data-theme="white"] #detail{display:flex;flex-direction:column;}
-  :root[data-theme="white"] #detail .detail-jump{order:-2;width:100vw;margin:-38px 0 18px calc(50% - 50vw);padding:0 max(24px,calc(50vw - 880px));border-radius:0;box-shadow:none;background:#f6f7fb;border-bottom:1px solid #e6e9f2;box-sizing:border-box;}
-  :root[data-theme="white"] #detail .detail-back-bar{order:-1;}
-  :root[data-theme="white"] #detail .detail-jump .detail-jump-who{flex:0 0 auto;padding:0 14px 0 0;}
-  :root[data-theme="white"] #detail .detail-jump a{padding:14px 18px;}
-}
+
 /* Detail screens (cont.): the Back button sits at the right end of the tab strip, and the tab of the section being read is marked as you scroll. */
-@media (min-width:901px){
-  :root[data-theme="white"] #detail .detail-back-bar{order:-3;position:sticky;top:var(--tb-h);height:0;margin:-38px 0 38px;padding:0 max(24px,calc(50vw - 880px)) 0 0;width:100vw;margin-left:calc(50% - 50vw);box-sizing:border-box;z-index:8;pointer-events:none;}
-  :root[data-theme="white"] #detail .detail-back-bar .detail-back{pointer-events:auto;}
-  :root[data-theme="white"] #detail .detail-jump .detail-jump-who{display:flex;}
-  :root[data-theme="white"] #detail .detail-jump .detail-jump-name{font-size:var(--t-md);font-weight:500;color:#3b4156;}
-  :root[data-theme="white"] #detail .detail-jump .detail-jump-ticker{display:none;}
-  :root[data-theme="white"] #detail .detail-jump .detail-jump-who{align-self:stretch;align-items:center;padding:0 18px;border-bottom:3px solid transparent;}
-  :root[data-theme="white"] #detail .detail-jump .detail-jump-who.is-current{border-bottom-color:var(--accent);}
-  :root[data-theme="white"] #detail .detail-jump .detail-jump-who.is-current .detail-jump-name,:root[data-theme="white"] #detail .detail-jump a.is-current{color:var(--accent);}
-  :root[data-theme="white"] #detail .detail-jump a.is-current{border-bottom-color:var(--accent);}
-}
+
 /* Wordmark: lowercase rounded geometric type (Quicksand, added by src/ui/theme.js when White is in use) with the bar-chart mark in front, like the Screener logo. */
 :root[data-theme="white"] .topbar-brand{font-family:"Quicksand","Nunito","Varela Round",-apple-system,"Segoe UI",sans-serif;text-transform:lowercase;font-weight:700;letter-spacing:-.01em;}
 @media (min-width:901px){:root[data-theme="white"] .topbar-brand{font-size:var(--t-xl);line-height:1;}}
@@ -179,30 +121,13 @@
 :root[data-theme="white"] #section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-title{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='7' width='20' height='14' rx='2'/%3E%3Cpath d='M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2'/%3E%3Cline x1='2' y1='13' x2='22' y2='13'/%3E%3C/svg%3E");}
 :root[data-theme="white"] #section-trackrecord .tl-ideas .analysis-panel-title{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6'/%3E%3Cpath d='M10 22h4'/%3E%3Cpath d='M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z'/%3E%3C/svg%3E");}
 /* Stock detail: the Refresh control reads like the links beside it (View on screener.in, Open chart, Share link). */
-@media (min-width:901px){
-  :root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn{background:transparent;border:0;padding:0;border-radius:0;font-size:var(--t-md);font-weight:500;line-height:1.5;color:var(--accent);gap:8px;}
-  :root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn:hover{text-decoration:underline;color:var(--accent);}
-  :root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn svg{width:18px;height:18px;}
-}
+
 /* Stock/Industry detail: the gap under the header card equals the gap between the section cards (each card already has its own top margin). */
-@media (min-width:901px){:root[data-theme="white"] #detail .detail-top{margin-bottom:0;}}
+
 /* Detail pages: text in the Global & Macro lists, Strengths / Watch-outs and the factor cards is raised to the size of the metric rows (about 16px). */
-@media (min-width:901px){
-  :root[data-theme="white"] #detail :is(.global-item,.fund-pros li,.fund-cons li,.fund-pc-empty,.fund-cell-business,.val-cell-sub){font-size:var(--t-md);line-height:1.55;}
-  :root[data-theme="white"] #detail .global-item .global-item-source{font-size:var(--t-sm);}
-  :root[data-theme="white"] #detail .global-col-title{font-size:var(--t-md);letter-spacing:.1em;}
-  :root[data-theme="white"] #detail :is(.fund-pros li,.fund-cons li){margin-bottom:8px;}
-}
-@media (min-width:901px){:root[data-theme="white"] #detail .detail-back-bar .detail-back{position:relative;top:1px;}}
+
 /* Tab strip: the score and verdict beside Fundamental / Technical Score become a clear tinted pill with black text. */
-@media (min-width:901px){
-  :root[data-theme="white"] #detail .detail-jump .jump-preview{display:inline-flex;align-items:baseline;gap:6px;margin-left:10px;padding:3px 12px;border-radius:999px;font-size:var(--t-md);font-weight:600;color:#000;background:#eef0f6;}
-  :root[data-theme="white"] #detail .detail-jump .jump-preview b{font-size:var(--t-lg);font-weight:800;}
-  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-buy{background:rgba(31,122,84,.18);}
-  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-mbuy{background:rgba(86,111,41,.2);}
-  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-hold{background:rgba(201,162,39,.26);}
-  :root[data-theme="white"] #detail .detail-jump .jump-preview.fs-avoid{background:rgba(168,63,56,.18);}
-}
+
 /* Tools screens (Data Refresh, Help, Knowledge Base, Settings): body text raised to about 16px, like the detail pages. */
 @media (min-width:901px){
   :root[data-theme="white"] :is(#section-help,#section-knowledgebase) :is(p,li,b,strong,i,em,a,td,code,.glossary-term,.help-disclaimer,.help-formula){font-size:var(--t-md);}
@@ -283,17 +208,11 @@
   :root[data-theme="white"] :is(#section-help,#section-knowledgebase) h3{margin-top:28px;}
   :root[data-theme="white"] :is(#section-help,#section-knowledgebase) h3:first-child{margin-top:0;}
   :root[data-theme="white"] #section-refreshlog .refreshlog-sub-title{margin-top:28px;}
-  :root[data-theme="white"] #detail .fund-subsection{margin-top:30px;}
-  :root[data-theme="white"] #detail .fund-subsection:first-of-type{margin-top:18px;}
+  
+  
 }
 /* Detail and industry pages: space between a card heading and its content. */
-@media (min-width:901px){
-  :root[data-theme="white"] #detail :is(.val-panel-head,.global-panel-head,.fund-panel-head,.tech-panel-head){margin-bottom:22px;}
-  :root[data-theme="white"] #detail :is(.fund-overall-summary,.global-panel-sub,.peers-sub){margin-top:0;margin-bottom:18px;}
-  :root[data-theme="white"] #detail .fund-pros-cons{margin-top:6px;}
-  :root[data-theme="white"] #detail .fund-pc-title{margin-bottom:12px;}
-  :root[data-theme="white"] #detail .fund-subsection-head{margin-bottom:16px;}
-}
+
 /* Grids: the Analysis table look (plain dark header with a hairline, roomy rows, every other row tinted) for the remaining tables:
    Help, Knowledge Base, Trade Log positions (table view) and Buy / Sell ideas. Explorer's own industry table keeps its own look. */
 @media (min-width:901px){
@@ -361,23 +280,23 @@
 @media (max-width:900px){
   :root[data-theme="white"]{--card-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);}
   /* Stock and industry pages */
-  :root[data-theme="white"] #detail{padding:0;}
-  :root[data-theme="white"] #detail .detail-top{background:#fff;border-radius:16px;box-shadow:var(--card-shadow);padding:18px 18px 16px;margin:0 0 12px;}
-  :root[data-theme="white"] #detail .detail-title .detail-name{font-size:var(--t-xl);font-weight:500;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;}
-  :root[data-theme="white"] #detail .detail-title .detail-ticker{font-size:var(--t-md);color:#4a5163;}
-  :root[data-theme="white"] #detail .detail-meta-links{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;}
-  :root[data-theme="white"] #detail .detail-meta-links a,:root[data-theme="white"] #detail .detail-meta-links .rk-row-btn.rk-stockbtn{font-size:var(--t-md);font-weight:500;color:var(--accent);background:transparent;border:0;padding:0;}
-  :root[data-theme="white"] #detail :is(.val-panel,.global-panel,.fund-panel,.tech-panel){background:#fff;border:0;border-radius:16px;box-shadow:var(--card-shadow);padding:18px 16px 20px;margin-top:12px;}
-  :root[data-theme="white"] #detail .tech-panel .pc-head{right:16px;}
-  :root[data-theme="white"] #detail .tech-panel .pc-panels{margin:0 -8px;}
-  :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title){font-size:var(--t-lg);font-weight:500;letter-spacing:-.01em;color:#1b1f2a;}
-  :root[data-theme="white"] #detail :is(.val-panel-title,.global-panel-title,.fund-panel-title,.tech-panel-title) svg{color:var(--accent);}
-  :root[data-theme="white"] #detail :is(.val-panel-head,.global-panel-head,.fund-panel-head,.tech-panel-head){margin-bottom:14px;}
-  :root[data-theme="white"] #detail :is(.fund-subsection-title,.fund-pc-title){font-size:var(--t-sm);font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#1b1f2a;}
-  :root[data-theme="white"] #detail .data-chips > .data-chip:nth-child(odd){background:#f3f5fb;}
-  :root[data-theme="white"] #detail .data-chips > .data-chip{border:0;border-radius:8px;}
-  :root[data-theme="white"] #detail .peers-table tbody tr:nth-child(even) td{background:#f7f8fc;}
-  :root[data-theme="white"] #detail .detail-back-bar{position:static;height:auto;margin:0 0 10px;}
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   /* Data Refresh and Settings: one white card with flat rows */
   :root[data-theme="white"] .card-narrow :is(.refreshlog-job,.settings-subhead){margin-top:0;}
   :root[data-theme="white"] :is(h2[data-icon],#section-settings .settings-panel:not(#claudeControls) .settings-row-title){font-size:var(--t-lg);gap:10px;margin-top:26px;margin-bottom:12px;padding-bottom:10px;}

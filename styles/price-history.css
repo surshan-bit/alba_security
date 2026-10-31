@@ -90,13 +90,13 @@
 .detail-jump .jump-preview b{font-weight:700;}
 /* Stock detail: no divider lines inside a panel. Only the five main headings (Valuation, Global & Macro, Fundamental Score,
    Technical Score, Peers) keep their top line. Borders are made transparent, not removed, so spacing stays the same. */
-#detail .val-cell,#detail .fund-overall-summary,#detail .fund-pc-footnote,#detail .fund-cell,#detail .data-chip,#detail .pc-block,#detail .global-list > *,#detail .peers-scroll th,#detail .peers-scroll td,#detail .jump-preview{border-color:transparent;}
+
 /* Price history: the colour key and the event-tag buttons start hidden; the Legend button shows them. */
 .pc-block:not(.show-key) .pc-legend,.pc-block:not(.show-key) .pc-evlegend{display:none;}
 /* Price history: the Weekly / Monthly (Daily) charts have no box around them. */
 .pc-panel{background:transparent;border:0;border-radius:0;padding:6px 0 4px;}
 /* Valuation: the intrinsic value and the price comparison share one line, with less space above and below. */
-#detail .val-panel .val-text{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 20px;}
+
 /* Technical Score: each timeframe is one line, "Weekly  +10.31%  Bullish  RSI (70.9)"; the trend sentence is the hover text. */
 /* Each price chart's header carries that timeframe's figures: "Weekly 261 bars   +10.31%  Bullish  RSI (70.9)   [6M 1Y All]". */
 /* Chart header: one baseline, even sizes, and the same column positions for Weekly and Monthly so the figures line up. */
@@ -105,12 +105,8 @@
 .pc-ph .pc-pills{margin-left:auto;}
 .pc-ptitle{display:flex;align-items:baseline;gap:8px;font-size:var(--t-md);font-weight:700;min-width:0;}
 .pc-ptitle small{margin:0;font-size:var(--t-sm);font-weight:400;}
-#detail .tech-panel .pc-block{margin-top:0;padding-top:0;border-top:0;}
+
 @media (min-width:601px){.tech-panel .pc-head{position:absolute;top:16px;right:0;margin:0;}}
 .tech-panel .pc-head{margin:0 0 8px;justify-content:flex-end;}
-#detail .pc-panel{padding:2px 0 0;}
-#detail .pc-legend{margin:0 0 6px;}
-#detail .pc-evlegend{margin:0 0 6px;}
-#detail .pc-panels{gap:22px;}
-#detail .pc-ph{margin-bottom:8px;}
+
 .pcs-gauge i{position:absolute;top:50%;border-radius:50%;background:var(--text);border:2px solid var(--panel2);transform:translate(-50%,-50%);box-sizing:content-box;margin:0;width:7px;height:7px;}

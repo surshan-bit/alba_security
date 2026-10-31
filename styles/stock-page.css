@@ -206,54 +206,28 @@ html{scrollbar-color:var(--line) transparent;}
 *{scrollbar-width:thin;}
 #section-analysis table th,#section-analysis table td,#section-strategies table th,#section-strategies table td,#section-help table th,#section-help table td,#section-knowledgebase table th,#section-knowledgebase table td,#section-trackrecord table th,#section-trackrecord table td{border-color:transparent;}
 /* the quick links sit on their own line under the title, clear of the Back button */
-#detail .detail-meta-links{font-size:var(--t-sm);gap:6px 26px;padding-left:2px;}
-#detail .val-panel-title,#detail .fund-panel-title,#detail .tech-panel-title,#detail .global-panel-title{font-size:var(--t-md);}
-#detail .val-panel-head,#detail .fund-panel-head,#detail .tech-panel-head,#detail .global-panel-head{margin-bottom:6px;}
-#detail .fund-overall-summary{padding:8px 0;margin:2px 0 6px;}
-#detail .fund-subsection{margin-bottom:10px;}
-#detail .fund-subsection .fund-cell-bar{margin-bottom:6px;}
-#detail .fund-cell-head{margin-bottom:4px;}
-#detail .fund-pc-footnote{margin-top:4px;padding-top:4px;}
-#detail .fund-pros-cons ul{gap:4px;}
-#detail .fund-cell-flags{margin-bottom:6px;}
+
 /* Critical news & world events: items sit in columns (as many as fit), the Helps / Hurts / Mixed tag is coloured, the explanation is smaller, and the source goes on the same line as it. */
-#detail .global-events .global-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px 28px;}
+
 /* Header breathing space: room above the name, between name, ticker, links and the Jump to bar, and between the links themselves. */
-#detail{padding-top:16px;}
-#detail .val-cell,#detail .fund-cell,#detail .global-item,#detail .fund-cell-research,#detail .fund-subsection .fund-cell{padding:11px 0;}
+
 /* Global & Macro: each column is its own compact list (no row pairing across columns), tighter text, source on the line of its text. */
-#detail .global-cols{column-gap:36px;row-gap:0;align-items:start;}
-#detail .global-col{display:block;grid-row:auto;}
+
 /* Global & Macro reads like the Strengths / Watch-outs lists: a coloured bullet per item, more room between items and under the headings. */
-#detail .global-col .global-list{display:flex;flex-direction:column;gap:10px;}
-#detail .global-col .global-item{height:auto;position:relative;padding:0 0 0 20px;font-size:var(--t-md);line-height:1.45;}
-#detail .global-col .global-col-title{margin-bottom:10px;}
-#detail .global-col .global-item::before{content:"";position:absolute;left:0;top:.5em;width:8px;height:8px;border-radius:50%;background:var(--muted);}
-#detail .global-col:first-child .global-item::before{background:var(--buy);}
-#detail .global-col:nth-child(2) .global-item::before{background:var(--avoid);}
-#detail .global-panel-head{margin-bottom:14px;}
-#detail .val-panel .val-cell{padding:2px 0 4px;}
-#detail .val-panel .val-panel-head{margin-bottom:4px;}
-#detail .val-panel .val-cell-sub{font-size:var(--t-sm);}
-#detail .fund-cell-research{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));column-gap:32px;align-items:start;}
-#detail .fund-cell-research > *{margin:0;}
-#detail .fund-cell-research > .fund-research-stale,#detail .fund-cell-research > .fund-research-sources,#detail .fund-cell-research > .fund-research-summary{grid-column:1/-1;}
-#detail .fund-cell-research .fund-research-list{padding-left:20px;}
-#detail .fund-cell-research .fund-research-sources{margin-top:4px;}
+
 /* a section with a single card (e.g. Valuation & Margin of Safety) already has its title and score in the section heading, so the card does not repeat them */
-#detail .fund-subsection .fund-cell:only-child > .fund-cell-head,#detail .fund-subsection .fund-cell:only-child > .fund-cell-bar{display:none;}
+
 /* Heading colour: every section and sub-section heading on the stock page is amber. */
 :root{--hd:#e0b04a;}
 :root[data-theme="white"]{--hd:#98680a;}
-#detail .val-panel-title,#detail .global-panel-title,#detail .fund-panel-title,#detail .tech-panel-title,#detail .fund-subsection-title{color:var(--hd);}
+
 .pc-psum{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;}
 .tech-fallback{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
 /* Chart header figures: three matching chips in the order Change, RSI, Signal; a small muted label and a bold value, coloured where it carries meaning. */
 /* Price charts, tight: the Legend button sits on the Technical Score heading line (top right) instead of its own row, and the gaps around the two charts are smaller. */
-#detail .tech-panel{position:relative;}
-#detail .pc-keytoggle{margin:0;}
+
 /* A little air between the Technical Score heading, the chart headers, the charts and between the two charts. */
-#detail .tech-panel .tech-panel-head{margin-bottom:16px;}
+
 .analysis-chart-block{margin:16px 0 16px;flex:none;}
 /* Industry heat map */
 .hm-wrap{position:relative;width:100%;margin-top:12px;border-radius:6px;overflow:hidden;}
@@ -343,8 +317,7 @@ html{scrollbar-color:var(--line) transparent;}
 .live-toggle{margin-left:0;}
 /* The links under the stock's name: icon in front, vertically centred with the text, same gap for all three. */
 }
-#detail .detail-meta-links a{display:inline-flex;align-items:center;gap:7px;line-height:1.2;}
-#detail .detail-meta-links .link-ico{flex:none;width:14px;height:14px;}
+
 /* Expand all / Collapse all sits at the right end of the grid, on the line above it. */
 .biz-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:0 0 8px;}
 .biz-toolbar .biz-showing{margin:0 auto 0 0;}
