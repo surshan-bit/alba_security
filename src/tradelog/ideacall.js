@@ -82,7 +82,9 @@ function risksOf(stock, today, f, mos){
 const sign = (x) => (x >= 0 ? '+' : '') + fixedOrNull(x, 1) + '%';
 // Short, plain lines for the row (one idea each; the screen shows them as bullets).
 const TREND_WORD = { up: 'Upward', early: 'Early-trend' };
-function rankLine(r){ return 'Top ' + r.topPct + '% of the ' + (TREND_WORD[r.trend] || '') + ' stocks in this strategy today'; }
+function rankLine(r){
+  if(r.trend === 'early' && r.rank) return 'Rank ' + r.rank + ' of ' + r.groupN + ' Early-trend stocks in this strategy today';
+  return 'Top ' + r.topPct + '% of the ' + (TREND_WORD[r.trend] || '') + ' stocks in this strategy today'; }
 function recordLine(r){
   if(r.up == null && !r.short) return 'No tested record: the five-year tests covered stocks with both trends up or both down, not this group, so treat the rank as a watch-list signal';
   if(r.short) return 'New listing (' + r.weeks + ' weeks of prices): in 5 years of tests, recent listings ranked in the top 10% were higher after 2 weeks ' + fixedOrNull(SHORT_HISTORY.up, 0) + '% of the time (all recent listings: ' + fixedOrNull(SHORT_HISTORY.base, 0) + '%)';
@@ -96,7 +98,7 @@ function ideaCall(stock, trade, read, today){
   const f = factsFor(trade || {}, stock);
   const mos = marginOfSafety(f.intrinsic, f.price);
   const r = read || null, o = risksOf(stock, today, f, mos);
-  const base = { short: !!(r && r.short), weeklyOnly: weeklyOnly(stock), trend: r ? r.trend || null : null, base: r ? r.base : null, mos, cap: o.cap, resultsIn: o.resultsIn, p: r ? r.p : null, pct: r ? r.pct : null, topPct: r ? r.topPct : null, up: r ? r.up : null, beat: r ? r.beat : null };
+  const base = { short: !!(r && r.short), blocked: o.blocks.length > 0, weeklyOnly: weeklyOnly(stock), trend: r ? r.trend || null : null, base: r ? r.base : null, mos, cap: o.cap, resultsIn: o.resultsIn, p: r ? r.p : null, pct: r ? r.pct : null, topPct: r ? r.topPct : null, up: r ? r.up : null, beat: r ? r.beat : null };
   if(trade){
     const sig = tradeSignal(f);
     const call = sig.call === 'add' ? 'buy' : sig.call === 'hold' ? 'hold' : 'sell';
@@ -137,4 +139,8 @@ function rankIdeas(items){
 // The best Buy calls of one trend ('up' or 'early'), in ranked order (rankIdeas has already put the Buys first).
 function topBuys(ranked, trend, n = 5){ return ranked.filter(x => x.c.call === 'buy' && !x.c.held && x.c.trend === trend).slice(0, n); }
 
-export { BUY_TOP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys, trendOf };
+// The Early trend list (v1.342): the best-ranked Early stocks that no risk check holds back, whatever their rank. The tests never covered this group, so the top-10% cutoff
+// has no meaning for it and a small group gave a single stock; each card states its rank instead. Avoid calls (the bottom tenth) are left out. `ranked` is already in score order.
+function topEarly(ranked, n = 5){ return ranked.filter(x => x.c.trend === 'early' && !x.c.held && !x.c.blocked && x.c.call !== 'sell' && typeof x.c.p === 'number').slice(0, n); }
+
+export { BUY_TOP, RESULTS_DAYS, THIN_LAKH, ideaCall, rankIdeas, topBuys, topEarly, trendOf };

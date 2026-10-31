@@ -731,6 +731,8 @@ test('next week (v1.289): the ranking among a strategy\'s stocks, thin flag and 
   assert.ok(two[0].base > 0 && two[1].up === null && two[1].beat === null && two[1].base === null, 'v1.335: the Early group is ranked but the tests have no record for it, so it carries none');
   assert.strictEqual(NW.rankReads([{ p: 0.5 }, { p: 0.7 }], ['down', 'down'])[0].pct, undefined, 'v1.335: a Downward stock has no rank, there is no Downward list');
   assert.strictEqual(rr[1].topPct, 1); assert.strictEqual(rr[3].topPct, 100);
+  assert.deepStrictEqual(rr.map(x => x && [x.rank, x.groupN]), [[3, 4], [1, 4], null, [4, 4], [2, 4]], 'v1.342: rank 1 is the best of the group, with the group size');
+  assert.deepStrictEqual(two.slice(0, 4).map(x => [x.rank, x.groupN]), [[1, 2], [1, 2], [2, 2], [2, 2]], 'v1.342: rank counts inside the stock\'s own trend');
   assert.ok(rr[1].up > rr[3].up && rr[1].beat > rr[3].beat, 'the top band rose and beat the median more often than the bottom one in the tests');
   assert.strictEqual(NW.rankReads([{ p: 0.5 }], ['up'])[0].pct, 50, 'one stock alone has no rank'); assert.deepStrictEqual(NW.rankReads([null], ['up']), [null]);
   const walk = Array.from({ length: 100 }, (_, i) => 100 + 10 * Math.sin(i / 3) + i * 0.2);
@@ -904,6 +906,18 @@ test('ideas (v1.289): ranking is Buy, then Wait, then Avoid; the highest score l
   assert.strictEqual(I.topBuys(list, 'up').map(x => x.s.name).join(''), 'adefg', 'five Buys of the trend, skipping stocks you hold and non-Buys, in the order given');
   assert.strictEqual(I.topBuys(list, 'early').map(x => x.s.name).join(''), 'ij', 'the Early list has its own Buys');
   assert.strictEqual(I.topBuys(list, 'up', 2).length, 2); assert.strictEqual(I.topBuys([], 'up').length, 0);
+});
+test('ideas (v1.342): the Early list is the best-ranked Early stocks no risk check holds back, Buy or not; Avoid, blocked and unscored stocks are left out', () => {
+  const me = (n, trend, call, p, blocked, held) => ({ s: { name: n }, c: { trend, call, p, blocked, held } });
+  const list = [me('a', 'early', 'buy', 0.9, false), me('b', 'early', 'hold', 0.8, false), me('c', 'early', 'hold', 0.75, true), me('d', 'up', 'buy', 0.7, false), me('e', 'early', 'sell', 0.1, false),
+    me('f', 'early', 'hold', null, false), me('g', 'early', 'hold', 0.6, false), me('h', 'early', 'hold', 0.5, false), me('i', 'early', 'hold', 0.4, false), me('j', 'early', 'hold', 0.3, false), me('k', 'early', 'hold', 0.2, false)];
+  assert.strictEqual(I.topEarly(list).map(x => x.s.name).join(''), 'abghi', 'five, in the order given, skipping a blocked, an Avoid, an unscored and an Upward stock');
+  assert.strictEqual(I.topEarly(list, 2).length, 2); assert.strictEqual(I.topEarly([]).length, 0);
+  const call = (o, rd) => I.ideaCall(idea(o), null, nwr(60, { trend: 'early', base: null, up: null, beat: null, rank: 3, groupN: 11, ...rd }), TODAY);
+  const ok = call({});
+  assert.strictEqual(ok.call, 'hold'); assert.strictEqual(ok.blocked, false);
+  assert.strictEqual(ok.reasons[0], 'Rank 3 of 11 Early-trend stocks in this strategy today', 'the card says where the stock stands in its group');
+  assert.strictEqual(call({ liquidity: { nextResults: '2026-10-30' } }).blocked, true, 'a risk check marks the stock blocked even when it is not in the top tenth');
 });
 test('ideas (v1.289): the trend comes from weekly and monthly MACD; a mixed, down or unknown trend is never a Buy; an Early Buy says it is less confirmed and untested', () => {
   const t = (wl, ws, ml, ms) => ({ technical: { raw: { weekMacdLevel: wl, weekMacdSignal: ws, monthMacdLevel: ml, monthMacdSignal: ms } } });

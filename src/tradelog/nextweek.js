@@ -84,7 +84,7 @@ function nextWeekRead(weekBars, today){
 // Adds each reading's rank among the readings of the same trend (the stocks of one strategy today, split into 'up', 'early', 'down' and 'mixed'; `trends` is one entry per
 // reading): pct (0 lowest to 100 highest), topPct (it is in the top N%), and what happened in the five-year tests to stocks that ranked in the same 5% band
 // within their trend group each week: how often they were higher two weeks later (up) and how often they beat the median stock (beat), with `base`, how often
-// any stock of that trend was higher. The 'early' group (weekly up, monthly not) was not split out in those tests, so it is ranked but its up, beat and base are null.
+// any stock of that trend was higher. rank (1 = best) and groupN (stocks in the group) say where it stands among the stocks of its own trend. The 'early' group (weekly up, monthly not) was not split out in those tests, so it is ranked but its up, beat and base are null.
 // A reading with no trend, or a down or mixed one (in neither list), gets no rank. Returns new objects in the same order; a null stays null.
 function rankReads(reads, trends){
   const groups = {};
@@ -96,7 +96,7 @@ function rankReads(reads, trends){
     if(!ps) return { ...r, trend: t || null };
     let lo = 0; while(lo < ps.length && ps[lo] < r.p) lo++;
     const pct = ps.length > 1 ? 100 * lo / (ps.length - 1) : 50, bin = Math.min(19, Math.floor(pct / 5)), seg = M.seg[t];
-    return { ...r, trend: t, pct, topPct: Math.max(1, Math.round(100 - pct)), up: seg ? Math.round(seg.up[bin] * 1000) / 10 : null, beat: seg ? Math.round(seg.beat[bin] * 1000) / 10 : null, base: seg ? seg.base : null };
+    return { ...r, trend: t, pct, topPct: Math.max(1, Math.round(100 - pct)), rank: ps.length - lo, groupN: ps.length, up: seg ? Math.round(seg.up[bin] * 1000) / 10 : null, beat: seg ? Math.round(seg.beat[bin] * 1000) / 10 : null, base: seg ? seg.base : null };
   });
 }
 
