@@ -89,6 +89,28 @@ class Ledger(unittest.TestCase):
         self.assertEqual(len(s['curve']), 1)
         self.assertEqual(s['curve'][0][1], 2050)
 
+class Metrics(unittest.TestCase):
+    def test_drawdown(self):
+        m = A.metrics({'curve': [['a', 1100000, None], ['b', 880000, None], ['c', 990000, None]], 'closed': []})
+        self.assertEqual(m['maxDD'], -20.0); self.assertEqual(m['curDD'], -10.0)
+    def test_drawdown_from_start_capital(self):
+        self.assertEqual(A.metrics({'curve': [['a', 900000, None]], 'closed': []})['maxDD'], -10.0)
+    def test_no_drawdown_when_rising(self):
+        m = A.metrics({'curve': [['a', 1010000, None], ['b', 1020000, None]], 'closed': []}); self.assertEqual((m['maxDD'], m['curDD']), (0, 0))
+    def test_expectancy_and_payoff(self):
+        m = A.metrics({'curve': [], 'closed': [{'ret': 10}, {'ret': 10}, {'ret': -5}, {'ret': -5}, {'ret': -5}]})
+        self.assertEqual(m['expectancy'], 1.0); self.assertEqual(m['avgWin'], 10.0); self.assertEqual(m['avgLoss'], -5.0); self.assertEqual(m['payoff'], 2.0)
+    def test_no_trades(self):
+        m = A.metrics({'curve': [], 'closed': []}); self.assertIsNone(m['expectancy']); self.assertIsNone(m['payoff'])
+    def test_alpha_uses_window_with_nifty_only(self):
+        c = [['a', 1000000, None], ['b', 1100000, 20000], ['c', 1155000, 21000]]
+        m = A.metrics({'curve': c, 'closed': []})
+        self.assertEqual(m['niftyRet'], 5.0); self.assertEqual(m['agentRet'], 5.0); self.assertEqual(m['alpha'], 0.0); self.assertEqual(m['since'], 'b')
+    def test_alpha_none_without_two_nifty_points(self):
+        self.assertIsNone(A.metrics({'curve': [['a', 1e6, 20000]], 'closed': []})['alpha'])
+    def test_daily_stores_metrics(self):
+        e = Env({}, [row('X', 105)], st([pos('X')], cash=0)); self.assertIn('maxDD', e.run(nifty=22000)['state']['metrics'])
+
 class Learning(unittest.TestCase):
     def weekly(self, n_closed, win_f=.9, lose_f=.1):
         w = tempfile.mkdtemp(); os.makedirs(w + '/agent')

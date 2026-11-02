@@ -17,6 +17,26 @@ def S(p,o): json.dump(o,open(p,'w'),separators=(',',':'))
 def clip(x,a,b): return max(a,min(b,x))
 def today(): return (dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)+dt.timedelta(hours=5,minutes=30)).date().isoformat()
 
+def metrics(st):
+    """Performance metrics from the ledger. Returns plain numbers (percent) or None when not computable."""
+    cv=st.get('curve') or []; eq=[CAP]+[p[1] for p in cv]
+    peak=CAP; mdd=0.0
+    for e in eq:
+        peak=max(peak,e); mdd=min(mdd,(e/peak-1)*100)
+    m={'maxDD':round(mdd,2),'curDD':round((eq[-1]/max(eq)-1)*100,2)}
+    cl=st.get('closed') or []; win=[c['ret'] for c in cl if c['ret']>0]; lose=[c['ret'] for c in cl if c['ret']<=0]
+    m['n']=len(cl)
+    m['expectancy']=round(sum(c['ret'] for c in cl)/len(cl),2) if cl else None
+    m['avgWin']=round(sum(win)/len(win),2) if win else None
+    m['avgLoss']=round(sum(lose)/len(lose),2) if lose else None
+    m['payoff']=round(m['avgWin']/-m['avgLoss'],2) if win and lose and m['avgLoss'] else None
+    nf=[p for p in cv if len(p)>2 and p[2]]
+    if len(nf)>=2:
+        a,b=nf[0],nf[-1]; ar=(b[1]/a[1]-1)*100; nr=(b[2]/a[2]-1)*100
+        m.update({'niftyRet':round(nr,2),'agentRet':round(ar,2),'alpha':round(ar-nr,2),'since':a[0]})
+    else: m.update({'niftyRet':None,'agentRet':None,'alpha':None,'since':None})
+    return m
+
 def build(work,D):
     uni=set(J('%s/universe.json'%work)) if os.path.exists('%s/universe.json'%work) else None
     stocks={};live={};bars={}
@@ -123,6 +143,7 @@ def daily(work,nifty=None):
     eq=st['cash']+sum(p.get('last',p['entry'])*p['q'] for p in st['open'])
     ub=[px[k] for k in comp if k in px]
     st['curve']=[x for x in st['curve'] if x[0]!=day]+[[day,round(eq,0),nifty]]
+    st['metrics']=metrics(st)
     S(work+'/agent/state.json',st)
     S(work+'/agent/picks.json',{'asof':day,'dataAsof':asof,'weightsVersion':J(work+'/agent/weights.json',{'v':0})['v'],'top':rows[:15],'picks':[{k:r[k] for k in('k','n','g','close','score','mos','rsiW')} for r in picks],'new':new,'universe':len(rows),'blocked':sum(1 for r in rows if r['blocks'])})
     log=[l for l in log if l['d']!=day]+[{'d':day,'equity':round(eq),'open':len(st['open']),'new':[p['k'] for p in new],'closed':[c['k']+':'+c['why'] for c in st['closed'] if c['xd']==day]}]
