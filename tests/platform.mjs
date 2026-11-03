@@ -287,5 +287,26 @@ import { readFileSync } from 'node:fs';
   for(const line of ['Strict-Transport-Security: max-age=31536000', 'X-Frame-Options: DENY', 'X-Content-Type-Options: nosniff', 'Referrer-Policy: strict-origin-when-cross-origin']) eq('headers: ' + line, h.includes(line), true);
 }
 
+// Content-Security-Policy: strict (no unsafe-inline / unsafe-eval), and the one allowed inline <style> (the page skeleton on line 1 of index.html)
+// is pinned by hash, so changing that block without updating the header fails here instead of blanking the site.
+{
+  const { readFileSync } = await import('node:fs');
+  const { createHash } = await import('node:crypto');
+  const headers = readFileSync(new URL('../platform/_headers', import.meta.url), 'utf8');
+  const line = /^\s*Content-Security-Policy:\s*(.+)$/m.exec(headers);
+  eq('csp: the header is set', !!line, true);
+  const directives = new Map(String(line && line[1]).split(';').map(d => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
+  const has = (name, value) => (directives.get(name) || []).includes(value);
+  eq('csp: nothing is allowed by default', directives.get('default-src'), ["'none'"]);
+  eq('csp: scripts only from the site itself', directives.get('script-src'), ["'self'"]);
+  eq('csp: no unsafe-inline or unsafe-eval anywhere', /unsafe-(inline|eval)/.test(String(line && line[1])), false);
+  eq('csp: the database is reachable over https and wss', [has('connect-src', 'https://djxnoijgwtklszvgunma.supabase.co'), has('connect-src', 'wss://djxnoijgwtklszvgunma.supabase.co')], [true, true]);
+  eq('csp: fonts', [has('style-src', 'https://fonts.googleapis.com'), has('font-src', 'https://fonts.gstatic.com')], [true, true]);
+  eq('csp: no framing, plugins or base tag', [directives.get('frame-ancestors'), directives.get('object-src'), directives.get('base-uri')], [["'none'"], ["'none'"], ["'none'"]]);
+  const skeleton = /<style>([\s\S]*?)<\/style>/.exec(readFileSync(new URL('../index.html', import.meta.url), 'utf8'));
+  eq('csp: index.html has exactly one inline <style> block', (readFileSync(new URL('../index.html', import.meta.url), 'utf8').match(/<style/g) || []).length, 1);
+  eq('csp: the skeleton style is allowed by its hash', has('style-src', "'sha256-" + createHash('sha256').update(skeleton[1]).digest('base64') + "'"), true);
+}
+
 console.log(fails ? fails + ' FAILED' : 'OK: platform contract tests pass');
 process.exit(fails ? 1 : 0);
