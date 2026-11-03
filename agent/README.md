@@ -34,3 +34,6 @@ Weekly: also copy `stockData`, `barsRecent`; run `build` (expect 400-500 stocks,
 - `daily` computes `ub` but never uses it.
 - Stops/targets are checked on daily closes, so gaps fill worse than modelled.
 - No benchmark series is charted even though `--nifty` is stored in the curve.
+
+## Backtest (backtest.py)
+`python3 agent/backtest.py DIR [--json out.json]` replays weekly bars (priceHistory `*_1W.json`) and compares exit/gate rule sets on identical entry signals. Latest output: `BACKTEST_RESULTS.txt`. Price/volume rules only; no fundamentals; survivorship bias; weekly bars (stop assumed first if both hit in one bar). Tests: `tests/test_backtest.py`.
