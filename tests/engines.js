@@ -796,8 +796,23 @@ test('update banner: it appears once, and its Reload button reloads the page', (
   S.showUpdateBanner(); S.showUpdateBanner();
   assert.strictEqual(win.document.querySelectorAll('#dataUpdateBanner').length, 1);
   assert.strictEqual(win.document.querySelector('#dataUpdateBanner span').textContent, 'Stock data was updated.');
+  assert.strictEqual(win.document.getElementById('dataUpdateBanner').className, 'toast-banner');
+  assert.strictEqual(win.document.querySelector('#dataUpdateBanner button').className, 'toast-banner__btn');
+  assert.strictEqual(win.document.querySelectorAll('[style]').length, 0, 'styled by classes, never inline');
   win.document.querySelector('#dataUpdateBanner button').click();
   assert.strictEqual(spy.reloads, 1);
+}));
+
+test('copy fallback: the hidden text box is styled by a class, holds the text while copying and is removed again', () => withPage('', async (win) => {
+  const stubs = { 'core/stocks.js': 'export const stocks = [];', 'navigation.js': 'export const appSections = []; export const showSection = () => {};', 'inlinedetail.js': 'export const openStockInline = () => {};' };
+  const { copyText } = await loadWithStubs('src/ui/deeplink.js', '', stubs);
+  Object.defineProperty(win.navigator, 'clipboard', { value: undefined, configurable: true });
+  let seen = null;
+  win.document.execCommand = () => { const ta = win.document.querySelector('textarea'); seen = ta && { value: ta.value, cls: ta.className, inline: ta.hasAttribute('style') }; return true; };
+  const prev = globalThis.navigator; Object.defineProperty(globalThis, 'navigator', { value: win.navigator, configurable: true });
+  try { await copyText('https://example.test/#ABC'); } finally { Object.defineProperty(globalThis, 'navigator', { value: prev, configurable: true }); }
+  assert.deepStrictEqual(seen, { value: 'https://example.test/#ABC', cls: 'clipboard-proxy', inline: false });
+  assert.strictEqual(win.document.querySelector('textarea'), null, 'removed after copying');
 }));
 
 test('boot(): it loads the stock list, hands it over and starts the app, with the database loader when none is given', () => withPage(COVER, async (win) => {
@@ -1821,6 +1836,173 @@ test('gate: the import page has the file picker, button and log, and no inline s
   assert.strictEqual(page.querySelectorAll('[style]').length, 0);
   log.textContent = '<script>alert(1)</script>';
   assert.strictEqual(page.querySelector('script'), null, 'the log is text, never markup');
+}));
+
+const memoryStorage = () => { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: k => { m.delete(k); } }; };
+// ---- share links and the address bar (src/ui/deeplink.js): opened once from the address, kept in step with the open stock, a stock link left for a new tab
+test('deep link: the address opens its stock, share links and the address bar use the ticker symbol, and a stock link leaves a note for a new tab', () => withPage('<a class="stock-link" href="#ABC">Abc</a>', async (win) => {
+  const calls = { shown: [], opened: [], replaced: [] }, listeners = {};
+  globalThis.__dlStocks = [{ ticker: 'ABC · Banks', name: 'Abc Ltd' }]; globalThis.__dlCalls = calls;
+  const stubs = { 'core/stocks.js': 'export const stocks = globalThis.__dlStocks;',
+    'navigation.js': "export const appSections = { business: { id: 'business' } }; export const showSection = k => globalThis.__dlCalls.shown.push(k);",
+    'inlinedetail.js': 'export const openStockInline = (sec, label, idx) => globalThis.__dlCalls.opened.push([sec.id, label, idx]);' };
+  const fakeWindow = { location: { hash: '#abc', search: '' }, sessionStorage: memoryStorage(), history: { state: null, replaceState: (...a) => calls.replaced.push(a[2]) }, addEventListener: (t, f) => { listeners[t] = f; } };
+  const saved = ['window', 'history', 'localStorage'].map(k => [k, Object.getOwnPropertyDescriptor(globalThis, k)]), loc = globalThis.location;
+  Object.defineProperty(globalThis, 'window', { value: fakeWindow, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'history', { value: fakeWindow.history, configurable: true, writable: true });
+  const local = memoryStorage(); Object.defineProperty(globalThis, 'localStorage', { value: local, configurable: true, writable: true });
+  globalThis.location = { pathname: '/page', search: '?x=1', reload(){} };
+  try {
+    const D = await loadWithStubs('src/ui/deeplink.js', '', stubs);
+    assert.strictEqual(D.stockShareLink(globalThis.__dlStocks[0]), 'https://claude.ai/artifact/VbEn1ocnjxCGFL9Bz9S5Wh#ABC');
+    D.init_ui_deeplink();
+    assert.deepStrictEqual([calls.shown, calls.opened], [['business'], [['business', '', 0]]], 'the code in the address opens that stock');
+    assert.strictEqual(D.stockCodeFromAddress(), 'abc', 'the code is read once per page');
+    listeners.hashchange(); assert.strictEqual(calls.opened.length, 2, 'a changed address opens the stock again');
+    fakeWindow.location.hash = '#nosuch'; listeners.hashchange(); assert.strictEqual(calls.opened.length, 2, 'an unknown code opens nothing');
+    fakeWindow.history.state = { alba: true }; fakeWindow.location.hash = '#abc'; listeners.hashchange(); assert.strictEqual(calls.opened.length, 2, 'the app\'s own history entries are left alone');
+    D.syncStockHash(globalThis.__dlStocks[0]); D.syncStockHash(null);
+    assert.deepStrictEqual(calls.replaced, ['#ABC', '/page?x=1'], 'the open stock is in the address, none clears it');
+    const a = win.document.querySelector('a.stock-link');
+    a.dispatchEvent(new win.MouseEvent('contextmenu', { bubbles: true }));
+    assert.strictEqual(JSON.parse(local.getItem('alba.openStock')).code, 'ABC', 'a right-click leaves the code for the new tab');
+    const plain = new win.MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }); a.dispatchEvent(plain);
+    assert.strictEqual(plain.defaultPrevented, true, 'a plain click on a stock link opens it in place');
+    const ctrl = new win.MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ctrlKey: true }); a.dispatchEvent(ctrl);
+    assert.strictEqual(ctrl.defaultPrevented, false, 'Ctrl+click keeps the browser\'s new-tab behaviour');
+  } finally {
+    for(const [k, d] of saved){ if(d) Object.defineProperty(globalThis, k, d); else delete globalThis[k]; }
+    globalThis.location = loc; delete globalThis.__dlStocks; delete globalThis.__dlCalls;
+  }
+}));
+
+// ---- the update-ready banner (src/boot/autoreload.js): shown, with a Reload button, when a newer build is published and a reload already happened or work is running
+test('auto reload: a newer published build shows a banner styled by classes, with a Reload button when it already reloaded once', () => withPage('<script data-entry="app.js?v=aaa111"></script>', async (win, spy) => {
+  let onRelease = null;
+  globalThis.__arDb = { doc: () => ({ onSnapshot: cb => { onRelease = cb; } }) }; globalThis.__arBusy = false;
+  const stubs = { 'core/store.js': 'export const dbCapabilityPromise = Promise.resolve(globalThis.__arDb);', 'core/busy.js': 'export const anyBusy = () => globalThis.__arBusy;' };
+  const savedWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const session = memoryStorage();
+  Object.defineProperty(globalThis, 'window', { value: { sessionStorage: session, location: globalThis.location }, configurable: true, writable: true });
+  const release = build => onRelease({ exists: true, data: () => ({ build }) });
+  try {
+    const A = await loadWithStubs('src/boot/autoreload.js', '', stubs);
+    const realInterval = globalThis.setInterval, timers = []; globalThis.setInterval = f => { timers.push(f); return 0; };   // the 5-second re-check runs when the test says so, never after the page is gone
+    try { A.init_boot_autoreload(); await new Promise(r => setTimeout(r, 20)); } finally { globalThis.setInterval = realInterval; }
+    assert.strictEqual(timers.length, 1, 'one periodic re-check is scheduled');
+    release('aaa111'); assert.strictEqual(win.document.getElementById('appUpdateBanner'), null, 'the same build shows nothing');
+    globalThis.__arBusy = true; release('bbb222');
+    const banner = () => win.document.getElementById('appUpdateBanner');
+    assert.ok(/loads when the current work finishes/.test(banner().textContent) && banner().className === 'toast-banner' && !banner().querySelector('button'), 'busy: told it will load later, no button');
+    session.setItem('albaAutoReload', 'bbb222'); release('bbb222');
+    const btn = banner().querySelector('button');
+    assert.ok(/new version is available/.test(banner().textContent) && btn.className === 'toast-banner__btn' && btn.textContent === 'Reload now', 'already reloaded once: a Reload button instead of a loop');
+    assert.strictEqual(win.document.querySelectorAll('[style]').length, 0, 'styled by classes, never inline');
+    btn.click(); assert.strictEqual(spy.reloads, 1);
+    release(null); timers[0]();   // no release record: the periodic re-check has nothing to show
+    assert.strictEqual(spy.reloads, 1);
+  } finally { if(savedWindow) Object.defineProperty(globalThis, 'window', savedWindow); else delete globalThis.window; delete globalThis.__arDb; delete globalThis.__arBusy; }
+}));
+
+// A page environment for src/ui/deeplink.js: the address, both storages and the calls it makes, restored afterwards.
+async function withDeeplink(win, { hash = '', search = '', top, local = memoryStorage(), session = memoryStorage(), stocks = [{ ticker: 'ABC · Banks', name: 'Abc Ltd' }] }, fn){
+  const calls = { shown: [], opened: [] };
+  globalThis.__dlStocks = stocks; globalThis.__dlCalls = calls;
+  const stubs = { 'core/stocks.js': 'export const stocks = globalThis.__dlStocks;',
+    'navigation.js': "export const appSections = { business: { id: 'business' } }; export const showSection = k => globalThis.__dlCalls.shown.push(k);",
+    'inlinedetail.js': 'export const openStockInline = (sec, label, idx) => globalThis.__dlCalls.opened.push([sec.id, label, idx]);' };
+  const fakeWindow = { location: { hash, search }, sessionStorage: session, history: { state: null, replaceState(){} }, addEventListener(){}, top: undefined };
+  fakeWindow.top = top === undefined ? fakeWindow : top;
+  const saved = ['window', 'history', 'localStorage'].map(k => [k, Object.getOwnPropertyDescriptor(globalThis, k)]);
+  Object.defineProperty(globalThis, 'window', { value: fakeWindow, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'history', { value: fakeWindow.history, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'localStorage', { value: local, configurable: true, writable: true });
+  try { return await fn(await loadWithStubs('src/ui/deeplink.js', '', stubs), calls, fakeWindow); }
+  finally { for(const [k, d] of saved){ if(d) Object.defineProperty(globalThis, k, d); else delete globalThis[k]; } delete globalThis.__dlStocks; delete globalThis.__dlCalls; }
+}
+test('deep link: the code is read from #CODE, #stock=CODE, ?stock= or the page around, and a used code is not acted on twice', () => withPage('', async (win) => {
+  const read = async (opts) => withDeeplink(win, opts, D => D.stockCodeFromAddress());
+  assert.strictEqual(await read({ hash: '#/ABC' }), 'ABC');
+  assert.strictEqual(await read({ hash: '#stock=a%20b' }), 'a b');
+  assert.strictEqual(await read({ search: '?stock=XYZ' }), 'XYZ');
+  assert.strictEqual(await read({ search: '?s=QQ' }), 'QQ');
+  assert.strictEqual(await read({ hash: '#%E0%A4%A' }), '', 'an address that cannot be decoded gives no code');
+  assert.strictEqual(await read({}), '', 'no code in the address');
+  assert.strictEqual(await read({ top: { location: { hash: '#TOPCODE', search: '' } } }), 'TOPCODE', 'the page around the app can carry the code');
+  const unreadable = { get location(){ throw new Error('another site'); } };
+  assert.strictEqual(await read({ top: unreadable }), '', 'a parent page on another site cannot be read');
+  const session = memoryStorage(); session.setItem('alba.usedStockCode', 'ABC');
+  assert.strictEqual(await read({ hash: '#ABC', session }), '', 'a code already used in this tab is ignored on refresh');
+  const broken = { getItem(){ throw new Error('blocked'); }, setItem(){ throw new Error('blocked'); }, removeItem(){} };
+  assert.strictEqual(await read({ hash: '#ABC', session: broken }), 'ABC', 'unavailable storage never stops a link from opening');
+}));
+test('deep link: a note left by another tab opens its stock once; a stock found by exact name; an unknown or empty code opens nothing', () => withPage('', async (win) => {
+  const local = memoryStorage(); local.setItem('alba.openStock', JSON.stringify({ code: 'ABCLTD', from: 'another-tab', at: Date.now() }));
+  await withDeeplink(win, { local }, (D, calls) => {
+    assert.strictEqual(D.stockCodeFromAddress(), 'ABCLTD', 'the hand-off from another tab');
+    assert.strictEqual(local.getItem('alba.openStock'), null, 'a note is read once');
+    D.init_ui_deeplink();
+    assert.deepStrictEqual(calls.opened, [['business', '', 0]], 'found by the stock\'s exact name (Abc Ltd), spaces ignored');
+  });
+  const stale = memoryStorage(); stale.setItem('alba.openStock', JSON.stringify({ code: 'ABC', from: 'another-tab', at: Date.now() - 60000 }));
+  assert.strictEqual(await withDeeplink(win, { local: stale }, D => D.stockCodeFromAddress()), '', 'a note older than 30 seconds is ignored');
+  const garbage = memoryStorage(); garbage.setItem('alba.openStock', '{not json');
+  assert.strictEqual(await withDeeplink(win, { local: garbage }, D => D.stockCodeFromAddress()), '', 'an unreadable note is ignored');
+  await withDeeplink(win, { hash: '#   ' }, (D, calls) => { D.init_ui_deeplink(); assert.strictEqual(calls.opened.length, 0, 'an empty code opens nothing'); });
+  const throwing = { getItem(){ return null; }, setItem(){ throw new Error('full'); }, removeItem(){} };
+  await withDeeplink(win, { local: throwing }, (D) => {
+    win.document.body.innerHTML = '<a class="stock-link" href="#ABC">x</a>';
+    assert.doesNotThrow(() => win.document.querySelector('a').dispatchEvent(new win.MouseEvent('auxclick', { bubbles: true })), 'a full storage never breaks the click');
+  });
+}));
+test('copy text: the clipboard is used when there is one, the hidden box when there is not, and a refused copy rejects', () => withPage('', async (win) => {
+  await withDeeplink(win, {}, async (D) => {
+    const written = []; Object.defineProperty(globalThis, 'navigator', { value: { clipboard: { writeText: t => { written.push(t); return Promise.resolve(); } } }, configurable: true });
+    await D.copyText('via clipboard'); assert.deepStrictEqual(written, ['via clipboard']);
+    Object.defineProperty(globalThis, 'navigator', { value: { clipboard: { writeText(){ throw new Error('denied'); } } }, configurable: true });
+    win.document.execCommand = () => false;
+    await assert.rejects(D.copyText('x'), /copy failed/, 'the fallback reports a refused copy');
+    win.document.execCommand = () => { throw new Error('unsupported'); };
+    await assert.rejects(D.copyText('x'), /unsupported/);
+    delete globalThis.navigator;
+  });
+}));
+test('deep link: the address bar cannot always be changed, and that never throws', () => withPage('', async (win) => {
+  await withDeeplink(win, {}, (D, calls, fakeWindow) => {
+    fakeWindow.history.replaceState = () => { throw new Error('sandboxed'); };
+    assert.doesNotThrow(() => D.syncStockHash({ ticker: 'ABC · Banks', name: 'Abc Ltd' }));
+  });
+}));
+test('auto reload: it updates by itself when idle, waits while someone types, and does nothing without a release record or a script id', () => withPage('<script data-entry="app.js?v=aaa111"></script><textarea id="t"></textarea>', async (win, spy) => {
+  const stubs = { 'core/store.js': 'export const dbCapabilityPromise = globalThis.__arDbMake();', 'core/busy.js': 'export const anyBusy = () => false;' };
+  const savedWindow = Object.getOwnPropertyDescriptor(globalThis, 'window'), session = memoryStorage();
+  Object.defineProperty(globalThis, 'window', { value: { sessionStorage: session, location: globalThis.location }, configurable: true, writable: true });
+  const realTimeout = globalThis.setTimeout, realInterval = globalThis.setInterval, delayed = [];
+  const start = async (makeDb) => {
+    globalThis.__arDbMake = makeDb;   // the database promise is made when the module loads, so a rejection is handled the moment the module awaits it
+    const A = await loadWithStubs('src/boot/autoreload.js', '', stubs);
+    globalThis.setInterval = () => 0;
+    try { A.init_boot_autoreload(); await new Promise(r => realTimeout(r, 20)); } finally { globalThis.setInterval = realInterval; }
+  };
+  try {
+    let onRelease = null; const db = { doc: () => ({ onSnapshot: cb => { onRelease = cb; } }) };
+    await start(() => Promise.resolve(db));
+    const ta = win.document.getElementById('t'); ta.value = 'half-typed note'; ta.focus();
+    onRelease({ exists: true, data: () => ({ build: 'ccc333' }) });
+    assert.ok(/loads when the current work finishes/.test(win.document.getElementById('appUpdateBanner').textContent), 'typing holds the reload back');
+    ta.value = ''; ta.blur(); globalThis.setTimeout = (f, ms) => { delayed.push([f, ms]); return 0; };
+    try { onRelease({ exists: true, data: () => ({ build: 'ccc333' }) }); } finally { globalThis.setTimeout = realTimeout; }
+    assert.strictEqual(session.getItem('albaAutoReload'), 'ccc333', 'one automatic reload per build is recorded');
+    assert.ok(/Updating to the new version/.test(win.document.getElementById('appUpdateBanner').textContent));
+    delayed[0][0](); assert.strictEqual(spy.reloads, 1, 'it reloads after a short pause');
+    onRelease({ exists: false }); onRelease(undefined);
+    await start(() => Promise.reject(new Error('no database'))); await start(() => Promise.resolve(null));
+    await start(() => Promise.resolve({ doc: () => { throw new Error('no such document'); } }));
+    win.document.querySelector('script').removeAttribute('data-entry'); await start(() => Promise.resolve(db));
+    const visibility = []; const realAdd = win.document.addEventListener.bind(win.document); win.document.addEventListener = (t, f) => { visibility.push([t, f]); return realAdd(t, f); };
+    win.document.querySelector('script').setAttribute('data-entry', 'app.js?v=aaa111'); await start(() => Promise.resolve(db));
+    visibility.find(v => v[0] === 'visibilitychange')[1]();
+  } finally { if(savedWindow) Object.defineProperty(globalThis, 'window', savedWindow); else delete globalThis.window; delete globalThis.__arDbMake; }
 }));
 
 (async () => {

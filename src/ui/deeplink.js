@@ -75,7 +75,7 @@ function copyText(text){
   try{ if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text); }catch(e){ /* no clipboard access: falls back below */ }
   return new Promise((resolve, reject) => {
     try{
-      const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      const ta = document.createElement('textarea'); ta.value = text; ta.className = 'clipboard-proxy';
       document.body.appendChild(ta); ta.select();
       const ok = document.execCommand('copy'); document.body.removeChild(ta);
       ok ? resolve(undefined) : reject(new Error('copy failed'));
