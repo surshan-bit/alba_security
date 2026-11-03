@@ -249,6 +249,23 @@ import { readFileSync } from 'node:fs';
   }
 }
 
+// The server functions' packages are recorded with their hashes in supabase/deno.lock, and CI checks them with --frozen: a package whose
+// content no longer matches its recorded hash, or a new package nobody reviewed, fails the check (CLAUDE.md section 3, A06 and A08)
+{
+  const { readFileSync } = await import('node:fs');
+  const lock = JSON.parse(readFileSync(new URL('../supabase/deno.lock', import.meta.url), 'utf8'));
+  const pinned = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dependencies['@supabase/supabase-js'];
+  const npmPackages = Object.entries(lock.npm || {});
+  eq('lock: supabase-js is recorded at the version package.json pins', Object.keys(lock.npm || {}).includes('@supabase/supabase-js@' + pinned), true);
+  eq('lock: every package has a hash', npmPackages.length > 1 && npmPackages.every(([, p]) => /^sha512-/.test(p.integrity)), true);
+  for(const file of ['ci.yml', 'functions.yml']){
+    const wf = readFileSync(new URL('../.github/workflows/' + file, import.meta.url), 'utf8');
+    eq(file + ': Deno is installed by an action pinned to a commit', /uses: denoland\/setup-deno@[0-9a-f]{40} # v\d+\.\d+\.\d+/.test(wf), true);
+    eq(file + ': Deno itself is pinned to an exact version', /deno-version: \d+\.\d+\.\d+/.test(wf), true);
+    eq(file + ': the function is checked against the lock without being allowed to change it', /deno check --frozen --node-modules-dir=none --lock=supabase\/deno\.lock supabase\/functions\/sample\/index\.ts/.test(wf), true);
+  }
+}
+
 // Security headers: the Cloudflare site must ship the file that sets them
 {
   const { readFileSync } = await import('node:fs');
