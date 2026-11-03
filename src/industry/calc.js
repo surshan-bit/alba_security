@@ -1,5 +1,6 @@
 // Industry page numbers: the roll-up of a group of stocks (scores, valuation, verdicts, factors), their combined news
 // and global / macro notes, and the average weekly / monthly % change series. Pure functions of the stocks handed in.
+import { cleanSentiment } from '../core/sentiment.js';
 import { tickerSymbol } from '../core/util.js';
 import { mosPct, scoreBand } from '../list/metrics.js';
 import { eventTime } from '../prices/events.js';
@@ -39,7 +40,7 @@ function industryNews(members){
   members.forEach(s => {
     (Array.isArray(s.__events) ? s.__events : []).forEach(e => {
       if(!e || (e.k !== 'news' && e.k !== 'earn' && e.k !== 'corp') || !e.t || eventTime(e.d) === null) return;
-      out.push({ d: String(e.d).slice(0, 10), t: String(e.t), k: e.k, src: e.src || '', url: e.url || '', s: e.s || '', stock: s.name, ticker: tickerSymbol(s) });
+      out.push({ d: String(e.d).slice(0, 10), t: String(e.t), k: e.k, src: e.src || '', url: e.url || '', s: cleanSentiment(e.s), stock: s.name, ticker: tickerSymbol(s) });
     });
   });
   return out.sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0));

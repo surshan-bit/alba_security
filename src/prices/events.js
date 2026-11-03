@@ -2,6 +2,7 @@
 // your own trades and the day research was saved. News, results and corporate events are read from TradingView by
 // Refresh Fundamental Info and kept on the stock (s.__events); trades come from the Trade Log.
 import { allTrades } from '../core/store.js';
+import { cleanSentiment } from '../core/sentiment.js';
 import { tickerSymbol } from '../core/util.js';
 import { stockResearchAsof } from '../research/status.js';
 
@@ -29,7 +30,7 @@ function stockChartEvents(s){
   const add = (k, d, text, src, url, sentiment) => {
     const t = eventTime(d);
     if(t === null || !text) return;
-    out.push({ t, d: String(d).slice(0, 10), k, group: GROUP_OF[k], glyph: GLYPH_OF[k] || '', text: String(text), src: src || '', url: url || '', s: sentiment || '' });
+    out.push({ t, d: String(d).slice(0, 10), k, group: GROUP_OF[k], glyph: GLYPH_OF[k] || '', text: String(text), src: src || '', url: url || '', s: cleanSentiment(sentiment) });
   };
   (Array.isArray(s.__events) ? s.__events : []).forEach(e => { if(e && GROUP_OF[e.k]) add(e.k, e.d, e.t, e.src, e.url, e.s); });
   const sym = tickerSymbol(s);
