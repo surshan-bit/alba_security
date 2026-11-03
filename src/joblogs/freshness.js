@@ -1,6 +1,7 @@
 // Data Freshness bars on the Data Refresh page.
 import { stocks } from '../core/stocks.js';
 import { escapeHtml } from '../core/util.js';
+import { setHtml } from '../core/safehtml.js';
 
 // Parses a stock's top-level `asof` field (the Fundamental Score / Valuation / Global Factors
 // last-touched date), in either the ISO form written by onboarding scripts ("2026-09-20") or the
@@ -38,7 +39,7 @@ function renderFreshnessPanel(cfg){
 
   if(ages.length === 0){
     summaryEl.textContent = cfg.noDataText;
-    barsEl.innerHTML = '';
+    barsEl.textContent = '';
     return;
   }
 
@@ -60,7 +61,7 @@ function renderFreshnessPanel(cfg){
   summaryEl.textContent = `Average ${avgAge.toFixed(1)} day${avgAge.toFixed(1) === '1.0' ? '' : 's'} old, oldest ${oldestAge} day${oldestAge === 1 ? '' : 's'}, ${freshCount} of ${ages.length} (${Math.round(100 * freshCount / ages.length)}%) refreshed in the last 3 days`
     + (unparsed ? ` · ${unparsed} stock${unparsed === 1 ? '' : 's'} with no parseable refresh date` : '') + '.';
 
-  barsEl.innerHTML = buckets.map((b, i) => {
+  setHtml(barsEl, buckets.map((b, i) => {
     const count = counts[i];
     const pct = Math.round(100 * count / maxCount);
     return `
@@ -70,7 +71,7 @@ function renderFreshnessPanel(cfg){
         <span class="refreshlog-freshness-count">${count} stock${count === 1 ? '' : 's'}</span>
       </div>
     `;
-  }).join('');
+  }).join(''));
 }
 
 // The day a stock's technical data was last confirmed: its score's date, or the day TradingView's snapshot last covered it if that is later.

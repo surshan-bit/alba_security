@@ -4,6 +4,7 @@ import { escapeHtml } from '../core/util.js';
 import { parseCSV } from './csvparse.js';
 import { recordFundamentalCsvUpload } from './upload-history.js';
 import { targetEl } from '../core/evt.js';
+import { setHtml } from '../core/safehtml.js';
 
 function tickerFromString(t){
   return t.split('·')[0].trim().toUpperCase();
@@ -18,7 +19,7 @@ function renderFundamentalDiffResults(resultEl, fileTickers, newTickers, dropped
   const alreadyScored = fileTickers.length - newTickers.length;
   const newLine = newTickers.length
     ? `<div class="upload-hint">New: ${newTickers.slice(0, 12).map(escapeHtml).join(', ')}${newTickers.length > 12 ? ' … +' + (newTickers.length - 12) : ''}</div>` : '';
-  resultEl.innerHTML = `
+  setHtml(resultEl, `
     <div class="diff-summary">
       <div class="diff-stat"><b>${fileTickers.length}</b>In file</div>
       <div class="diff-stat"><b>${alreadyScored}</b>Already scored</div>
@@ -26,7 +27,7 @@ function renderFundamentalDiffResults(resultEl, fileTickers, newTickers, dropped
       <div class="diff-stat"><b>${droppedTickers.length}</b>Not in file</div>
     </div>
     ${newLine}
-  `;
+  `);
 }
 
 // ---- Fundamental Score CSV (screener.in export) — primary, always-on source ----
@@ -82,14 +83,14 @@ function processFundamentalCsvText(text){
     renderFundamentalDiffResults(resultEl, fileTickers, newTickers, droppedTickers);
     return { rowCount: fileTickers.length, newCount: newTickers.length, droppedCount: droppedTickers.length };
   } catch(err){
-    resultEl.innerHTML = `<div class="upload-error">Couldn't process this CSV: ${escapeHtml(err.message)}</div>`;
+    setHtml(resultEl, `<div class="upload-error">Couldn't process this CSV: ${escapeHtml(err.message)}</div>`);
     return null;
   }
 }
 
 function handleFundamentalCsvFile(file){
   const resultEl = document.getElementById('fundamentalUploadResult');
-  resultEl.innerHTML = `<div class="upload-hint">Reading ${escapeHtml(file.name)}…</div>`;
+  setHtml(resultEl, `<div class="upload-hint">Reading ${escapeHtml(file.name)}…</div>`);
   const reader = new FileReader();
   reader.onload = () => {
     const text = String(reader.result);
@@ -97,7 +98,7 @@ function handleFundamentalCsvFile(file){
     recordFundamentalCsvUpload(file, text, stats);
   };
   reader.onerror = () => {
-    resultEl.innerHTML = `<div class="upload-error">Couldn't read this file. Please try again.</div>`;
+    setHtml(resultEl, `<div class="upload-error">Couldn't read this file. Please try again.</div>`);
   };
   reader.readAsText(file);
 }

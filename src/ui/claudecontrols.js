@@ -1,11 +1,12 @@
 import { CLAUDE_STEPS, claudeMasterOn, claudeStepOn, setClaudeStep } from '../livedata/claudegate.js';
+import { setHtml } from '../core/safehtml.js';
 // Settings > Claude controls: one switch per step that sends data to Claude, and a master switch.
 
 function row(id, title, sub, on, disabled){
   const lab = document.createElement('label');
   lab.className = 'settings-row claude-ctl-row';
-  lab.innerHTML = '<div class="settings-row-text"><div class="settings-row-title"></div><div class="settings-row-sub"></div></div>' +
-    '<input type="checkbox" class="claude-ctl-box" data-claude-step="' + id + '" aria-label="' + title.replace(/"/g, '&quot;') + '">';
+  setHtml(lab, '<div class="settings-row-text"><div class="settings-row-title"></div><div class="settings-row-sub"></div></div>' +
+    '<input type="checkbox" class="claude-ctl-box" data-claude-step="' + id + '" aria-label="' + title.replace(/"/g, '&quot;') + '">');
   lab.querySelector('.settings-row-title').textContent = title;
   lab.querySelector('.settings-row-sub').textContent = sub;
   const box = /** @type {HTMLInputElement} */ (lab.querySelector('input'));

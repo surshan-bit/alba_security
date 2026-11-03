@@ -1,5 +1,6 @@
 // Refresh kit: the floating menu that the Refresh buttons open (placing it, closing it, focus, and the shared menu-item markup).
 
+import { setHtml } from '../core/safehtml.js';
 let menuEl = null, menuAnchor = null, menuState = null;
 function closeMenu(focusBack) {
   if (!menuEl) return;
@@ -26,7 +27,7 @@ function openMenu(anchor, html, state) {
   closeMenu(false);
   menuEl = document.createElement("div");
   menuEl.className = "rk-menu"; menuEl.setAttribute("role", "menu");
-  menuEl.innerHTML = html;
+  setHtml(menuEl, html);
   document.body.appendChild(menuEl);
   menuAnchor = anchor; menuState = state || {};
   if (anchor) anchor.setAttribute("aria-expanded", "true");
@@ -36,7 +37,7 @@ function openMenu(anchor, html, state) {
 }
 function refillMenu(html) {
   if (!menuEl) return;
-  menuEl.innerHTML = html; placeMenu();
+  setHtml(menuEl, html); placeMenu();
 }
 const item = (act, attrs, label, small, off) => '<button type="button" role="menuitem" class="rk-item" data-rk-act="' + act + '" ' + attrs + (off ? " disabled" : "") + ">" + label + (small ? "<small>" + small + "</small>" : "") + "</button>";
 const menuIsOpen = () => !!menuEl;

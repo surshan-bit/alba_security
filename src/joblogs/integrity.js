@@ -3,6 +3,7 @@ import { stocks } from '../core/stocks.js';
 import { escapeHtml, tickerSymbol } from '../core/util.js';
 import { fiHasValuation } from '../import/fund-check.js';
 import { expectedScore } from '../core/fundscore.js';
+import { setHtml } from '../core/safehtml.js';
 
 // One-time data-integrity sanity check, run once at load. The offline refresh/merge pipeline
 // (scripts/lib/scoring.js, run outside the browser before publishing) already enforces these
@@ -34,7 +35,7 @@ function runDataIntegrityCheck(){
   if(problems.length === 0) return; // clean — leave the banner hidden, don't clutter the UI
   console.warn('[data-integrity] ' + problems.length + ' issue(s) found:', problems);
   const shown = problems.slice(0, 5);
-  banner.innerHTML = `⚠ Data integrity check found ${problems.length} issue${problems.length === 1 ? '' : 's'} in the published stock data (full list in the browser console): ${shown.map(escapeHtml).join(' · ')}${problems.length > shown.length ? ` · +${problems.length - shown.length} more` : ''}`;
+  setHtml(banner, `⚠ Data integrity check found ${problems.length} issue${problems.length === 1 ? '' : 's'} in the published stock data (full list in the browser console): ${shown.map(escapeHtml).join(' · ')}${problems.length > shown.length ? ` · +${problems.length - shown.length} more` : ''}`);
   banner.style.display = '';
 }
 

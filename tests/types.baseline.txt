@@ -22,8 +22,6 @@ src/analysis/leaderboard.js: error TS2345: Argument of type 'Element | null' is 
 src/analysis/leaderboard.js: error TS2345: Argument of type 'Element | null' is not assignable to parameter of type 'Node'.
 src/analysis/leaderboard.js: error TS2345: Argument of type 'Element | null' is not assignable to parameter of type 'Node'.
 src/analysis/leaderboard.js: error TS2531: Object is possibly 'null'.
-src/analysis/section.js: error TS2531: Object is possibly 'null'.
-src/analysis/tooltip.js: error TS18047: 'tooltip' is possibly 'null'.
 src/analysis/tooltip.js: error TS18047: 'tooltip' is possibly 'null'.
 src/analysis/tooltip.js: error TS18047: 'tooltip' is possibly 'null'.
 src/analysis/tooltip.js: error TS18047: 'tooltip' is possibly 'null'.
@@ -37,16 +35,10 @@ src/business/panel.js: error TS2322: Type 'string | undefined' is not assignable
 src/business/panel.js: error TS2345: Argument of type 'ChildNode | null' is not assignable to parameter of type 'string | Node'.
 src/detail/pending.js: error TS18047: 'moN' is possibly 'null'.
 src/detail/render.js: error TS18047: 'detailEl' is possibly 'null'.
-src/detail/render.js: error TS18047: 'detailEl' is possibly 'null'.
-src/import/csv-upload.js: error TS18047: 'resultEl' is possibly 'null'.
-src/import/csv-upload.js: error TS18047: 'resultEl' is possibly 'null'.
-src/import/csv-upload.js: error TS18047: 'resultEl' is possibly 'null'.
 src/import/csv-upload.js: error TS2531: Object is possibly 'null'.
 src/import/fund-engine.js: error TS18047: 'a' is possibly 'null'.
 src/import/fund-engine.js: error TS18047: 'b' is possibly 'null'.
 src/import/fund-engine.js: error TS2531: Object is possibly 'null'.
-src/industry/render.js: error TS18047: 'body' is possibly 'null'.
-src/industry/render.js: error TS18047: 'detailEl' is possibly 'null'.
 src/industry/render.js: error TS18047: 'detailEl' is possibly 'null'.
 src/industry/render.js: error TS18047: 'detailEl' is possibly 'null'.
 src/industry/render.js: error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
@@ -66,8 +58,6 @@ src/prices/chart.js: error TS18047: 'el' is possibly 'null'.
 src/prices/chart.js: error TS18047: 'panels' is possibly 'null'.
 src/prices/chart.js: error TS18047: 'panels' is possibly 'null'.
 src/prices/chart.js: error TS18047: 'svg' is possibly 'null'.
-src/prices/chart.js: error TS18047: 'svg' is possibly 'null'.
-src/prices/chart.js: error TS18047: 'tip' is possibly 'null'.
 src/prices/chart.js: error TS18047: 'xh' is possibly 'null'.
 src/prices/chart.js: error TS18047: 'xh' is possibly 'null'.
 src/prices/chart.js: error TS18047: 'xh' is possibly 'null'.
@@ -105,8 +95,6 @@ src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
 src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
 src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
 src/strategies/rules.js: error TS18048: 'f' is possibly 'undefined'.
-src/strategies/section.js: error TS2531: Object is possibly 'null'.
-src/strategies/section.js: error TS2531: Object is possibly 'null'.
 src/strategies/section.js: error TS2531: Object is possibly 'null'.
 src/tradelog/form.js: error TS2531: Object is possibly 'null'.
 src/ui/claudecontrols.js: error TS2531: Object is possibly 'null'.

@@ -16,6 +16,7 @@ import { escapeHtml } from '../core/util.js';
 import { isRebound } from '../list/rebound.js';
 import { ensureAllPriceBars } from '../prices/store.js';
 import { ideasStockSet, ideasWhen } from './ideasfilter.js';
+import { setHtml } from '../core/safehtml.js';
 
 // Both filter groups are multiselect (changed 2026-10-06): clicking "All" clears the group back
 // to showing everything; clicking any other button toggles just that option in/out of the active
@@ -278,7 +279,7 @@ function renderAnalysisFilterPanel(rerender){
   const host = document.getElementById('analysisGlobalFilters');
   const old = document.getElementById('analysisFilterPanel');
   if(old) old.remove();   // the panel docked in the toolbar is the one being replaced
-  if(host) host.innerHTML = analysisFiltersHtml();
+  if(host) setHtml(host, analysisFiltersHtml());
   const panel = document.getElementById('analysisFilterPanel'), toggle = document.getElementById('analysisFiltersToggle'), summary = document.getElementById('analysisFiltersSummary');
   if(panel && toggle && summary){
     const names = Array.from(panel.querySelectorAll('.filter-btn.active')).filter(b => !['all'].includes(/** @type {HTMLElement} */ (b).dataset.averdict || /** @type {HTMLElement} */ (b).dataset.amos || /** @type {HTMLElement} */ (b).dataset.atechw || /** @type {HTMLElement} */ (b).dataset.atechm || /** @type {HTMLElement} */ (b).dataset.arebound || /** @type {HTMLElement} */ (b).dataset.astrat || /** @type {HTMLElement} */ (b).dataset.aideas)).map(b => {

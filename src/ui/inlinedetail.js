@@ -19,7 +19,7 @@ function closeInlineDetail(restoreScroll){
   if(!current) return;
   const { section, host, scroll } = current;
   current = null;
-  if(detailEl.parentNode === host){ detailHome.appendChild(detailEl); detailEl.innerHTML = ''; }
+  if(detailEl.parentNode === host){ detailHome.appendChild(detailEl); detailEl.textContent = ''; }
   host.remove();
   section.classList.remove('inline-detail-open');
   setDetailBackTo(null);

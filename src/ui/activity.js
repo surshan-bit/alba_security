@@ -6,6 +6,7 @@
 // supplies what Stop does; nothing here knows how a refresh works.
 import { escapeHtml } from '../core/util.js';
 import { closestEl } from '../core/evt.js';
+import { setHtml } from '../core/safehtml.js';
 
 const MAX_NOTICES = 20;
 const running = new Map();   // id -> { title, text, pct, section, onStop, stopping }
@@ -50,10 +51,10 @@ function paintPanel(panel){
   const signature = items.map(i => i.id + '|' + i.kind + '|' + (i.section || '') + '|' + (i.kind === 'run' && i.data.onStop ? 's' : '')).join(';');
   if(signature !== shownSignature){   // (null at first: with nothing to list the signature is '', and the "Nothing running" text must still be drawn)
     shownSignature = signature;
-    panel.innerHTML = '<div class="activity-head"><span class="activity-head-title">Notifications</span>'
+    setHtml(panel, '<div class="activity-head"><span class="activity-head-title">Notifications</span>'
       + (notices.length ? '<button type="button" class="activity-btn" data-act="clearall">Clear all</button>' : '') + '</div>'
       + (items.length ? '<div class="activity-list">' + items.map(i => itemHtml(i.id, i.kind, i.section)).join('') + '</div>'
-        : '<div class="activity-empty">Nothing running. Finished refreshes show up here.</div>');
+        : '<div class="activity-empty">Nothing running. Finished refreshes show up here.</div>'));
   }
   const list = panel.querySelector('.activity-list');
   if(!list) return;

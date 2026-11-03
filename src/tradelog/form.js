@@ -11,6 +11,7 @@ import { tellUser } from '../ui/confirm.js';
 import { appSections } from '../ui/navigation.js';
 import { openStockInline } from '../ui/inlinedetail.js';
 import { closestEl, targetEl } from '../core/evt.js';
+import { setHtml } from '../core/safehtml.js';
 
 // ---- Trade Log: add / sell / remove from this page (added 2026-10-06) ----
 function tlToday(){
@@ -39,13 +40,13 @@ function tlSetMsg(text, isErr){
   const m = document.getElementById('tlMsg');
   if(m){ m.textContent = text || ''; m.className = 'tl-msg' + (isErr ? ' err' : ''); }
 }
-function tlCloseForm(){ const h = document.getElementById('tradeFormHost'); if(h) h.innerHTML = ''; }
+function tlCloseForm(){ const h = document.getElementById('tradeFormHost'); if(h) h.textContent = ''; }
 
 function tlOpenAddForm(){
   const host = document.getElementById('tradeFormHost');
   if(!host) return;
   tlSel = null; tlItems = []; tlActive = -1; tlAutoPrice = null;
-  host.innerHTML = `
+  setHtml(host, `
     <div class="tl-form" data-tl-form="add">
       <div class="tl-form-title">Add a trade (buy)</div>
       <div class="tl-grid">
@@ -64,7 +65,7 @@ function tlOpenAddForm(){
         <button type="button" class="refresh-btn" id="tlCancel">Cancel</button>
         <span class="tl-msg" id="tlMsg">The stock's current score, verdict and data completeness are saved with the trade as a snapshot.</span>
       </div>
-    </div>`;
+    </div>`);
   document.getElementById('tlStock').focus();
 }
 let tlSel = null, tlItems = [], tlActive = -1, tlAutoPrice = null;
@@ -86,11 +87,11 @@ function tlShowSugg(){
   if(!q || (tlSel && /** @type {HTMLInputElement} */ (inp).value === tlLabel(tlSel))){ tlHideSugg(); return; }
   tlItems = buildSuggestions(q); tlActive = -1;
   if(!tlItems.length){ tlHideSugg(); return; }
-  el.innerHTML = tlItems.map((st, i) => {
+  setHtml(el, tlItems.map((st, i) => {
     const parts = String(st.ticker || '').split('·');
     const sub = parts[0].trim() + (parts[1] ? ' · ' + parts[1].trim() : '');
     return `<div class="sg-item" role="option" data-i="${i}"><div class="sg-main"><div class="sg-name">${sgMark(st.name || '', q)}</div><div class="sg-sub">${sgMark(sub, q)}</div></div><div class="sg-score">${Number(st.score).toFixed(2)}</div></div>`;
-  }).join('');
+  }).join(''));
   el.classList.add('show'); inp.setAttribute('aria-expanded', 'true');
 }
 function tlPick(st){
@@ -146,7 +147,7 @@ function tlOpenSellForm(id){
   if(!t || !host) return;
   const s = stockByTickerSymbolAny.get(t.ticker);
   const curPrice = s && s.valuation && s.valuation.currentPrice != null ? s.valuation.currentPrice : '';
-  host.innerHTML = `
+  setHtml(host, `
     <div class="tl-form" data-tl-form="sell" data-tl-id="${escapeHtml(id)}">
       <div class="tl-form-title">Sell: ${escapeHtml(t.name || t.ticker)} (bought ${escapeHtml(formatDate(t.buy.date))} at &#8377;${t.buy.price} &times; ${t.buy.quantity})</div>
       <div class="tl-grid">
@@ -158,7 +159,7 @@ function tlOpenSellForm(id){
         <button type="button" class="refresh-btn" id="tlCancel">Cancel</button>
         <span class="tl-msg" id="tlMsg">Sells the whole position. The return shown is before brokerage and taxes.</span>
       </div>
-    </div>`;
+    </div>`);
   host.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 async function tlSaveSell(id){

@@ -9,6 +9,7 @@ import { ldBatchStart, ldBatchStop } from '../livedata/batch.js';
 import { browserFullscreen, fullscreenLabel, watchFullscreenExit } from '../ui/fullscreen.js';
 import { getRefreshKit } from '../refresh/hook.js';
 import { closestEl } from '../core/evt.js';
+import { setHtml } from '../core/safehtml.js';
 
 // Rows drawn at first and added by each "Show more": a table of thousands of rows is slow to lay out.
 const LB_STEP = 100;
@@ -23,7 +24,7 @@ function paintFullscreen(){
   document.body.classList.toggle('lb-full-open', lbFull);
   if(btn){
     const label = fullscreenLabel(lbFull) + ' (Esc to leave)';
-    btn.innerHTML = iconBtnInner(lbFull ? 'shrink' : 'expand', fullscreenLabel(lbFull));
+    setHtml(btn, iconBtnInner(lbFull ? 'shrink' : 'expand', fullscreenLabel(lbFull)));
     btn.title = label; btn.setAttribute('aria-label', label); btn.setAttribute('aria-pressed', lbFull ? 'true' : 'false');
   }
 }
@@ -114,11 +115,11 @@ function renderLeaderboardRows(filtered){
   let drawn = Math.min(ranked.length, lbRows), drawable = ranked.length, rowsHtml;
   if(ranked.length === 0) rowsHtml = `<tr><td colspan="${colSpan}" class="analysis-lb-empty">No stocks in the current RSI range.</td></tr>`;
   else rowsHtml = ranked.slice(0, lbRows).map((s, i) => leaderboardRowHtml(s, i, colOrder)).join('');
-  if(lbBody) lbBody.innerHTML = rowsHtml;
+  if(lbBody) setHtml(lbBody, rowsHtml);
   const moreEl = document.getElementById('analysisLeaderboardMore');
   if(moreEl){
     moreEl.hidden = drawable <= drawn;
-    moreEl.innerHTML = moreEl.hidden ? '' : `Showing the first ${drawn} rows. <button type="button" class="analysis-reset-btn" data-lb-more="1">Show ${Math.min(LB_STEP, drawable - drawn)} more</button>`;
+    setHtml(moreEl, moreEl.hidden ? '' : `Showing the first ${drawn} rows. <button type="button" class="analysis-reset-btn" data-lb-more="1">Show ${Math.min(LB_STEP, drawable - drawn)} more</button>`);
   }
   // The refresh buttons work through the shown stocks in the order they are listed.
   setAnalysisShownIdx(ranked.map(s => stockIndex.get(s)));

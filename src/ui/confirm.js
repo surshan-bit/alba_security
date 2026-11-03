@@ -1,4 +1,5 @@
 import { closestEl } from '../core/evt.js';
+import { setHtml } from '../core/safehtml.js';
 // An in-page confirmation box. The browser's own confirm() pop-up is blocked inside the published page's sandbox (it
 // silently answers "no"), so buttons that asked it appeared to do nothing.
 function askConfirm(message, okLabel, info){
@@ -10,7 +11,7 @@ function askConfirm(message, okLabel, info){
     box.className = 'alba-confirm';
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
-    box.innerHTML = '<div class="alba-confirm-card"><div class="alba-confirm-msg"></div><div class="alba-confirm-btns"><button type="button" class="strat-btn" id="albaConfirmNo">Cancel</button><button type="button" class="strat-btn alba-confirm-ok" id="albaConfirmOk"></button></div></div>';
+    setHtml(box, '<div class="alba-confirm-card"><div class="alba-confirm-msg"></div><div class="alba-confirm-btns"><button type="button" class="strat-btn" id="albaConfirmNo">Cancel</button><button type="button" class="strat-btn alba-confirm-ok" id="albaConfirmOk"></button></div></div>');
     box.querySelector('.alba-confirm-msg').textContent = message;
     box.querySelector('#albaConfirmOk').textContent = okLabel || 'OK';
     if(info) /** @type {HTMLElement} */ (box.querySelector('#albaConfirmNo')).hidden = true;   // a notice: one button
