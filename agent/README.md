@@ -25,9 +25,12 @@ The scheduled tasks ("Alba Agent Daily Run", Mon-Fri 17:00 IST; "Alba Agent Week
 - Agent db (`agent/`): `state`, `picks`, `weights`, `learn`, `log`, `compact`, `code`.
 - Dashboard db (read-only for the agent): `stockData`, `liveSnapshot`, `barsRecent`.
 
+## Rocky page in the dashboard
+The dashboard (Alba Securities v1.346+) has a **Rocky** menu item. It only reads the dashboard database collection `rocky` (docs `state`, `picks`, `weights`, `learn`, `log`), which is a copy of the agent's own docs. The scheduled runs write that copy as their step 7 (daily: state, picks, log; weekly: weights, learn); they may write only the `rocky` collection of the dashboard. Source: `src/rocky/`, `src/sections/rocky.js`, `styles/rocky.css` in the dashboard repo.
+
 ## Run steps (what the scheduled tasks do)
-Daily: copy `agent/*` and `liveSnapshot` to a work dir, check newest `asof` is within 4 days, run `python3 -I agent.py daily WORK [--nifty X]`, write back `state`, `picks`, `log`.
-Weekly: also copy `stockData`, `barsRecent`; run `build` (expect 400-500 stocks, abort upload if < 300) then `weekly`; write back `compact`, `weights`, `learn`.
+Daily: copy `agent/*` and `liveSnapshot` to a work dir, check newest `asof` is within 4 days, run `python3 -I agent.py daily WORK [--nifty X]`, write back `state`, `picks`, `log`, then copy the same three to the dashboard's `rocky` collection.
+Weekly: also copy `stockData`, `barsRecent`; run `build` (expect 400-500 stocks, abort upload if < 300) then `weekly`; write back `compact`, `weights`, `learn`, then copy `weights` and `learn` to the dashboard's `rocky` collection.
 
 ## Known issues
 - `daily()` sets `asof` via `'asof' in dir()` and raises NameError if there are no liveSnapshot files; the task's freshness check normally prevents this.
