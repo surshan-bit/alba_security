@@ -180,6 +180,18 @@ import { readFileSync } from 'node:fs';
   }
 }
 
+// Every numbered migration can be run again: a policy is dropped before it is created, so a second run does not stop with "already exists"
+{
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = new URL('../supabase/', import.meta.url);
+  const files = readdirSync(dir).filter(f => /^\d{3}_.*\.sql$/.test(f));
+  eq('migrations: the numbered files are found', files.length >= 5, true);
+  for(const f of files){
+    const sql = readFileSync(new URL(f, dir), 'utf8');
+    for(const m of sql.matchAll(/^create policy (\w+) on ([\w.]+)/gm)) eq(f + ': policy ' + m[1] + ' is dropped first', new RegExp('drop policy if exists ' + m[1] + ' on ' + m[2].replace('.', '\\.') + ';\\s*create policy ' + m[1] + ' on').test(sql), true);
+  }
+}
+
 // Security headers: the Cloudflare site must ship the file that sets them
 {
   const { readFileSync } = await import('node:fs');
