@@ -186,7 +186,7 @@ function initCharts(members, events){
     if(!root.isConnected) return;
     const live = members.filter(s => priceHistoryByTicker[pcTickerKey(s)]);
     if(!ok || !live.length){ setHtml(root, '<p class="upload-hint biz-warn">Price history is not available for these stocks yet.</p>'); return; }
-    root.replaceChildren();
+    root.textContent = '';
     const ctl = [];
     CHARTS.forEach(c => {
       const series = industrySeries(live.map(s => priceHistoryByTicker[pcTickerKey(s)][c.int]), c.k);

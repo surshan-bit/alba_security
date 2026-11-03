@@ -39,7 +39,7 @@ function renderFreshnessPanel(cfg){
 
   if(ages.length === 0){
     summaryEl.textContent = cfg.noDataText;
-    barsEl.replaceChildren();
+    barsEl.textContent = '';
     return;
   }
 

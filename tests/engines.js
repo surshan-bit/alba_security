@@ -719,6 +719,15 @@ test('escaping: the Buy / Sell ideas news list still drops a hostile sentiment (
     SH.insertHtmlAfter(host.querySelector('#b'), '<em>after b</em>');
     assert.strictEqual(host.innerHTML, '<u>1</u><u>2</u><i id="b">b</i><em>after b</em><s>end</s>');
   }));
+  test('safe markup: a redraw triggered while the old children are being removed does not break the fill (Chromium 141 failed replaceChildren here)', withDom((win, doc) => {
+    const el = doc.createElement('div'); el.innerHTML = '<input value="focused field">';
+    const text = Object.getOwnPropertyDescriptor(win.Node.prototype, 'textContent'); let redraws = 0;
+    // stands in for a blur / change handler that fires when the focused field is removed and redraws the same element
+    Object.defineProperty(el, 'textContent', { configurable: true, get(){ return text.get.call(this); }, set(v){ text.set.call(this, v); if(!redraws++) SH.setHtml(el, '<p>redrawn by the handler</p>'); } });
+    SH.setHtml(el, '<p>drawn first</p>');
+    assert.strictEqual(redraws, 2);   // the handler's own fill clears too
+    assert.strictEqual(el.innerHTML, '<p>drawn first</p>');   // the fill that was asked for last wins, as with innerHTML
+  }));
   test('safe markup: with no element to fill the helpers fail loudly instead of doing nothing', withDom(() => {
     assert.throws(() => SH.setHtml(null, 'x'), /no element to fill/);
     assert.throws(() => SH.replaceWithHtml(null, 'x'), /no element to replace/);

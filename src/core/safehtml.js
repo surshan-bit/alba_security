@@ -65,7 +65,11 @@ function htmlFragment(html, anchor, context = anchor) {
  * @param {Element | null} el @param {string} html */
 function setHtml(el, html) {
   if (!el) throw new TypeError('setHtml: there is no element to fill');
-  el.replaceChildren(htmlFragment(html, el));
+  const fragment = htmlFragment(html, el);
+  // Children go first, then the new ones come in. Removing a focused field can fire a handler that redraws `el`; in Chromium 141 a
+  // replaceChildren() caught in the middle of that fails with NotFoundError, while clearing first behaves as the old innerHTML did.
+  el.textContent = '';
+  el.replaceChildren(fragment);   // replaces, not appends: a redraw made by such a handler may already have put content back
 }
 
 /** Replaces `el` itself with the markup, the safe way to set the outer HTML of an element.

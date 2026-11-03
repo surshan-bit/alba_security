@@ -346,12 +346,12 @@ const hostActive = () => { const s = hostSection(); return !!s && s.classList.co
 // After a refresh started here has saved its stocks, redraw so the grid shows the new numbers.
 document.addEventListener('alba-batch-done', (e) => { if(/** @type {CustomEvent} */ (e).detail && /^biz-/.test(/** @type {CustomEvent} */ (e).detail.source) && hostActive()) render(); });
 function show(){
-  if(embed && embed.el.isConnected) embed.el.replaceChildren();   // Analysis is not on screen now; its copy of the table must not clash with this page's
+  if(embed && embed.el.isConnected) embed.el.textContent = '';   // Analysis is not on screen now; its copy of the table must not clash with this page's
   embed = null; render(); ensureData();
 }
 // The same table inside Analysis: `cfg` = { el (where to draw), by ('industry' | 'group'), section, label, stocksNow() (the stocks that pass the Analysis filters) }. Wired once per element.
 function showIn(cfg){
-  const own = document.getElementById('businessBody'); if(own) own.replaceChildren();   // Explorer's own copy (hidden) would share element ids with this one
+  const own = document.getElementById('businessBody'); if(own) own.textContent = '';   // Explorer's own copy (hidden) would share element ids with this one
   if(!embed || embed.by !== cfg.by) open.clear();
   if(!cfg.el.dataset.bizWired){ cfg.el.dataset.bizWired = '1'; wire(cfg.el); }
   embed = Object.assign({ set: new Set(), on: false }, cfg);

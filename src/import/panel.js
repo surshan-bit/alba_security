@@ -18,8 +18,8 @@ function fiReset(title, steps){
   fiState = { title, status: {}, detail: {}, frac: {}, error: null };
   fiCur.forEach(s => { fiState.status[s.key] = 'pending'; fiState.detail[s.key] = ''; fiState.frac[s.key] = 0; });
   const p = fiEl('fundImportPanel'); if(p) p.hidden = false;
-  const r = fiEl('fiResult'); if(r){ r.replaceChildren(); r.className = 'fi-result'; }
-  const q = fiEl('fiPrompt'); if(q) q.replaceChildren();
+  const r = fiEl('fiResult'); if(r){ r.textContent = ''; r.className = 'fi-result'; }
+  const q = fiEl('fiPrompt'); if(q) q.textContent = '';
   fiPaint();
 }
 function fiSet(key, status, detail, frac){

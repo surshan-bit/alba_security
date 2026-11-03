@@ -40,7 +40,7 @@ function tlSetMsg(text, isErr){
   const m = document.getElementById('tlMsg');
   if(m){ m.textContent = text || ''; m.className = 'tl-msg' + (isErr ? ' err' : ''); }
 }
-function tlCloseForm(){ const h = document.getElementById('tradeFormHost'); if(h) h.replaceChildren(); }
+function tlCloseForm(){ const h = document.getElementById('tradeFormHost'); if(h) h.textContent = ''; }
 
 function tlOpenAddForm(){
   const host = document.getElementById('tradeFormHost');
