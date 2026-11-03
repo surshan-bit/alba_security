@@ -266,6 +266,20 @@ import { readFileSync } from 'node:fs';
   }
 }
 
+// Playwright 1.56 does not support ubuntu-latest (now Ubuntu 26.04), so every job runs on a pinned runner. functions.yml was missed once: its check
+// job died at `playwright install` and the deploy that depends on it was skipped.
+{
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = new URL('../.github/workflows/', import.meta.url);
+  const files = readdirSync(dir).filter(f => /\.ya?ml$/.test(f));
+  eq('workflows: the workflow files are found', files.length >= 2, true);
+  for(const f of files){
+    const runners = [...readFileSync(new URL(f, dir), 'utf8').matchAll(/^\s*runs-on:\s*(\S+)/gm)].map(m => m[1]);
+    eq(f + ': has at least one job with a runner', runners.length > 0, true);
+    eq(f + ': every job runs on ubuntu-24.04, never ubuntu-latest', runners.every(r => r === 'ubuntu-24.04'), true);
+  }
+}
+
 // Security headers: the Cloudflare site must ship the file that sets them
 {
   const { readFileSync } = await import('node:fs');
