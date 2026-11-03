@@ -3,6 +3,7 @@
 import { createDocStore, createMemoryBackend } from '../platform/docstore.js';
 import { installPlatform } from '../platform/shim.js';
 import { corsHeaders } from '../supabase/functions/_shared/cors.ts';
+import { readPrompt, MAX_PROMPT_CHARS } from '../supabase/functions/_shared/prompt.ts';
 let fails = 0;
 const eq = (name, a, b) => { const ok = JSON.stringify(a) === JSON.stringify(b); if(!ok){ fails++; console.log('FAIL', name, JSON.stringify(a), '!=', JSON.stringify(b)); } };
 const tick = () => new Promise(r => setTimeout(r, 5));
@@ -122,6 +123,16 @@ import { readFileSync } from 'node:fs';
   eq('cors: never a wildcard', corsHeaders(other, '*')['Access-Control-Allow-Origin'], undefined);
   eq('cors: a listed origin is echoed back', corsHeaders('https://b.example', ' https://a.example , https://b.example ')['Access-Control-Allow-Origin'], 'https://b.example');
   eq('cors: the answer varies by Origin', corsHeaders(site).Vary, 'Origin');
+}
+
+// Reading the prompt of a request to the Claude function: any malformed body is a clean 400/413, never a crash
+{
+  const bad = body => { const r = readPrompt(body); return 'status' in r ? r.status : 0; };
+  eq('prompt: a plain prompt is accepted', readPrompt({ prompt: 'hello' }), { prompt: 'hello' });
+  for(const body of [null, undefined, 7, 'text', true, [], ['prompt'], {}, { prompt: '' }, { prompt: 5 }, { prompt: null }, { prompt: { a: 1 } }]) eq('prompt: ' + JSON.stringify(body) + ' is a 400', bad(body), 400);
+  eq('prompt: the longest allowed prompt passes', bad({ prompt: 'a'.repeat(MAX_PROMPT_CHARS) }), 0);
+  eq('prompt: one character too many is a 413', bad({ prompt: 'a'.repeat(MAX_PROMPT_CHARS + 1) }), 413);
+  eq('prompt: the error carries a code and a user-safe message', readPrompt(null), { code: 'invalid_request', message: 'Bad request.', status: 400 });
 }
 
 // Security headers: the Cloudflare site must ship the file that sets them

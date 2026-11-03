@@ -1,6 +1,7 @@
 // Asks Claude on the owner's behalf (the Fundamental refresh and news labelling). The Anthropic key lives only in this function's
 // secrets (ANTHROPIC_API_KEY), never in the browser. Replies { text } like the claude.ai runtime did.
 import { cors, reply, requireOwner } from '../_shared/owner.ts';
+import { readPrompt } from '../_shared/prompt.ts';
 
 const MODELS: Record<string, string> = {
   quick: Deno.env.get('MODEL_QUICK') ?? 'claude-haiku-5-5',
@@ -16,9 +17,9 @@ Deno.serve(async (req) => {
 
   let body: any;
   try { body = await req.json(); } catch { return reply(req, { code: 'invalid_request', message: 'Bad request.' }, 400); }
-  const prompt = typeof body.prompt === 'string' ? body.prompt : '';
-  if (!prompt) return reply(req, { code: 'invalid_request', message: 'No prompt.' }, 400);
-  if (prompt.length > 400_000) return reply(req, { code: 'prompt_too_large', message: 'Too large.' }, 413);
+  const read = readPrompt(body);
+  if ('status' in read) return reply(req, { code: read.code, message: read.message }, read.status);
+  const prompt = read.prompt;
   const model = MODELS[body.modelTier === 'quick' ? 'quick' : 'default'];
 
   const r = await fetch('https://api.anthropic.com/v1/messages', {
