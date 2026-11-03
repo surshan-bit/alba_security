@@ -8,7 +8,7 @@ def series(n=80, px=100.0):
 class Fills(unittest.TestCase):
     def setUp(self):
         self.orig = B.signal
-        B.signal = lambda bars, i: ({'close': 100, 'atr': 5.0, 'hi52': 200, 'low3': 99, 'score': 1, 'volup': True, 'rsi': 60} if i == 60 else None)
+        B.signal = lambda bars, i, *a: ({'close': 100, 'atr': 5.0, 'hi52': 200, 'low3': 99, 'score': 1, 'volup': True, 'rsi': 60} if i == 60 else None)
     def tearDown(self): B.signal = self.orig
     def trade(self, bar62, rule=None, extra=None):
         v = series(); v[62] = bar62                    # entry fills at open of bar 61 (price 100)

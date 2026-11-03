@@ -82,6 +82,25 @@ class Blocks(unittest.TestCase):
         ts = (dt.datetime.fromisoformat(DAY) + dt.timedelta(days=30)).replace(tzinfo=dt.timezone.utc).timestamp()
         self.assertFalse(self.blocked(c11=ts))
 
+class Regime(unittest.TestCase):
+    def mk(self, up, n=40):
+        stocks = {'S%d' % i: comp('S%d' % i, g='G%d' % i) for i in range(n)}
+        rows = [row('S%d' % i, 100, c8=(5 if i < up else -5)) for i in range(n)]
+        return Env(stocks, rows)
+    def test_risk_on_opens_positions(self):
+        r = self.mk(30).run(); self.assertTrue(r['picks']['regime']['on']); self.assertGreater(len(r['state']['open']), 0)
+    def test_risk_off_opens_nothing_but_reports_picks(self):
+        r = self.mk(10).run(); self.assertFalse(r['picks']['regime']['on']); self.assertEqual(r['state']['open'], []); self.assertEqual(r['picks']['regime']['breadth'], .25)
+    def test_risk_off_still_manages_exits(self):
+        e = self.mk(10); w = e.w
+        import json; json.dump(st([pos('S0', stop=94, target=110)], cash=0), open(w + '/agent/state.json', 'w'))
+        rows = json.load(open(w + '/liveSnapshot/c001.json')); rows['rows'][0]['c'][0] = 93; json.dump(rows, open(w + '/liveSnapshot/c001.json', 'w'))
+        s = e.run()['state']; self.assertEqual(s['closed'][0]['why'], 'stop')
+    def test_too_few_stocks_keeps_filter_on(self):
+        self.assertTrue(A.regime({'A': [100] + [None] * 7 + [-5, None, None, None]}, {'A': {}})['on'])
+    def test_exactly_at_minimum_is_on(self):
+        self.assertTrue(self.mk(20).run()['picks']['regime']['on'])
+
 class Ledger(unittest.TestCase):
     def test_equity_is_cash_plus_positions_and_curve_idempotent(self):
         e = Env({}, [row('X', 105)], st([pos('X', q=10)], cash=1000))

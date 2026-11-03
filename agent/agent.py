@@ -8,6 +8,7 @@ Modes (all file based; WORK dir holds the JSON docs):
 import json,glob,sys,os,math,datetime as dt
 CAP=1_000_000; RISK=0.01; MAXPOS=8; POSCAP=0.125; COST=0.005  # round-trip costs+slippage
 TARGET=10.0; TIME_DAYS=30; MAX_PER_GROUP=2
+REGIME_MIN=0.5   # market filter: new entries only while at least this share of the universe has a positive 1-month change
 FEATS=['fund','mos','trend','rsi','mom','near']
 W0={'fund':1.0,'mos':1.0,'trend':1.5,'rsi':0.7,'mom':0.8,'near':0.8}
 def J(p,d=None):
@@ -84,6 +85,14 @@ def feats(k,m,c):
         except Exception: pass
     return f,mos,blocks
 
+def regime(live,comp,minimum=REGIME_MIN):
+    """Market breadth over the scored universe: share of stocks with a positive 1-month change (live column 8).
+    Returns dict(breadth, n, min, on). With too little data (<30 stocks) the filter stays on rather than blocking everything."""
+    ch=[live[k][8] for k in comp if k in live and live[k][8] is not None]
+    if len(ch)<30: return {'breadth':None,'n':len(ch),'min':minimum,'on':True}
+    b=sum(1 for x in ch if x>0)/len(ch)
+    return {'breadth':round(b,3),'n':len(ch),'min':minimum,'on':b>=minimum}
+
 def daily(work,nifty=None):
     comp=J(work+'/agent/compact.json')['stocks']; wts=J(work+'/agent/weights.json',{'w':W0,'v':0})['w']
     live={}
@@ -130,7 +139,8 @@ def daily(work,nifty=None):
         picks.append(r); gcount[r['g']]=gcount.get(r['g'],0)+1
         if len(picks)>=MAXPOS: break
     # 3) open new paper positions
-    slots=MAXPOS-len(keep); new=[]
+    reg=regime(live,comp)
+    slots=(MAXPOS-len(keep)) if reg['on'] else 0; new=[]   # risk-off: manage exits, open nothing
     for r in picks[:max(slots,0)]:
         atr=r['atr'] or 6.0
         sp=clip(atr*0.9,4.5,9.0)   # stop distance %, ~weekly range
@@ -145,10 +155,10 @@ def daily(work,nifty=None):
     st['curve']=[x for x in st['curve'] if x[0]!=day]+[[day,round(eq,0),nifty]]
     st['metrics']=metrics(st)
     S(work+'/agent/state.json',st)
-    S(work+'/agent/picks.json',{'asof':day,'dataAsof':asof,'weightsVersion':J(work+'/agent/weights.json',{'v':0})['v'],'top':rows[:15],'picks':[{k:r[k] for k in('k','n','g','close','score','mos','rsiW')} for r in picks],'new':new,'universe':len(rows),'blocked':sum(1 for r in rows if r['blocks'])})
-    log=[l for l in log if l['d']!=day]+[{'d':day,'equity':round(eq),'open':len(st['open']),'new':[p['k'] for p in new],'closed':[c['k']+':'+c['why'] for c in st['closed'] if c['xd']==day]}]
+    S(work+'/agent/picks.json',{'asof':day,'dataAsof':asof,'weightsVersion':J(work+'/agent/weights.json',{'v':0})['v'],'top':rows[:15],'picks':[{k:r[k] for k in('k','n','g','close','score','mos','rsiW')} for r in picks],'new':new,'regime':reg,'universe':len(rows),'blocked':sum(1 for r in rows if r['blocks'])})
+    log=[l for l in log if l['d']!=day]+[{'d':day,'equity':round(eq),'open':len(st['open']),'new':[p['k'] for p in new],'closed':[c['k']+':'+c['why'] for c in st['closed'] if c['xd']==day],'regime':reg['on'],'breadth':reg['breadth']}]
     S(work+'/agent/log.json',{'items':log[-120:]})
-    print('equity',round(eq),'open',len(st['open']),'new',[p['k'] for p in new],'dataAsof',asof)
+    print('equity',round(eq),'open',len(st['open']),'new',[p['k'] for p in new],'dataAsof',asof,'regime',reg)
 
 def weekly(work):
     st=J(work+'/agent/state.json'); wd=J(work+'/agent/weights.json',{'w':dict(W0),'v':0,'hist':[]})

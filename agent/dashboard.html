@@ -74,6 +74,7 @@ async function main(){
     ['Closed trades',cl.length],['Hit rate',cl.length?fmt(wins/cl.length*100,0)+'%':'–'],['Weights version',wt?'v'+wt.v:'v0'],
     ['Alpha vs Nifty',m.alpha==null?'–':pc(m.alpha)],['Nifty return',m.niftyRet==null?'–':pc(m.niftyRet)],
     ['Max drawdown',m.maxDD==null?'–':pc(m.maxDD)],['Current drawdown',m.curDD==null?'–':pc(m.curDD)],
+    ['Market regime',pk&&pk.regime?(pk.regime.on?'<span class="up">Risk-on</span>':'<span class="dn">Risk-off</span>')+(pk.regime.breadth==null?'':' <span class="sub">'+fmt(pk.regime.breadth*100,0)+'% up</span>'):'–'],
     ['Expectancy / trade',m.expectancy==null?'–':pc(m.expectancy)],['Avg win / avg loss',m.payoff==null?'–':m.avgWin.toFixed(1)+'% / '+m.avgLoss.toFixed(1)+'%']
   ].map(([a,b])=>`<div class="kpi"><span>${a}</span><b>${b}</b></div>`).join('');
   $('curve').innerHTML=curve(st.curve||[]);
@@ -81,7 +82,7 @@ async function main(){
   $('picks').innerHTML=pk?table([
     {h:'Stock',f:r=>`<b>${esc(r.k)}</b><br><span class="sub">${esc(r.n)}</span>`},{h:'Group',f:r=>esc(r.g)},
     {h:'Close ₹',n:1,f:r=>fmt(r.close,2)},{h:'Agent score',n:1,f:r=>r.score.toFixed(2)},{h:'MoS %',n:1,f:r=>fmt(r.mos,0)},{h:'Wk RSI',n:1,f:r=>fmt(r.rsiW,0)}
-  ],pk.picks,'No stock passes all the checks today. Staying in cash is a valid call.')+`<p class="sub">${pk.universe} stocks scored, ${pk.blocked} blocked by risk checks (downtrend, results within 7 days, falling knife, Avoid verdict, thin trading).</p>`:'<div class="empty">No picks yet.</div>';
+  ],pk.picks,pk.regime&&!pk.regime.on?'Risk-off: fewer than '+fmt(pk.regime.min*100,0)+'% of stocks are up over the last month, so Rocky opens no new positions. Staying in cash is a valid call.':'No stock passes all the checks today. Staying in cash is a valid call.')+(pk.regime&&!pk.regime.on&&pk.picks.length?'<p class="sub">Shown below are stocks that would have qualified; none were opened.</p>':'')+`<p class="sub">${pk.universe} stocks scored, ${pk.blocked} blocked by risk checks (downtrend, results within 7 days, falling knife, Avoid verdict, thin trading).</p>`:'<div class="empty">No picks yet.</div>';
   $('open').innerHTML=table([
     {h:'Stock',f:r=>`<b>${esc(r.k)}</b><br><span class="sub">${esc(r.n)}</span>`},{h:'Opened',f:r=>r.d},
     {h:'Qty',n:1,f:r=>fmt(r.q)},{h:'Entry',n:1,f:r=>fmt(r.entry,2)},{h:'Last',n:1,f:r=>fmt(r.last,2)},

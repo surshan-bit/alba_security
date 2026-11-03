@@ -12,7 +12,7 @@ What it can and cannot tell you (read before trusting a number):
 - Bars are keyed by Monday-aligned week number. Entry = next week's open after the signal week's close. Gaps through a stop fill at the open.
 - Costs: 0.5% round trip, as in agent.py.
 """
-import glob, json, os, sys, math
+import bisect, glob, json, os, random, sys, math
 CAP = 1_000_000; RISK = 0.01; MAXPOS = 8; POSCAP = 0.125; COST = 0.005
 MINWK = 2650   # first week used (~Nov 2020): keeps the five-year window all stocks share
 
@@ -39,21 +39,50 @@ def rsi(c, n=14):
     return 100.0 if al == 0 else 100 - 100 / (1 + ag / al)
 def clip(x, a, b): return max(a, min(b, x))
 
-def signal(bars, i):
-    """Entry candidate at the close of bar i. Returns dict or None. Same for every rule set."""
+def signal(bars, i, kind='base', rs=None):
+    """Entry candidate at the close of bar i. Returns dict or None. kind picks the entry rule.
+    rs = this stock's 13-week-return percentile (0-1) among all stocks that week."""
     if i < 52: return None
     w = bars[:i + 1]; c = [x[4] for x in w]; close = c[-1]
-    if sma(c, 10) > close or sma(c, 10) < sma(c[:-3], 10): return None            # >10w SMA (~50 DMA) and rising
-    r = rsi(c)
-    if not 45 <= r <= 75: return None
-    if close / c[-5] - 1 <= 0 or close / c[-5] - 1 < -0.15: return None            # 4-week momentum positive
-    hi52 = max(x[2] for x in w[-52:]); hi40 = max(x[2] for x in w[-40:])
-    if close < 0.85 * hi40: return None                                            # near highs
     if sum(x[4] * x[5] for x in w[-8:]) / 8 < 50e5: return None                     # weekly turnover >= 50 lakh (liquidity)
+    s10 = sma(c, 10); r = rsi(c)
+    hi52 = max(x[2] for x in w[-52:]); hi40 = max(x[2] for x in w[-40:])
     atr = sum((x[2] - x[3]) / x[4] for x in w[-8:]) / 8 * 100
-    vol_up = w[-1][5] > 1.2 * sum(x[5] for x in w[-9:-1]) / 8                       # volume surge (reported, used by one rule set)
-    score = (close / c[-13] - 1) * 100 + 20 * (close / hi40)
-    return {'close': close, 'atr': atr, 'hi52': hi52, 'low3': min(x[3] for x in w[-3:]), 'score': score, 'volup': vol_up, 'rsi': r}
+    vr = w[-1][5] / max(sum(x[5] for x in w[-9:-1]) / 8, 1)
+    out = {'close': close, 'atr': atr, 'hi52': hi52, 'low3': min(x[3] for x in w[-3:]), 'volup': vr > 1.2, 'rsi': r}
+    ret13 = close / c[-14] - 1
+    if kind == 'base':
+        if s10 > close or s10 < sma(c[:-3], 10): return None                        # >10w SMA (~50 DMA) and rising
+        if not 45 <= r <= 75: return None
+        m4 = close / c[-5] - 1
+        if m4 <= 0: return None
+        if close < 0.85 * hi40: return None
+        out['score'] = ret13 * 100 + 20 * (close / hi40); return out
+    if kind in ('breakout', 'bo_rs'):
+        if close < s10 or r > 85: return None
+        if close <= max(x[2] for x in w[-27:-1]) or vr < 1.5: return None             # close above the prior 26-week high on a volume surge
+        if kind == 'bo_rs' and (rs is None or rs < 0.7): return None
+        out['score'] = vr * 10 + (close / max(x[2] for x in w[-27:-1]) - 1) * 100; return out
+    if kind == 'rs':
+        if rs is None or rs < 0.8 or close < s10 or s10 < sma(c[:-3], 10): return None
+        if not 50 <= r <= 80 or close < 0.9 * hi40: return None
+        out['score'] = rs * 100; return out
+    if kind == 'pullback':
+        s30 = sma(c, 30)
+        if close < s30 or s30 < sma(c[:-5], 30) or not (0.97 * s10 <= close <= 1.03 * s10): return None
+        if not 40 <= r <= 58 or ret13 < 0.15: return None
+        out['score'] = ret13 * 100; return out
+    raise ValueError(kind)
+
+_XS = {}
+def cross_section(S):
+    """week -> sorted list of 13-week returns across all stocks (for relative-strength percentiles)."""
+    if id(S) in _XS: return _XS[id(S)]
+    xs = {}
+    for v in S.values():
+        for n in range(13, len(v)): xs.setdefault(v[n][0], []).append(v[n][4] / v[n - 13][4] - 1)
+    for k in xs: xs[k].sort()
+    _XS[id(S)] = xs; return xs
 
 def plan(rule, s, entry):
     """Return (stop, target, ok). rule: dict(kind='fixed10'|'rr', rr=3, gate=bool, ...)"""
@@ -101,16 +130,21 @@ def run(S, rule, t0=None, t1=None):
         # 2) entries decided at close of week t, filled at open of week nt
         if len(opn) < MAXPOS:
             eq = cash + sum(p['last'] * p['q'] for p in opn)
-            if rule.get('regime') and not regime_ok(S, idx, t): cands = []
+            if rule.get('regime') and not regime_ok(S, idx, t, *rule['regime']): cands = []
             else:
                 held = {p['k'] for p in opn}; cands = []
                 for k, v in S.items():
                     if k in held: continue
                     n = idx[k].get(t); n2 = idx[k].get(nt)
                     if n is None or n2 is None: continue
-                    s = signal(v, n)
+                    rsv = None
+                    if rule.get('entry', 'base') in ('rs', 'bo_rs'):
+                        xl = cross_section(S).get(t)
+                        rsv = bisect.bisect_left(xl, v[n][4] / v[n - 13][4] - 1) / len(xl) if xl and n >= 13 else None
+                    s = signal(v, n, rule.get('entry', 'base'), rsv)
                     if s: cands.append((s['score'], k, s, n2))
-                cands.sort(key=lambda x: -x[0])
+                if rule.get('rank_seed') is not None: random.Random(rule['rank_seed'] * 100003 + t).shuffle(cands)   # random order among valid candidates
+                else: cands.sort(key=lambda x: -x[0])
             for _, k, s, n2 in cands:
                 if len(opn) >= MAXPOS: break
                 o = S[k][n2][1]; entry = o * (1 + COST / 2)
@@ -126,14 +160,20 @@ def run(S, rule, t0=None, t1=None):
         cash += p['last'] * p['q']
     return trades, curve
 
-def regime_ok(S, idx, t):
-    """Market filter: equal-weight universe index above its 10-week average."""
-    ups = tot = 0
-    for k, v in S.items():
-        n = idx[k].get(t)
-        if n is None or n < 10: continue
-        tot += 1; ups += v[n][4] > sum(x[4] for x in v[n - 9:n + 1]) / 10
-    return tot > 0 and ups / tot >= 0.5
+_REG = {}
+def regime_ok(S, idx, t, kind='sma10', thr=0.5):
+    """Market breadth at week t. 'sma10' = share of stocks above their 10-week average;
+    'mom4' = share with a positive 4-week return (this one Rocky can compute live from TradingView's 1-month change)."""
+    key = (id(S), t, kind)
+    if key not in _REG:
+        ups = tot = 0
+        for k, v in S.items():
+            n = idx[k].get(t)
+            if n is None or n < 10: continue
+            tot += 1
+            ups += (v[n][4] > sum(x[4] for x in v[n - 9:n + 1]) / 10) if kind == 'sma10' else (v[n][4] > v[n - 4][4])
+        _REG[key] = ups / tot if tot else 0
+    return _REG[key] >= thr
 
 def stats(trades, curve):
     n = len(trades); w = [x for x in trades if x['ret'] > 0]; l = [x for x in trades if x['ret'] <= 0]
