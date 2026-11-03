@@ -4,7 +4,8 @@ function createSupabaseBackend(sb){
   const subs = new Set();
   const fire = (p) => subs.forEach(cb => cb(p));
   const fail = (error) => { if(error){ const e = new Error(error.message || 'database error'); e.code = error.code; throw e; } };
-  // other browsers' changes arrive through Realtime; our own writes fire locally at once
+  // other browsers' changes arrive through Realtime; our own writes fire locally at once. The publication carries inserts and updates only
+  // (supabase/schema.sql): a delete event would show every signed-in user the deleted path, so a deletion made elsewhere appears after a reload.
   sb.channel('docs-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'docs' }, (m) => {
     const row = m.new && m.new.path ? m.new : m.old; if(row && row.path) fire(row.path);
   }).subscribe();

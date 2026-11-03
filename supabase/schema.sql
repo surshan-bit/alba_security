@@ -24,7 +24,7 @@ create table if not exists public.profiles (
 );
 
 -- a profile appears at the first Google sign-in; the 15-day trial starts then
-create or replace function public.on_new_user() returns trigger language plpgsql security definer set search_path = public as $$
+create or replace function public.on_new_user() returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.profiles (uid, email) values (new.id, new.email) on conflict do nothing;
   return new;
@@ -32,13 +32,26 @@ end $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute function public.on_new_user();
 
-create or replace function public.is_owner() returns boolean language sql stable security definer set search_path = public as $$
+create or replace function public.is_owner() returns boolean language sql stable security definer set search_path = '' as $$
   select exists (select 1 from public.profiles where uid = auth.uid() and role = 'owner');
 $$;
-create or replace function public.has_pro() returns boolean language sql stable security definer set search_path = public as $$
+create or replace function public.has_pro() returns boolean language sql stable security definer set search_path = '' as $$
   select exists (select 1 from public.profiles where uid = auth.uid()
     and (role = 'owner' or (plan = 'pro' and pro_until > now()) or (plan = 'trial' and trial_end > now())));
 $$;
+
+-- the most a signed-in user may store in one document (1 MiB of JSON text); the app's largest documents are a small fraction of this
+create or replace function public.doc_size_ok(d jsonb) returns boolean language sql immutable set search_path = '' as $$
+  select octet_length(d::text) <= 1048576;
+$$;
+
+-- definer functions run with the owner's rights, so they get an empty search path and are not open to the public; only signed-in users
+-- need is_owner / has_pro (the row-level rules below call them), and the sign-up trigger needs no caller at all
+revoke all on function public.on_new_user() from public, anon;
+revoke all on function public.is_owner() from public, anon;
+revoke all on function public.has_pro() from public, anon;
+grant execute on function public.is_owner() to authenticated;
+grant execute on function public.has_pro() to authenticated;
 
 -- merge a partial update into a document (what update() means)
 create or replace function public.docs_merge(p_path text, p_data jsonb) returns void language plpgsql security invoker as $$
@@ -54,7 +67,7 @@ alter table public.profiles enable row level security;
 drop policy if exists own_docs_all on public.docs;
 create policy own_docs_all on public.docs for all to authenticated
   using (path like 'data/users/' || auth.uid()::text || '/%')
-  with check (path like 'data/users/' || auth.uid()::text || '/%');
+  with check (path like 'data/users/' || auth.uid()::text || '/%' and public.doc_size_ok(data));
 
 -- shared stock data: everyone signed in may read the free part; Pro / trial users and the owner read all; only the owner writes
 drop policy if exists shared_read_free on public.docs;
@@ -69,7 +82,7 @@ create policy shared_write_owner on public.docs for all to authenticated
 
 drop policy if exists own_user_record on public.docs;
 create policy own_user_record on public.docs for all to authenticated
-  using (path = 'users/' || auth.uid()::text) with check (path = 'users/' || auth.uid()::text);
+  using (path = 'users/' || auth.uid()::text) with check (path = 'users/' || auth.uid()::text and public.doc_size_ok(data));
 drop policy if exists owner_read_users on public.docs;
 create policy owner_read_users on public.docs for select to authenticated
   using (public.is_owner() and path like 'users/%');
@@ -78,10 +91,83 @@ drop policy if exists profile_read_own on public.profiles;
 create policy profile_read_own on public.profiles for select to authenticated using (uid = auth.uid());
 -- no insert / update policy: profiles change only through the trigger above, the payment webhook (service key) or the owner in the dashboard.
 
--- file storage: a PRIVATE bucket for uploads (CSV files and full backups of the stock list). Each person reaches only their own
+-- Claude call quota (the sample function counts each call the owner makes)
+create table if not exists public.sample_usage (
+  uid          uuid primary key references auth.users on delete cascade,
+  window_start timestamptz not null default now(),
+  calls        integer not null default 0
+);
+-- no policy and no grant: clients never touch this table, only take_sample_slot below does
+alter table public.sample_usage enable row level security;
+revoke all on public.sample_usage from anon;
+
+-- counts one Claude call for the owner and says whether it is inside the limit (a fixed window that restarts when it has run out)
+create or replace function public.take_sample_slot(p_limit integer, p_window interval) returns boolean
+  language plpgsql security definer set search_path = '' as $$
+declare used integer;
+begin
+  if not public.is_owner() then return false; end if;
+  insert into public.sample_usage as u (uid, window_start, calls) values (auth.uid(), now(), 1)
+  on conflict (uid) do update set
+    window_start = case when u.window_start <= now() - p_window then now() else u.window_start end,
+    calls        = case when u.window_start <= now() - p_window then 1 else u.calls + 1 end
+  returning u.calls into used;
+  return used <= p_limit;
+end $$;
+revoke all on function public.take_sample_slot(integer, interval) from public, anon;
+grant execute on function public.take_sample_slot(integer, interval) to authenticated;
+
+-- Row limit: a signed-in user keeps at most doc_row_limit() documents under data/users/<their uid>/ (the size of each is capped by doc_size_ok).
+-- A counter per user is kept by triggers. They run AFTER the insert, so an upsert that only rewrites an existing document is not counted again.
+create or replace function public.doc_row_limit() returns integer language sql immutable set search_path = '' as $$
+  select 10000;
+$$;
+-- whose private documents a path belongs to (data/users/<uid>/...), or null for any other path
+create or replace function public.doc_owner(p_path text) returns uuid language sql immutable set search_path = '' as $$
+  select (regexp_match(p_path, '^data/users/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/'))[1]::uuid;
+$$;
+create table if not exists public.doc_counts (
+  uid uuid primary key,
+  n   integer not null default 0
+);
+-- no policy and no grant: clients never touch this table, only the triggers below do
+alter table public.doc_counts enable row level security;
+revoke all on public.doc_counts from anon;
+
+create or replace function public.count_doc_insert() returns trigger language plpgsql security definer set search_path = '' as $$
+declare owner uuid := public.doc_owner(new.path); used integer;
+begin
+  if owner is null then return null; end if;
+  insert into public.doc_counts as c (uid, n) values (owner, 1) on conflict (uid) do update set n = c.n + 1 returning c.n into used;
+  if used > public.doc_row_limit() then
+    raise exception 'You have reached the limit of % documents.', public.doc_row_limit() using errcode = '54000';
+  end if;
+  return null;
+end $$;
+create or replace function public.count_doc_delete() returns trigger language plpgsql security definer set search_path = '' as $$
+declare owner uuid := public.doc_owner(old.path);
+begin
+  if owner is not null then update public.doc_counts as c set n = greatest(c.n - 1, 0) where c.uid = owner; end if;
+  return null;
+end $$;
+revoke all on function public.count_doc_insert() from public, anon;
+revoke all on function public.count_doc_delete() from public, anon;
+drop trigger if exists docs_count_insert on public.docs;
+create trigger docs_count_insert after insert on public.docs for each row execute function public.count_doc_insert();
+drop trigger if exists docs_count_delete on public.docs;
+create trigger docs_count_delete after delete on public.docs for each row execute function public.count_doc_delete();
+
+-- count what is already stored (also repairs the counters if they ever drift)
+insert into public.doc_counts (uid, n) select public.doc_owner(path), count(*) from public.docs where public.doc_owner(path) is not null group by 1
+  on conflict (uid) do update set n = excluded.n;
+update public.doc_counts set n = 0 where uid not in (select public.doc_owner(path) from public.docs where public.doc_owner(path) is not null);
+
+-- file storage: a PRIVATE bucket for uploads (CSV files of the fundamental import). Each person reaches only their own
 -- folder, using their own sign-in; there are no public links (the app reads files through the storage API, see platform/shim.js).
-insert into storage.buckets (id, name, public) values ('assets', 'assets', false)
-  on conflict (id) do update set public = false;
+-- Only CSV text up to 10 MiB is accepted, so a signed-in user cannot fill the project with other files or very large ones.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('assets', 'assets', false, 10485760, array['text/csv'])
+  on conflict (id) do update set public = false, file_size_limit = 10485760, allowed_mime_types = array['text/csv'];
 drop policy if exists assets_own on storage.objects;
 create policy assets_own on storage.objects for all to authenticated
   using (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text)
@@ -98,5 +184,16 @@ revoke all on public.docs, public.profiles from anon;
 do $$ begin
   if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'docs') then
     alter publication supabase_realtime add table public.docs;
+  end if;
+end $$;
+-- Realtime sends inserts and updates only. A delete event is not filtered by row-level security, so it would reach every signed-in user with the
+-- path of the deleted document (a trade's path carries its symbol and date). A deletion made on one device then shows on the others after a reload.
+-- The setting covers the whole publication, so it is applied only when docs is the only table in it.
+do $$ begin
+  if exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'docs')
+     and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and not (schemaname = 'public' and tablename = 'docs')) then
+    alter publication supabase_realtime set (publish = 'insert, update');
+  else
+    raise warning 'supabase_realtime does not publish docs alone, so delete events were NOT turned off: stop them another way, with a separate publication or private channels';
   end if;
 end $$;

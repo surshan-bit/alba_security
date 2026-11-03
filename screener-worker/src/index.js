@@ -8,6 +8,8 @@
 //   SCREENER_SESSIONID               the sessionid cookie of a signed-in Screener browser session (preferred), or
 //   SCREENER_USERNAME + SCREENER_PASSWORD
 import { Screener } from './screener.js';
+import { MAX_BODY_BYTES, cleanSymbol, cleanSymbols } from './limits.js';
+import { RETRY_AFTER_SECONDS, checkRate } from './ratelimit.js';
 
 const PROTOCOL = '2025-06-18';
 const DEFAULT_BATCH = 20;
@@ -25,7 +27,9 @@ function authorised(request, env){
   const url = new URL(request.url);
   const want = String(env.MCP_TOKEN || '');
   if(want.length < 16) return false;
-  const got = url.pathname.startsWith('/mcp/') ? decodeURIComponent(url.pathname.slice(5)) : (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  let got;
+  try { got = url.pathname.startsWith('/mcp/') ? decodeURIComponent(url.pathname.slice(5)) : (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''); }
+  catch(e){ return false; }   // a malformed percent escape cannot be the token
   if(got.length !== want.length) return false;
   let diff = 0;
   for(let i = 0; i < want.length; i++) diff |= got.charCodeAt(i) ^ want.charCodeAt(i);
@@ -35,13 +39,13 @@ function authorised(request, env){
 export async function callTool(name, args, env, opts = {}){
   const sc = new Screener(env, opts);
   if(name === 'diagnose'){
+    const symbol = cleanSymbol(args.symbol);   // checked before any login or request
     await sc.login();
-    const r = await sc.company(String(args.symbol || ''));
-    return r;
+    return sc.company(symbol);
   }
   if(name === 'fundamentals_batch'){
     const max = Math.max(1, Math.min(Number(env.BATCH_MAX) || DEFAULT_BATCH, 24));
-    const all = (Array.isArray(args.symbols) ? args.symbols : []).map(s => String(s).trim()).filter(Boolean);
+    const all = cleanSymbols(args.symbols);
     const todo = all.slice(0, max), remaining = all.slice(max);
     await sc.login();
     const results = [];
@@ -59,10 +63,16 @@ export async function handle(request, env, opts = {}){
   const url = new URL(request.url);
   if(request.method === 'GET' && url.pathname === '/') return new Response('alba-screener is running', { status: 200 });
   if(!url.pathname.startsWith('/mcp')) return new Response('Not found', { status: 404 });
+  const rate = await checkRate(request, env);
+  if(rate === 'limited') return new Response('Too many requests', { status: 429, headers: { 'Retry-After': String(RETRY_AFTER_SECONDS) } });
+  if(rate === 'unavailable') return new Response('Service unavailable', { status: 503 });
   if(!authorised(request, env)) return new Response('Unauthorized', { status: 401 });
   if(request.method !== 'POST') return new Response('Use POST', { status: 405, headers: { Allow: 'POST' } });
+  if(Number(request.headers.get('Content-Length')) > MAX_BODY_BYTES) return new Response('Request too large', { status: 413 });
+  const raw = await request.text();
+  if(raw.length > MAX_BODY_BYTES) return new Response('Request too large', { status: 413 });
   let msg;
-  try { msg = await request.json(); } catch(e){ return rpcError(null, -32700, 'Parse error'); }
+  try { msg = JSON.parse(raw); } catch(e){ return rpcError(null, -32700, 'Parse error'); }
   if(Array.isArray(msg)) return rpcError(null, -32600, 'Batches are not supported');
   const { id, method, params } = msg || {};
   if(id === undefined) return new Response(null, { status: 202 });   // notifications (initialized, cancelled ...)

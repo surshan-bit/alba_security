@@ -30,10 +30,10 @@ export function parseTable(html){
   return { headers: headRow.cells, rows: all.filter(r => r !== headRow && !r.header).map(({ cells, links }) => ({ cells, links })) };
 }
 
-// The id the peers endpoint needs: <div id="company-info" data-warehouse-id="...">
+// The id the peers endpoint needs: <div id="company-info" data-warehouse-id="...">. Digits only, because it is placed in a URL path.
 export function warehouseId(html){
   const tag = /<[^>]*\bid\s*=\s*["']company-info["'][^>]*>/i.exec(html);
-  const m = tag && /data-warehouse-id\s*=\s*["']([^"']+)["']/i.exec(tag[0]);
+  const m = tag && /data-warehouse-id\s*=\s*["']([0-9]+)["']/i.exec(tag[0]);
   return m ? m[1] : null;
 }
 // A company page has data when the top ratios list carries a price or the profit-and-loss table has values.

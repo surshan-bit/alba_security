@@ -21,6 +21,13 @@ jobs:
       - run: npx playwright install --with-deps chromium   # the Playwright version is pinned in package.json
       - run: npm run check -- --part=main
       - run: npm run platform
+      - run: npm run rls   # the database rules on a throw-away PostgreSQL (preinstalled on the runner); RLS_REQUIRED makes a missing server a failure, never a skip
+        env: { RLS_REQUIRED: '1' }
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with: { deno-version: 2.9.6 }
+      # type-checks the server function with its packages taken from the npm registry (--node-modules-dir=none: not the repo's node_modules) and
+      # compared with the hashes in supabase/deno.lock; --frozen means a changed package or a new one nobody reviewed fails instead of updating the lock
+      - run: deno check --frozen --node-modules-dir=none --lock=supabase/deno.lock supabase/functions/sample/index.ts
       - run: npm run coverage   # unit-test coverage of src/ may never fall below tools/coverage-ratchet.json
       - if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'coverage-waiver')
         run: npm run coverage -- --changed=origin/${{ github.base_ref }}   # every line this pull request adds or changes in src/ must be covered by a unit test, unless the pull request carries the coverage-waiver label (the reason goes in its description)

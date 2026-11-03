@@ -13,6 +13,7 @@
     "ticker": "node tests/ticker.js",
     "imports": "node tests/imports.js",
     "platform": "node tests/platform.mjs",
+    "rls": "node tests/rls.mjs",
     "update-golden": "node tests/check.js --update",
     "check:live": "node tests/check.js --live",
     "refresh": "node tests/refresh.js",
@@ -31,6 +32,6 @@
     "typescript": "5.9.3"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.3"
+    "@supabase/supabase-js": "2.117.3"
   }
 }
