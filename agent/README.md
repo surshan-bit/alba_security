@@ -37,3 +37,10 @@ Weekly: also copy `stockData`, `barsRecent`; run `build` (expect 400-500 stocks,
 
 ## Backtest (backtest.py)
 `python3 agent/backtest.py DIR [--json out.json]` replays weekly bars (priceHistory `*_1W.json`) and compares exit/gate rule sets on identical entry signals. Latest output: `BACKTEST_RESULTS.txt`. Price/volume rules only; no fundamentals; survivorship bias; weekly bars (stop assumed first if both hit in one bar). Tests: `tests/test_backtest.py`.
+
+## Findings so far (see GRID_RESULTS.txt, ROBUSTNESS_RESULTS.txt; one ~4-year regime, price rules only)
+- Ranking is noisy: the same rule gave +6% or +71% total return after a one-week change in the ranking formula. With random ordering of valid candidates the spread for one rule is about -10% to +58%. Don't trust any single run.
+- The 1:3 reward:risk target with a headroom gate, combined with the market-breadth filter (share of stocks with a positive 4-week return >= 50-60%), was positive in 8 of 8 random orderings (median +30% to +44%), with lower drawdowns. The fixed +10% target was mixed (5-7 of 8 positive).
+- Breakout-on-volume and relative-strength entries were no better than the base entry (trend + RSI + momentum + near highs); the pullback entry had too few trades.
+- Everything still trails an equal-weight buy-and-hold of the same stocks (+192%) in this small-cap bull window. Treat as "less bad", not "proven edge".
+- Live: `REGIME_MIN = 0.6` in agent.py (no new entries when fewer than 60% of the scored universe is up over 1 month; exits still run).

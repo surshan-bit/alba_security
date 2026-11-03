@@ -90,7 +90,7 @@ class Regime(unittest.TestCase):
     def test_risk_on_opens_positions(self):
         r = self.mk(30).run(); self.assertTrue(r['picks']['regime']['on']); self.assertGreater(len(r['state']['open']), 0)
     def test_risk_off_opens_nothing_but_reports_picks(self):
-        r = self.mk(10).run(); self.assertFalse(r['picks']['regime']['on']); self.assertEqual(r['state']['open'], []); self.assertEqual(r['picks']['regime']['breadth'], .25)
+        r = self.mk(10).run(); self.assertFalse(r['picks']['regime']['on']); self.assertEqual(r['state']['open'], []); self.assertEqual(r['picks']['regime']['breadth'], .25); self.assertEqual(r['picks']['regime']['min'], A.REGIME_MIN)
     def test_risk_off_still_manages_exits(self):
         e = self.mk(10); w = e.w
         import json; json.dump(st([pos('S0', stop=94, target=110)], cash=0), open(w + '/agent/state.json', 'w'))
@@ -99,7 +99,7 @@ class Regime(unittest.TestCase):
     def test_too_few_stocks_keeps_filter_on(self):
         self.assertTrue(A.regime({'A': [100] + [None] * 7 + [-5, None, None, None]}, {'A': {}})['on'])
     def test_exactly_at_minimum_is_on(self):
-        self.assertTrue(self.mk(20).run()['picks']['regime']['on'])
+        self.assertTrue(self.mk(24).run()['picks']['regime']['on']); self.assertFalse(self.mk(23).run()['picks']['regime']['on'])
 
 class Ledger(unittest.TestCase):
     def test_equity_is_cash_plus_positions_and_curve_idempotent(self):

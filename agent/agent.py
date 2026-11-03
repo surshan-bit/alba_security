@@ -8,7 +8,7 @@ Modes (all file based; WORK dir holds the JSON docs):
 import json,glob,sys,os,math,datetime as dt
 CAP=1_000_000; RISK=0.01; MAXPOS=8; POSCAP=0.125; COST=0.005  # round-trip costs+slippage
 TARGET=10.0; TIME_DAYS=30; MAX_PER_GROUP=2
-REGIME_MIN=0.5   # market filter: new entries only while at least this share of the universe has a positive 1-month change
+REGIME_MIN=0.6   # market filter: new entries only while at least this share of the universe has a positive 1-month change
 FEATS=['fund','mos','trend','rsi','mom','near']
 W0={'fund':1.0,'mos':1.0,'trend':1.5,'rsi':0.7,'mom':0.8,'near':0.8}
 def J(p,d=None):
