@@ -217,3 +217,47 @@ test('limits: exactly the largest allowed symbol list is processed', async () =>
   const out = JSON.parse(body.result.content[0].text);
   assert.equal(out.processed + out.remaining.length, MAX_SYMBOLS);
 });
+
+// ---- per-caller rate limit (CLAUDE.md section 3, A04): Cloudflare's Rate Limiting binding, counted per client address
+function fakeLimiter(limit){
+  const used = new Map(), keys = [];
+  return { keys, limit: async ({ key }) => { keys.push(key); used.set(key, (used.get(key) || 0) + 1); return { success: used.get(key) <= limit }; } };
+}
+const fromIp = (ip, body = { jsonrpc: '2.0', id: 1, method: 'ping' }, path = '/mcp/' + ENV.MCP_TOKEN) =>
+  new Request('https://w.example' + path, { method: 'POST', body: JSON.stringify(body), headers: ip ? { 'CF-Connecting-IP': ip } : {} });
+
+test('rate limit: a caller inside the limit is served, the next one gets 429 with Retry-After and Screener is never contacted', async () => {
+  const env = { ...ENV, RATE_LIMITER: fakeLimiter(2) }, f = fakeScreener({ hasConsolidated: true });
+  const call = () => handle(fromIp('1.2.3.4', { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'fundamentals_batch', arguments: { symbols: ['PASUPTAC'] } } }), env, { fetch: f.fn, gap: 0 });
+  assert.equal((await call()).status, 200); assert.equal((await call()).status, 200);
+  const before = f.calls.length, limited = await call();
+  assert.equal(limited.status, 429); assert.equal(limited.headers.get('Retry-After'), '60');
+  assert.equal(f.calls.length, before, 'no request to Screener once limited');
+});
+
+test('rate limit: each client address has its own count, and the address is the key', async () => {
+  const limiter = fakeLimiter(1), env = { ...ENV, RATE_LIMITER: limiter };
+  assert.equal((await handle(fromIp('1.1.1.1'), env)).status, 200);
+  assert.equal((await handle(fromIp('2.2.2.2'), env)).status, 200, 'another address is not held back');
+  assert.equal((await handle(fromIp('1.1.1.1'), env)).status, 429);
+  assert.equal((await handle(fromIp(null), env)).status, 200); assert.equal((await handle(fromIp(null), env)).status, 429, 'callers without an address share one count');
+  assert.deepEqual(limiter.keys.slice(0, 3), ['1.1.1.1', '2.2.2.2', '1.1.1.1']);
+});
+
+test('rate limit: it comes before the token check, so guessing the token is limited too', async () => {
+  const env = { ...ENV, RATE_LIMITER: fakeLimiter(1) }, wrong = () => handle(fromIp('9.9.9.9', undefined, '/mcp/wrong-token-wrong-token'), env);
+  assert.equal((await wrong()).status, 401);
+  assert.equal((await wrong()).status, 429);
+});
+
+test('rate limit: the health address is not limited, and a worker without the binding still works', async () => {
+  const limiter = fakeLimiter(0), env = { ...ENV, RATE_LIMITER: limiter };
+  assert.equal((await handle(new Request('https://w.example/'), env)).status, 200);
+  assert.deepEqual(limiter.keys, []);
+  assert.equal((await handle(fromIp('1.1.1.1'), ENV)).status, 200);
+});
+
+test('rate limit: if the limiter itself fails the request is refused (503), not let through', async () => {
+  const env = { ...ENV, RATE_LIMITER: { limit: async () => { throw new Error('binding down'); } } };
+  assert.equal((await handle(fromIp('1.1.1.1'), env)).status, 503);
+});

@@ -9,6 +9,7 @@
 //   SCREENER_USERNAME + SCREENER_PASSWORD
 import { Screener } from './screener.js';
 import { MAX_BODY_BYTES, cleanSymbol, cleanSymbols } from './limits.js';
+import { RETRY_AFTER_SECONDS, checkRate } from './ratelimit.js';
 
 const PROTOCOL = '2025-06-18';
 const DEFAULT_BATCH = 20;
@@ -62,6 +63,9 @@ export async function handle(request, env, opts = {}){
   const url = new URL(request.url);
   if(request.method === 'GET' && url.pathname === '/') return new Response('alba-screener is running', { status: 200 });
   if(!url.pathname.startsWith('/mcp')) return new Response('Not found', { status: 404 });
+  const rate = await checkRate(request, env);
+  if(rate === 'limited') return new Response('Too many requests', { status: 429, headers: { 'Retry-After': String(RETRY_AFTER_SECONDS) } });
+  if(rate === 'unavailable') return new Response('Service unavailable', { status: 503 });
   if(!authorised(request, env)) return new Response('Unauthorized', { status: 401 });
   if(request.method !== 'POST') return new Response('Use POST', { status: 405, headers: { Allow: 'POST' } });
   if(Number(request.headers.get('Content-Length')) > MAX_BODY_BYTES) return new Response('Request too large', { status: 413 });
