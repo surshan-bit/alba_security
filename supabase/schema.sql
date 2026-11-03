@@ -99,6 +99,7 @@ create table if not exists public.sample_usage (
 );
 -- no policy and no grant: clients never touch this table, only take_sample_slot below does
 alter table public.sample_usage enable row level security;
+revoke all on public.sample_usage from anon;
 
 -- counts one Claude call for the owner and says whether it is inside the limit (a fixed window that restarts when it has run out)
 create or replace function public.take_sample_slot(p_limit integer, p_window interval) returns boolean

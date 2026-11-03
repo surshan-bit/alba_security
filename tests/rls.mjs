@@ -123,7 +123,7 @@ function sizeCases(db){
 function quotaCases(db){
   eq(db + ': the owner may call Claude twice in the limit, the third is refused', [1, 2, 3].map(() => value(db, 'owner', "select public.take_sample_slot(2, interval '1 hour')::text")), ['true', 'true', 'false']);
   eq(db + ': someone who is not the owner gets no slot', value(db, 'free', "select public.take_sample_slot(2, interval '1 hour')::text"), 'false');
-  eq(db + ': the usage table is not readable by clients', allowed(db, 'owner', 'select * from public.sample_usage'), false);
+  eq(db + ': the usage table is not readable by clients', ['anon', 'owner', 'free'].map(who => allowed(db, who, 'select * from public.sample_usage')), [false, false, false]);
   asServer(db, `update public.sample_usage set window_start = now() - interval '2 hours' where uid = '${U.owner}'`);
   eq(db + ': a new window starts when the old one has run out', value(db, 'owner', "select public.take_sample_slot(2, interval '1 hour')::text"), 'true');
 }

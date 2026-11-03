@@ -159,10 +159,11 @@ import { readFileSync } from 'node:fs';
   const { readFileSync } = await import('node:fs');
   const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'), mig = readFileSync(new URL('../supabase/005_sample_quota.sql', import.meta.url), 'utf8');
   for(const [name, sql] of [['schema', schema], ['migration', mig]]){
-    eq(name + ': the usage table has row level security and no policy', /alter table public\.sample_usage enable row level security/.test(sql) && !/on public\.sample_usage/.test(sql), true);
+    eq(name + ': the usage table has row level security and no policy', /alter table public\.sample_usage enable row level security/.test(sql) && !/create policy [^;]*on public\.sample_usage/.test(sql), true);
     eq(name + ': the slot function is owner-only, with an empty search path', /function public\.take_sample_slot\([^)]*\)[\s\S]*?security definer set search_path = ''[\s\S]*?is_owner\(\)/.test(sql), true);
     eq(name + ': only signed-in users may run it', /revoke all on function public\.take_sample_slot\(integer, interval\) from public, anon/.test(sql) && /grant execute on function public\.take_sample_slot\(integer, interval\) to authenticated/.test(sql), true);
     eq(name + ': the table is not readable by clients', !/grant [^;]*sample_usage/.test(sql), true);
+    eq(name + ': anon has no access to the usage table', /revoke all on public\.sample_usage from anon/.test(sql), true);
   }
 }
 
