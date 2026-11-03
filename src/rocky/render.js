@@ -65,7 +65,7 @@ function learnHtml(wt, ln){
   let h = '';
   if(wt && wt.w){
     const mx = Math.max(...Object.values(wt.w).filter(num), 1);
-    h += Object.entries(wt.w).map(([k, v]) => '<div class="rky-bar"><span>' + e(k) + '</span><i style="width:' + (num(v) ? Math.round(v / mx * 60) : 0) + '%"></i><span class="rky-mono">' + e(v) + '</span></div>').join('');
+    h += Object.entries(wt.w).map(([k, v]) => '<div class="rky-bar"><span>' + e(k) + '</span><i data-css="--w:' + (num(v) ? Math.round(v / mx * 60) : 0) + '%"></i><span class="rky-mono">' + e(v) + '</span></div>').join('');
   }
   if(ln) h += '<p class="rky-sub">Last review ' + e(ln.d) + ': ' + e(ln.note || ('hit rate ' + ln.hit + '%, average ' + ln.avg + '% per trade, weights updated')) + '</p>';
   if(wt && list(wt.hist).length) h += wt.hist.slice(-3).map(x => '<p class="rky-sub">' + e(x.d) + ': ' + Object.entries(x.ch || {}).map(([k, v]) => e(k) + ' ' + e(v[0]) + '→' + e(v[1])).join(', ') + '</p>').join('');

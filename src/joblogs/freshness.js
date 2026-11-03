@@ -67,7 +67,7 @@ function renderFreshnessPanel(cfg){
     return `
       <div class="refreshlog-freshness-row">
         <span class="refreshlog-freshness-label">${escapeHtml(b.label)}</span>
-        <span class="refreshlog-freshness-track"><span class="refreshlog-freshness-fill" style="width:${count ? Math.max(pct, 3) : 0}%"></span></span>
+        <span class="refreshlog-freshness-track"><span class="refreshlog-freshness-fill" data-css="--w:${count ? Math.max(pct, 3) : 0}%"></span></span>
         <span class="refreshlog-freshness-count">${count} stock${count === 1 ? '' : 's'}</span>
       </div>
     `;

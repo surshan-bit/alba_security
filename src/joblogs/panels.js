@@ -116,9 +116,9 @@ function renderWatchlistSyncLogPanel(){
       ${r.finishedAt ? `<span>finished ${escapeHtml(formatDeepRefreshTimestamp(r.finishedAt))}</span>` : ''}
     `,
     renderExtra: r => `
-      ${r.note ? `<div class="refreshlog-run-stats" style="color:var(--muted);">${escapeHtml(r.note)}</div>` : ''}
-      ${r.error ? `<div class="refreshlog-run-stats" style="color:var(--avoid);">${escapeHtml(r.error)}</div>` : ''}
-      ${Array.isArray(r.droppedTickers) && r.droppedTickers.length ? `<div class="refreshlog-run-stats" style="color:var(--avoid);">Dropped by TradingView, couldn't be resolved: ${r.droppedTickers.map(escapeHtml).join(', ')}</div>` : ''}
+      ${r.note ? `<div class="refreshlog-run-stats refreshlog-run-stats--muted">${escapeHtml(r.note)}</div>` : ''}
+      ${r.error ? `<div class="refreshlog-run-stats refreshlog-run-stats--bad">${escapeHtml(r.error)}</div>` : ''}
+      ${Array.isArray(r.droppedTickers) && r.droppedTickers.length ? `<div class="refreshlog-run-stats refreshlog-run-stats--bad">Dropped by TradingView, couldn't be resolved: ${r.droppedTickers.map(escapeHtml).join(', ')}</div>` : ''}
     `
   });
 }
