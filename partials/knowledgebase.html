@@ -251,6 +251,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.350 &middot; 2026-11-03</h3>
+            <ul>
+              <li><strong>Stricter limits on the test website (nothing changes in claude.ai):</strong> the copy of Alba that runs outside claude.ai now refuses a single saved document over 1 MB, more than 10,000 saved documents per person, and uploaded files that are not CSV or are over 10 MB. Asking Claude from that website is limited to 1,000 calls an hour, and a deleted trade or other private document is no longer announced to other signed-in users.</li>
+              <li><strong>Safer helper services (nothing looks different):</strong> the Screener helper only talks to screener.in, rejects malformed requests and limits how often one caller can ask, and the packages the server functions use are now checked against recorded fingerprints on every build.</li>
+            </ul>
             <h3>v1.349 &middot; 2026-11-03</h3>
             <ul>
               <li><strong>Safer page drawing (nothing looks different):</strong> every screen that is drawn from saved or imported text now goes through one checked step that removes anything able to run code (scripts, hidden event handlers, unsafe links) before it reaches the page. The 81 places that used to write raw HTML directly are down to none. One behaviour was kept on purpose: clicking the Screener or TV link on a stock row still opens the link without also opening the stock.</li>
