@@ -233,6 +233,21 @@ import { readFileSync } from 'node:fs';
   }
 }
 
+// A signed-in user keeps at most 10000 documents under their own private path; a trigger-kept counter does the counting (CLAUDE.md section 3, A04)
+{
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'), mig = readFileSync(new URL('../supabase/009_doc_row_limit.sql', import.meta.url), 'utf8');
+  for(const [name, sql] of [['schema', schema], ['migration', mig]]){
+    eq(name + ': the limit is one named function, 10000', /function public\.doc_row_limit\(\)[^;]*?immutable[^;]*?set search_path = ''[\s\S]*?select 10000;/.test(sql), true);
+    eq(name + ': only data/users/<uuid>/ paths are counted', /regexp_match\(p_path, '\^data\/users\/\(\[0-9a-f\]\{8\}-/.test(sql), true);
+    eq(name + ': counting runs after the insert, so a rewrite of a stored document is not counted again', /create trigger docs_count_insert after insert on public\.docs for each row/.test(sql), true);
+    eq(name + ': a delete frees a place', /create trigger docs_count_delete after delete on public\.docs for each row/.test(sql), true);
+    eq(name + ': the trigger functions are definer functions with an empty search path', ['count_doc_insert', 'count_doc_delete'].every(fn => new RegExp('function public\\.' + fn + '\\(\\) returns trigger[^;]*?security definer set search_path = \'\' as').test(sql)), true);
+    eq(name + ': the counter table has row-level security, no policy and no anon access', /alter table public\.doc_counts enable row level security/.test(sql) && /revoke all on public\.doc_counts from anon/.test(sql) && !/on public\.doc_counts for/.test(sql), true);
+    eq(name + ': the trigger functions are not callable by the public', /revoke all on function public\.count_doc_insert\(\) from public, anon/.test(sql) && /revoke all on function public\.count_doc_delete\(\) from public, anon/.test(sql), true);
+  }
+}
+
 // Security headers: the Cloudflare site must ship the file that sets them
 {
   const { readFileSync } = await import('node:fs');

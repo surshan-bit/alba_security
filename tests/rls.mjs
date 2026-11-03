@@ -11,6 +11,7 @@ import { startPostgres } from './lib/pgtemp.mjs';
 const SUPABASE = process.env.RLS_SUPABASE_DIR || fileURLToPath(new URL('../supabase/', import.meta.url));
 const STANDINS = fileURLToPath(new URL('./rls/standins.sql', import.meta.url));
 const DOC_LIMIT_BYTES = 1048576;   // public.doc_size_ok
+const DOC_ROW_LIMIT = 10000;   // public.doc_row_limit: most documents one user may keep
 const JSON_FRAME = '{"a": ""}'.length;   // what jsonb adds around one string value when it is written out as text
 const U = {   // one id per kind of user
   owner: '00000000-0000-0000-0000-0000000000a1', free: '00000000-0000-0000-0000-0000000000b2', pro: '00000000-0000-0000-0000-0000000000c3',
@@ -147,8 +148,26 @@ function realtimeCases(db){
   eq(db + ': Realtime publishes only docs, inserts and updates, never deletes', asServer(db, "select (select string_agg(schemaname || '.' || tablename, ',') from pg_publication_tables where pubname = 'supabase_realtime') || ' ' || pubinsert || pubupdate || pubdelete from pg_publication where pubname = 'supabase_realtime'"), 'public.docs truetruefalse');
 }
 
+function rowCapCases(db){
+  const base = `data/users/${U.trial}`, stored = () => Number(asServer(db, `select coalesce((select n from public.doc_counts where uid = '${U.trial}'), 0)`));
+  const put = (who, path) => allowed(db, who, `insert into public.docs (path, data) values ('${path}', '{}')`);
+  asServer(db, `insert into public.docs (path, data) select '${base}/bulk/' || g, '{}' from generate_series(1, ${DOC_ROW_LIMIT}) g`);
+  eq(db + ': a user can keep exactly the most documents, and they are counted', stored(), DOC_ROW_LIMIT);
+  eq(db + ': one document more is refused', put('trial', base + '/extra'), false);
+  eq(db + ': rewriting or merging into an existing document still works at the limit', [allowed(db, 'trial', `insert into public.docs (path, data) values ('${base}/bulk/1', '{"v": 1}') on conflict (path) do update set data = excluded.data`), allowed(db, 'trial', `select public.docs_merge('${base}/bulk/2', '{"v": 2}')`), stored()], [true, true, DOC_ROW_LIMIT]);
+  eq(db + ': deleting a document frees a place', [count(db, 'trial', `delete from public.docs where path = '${base}/bulk/3'`), stored(), put('trial', base + '/extra'), stored()], [1, DOC_ROW_LIMIT - 1, true, DOC_ROW_LIMIT]);
+  eq(db + ': nobody but the triggers can read or change the counters', ['anon', 'trial', 'owner'].map(who => allowed(db, who, 'select count(*) from public.doc_counts')), [false, false, false]);
+  eq(db + ': the user record, other users and the owner\'s shared data are not held back', [put('trial', 'users/' + U.trial), put('pro', `data/users/${U.pro}/x`), put('owner', 'stockData/c'), stored()], [true, true, true, DOC_ROW_LIMIT]);
+}
+
+// The counters are kept by triggers, so after everything above they must still equal the real number of documents of each user.
+function counterCases(db){
+  eq(db + ': every user\'s counter equals their real number of documents', asServer(db, `select count(*) from (select public.doc_owner(path) as uid, count(*) as c from public.docs where public.doc_owner(path) is not null group by 1) a
+    full join public.doc_counts d on d.uid = a.uid where coalesce(a.c, 0) <> coalesce(d.n, 0)`), '0');
+}
+
 function runCases(db){
-  for(const group of [readCases, writeCases, mergeCases, profileCases, sizeCases, quotaCases, functionCases, storageCases, realtimeCases]) group(db);
+  for(const group of [readCases, writeCases, mergeCases, profileCases, sizeCases, quotaCases, functionCases, storageCases, realtimeCases, rowCapCases, counterCases]) group(db);
 }
 
 try {
