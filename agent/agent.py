@@ -9,7 +9,7 @@ import json,glob,sys,os,math,datetime as dt
 CAP=1_000_000; RISK=0.01; MAXPOS=8; POSCAP=0.125; COST=0.005  # round-trip costs+slippage
 TIME_DAYS=30; MAX_PER_GROUP=2   # TIME_DAYS: legacy positions opened before the 1:3 gate
 RSI_LO=45; RSI_HI=75; NEAR_HIGH=0.85   # hard entry filters (see entry_blocks)
-RISK_HIGH=0.005; HIGH_MRSI=70           # high-risk tier: monthly RSI above 70 (or unknown) risks half as much per trade
+TIER_RISK={'low':0.01,'medium':0.0075,'high':0.005}; MRSI_HIGH=70; MRSI_MEDIUM=60   # risk-reward tiers by monthly RSI: above 70 high, above 60 medium, otherwise low (unknown counts as high)
 RR_MIN=3.0; GATE_DAYS=70       # 1:3 gate: target = RR_MIN x stop distance; new positions may run 70 days (10 weeks, as tested)
 REGIME_MIN=0.6   # market filter: new entries only while at least this share of the universe has a positive 1-month change
 FEATS=['fund','mos','trend','rsi','mom','near']
@@ -114,9 +114,11 @@ def regime(live,comp,minimum=REGIME_MIN):
     return {'breadth':round(b,3),'n':len(ch),'min':minimum,'on':b>=minimum}
 
 def risk_tier(mrsi):
-    """'high' when the monthly RSI is above HIGH_MRSI or unknown. Backtest: such stocks reach +10% in 3 weeks more often (38% vs 27-35%)
-    but are down 7% at some point in half of the trades (36% at monthly RSI under 50), so they get half the risk per trade."""
-    return 'high' if (mrsi is None or mrsi>HIGH_MRSI) else 'standard'
+    """Risk-reward tier from the monthly RSI: 'high' above 70 (or unknown), 'medium' above 60, else 'low'.
+    Backtest (3 weeks after entry): the higher the monthly RSI, the more often a stock reaches +10% (27% -> 38%) and the more
+    often it is down 7% at some point (36% -> 50%), so riskier tiers get a smaller position (TIER_RISK, and a proportionally smaller position cap)."""
+    if mrsi is None or mrsi>MRSI_HIGH: return 'high'
+    return 'medium' if mrsi>MRSI_MEDIUM else 'low'
 
 def trade_plan(r,hi):
     """Entry, stop, target for candidate r under the 1:3 gate. Returns (plan, reason); reason is None when the gate passes.
@@ -183,8 +185,8 @@ def daily(work,nifty=None):
     slots=(MAXPOS-len(keep)) if reg['on'] else 0; new=[]   # risk-off: manage exits, open nothing
     for r in picks[:max(slots,0)]:
         pl=r['plan']; entry=pl['entry']
-        rk=RISK_HIGH if r['tier']=='high' else RISK
-        q=int(min(eq*rk/(entry-pl['stop']), eq*POSCAP*(rk/RISK)/entry, st['cash']/entry))   # the high-risk tier halves both the risk and the position-size cap
+        rk=TIER_RISK[r['tier']]
+        q=int(min(eq*rk/(entry-pl['stop']), eq*POSCAP*(rk/RISK)/entry, st['cash']/entry))   # riskier tiers shrink both the risk and the position-size cap
         if q<1: continue
         st['cash']-=q*entry
         pos={'k':r['k'],'n':r['n'],'g':r['g'],'d':day,'entry':entry,'q':q,'stop':pl['stop'],'target':pl['target'],'rr':RR_MIN,'maxd':GATE_DAYS,'tier':r['tier'],'risk':rk,'mrsi':r['mrsi'],'f':r['f'],'last':r['close']}

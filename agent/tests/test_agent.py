@@ -126,25 +126,30 @@ class Build(unittest.TestCase):
 class Tier(unittest.TestCase):
     def one(self, **c):
         r = Env({'A': comp('A')}, [row('A', 100, **c)]).run(); return r, r['state']['open'][0]
-    def test_standard_tier_risks_one_percent(self):
-        r, p = self.one(c6=55); self.assertEqual(p['tier'], 'standard'); self.assertEqual(p['risk'], A.RISK); self.assertEqual(r['picks']['picks'][0]['tier'], 'standard')
-    def test_high_tier_when_monthly_rsi_above_70(self):
-        r, p = self.one(c6=75); self.assertEqual(p['tier'], 'high'); self.assertEqual(p['risk'], A.RISK_HIGH); self.assertEqual(r['picks']['picks'][0]['tier'], 'high'); self.assertEqual(p['mrsi'], 75)
-    def test_exactly_70_is_standard(self):
-        self.assertEqual(self.one(c6=70)[1]['tier'], 'standard'); self.assertEqual(self.one(c6=70.1)[1]['tier'], 'high')
+    def test_low_tier_risks_one_percent(self):
+        r, p = self.one(c6=55); self.assertEqual(p['tier'], 'low'); self.assertEqual(p['risk'], 0.01); self.assertEqual(r['picks']['picks'][0]['tier'], 'low'); self.assertEqual(p['mrsi'], 55)
+    def test_medium_tier(self):
+        r, p = self.one(c6=65); self.assertEqual(p['tier'], 'medium'); self.assertEqual(p['risk'], 0.0075); self.assertEqual(r['picks']['picks'][0]['tier'], 'medium')
+    def test_high_tier(self):
+        r, p = self.one(c6=75); self.assertEqual(p['tier'], 'high'); self.assertEqual(p['risk'], 0.005); self.assertEqual(r['picks']['picks'][0]['tier'], 'high')
+    def test_boundaries(self):
+        self.assertEqual(A.risk_tier(60), 'low'); self.assertEqual(A.risk_tier(60.1), 'medium'); self.assertEqual(A.risk_tier(70), 'medium'); self.assertEqual(A.risk_tier(70.1), 'high'); self.assertEqual(A.risk_tier(30), 'low'); self.assertEqual(A.risk_tier(80), 'high')
     def test_unknown_monthly_rsi_is_treated_as_high(self):
-        self.assertEqual(self.one(c6=None)[1]['tier'], 'high')
-    def test_high_tier_gets_about_half_the_shares(self):
-        qs = self.one(c6=55)[1]['q']; qh = self.one(c6=75)[1]['q']
-        self.assertAlmostEqual(qh / qs, A.RISK_HIGH / A.RISK, delta=0.03)
-    def test_high_tier_never_exceeds_half_the_risk_or_half_the_position_cap(self):
-        p = self.one(c6=75)[1]
-        self.assertLessEqual(p['q'] * (p['entry'] - p['stop']) / A.CAP, A.RISK_HIGH + 1e-4); self.assertLessEqual(p['q'] * p['entry'] / A.CAP, A.POSCAP / 2 + 1e-3)
-    def test_high_tier_with_a_wide_stop_risks_half_a_percent(self):
-        r = Env({'A': comp('A', atr=20, hi=101)}, [row('A', 100, c6=75)]).run(); p = r['state']['open'][0]     # 9% stop: the risk limit binds, not the cap
-        self.assertAlmostEqual(p['q'] * (p['entry'] - p['stop']) / A.CAP, A.RISK_HIGH, delta=0.0003)
-    def test_risk_tier_function(self):
-        self.assertEqual(A.risk_tier(69.9), 'standard'); self.assertEqual(A.risk_tier(80), 'high'); self.assertEqual(A.risk_tier(None), 'high')
+        self.assertEqual(self.one(c6=None)[1]['tier'], 'high'); self.assertEqual(A.risk_tier(None), 'high')
+    def test_position_shrinks_as_the_tier_gets_riskier(self):
+        ql, qm, qh = (self.one(c6=v)[1]['q'] for v in (55, 65, 75))
+        self.assertGreater(ql, qm); self.assertGreater(qm, qh)
+        self.assertAlmostEqual(qm / ql, 0.75, delta=0.03); self.assertAlmostEqual(qh / ql, 0.5, delta=0.03)
+    def test_never_exceeds_the_tiers_risk_or_position_cap(self):
+        for v, tier in ((55, 'low'), (65, 'medium'), (75, 'high')):
+            p = self.one(c6=v)[1]; rk = A.TIER_RISK[tier]
+            self.assertLessEqual(p['q'] * (p['entry'] - p['stop']) / A.CAP, rk + 1e-4); self.assertLessEqual(p['q'] * p['entry'] / A.CAP, A.POSCAP * rk / A.RISK + 1e-3)
+    def test_wide_stop_risks_exactly_the_tiers_risk(self):
+        for v, tier in ((55, 'low'), (65, 'medium'), (75, 'high')):
+            p = Env({'A': comp('A', atr=20, hi=101)}, [row('A', 100, c6=v)]).run()['state']['open'][0]      # 9% stop: the risk limit binds, not the cap
+            self.assertAlmostEqual(p['q'] * (p['entry'] - p['stop']) / A.CAP, A.TIER_RISK[tier], delta=0.0003)
+    def test_positions_opened_before_the_tiers_have_no_tier(self):
+        e = Env({}, [row('X', 100)], st([pos('X')], cash=0)); s = e.run()['state']; self.assertNotIn('tier', s['open'][0])
 
 class Gate(unittest.TestCase):
     def run1(self, hi, close=100, atr=5.0):
