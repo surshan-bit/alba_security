@@ -13,8 +13,16 @@ function stubPlugin(stubs){
     b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: stubs[a.path], loader: 'js' }));
   } };
 }
-const options = (file, extra) => ({ stdin: { contents: fs.readFileSync(path.join(root, file), 'utf8') + '\n' + (extra || ''), resolveDir: path.dirname(path.join(root, file)), sourcefile: file }, bundle: true, format: 'cjs', write: false, logLevel: 'silent' });
-const run = res => { const m = { exports: {} }; new Function('module', 'exports', res.outputFiles[0].text)(m, m.exports); return m.exports; };
+const COVER = !!process.env.ALBA_COVERAGE;   // tools/coverage.js: bundles carry a source map and run from a file, so V8 coverage maps back to src/
+let seq = 0;
+const options = (file, extra) => ({ stdin: { contents: fs.readFileSync(path.join(root, file), 'utf8') + '\n' + (extra || ''), resolveDir: path.dirname(path.join(root, file)), sourcefile: path.join(root, file) }, bundle: true, format: 'cjs', write: false, logLevel: 'silent', sourcemap: COVER ? 'inline' : false, sourcesContent: false, sourceRoot: root + '/' });
+const run = res => {
+  const m = { exports: {} };
+  if(!COVER){ new Function('module', 'exports', res.outputFiles[0].text)(m, m.exports); return m.exports; }
+  const dir = path.join(root, 'node_modules', '.cache', 'alba-coverage'); fs.mkdirSync(dir, { recursive: true });
+  const f = path.join(dir, 'bundle' + (seq++) + '.cjs'); fs.writeFileSync(f, res.outputFiles[0].text);
+  return require(f);
+};
 function load(file, extra){ return run(esbuild.buildSync(options(file, extra))); }
 async function loadWithStubs(file, extra, stubs){ return run(await esbuild.build(Object.assign(options(file, extra), { plugins: [stubPlugin(stubs)] }))); }
 module.exports = { load, loadWithStubs, root };
