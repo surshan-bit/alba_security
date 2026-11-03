@@ -913,6 +913,77 @@ test('rocky page: the learning line reads the review figures when there is no wr
   assert.ok(/No picks yet/.test(none) && !/Last review/.test(none));
 });
 
+// ---- the Rocky page: best swing trades of the day (src/rocky/swing.js), the risk-tier columns and the store that reads the swing document
+const EMPTY_ST = { curve: [], closed: [], open: [] };
+const IDEA = (o) => Object.assign({ k: 'AAA', n: 'Aaa Ltd', g: 'Textiles', close: 100, mrsi: 71, mos: 20, sc: 7, vd: 'buy', thin: false, inU: true, tier: 'high', risk: 0.005, score: 81.3, action: 'Buy zone',
+  entry: [100, 101], stop: 92.5, stopPct: 7.5, t1: 110, t2: 120, rr: 2.7, qty: { '500000': 47, '1000000': 94 }, why: ['Fundamentals: buy (score 7)', 'Margin of safety 20%'], warn: [] }, o);
+const SWING = (o) => Object.assign({ asof: '2026-11-03', dataAsof: '2026-11-03', m3hAsof: '2026-11-03', band: [66, 76], pool: 22, ideas: [IDEA()], also: [], skipped: [], capitals: [500000, 1000000] }, o);
+test('rocky page: best swing trades say so when the document is missing or the day has no idea', async () => {
+  const none = await rockyPage({ state: EMPTY_ST });
+  assert.ok(/Best swing trades for the day/.test(none) && /appear after the next daily run/.test(none));
+  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [] }) }), /No stock fits today: monthly RSI 66-76/);
+  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: undefined }) }), /No stock fits today/);
+});
+test('rocky page: a swing idea shows rank, action, score, tier, the levels in rupees, shares for both capitals, the reasons and the caveat', async () => {
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING() });
+  assert.ok(html.includes('rky-idea rky-idea-top') && html.includes('<span class="rky-rank">1</span><b>AAA</b>') && html.includes('Aaa Ltd · Textiles'));
+  assert.ok(html.includes('rky-act rky-act-buy">Buy zone') && html.includes('Score 81') && html.includes('High risk tier'));
+  assert.ok(html.includes('₹100.00 – 101.00') && html.includes('₹92.50 (−7.5%)') && html.includes('₹110.00') && html.includes('₹120.00') && html.includes('2.7 : 1'));
+  assert.ok(html.includes('Shares at ₹5L / ₹10L</b><span>47 / 94</span>'), 'shares for both capitals');
+  assert.ok(html.includes('<li>Fundamentals: buy (score 7)</li>') && /22 stocks fit your rule today \(monthly RSI 66-76/.test(html));
+  assert.ok(/Data as of 2026-11-03 · 3-hour check 2026-11-03/.test(html) && /not a prediction/.test(html) && !/style=/.test(html));
+});
+test('rocky page: only the first idea is marked as the top one; thin, outside-universe and unrated ideas carry their flags and warnings', async () => {
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA(), IDEA({ k: 'BBB', thin: true, inU: false, tier: 'medium', action: 'Wait: momentum fading', warn: ['Thinly traded', 'Stop is an estimate'] }), IDEA({ k: 'CCC', tier: 'low', action: 'Check the 3-hour chart' }), IDEA({ k: 'DDD', tier: 'odd', action: undefined })] }) });
+  assert.strictEqual((html.match(/rky-idea-top/g) || []).length, 1);
+  assert.ok(html.includes('rky-act rky-act-wait">Wait: momentum fading') && html.includes('Medium risk tier') && html.includes('<span class="rky-chip">Thin</span>') && html.includes('Outside Rocky universe'));
+  assert.ok(html.includes('<div class="rky-warn">Thinly traded</div><div class="rky-warn">Stop is an estimate</div>'));
+  assert.ok(html.includes('rky-act ">Check the 3-hour chart') && html.includes('Low risk tier') && html.includes('Unrated risk tier'), 'other actions and unknown tiers get no colour');
+  assert.ok(html.includes('rky-act ">') && (html.match(/Outside Rocky universe/g) || []).length === 1, 'only the idea outside the universe is flagged');
+});
+test('rocky page: missing figures in an idea show a dash, and a missing 3-hour check or date is said plainly', async () => {
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ m3hAsof: null, dataAsof: null, band: undefined, capitals: undefined, ideas: [IDEA({ entry: undefined, stop: null, qty: undefined, why: undefined, warn: undefined, score: undefined })] }) });
+  assert.ok(/Entry zone<\/b><span>– – –/.test(html) && /Stop<\/b><span>– \(−7\.5%\)/.test(html) && /Shares at <\/b><span><\/span>/.test(html));
+  assert.ok(/Data as of \? · no 3-hour check yet/.test(html) && /monthly RSI -,/.test(html) && /Score –/.test(html));
+  const noQty = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ qty: undefined })] }) });
+  assert.ok(/Shares at ₹5L \/ ₹10L<\/b><span>– \/ –/.test(noQty));
+});
+test('rocky page: the rest of the list and the skipped stocks are listed, and saved text in the swing section stays text', async () => {
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ k: HOSTILE, n: HOSTILE, g: HOSTILE, action: HOSTILE, why: [HOSTILE], warn: [HOSTILE] })],
+    also: [{ k: 'ZZZ', n: HOSTILE, score: 40.2, close: 55.3, mrsi: 70, mos: 49, thin: true, action: HOSTILE }, { k: 'YYY', n: 'Y', score: 30, close: 10, mrsi: 66, mos: 5, thin: false, action: 'Buy zone' }],
+    skipped: [{ k: 'SKP', why: HOSTILE }, { k: 'SK2', why: 'Avoid verdict' }], pool: HOSTILE, dataAsof: HOSTILE, m3hAsof: HOSTILE }) });
+  assert.ok(!html.includes('<img'), 'no markup from saved data');
+  assert.ok(/Also on the list/.test(html) && html.includes('ZZZ') && html.includes('YYY') && /<td class="num">40<\/td><td class="num">55\.30<\/td>/.test(html));
+  assert.ok(html.includes('skipped by Rocky\'s filters: SKP (&lt;img src=x onerror=alert(1)&gt;); SK2 (Avoid verdict).'));
+  const plain = await rockyPage({ state: EMPTY_ST, swing: SWING() });
+  assert.ok(!/Also on the list/.test(plain) && !/skipped by Rocky/.test(plain), 'no empty lists');
+});
+test('rocky page: picks and open positions show the risk tier with the monthly RSI, and a dash when there is none', async () => {
+  const html = await rockyPage({ state: { curve: [], closed: [], open: [{ k: 'OLD', d: 'd', q: 1, entry: 10, last: 10, stop: 9, target: 13 }, { k: 'NEW', d: 'd', q: 1, entry: 10, last: 10, stop: 9, target: 13, tier: 'medium', mrsi: 65.4 }] },
+    picks: { asof: 'd', universe: 3, blocked: 1, picks: [{ k: 'P1', score: 6, tier: 'high', mrsi: 74.6 }, { k: 'P2', score: 6, tier: 'odd' }, { k: 'P3', score: 6, tier: 'low', mrsi: 'x' }, { k: 'P4', score: 6 }] } });
+  assert.ok(html.includes('Risk tier') && html.includes('High <span class="rky-sub">M RSI 75</span>') && html.includes('Medium <span class="rky-sub">M RSI 65</span>'));
+  assert.ok(/odd<\/td>/.test(html) && /Low<\/td>/.test(html) && /<td>–<\/td>/.test(html), 'unknown tier shows its text, no monthly RSI shows nothing extra, no tier shows a dash');
+});
+test('rocky page: the notes name the trend checks and the risk tiers', async () => {
+  const html = await rockyPage({ state: EMPTY_ST, picks: { asof: 'd', universe: 1, blocked: 1, picks: [] } });
+  assert.ok(/blocked by risk and trend checks \(below a rising 10-week average, weekly RSI outside 45-75/.test(html));
+  assert.ok(/above 70 high \(0\.5% risk\), above 60 medium \(0\.75%\), otherwise low \(1%\)/.test(html) && /within 15% of the 40-week high/.test(html));
+});
+test('rocky store: the live listener keeps the five ledger documents and the swing document, ignores others and clears what is gone', async () => {
+  let cb; const seen = [];
+  globalThis.__rkDb = { collection: (c) => ({ onSnapshot: (ok, bad) => { seen.push(c); cb = ok; return () => {}; } }) };
+  const S = await alone(() => loadWithStubs('src/rocky/store.js', '', { '../core/store.js': 'export const dbCapabilityPromise = Promise.resolve(globalThis.__rkDb);', '../core/lazy.js': 'export const renderLoadedPart = (k) => { (globalThis.__rkRender = globalThis.__rkRender || []).push(k); };' }));
+  await S.startRockySync(true);
+  assert.deepStrictEqual(seen, ['rocky']);
+  const doc = (id, d) => ({ id, exists: true, data: () => d });
+  cb({ docs: [doc('state', { a: 1 }), doc('swing', { ideas: [] }), doc('other', { x: 1 }), { id: 'log', exists: false, data: () => ({}) }] });
+  assert.deepStrictEqual([S.rocky.state, S.rocky.swing, S.rocky.log, S.rocky.other], [{ a: 1 }, { ideas: [] }, null, undefined]);
+  cb({ docs: [doc('state', { a: 2 })] });
+  assert.deepStrictEqual([S.rocky.state, S.rocky.swing], [{ a: 2 }, null], 'a document that disappears is cleared');
+  assert.ok(S.rocky.ready && globalThis.__rkRender.includes('rocky'));
+  delete globalThis.__rkDb; delete globalThis.__rkRender;
+});
+
 // =========================================================== safe markup sink (src/core/safehtml.js): markup text becomes elements without script-capable parts
 {
   const { JSDOM } = require('jsdom');

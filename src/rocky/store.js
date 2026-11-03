@@ -1,11 +1,11 @@
-// The Rocky page's saved data, listened to live: the documents of the `rocky` collection (state, picks, weights, learn, log).
+// The Rocky page's saved data, listened to live: the documents of the `rocky` collection (state, picks, weights, learn, log, swing).
 // Rocky's daily run writes them (a copy of the agent's own ledger); this page only reads. Paper trading only, no real orders.
 import { dbCapabilityPromise } from '../core/store.js';
 import { renderLoadedPart } from '../core/lazy.js';
 
-const IDS = ['state', 'picks', 'weights', 'learn', 'log'];
-/** @type {{ state: any, picks: any, weights: any, learn: any, log: any, ready: boolean, noDb: boolean }} */
-const rocky = { state: null, picks: null, weights: null, learn: null, log: null, ready: false, noDb: false };
+const IDS = ['state', 'picks', 'weights', 'learn', 'log', 'swing'];
+/** @type {{ state: any, picks: any, weights: any, learn: any, log: any, swing: any, ready: boolean, noDb: boolean }} */
+const rocky = { state: null, picks: null, weights: null, learn: null, log: null, swing: null, ready: false, noDb: false };
 let started = false, heard = false, tries = 0;
 /** @type {null | (() => void)} */
 let unsub = null;

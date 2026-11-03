@@ -1,21 +1,13 @@
 // The Rocky page: the paper-trading swing agent's ledger. Everything here is read from the `rocky` collection (see store.js).
-import { escapeHtml } from '../core/util.js';
+import { TIER_LABEL, e, fmt, list, num, table } from './fmt.js';
+import { swingHtml } from './swing.js';
 import { rocky } from './store.js';
 
 const CAPITAL = 1000000;
 const MAX_POS = 8;
-const num = (v) => typeof v === 'number' && isFinite(v);
-const fmt = (v, d = 0) => num(v) ? v.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d }) : '–';
 const pct = (v) => num(v) ? '<span class="' + (v >= 0 ? 'rky-up' : 'rky-dn') + '">' + (v >= 0 ? '+' : '') + v.toFixed(2) + '%</span>' : '–';
-const e = (s) => escapeHtml(s == null ? '' : String(s));
-const list = (a) => Array.isArray(a) ? a : [];
 
-/** @param {{h:string, n?:boolean, f:(r:any)=>string}[]} cols @param {any[]} rows @param {string} empty */
-function table(cols, rows, empty){
-  if(!rows.length) return '<p class="rky-empty">' + empty + '</p>';
-  return '<div class="strat-table-wrap"><table class="strat-table rky-table"><thead><tr>' + cols.map(c => '<th' + (c.n ? ' class="num"' : '') + '>' + c.h + '</th>').join('') + '</tr></thead><tbody>' +
-    rows.map(r => '<tr>' + cols.map(c => '<td' + (c.n ? ' class="num"' : '') + '>' + c.f(r) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
-}
+const tierCell = (r) => r.tier ? e(TIER_LABEL[r.tier] || r.tier) + (num(r.mrsi) ? ' <span class="rky-sub">M RSI ' + fmt(r.mrsi) + '</span>' : '') : '–';
 const stock = (r) => '<b>' + e(r.k) + '</b>' + (r.n ? '<br><span class="rky-sub">' + e(r.n) + '</span>' : '');
 
 // Equity curve (agent, solid) with Nifty (dashed) rebased to the agent's equity on the first day that has a Nifty close.
@@ -50,9 +42,10 @@ function picksHtml(pk){
   const empty = off ? 'Risk-off: fewer than ' + fmt((rg.min || 0) * 100) + '% of stocks are up over the last month, so Rocky opens no new positions. Staying in cash is a valid call.' : 'No stock passes all the checks today. Staying in cash is a valid call.';
   const picks = table([
     { h: 'Stock', f: stock }, { h: 'Group', f: r => e(r.g) }, { h: 'Close ₹', n: true, f: r => fmt(r.close, 2) }, { h: 'Score', n: true, f: r => num(r.score) ? r.score.toFixed(2) : '–' },
-    { h: 'MoS %', n: true, f: r => fmt(r.mos) }, { h: 'Wk RSI', n: true, f: r => fmt(r.rsiW) }, { h: 'Stop / Target', n: true, f: r => num(r.stop) ? fmt(r.stop, 2) + ' / ' + fmt(r.target, 2) : '–' }
+    { h: 'MoS %', n: true, f: r => fmt(r.mos) }, { h: 'Wk RSI', n: true, f: r => fmt(r.rsiW) }, { h: 'Stop / Target', n: true, f: r => num(r.stop) ? fmt(r.stop, 2) + ' / ' + fmt(r.target, 2) : '–' },
+    { h: 'Risk tier', f: tierCell }
   ], list(pk.picks), empty);
-  const note = '<p class="rky-sub">' + e(pk.universe) + ' stocks scored, ' + e(pk.blocked) + ' blocked by risk checks (downtrend, results within 7 days, falling knife, Avoid verdict, thin trading).</p>';
+  const note = '<p class="rky-sub">' + e(pk.universe) + ' stocks scored, ' + e(pk.blocked) + ' blocked by risk and trend checks (below a rising 10-week average, weekly RSI outside 45-75, no positive 1-month momentum, more than 15% below the 40-week high, downtrend, results within 7 days, falling knife, Avoid verdict, thin trading).</p>';
   const gated = list(pk.gated);
   const gt = gated.length ? '<h3 class="rky-h3">Passed the checks, failed the 1:3 gate</h3>' + table([
     { h: 'Stock', f: stock }, { h: 'Score', n: true, f: r => num(r.score) ? r.score.toFixed(2) : '–' }, { h: 'Close ₹', n: true, f: r => fmt(r.close, 2) },
@@ -72,7 +65,7 @@ function learnHtml(wt, ln){
   return h || '<p class="rky-empty">No learning data yet.</p>';
 }
 
-const RULES = 'Rules: ₹10 lakh paper capital, 1% risk per trade, max 8 positions (2 per industry group). Stop 4.5–9% by volatility, target 3 times the stop distance (1:3 reward to risk), and a stock is only taken if its 40-week high leaves room for that target or it is already within 3% of the high. New positions may run up to 70 days. No new entries while fewer than 60% of stocks are up over the month. Costs and slippage of 0.5% round trip are charged. Exits are checked on daily closes, so real fills could be worse. Weights change only after 20 or more closed trades. This is a paper ledger: no real orders are ever placed and nothing here is advice. The agent graduates to real-money ideas only if it beats the market after costs over a meaningful number of trades.';
+const RULES = 'Rules: ₹10 lakh paper capital, 1% risk per trade, max 8 positions (2 per industry group). Stop 4.5–9% by volatility, target 3 times the stop distance (1:3 reward to risk), and a stock is only taken if its 40-week high leaves room for that target or it is already within 3% of the high. New positions may run up to 70 days. No new entries while fewer than 60% of stocks are up over the month. Entries need price above a rising 10-week average, weekly RSI 45–75, a positive 1-month change and a price within 15% of the 40-week high. Trades are sized by monthly-RSI risk tier: above 70 high (0.5% risk), above 60 medium (0.75%), otherwise low (1%). Costs and slippage of 0.5% round trip are charged. Exits are checked on daily closes, so real fills could be worse. Weights change only after 20 or more closed trades. This is a paper ledger: no real orders are ever placed and nothing here is advice. The agent graduates to real-money ideas only if it beats the market after costs over a meaningful number of trades.';
 
 function rockyHtml(){
   if(rocky.noDb) return '<p class="rky-empty">Sign in to view Rocky.</p>';
@@ -83,11 +76,13 @@ function rockyHtml(){
   const stamp = pk ? 'Run ' + e(pk.asof) + ' · data as of ' + e(pk.dataAsof || '?') : '';
   return '<div class="rky-head"><div class="rky-sub">Paper-trading swing agent on your Positive MoS list. Protect capital first, then capture the big multi-week moves. No real orders are ever placed.</div><div class="rky-stamp">' + stamp + '</div></div>' +
     kpis(st, pk, rocky.weights) +
+    '<h2 class="rky-sec">Best swing trades for the day</h2>' + swingHtml(rocky.swing) +
     '<h2 class="rky-sec">Equity curve (₹)</h2>' + curveSvg(list(st.curve)) +
     '<h2 class="rky-sec">Today\'s picks</h2>' + picksHtml(pk) +
     '<h2 class="rky-sec">Open paper positions</h2>' + table([
       { h: 'Stock', f: stock }, { h: 'Opened', f: r => e(r.d) }, { h: 'Qty', n: true, f: r => fmt(r.q) }, { h: 'Entry', n: true, f: r => fmt(r.entry, 2) }, { h: 'Last', n: true, f: r => fmt(r.last, 2) },
-      { h: 'P&amp;L', n: true, f: r => num(r.last) && num(r.entry) && r.entry ? pct((r.last / r.entry - 1) * 100) : '–' }, { h: 'Stop / Target', n: true, f: r => fmt(r.stop, 2) + ' / ' + fmt(r.target, 2) }
+      { h: 'P&amp;L', n: true, f: r => num(r.last) && num(r.entry) && r.entry ? pct((r.last / r.entry - 1) * 100) : '–' }, { h: 'Stop / Target', n: true, f: r => fmt(r.stop, 2) + ' / ' + fmt(r.target, 2) },
+      { h: 'Risk tier', f: tierCell }
     ], list(st.open), 'No open positions.') +
     '<h2 class="rky-sec">Closed trades</h2>' + table([
       { h: 'Stock', f: r => '<b>' + e(r.k) + '</b>' }, { h: 'Held', f: r => e(r.d) + ' → ' + e(r.xd) }, { h: 'Exit', f: r => e(r.why) }, { h: 'Return', n: true, f: r => pct(r.ret) }, { h: 'P&amp;L ₹', n: true, f: r => fmt(r.pnl) }
