@@ -10,7 +10,7 @@ const D = createData(20261010);
 const { TV_HEADER, FUND_HEADER, tvCsv, fundCsv, fundRow, rv } = D;
 const rd = f => fs.readFileSync(path.join(root, f), 'utf8');
 
-const { load } = require('./lib/load.js');
+const { load, loadWithStubs } = require('./lib/load.js');
 const F = load('src/import/fund-engine.js', 'export { FundEngine };');
 const P = load('src/import/csvparse.js');
 const Fe = F.FundEngine;
@@ -631,6 +631,33 @@ test('escaping: safeText turns raw < and > into text and never escapes twice', (
   const U = load('src/core/util.js');
   assert.strictEqual(U.safeText('<b>a</b> &amp; &lt;x'), '&lt;b&gt;a&lt;/b&gt; &amp; &lt;x');
   assert.strictEqual(U.safeText(null), '');
+});
+
+// core/store.js, research/status.js and list/metrics.js reach the page at start-up; the event logic under test needs none of them.
+const EVENT_STUBS = { 'core/store.js': 'export const allTrades = () => [];', 'research/status.js': 'export const stockResearchAsof = () => null;', 'list/metrics.js': 'export const mosPct = () => null; export const scoreBand = () => "";' };
+const HOSTILE_SENTIMENT = 'pos" onmouseover="alert(1)';
+test('escaping: cleanSentiment keeps pos / neg / neu and drops anything else, so a saved tag can never leave its class attribute', () => {
+  const { cleanSentiment } = load('src/core/sentiment.js');
+  ['pos', 'neg', 'neu'].forEach(v => assert.strictEqual(cleanSentiment(v), v));
+  [HOSTILE_SENTIMENT, '"><img src=x onerror=alert(1)>', 'mix', 'POS', '', null, undefined, 7, {}, ['pos']].forEach(v => assert.strictEqual(cleanSentiment(v), ''));
+});
+test('escaping: a hostile sentiment saved on a news event is dropped before the price chart can draw it', async () => {
+  const E = await loadWithStubs('src/prices/events.js', '', EVENT_STUBS);
+  const stock = { ticker: 'AAA1', __events: [{ k: 'news', d: '2026-01-05', t: 'Results beat', src: 'Wire', s: HOSTILE_SENTIMENT }, { k: 'news', d: '2026-01-06', t: 'Order win', s: 'pos' }] };
+  const evs = E.stockChartEvents(stock);
+  assert.deepStrictEqual(evs.map(e => e.s).sort(), ['', 'pos']);
+  assert.ok(evs.every(e => !/["<>]/.test(e.s)));
+});
+test('escaping: a hostile sentiment saved on a news event is dropped before the industry news list can draw it', async () => {
+  const C = await loadWithStubs('src/industry/calc.js', '', EVENT_STUBS);
+  const items = C.industryNews([{ ticker: 'AAA1', name: 'Alpha', __events: [{ k: 'news', d: '2026-01-05', t: 'Results beat', s: HOSTILE_SENTIMENT }, { k: 'earn', d: '2026-01-04', t: 'Q3 results', s: 'neg' }] }]);
+  assert.deepStrictEqual(items.map(x => x.s), ['', 'neg']);
+});
+test('escaping: the Buy / Sell ideas news list still drops a hostile sentiment (shared helper, same result as before)', () => {
+  const NEWSMOD = load('src/strategies/news.js');
+  const today = new Date().toISOString().slice(0, 10);
+  const items = NEWSMOD.recentNews({ ticker: 'AAA1', __events: [{ k: 'news', d: today, t: 'Headline', s: HOSTILE_SENTIMENT }, { k: 'news', d: today, t: 'Other', s: 'neg' }] });
+  assert.deepStrictEqual(items.map(x => x.s).sort(), ['', 'neg']);
 });
 
 // =========================================================== score history (recorded by each import)

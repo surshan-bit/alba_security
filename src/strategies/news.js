@@ -2,6 +2,8 @@
 // news items with a positive / negative / neutral label, results dates, and other company events.
 // A stock that has never had a Fundamental refresh has no event record at all, which is different from having one with
 // nothing recent in it, so these helpers return null for "unknown".
+import { cleanSentiment } from '../core/sentiment.js';
+
 const DAY_MS = 86400000;
 const NEWS_DAYS = 14;
 
@@ -35,7 +37,7 @@ function recentNews(s, days = NEWS_DAYS, max = 4){
     if(!e || e.k !== 'news' || typeof e.t !== 'string') return;
     const ms = eventMs(e.d);
     if(ms === null || now - ms > days * DAY_MS || ms - now > DAY_MS) return;
-    list.push({ d: String(e.d).slice(0, 10), t: e.t, s: e.s === 'pos' || e.s === 'neg' || e.s === 'neu' ? e.s : '', src: e.src || '', url: /^https?:\/\//i.test(e.url || '') ? e.url : '' });
+    list.push({ d: String(e.d).slice(0, 10), t: e.t, s: cleanSentiment(e.s), src: e.src || '', url: /^https?:\/\//i.test(e.url || '') ? e.url : '' });
   });
   const rank = x => (x.s === 'neg' ? 0 : 1);
   list.sort((a, b) => rank(a) - rank(b) || (a.d < b.d ? 1 : a.d > b.d ? -1 : 0));
