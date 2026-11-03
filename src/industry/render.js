@@ -25,7 +25,7 @@ function membersOf(by, name){
 }
 
 function scoreCell(label, v, n, total){
-  return `<div class="fund-cell"><div class="fund-cell-head"><div class="fund-cell-label">${label}</div>${v === null ? '<div class="fund-cell-score fs-pending">n/a</div>' : `<div class="fund-cell-score ${scoreBand(v)}">${v.toFixed(2)}<span class="fund-cell-max">/10</span></div>`}</div>${v === null ? '' : `<div class="fund-cell-bar"><i class="${scoreBand(v)}" style="width:${Math.max(0, Math.min(100, v * 10))}%"></i></div>`}<div class="fund-cell-note">Average of ${n} of ${total} stocks.</div></div>`;
+  return `<div class="fund-cell"><div class="fund-cell-head"><div class="fund-cell-label">${label}</div>${v === null ? '<div class="fund-cell-score fs-pending">n/a</div>' : `<div class="fund-cell-score ${scoreBand(v)}">${v.toFixed(2)}<span class="fund-cell-max">/10</span></div>`}</div>${v === null ? '' : `<div class="fund-cell-bar"><i class="${scoreBand(v)}" data-css="--w:${Math.max(0, Math.min(100, v * 10))}%"></i></div>`}<div class="fund-cell-note">Average of ${n} of ${total} stocks.</div></div>`;
 }
 function factorsHtml(f){
   const av = f.score === null ? '' : ' &middot; ' + f.score.toFixed(2) + '/10';
@@ -52,7 +52,7 @@ function globalHtml(g){
   const head = `<div class="global-panel-head"><div class="global-panel-title">${panelIcon('global')}Global &amp; Macro Information</div></div>`;
   if(!g.researched) return `<div class="global-panel" id="jump-ind-global">${head}<p class="global-panel-sub">None of the stocks in this group has been researched for Global &amp; Macro yet. Open a stock and use its Refresh button, then choose Fundamental.</p></div>`;
   return `<div class="global-panel" id="jump-ind-global">${head}<p class="global-panel-sub">Collected from the ${g.researched} researched stock${g.researched === 1 ? '' : 's'} in this group. Notes with the same wording are joined.</p>
-    <div class="global-cols" style="--n:${Math.max(1, g.positive.length, g.negative.length)}">${col('pos', '&#9650; Positive / tailwind', g.positive)}${col('neg', '&#9660; Negative / risk', g.negative)}</div></div>`;
+    <div class="global-cols" data-css="--n:${Math.max(1, g.positive.length, g.negative.length)}">${col('pos', '&#9650; Positive / tailwind', g.positive)}${col('neg', '&#9660; Negative / risk', g.negative)}</div></div>`;
 }
 
 function newsHtml(news){

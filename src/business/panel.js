@@ -153,7 +153,7 @@ function detailHtml(r, cols){
     const scores = detailAllCols ? '' : '<span class="biz-ft">Fund ' + (ctx.scoreLabel || 'n/a') + ' · Tech ' + (ts === null ? 'n/a' : ts.toFixed(1)) + '</span>';
     return '<tr class="strat-row' + (x.match ? ' biz-match' : '') + '" data-idx="' + idx + '" tabindex="0">' + colIds.map(id => { const c = analysisLbCell(id, ctx); return id === 'stock' && scores ? c.replace(/<\/td>$/, scores + '</td>') : c; }).join('') + (showPeriod ? '<td class="num">' + pct(x.change) + '</td>' : '') + '</tr>';
   }).join('');
-  const grid = '<div class="strat-table-wrap' + (detailAllCols ? '' : ' biz-lean') + '" style="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + colIds.map(id => columnHeaderHtml(id, detailSort)).join('') + (showPeriod ? sortHeaderHtml('periodChg', p.key + ' chg', detailSort, ' class="num"') : '') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  const grid = '<div class="strat-table-wrap' + (detailAllCols ? '' : ' biz-lean') + '" data-css="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + colIds.map(id => columnHeaderHtml(id, detailSort)).join('') + (showPeriod ? sortHeaderHtml('periodChg', p.key + ' chg', detailSort, ' class="num"') : '') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   const card = (label, value) => '<div class="biz-kpi"><small>' + label + '</small><span>' + value + '</span></div>';
   const vsInd = r.matches && r.matchMean !== null && r.mean !== null ? r.matchMean - r.mean : null;
   const lastCard = strategyOn()
@@ -172,18 +172,18 @@ function openStockFromBusiness(idx){
 function breadth(r){
   if(!r.known) return '';
   const u = r.up / r.known * 100, d = r.down / r.known * 100;
-  return '<span class="biz-breadth" title="' + r.up + ' up, ' + r.down + ' down, ' + (r.known - r.up - r.down) + ' unchanged"><i class="up" style="width:' + u + '%"></i><i class="down" style="width:' + d + '%"></i></span> ' + r.up + '↑ ' + r.down + '↓';
+  return '<span class="biz-breadth" title="' + r.up + ' up, ' + r.down + ' down, ' + (r.known - r.up - r.down) + ' unchanged"><i class="up" data-css="--w:' + u + '%"></i><i class="down" data-css="--w:' + d + '%"></i></span> ' + r.up + '↑ ' + r.down + '↓';
 }
 
 // Strategy choice as buttons, like the Analysis filter: "All" (no strategy) or one of your strategies, each with how many stocks qualify today.
 function strategyGroupHtml(){
   const chosen = chosenStrategy();
-  const btn = (value, label, n, active, dot, title) => '<button type="button" class="filter-btn' + (active ? ' active' : '') + '" data-biz-strat="' + escapeHtml(value) + '" title="' + title + '"><span class="filter-dot" style="background:' + dot + '"></span>' + label + '<span class="filter-n">' + n + '</span></button>';
-  const list = [btn('', 'All', stocks.length, !chosen, 'var(--text)', 'Do not highlight by a strategy')].concat(publishedStrategies().map(x => {
+  const btn = (value, label, n, active, dot, title) => '<button type="button" class="filter-btn' + (active ? ' active' : '') + '" data-biz-strat="' + escapeHtml(value) + '" title="' + title + '"><span class="filter-dot filter-dot--' + dot + '"></span>' + label + '<span class="filter-n">' + n + '</span></button>';
+  const list = [btn('', 'All', stocks.length, !chosen, 'text', 'Do not highlight by a strategy')].concat(publishedStrategies().map(x => {
     const set = strategyStockSet(x.id);
-    return btn(x.id, '<span class="filter-label">' + escapeHtml(x.name) + '</span>', set ? set.size : 0, x.id === chosen, 'var(--accent)', 'Highlight the stocks that qualify for this strategy today');
+    return btn(x.id, '<span class="filter-label">' + escapeHtml(x.name) + '</span>', set ? set.size : 0, x.id === chosen, 'accent', 'Highlight the stocks that qualify for this strategy today');
   }));
-  const rb = '<div class="filter-group"><h2>Weekly Move</h2><div class="filter-group-row"><button type="button" class="filter-btn' + (rebound ? ' active' : '') + '" data-biz-rebound="1" aria-pressed="' + rebound + '" title="Down last week, up this week"><span class="filter-dot" style="background:var(--buy)"></span>Rebound<span class="filter-n">' + stocks.filter(isRebound).length + '</span></button></div></div>';
+  const rb = '<div class="filter-group"><h2>Weekly Move</h2><div class="filter-group-row"><button type="button" class="filter-btn' + (rebound ? ' active' : '') + '" data-biz-rebound="1" aria-pressed="' + rebound + '" title="Down last week, up this week"><span class="filter-dot filter-dot--buy"></span>Rebound<span class="filter-n">' + stocks.filter(isRebound).length + '</span></button></div></div>';
   return '<div class="filters analysis-filters-panel biz-strategy-panel"><div class="filter-group"><h2>Strategy</h2><div class="filter-group-row">' + list.join('') + '</div></div>' + rb + '</div>';
 }
 // The view, period, grouping and strategy controls sit in a column beside the content, like the Analysis filters.

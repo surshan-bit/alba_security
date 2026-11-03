@@ -10,7 +10,7 @@
 .biz-na{color:var(--muted);}
 .biz-warn{color:var(--avoid);}
 .biz-breadth{display:inline-flex;width:70px;height:6px;border-radius:3px;background:var(--line);overflow:hidden;vertical-align:middle;margin-right:6px;}
-.biz-breadth i{display:block;height:100%;}
+.biz-breadth i{display:block;height:100%;width:var(--w,0%);}
 .biz-breadth .up{background:var(--buy);}
 .biz-breadth .down{background:var(--avoid);}
 .biz-table > tbody > .biz-detail > td{padding:0 0 6px;border-bottom:1px solid var(--line);}

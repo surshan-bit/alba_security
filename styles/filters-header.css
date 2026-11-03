@@ -18,6 +18,9 @@
 .filter-btn:hover{background:var(--panel2);}
 .filter-btn.active{background:var(--panel2);border-color:var(--line);font-weight:700;}
 .filter-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.filter-dot--text{background:var(--text);}
+.filter-dot--accent{background:var(--accent);}
+.filter-dot--buy{background:var(--buy);}
 .filter-n{margin-left:auto;color:var(--muted);font-size:var(--t-sm);}
 .search-box{position:relative;flex:1 1 200px;min-width:160px;}
 .search-box--block{flex:none;width:100%;min-width:0;}
