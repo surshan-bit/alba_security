@@ -28,6 +28,20 @@ td.n,th.n{text-align:right}
 .bar span{width:60px;color:var(--mut);font-size:12px}
 svg{width:100%;height:150px;display:block}
 .empty{color:var(--mut);padding:10px 0}
+.sw-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;margin-bottom:8px}
+.idea{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0;background:var(--panel)}
+.idea.top{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.idea h3{margin:0;font-size:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.idea .rank{background:var(--acc);color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+.act{display:inline-block;border-radius:10px;padding:2px 9px;font-size:12px;font-weight:600;background:var(--chip)}
+.act.buy{background:var(--up);color:#fff}.act.wait{background:var(--warn);color:#fff}
+.lv{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:10px 0}
+.lv div{background:var(--bg);border-radius:8px;padding:6px 8px}.lv b{display:block;font:500 11px "IBM Plex Sans",sans-serif;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.lv span{font:500 14px "IBM Plex Mono",monospace}
+.idea ul{margin:6px 0 0;padding-left:18px;color:var(--fg)}.idea li{margin:2px 0}
+.warn{margin:8px 0 0;padding:6px 10px;border-left:3px solid var(--warn);background:var(--bg);color:var(--mut);font-size:13px}
+.also td,.also th{padding:5px 8px}
+
 </style>
 <main>
   <header>
@@ -35,6 +49,7 @@ svg{width:100%;height:150px;display:block}
     <p class="sub">Rocky, the paper-trading swing agent on your Positive MoS list. Mandate: protect capital first, then capture the big multi-week moves. No real orders are ever placed. <span id="asof" class="mono"></span></p>
   </header>
   <div class="kpis" id="kpis"></div>
+  <section class="card" id="swingCard"><h2>Best swing trades for the day</h2><div id="swing"></div></section>
   <section class="card"><h2>Equity curve (₹)</h2><div id="curve"></div></section>
   <section class="card"><h2>Today's picks</h2><div class="wrap" id="picks"></div></section>
   <section class="card"><h2>Open paper positions</h2><div class="wrap" id="open"></div></section>
@@ -60,11 +75,22 @@ function curve(pts){
   const leg=`<p class="sub"><span style="color:var(--acc)">&#9644;</span> Agent${base?` &nbsp; <span style="color:var(--mut)">&#9644;</span> Nifty, rebased to the agent on ${esc(base[0])}`:' &nbsp; Nifty line appears once two runs have a Nifty close'}</p>`;
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" x2="${W}" y1="${y(1e6)}" y2="${y(1e6)}" stroke="var(--line)" stroke-dasharray="4 4"/>${base?line(nf,'var(--mut)',1):''}${line(pts.map(p=>p[1]),'var(--acc)')}</svg>`+leg;
 }
+function swingHtml(sw){
+  if(!sw||!(sw.ideas||[]).length) return '<div class="empty">No stock fits today: monthly RSI 66-76, positive margin of safety, and the entry filters. Staying in cash is a valid call.</div>';
+  const act=a=>a.startsWith('Buy')?'buy':(a.startsWith('Wait')?'wait':'');
+  const m=n=>fmt(n,2), cap=sw.capitals||[500000,1000000];
+  const card=(i,n)=>`<div class="idea${n==1?' top':''}"><h3><span class="rank">${n}</span><b>${esc(i.k)}</b><span class="sub">${esc(i.n)} · ${esc(i.g||'')}</span><span class="act ${act(i.action)}">${esc(i.action)}</span><span class="chip">Score ${fmt(i.score,0)}</span><span class="chip">${i.tier==='high'?'High':'Medium'} risk tier</span>${i.thin?'<span class="chip">Thin</span>':''}${i.inU?'':'<span class="chip">Outside Rocky universe</span>'}</h3>
+    <div class="lv"><div><b>Entry zone</b><span>₹${m(i.entry[0])} – ${m(i.entry[1])}</span></div><div><b>Stop</b><span>₹${m(i.stop)} (−${fmt(i.stopPct,1)}%)</span></div><div><b>Target 1 (+10%)</b><span>₹${m(i.t1)}</span></div><div><b>Target 2 (+20%)</b><span>₹${m(i.t2)}</span></div><div><b>Reward : risk to T2</b><span>${fmt(i.rr,1)} : 1</span></div><div><b>Shares at ${cap.map(c=>'₹'+fmt(c/100000)+'L').join(' / ')}</b><span>${cap.map(c=>fmt(i.qty[String(c)])).join(' / ')}</span></div></div>
+    <ul>${i.why.map(w=>'<li>'+esc(w)+'</li>').join('')}</ul>${i.warn.map(w=>'<div class="warn">'+esc(w)+'</div>').join('')}</div>`;
+  const also=(sw.also||[]).length?`<h2 style="margin-top:16px">Also on the list</h2><div class="wrap"><table class="also"><thead><tr><th>Stock</th><th class="n">Score</th><th class="n">Close ₹</th><th class="n">M RSI</th><th class="n">MoS %</th><th>Status</th></tr></thead><tbody>${sw.also.map(a=>`<tr><td><b>${esc(a.k)}</b> <span class="sub">${esc(a.n)}</span>${a.thin?' <span class="chip">Thin</span>':''}</td><td class="n">${fmt(a.score,0)}</td><td class="n">${m(a.close)}</td><td class="n">${fmt(a.mrsi,0)}</td><td class="n">${fmt(a.mos)}</td><td>${esc(a.action)}</td></tr>`).join('')}</tbody></table></div>`:'';
+  const skip=(sw.skipped||[]).length?`<p class="sub">Matched your band but skipped by Rocky's filters: ${sw.skipped.map(s=>esc(s.k)+' ('+esc(s.why)+')').join('; ')}.</p>`:'';
+  return `<div class="sw-head"><span class="sub">${sw.pool} stocks fit your rule today (monthly RSI ${sw.band[0]}-${sw.band[1]}, positive margin of safety). Data as of ${esc(sw.dataAsof||'?')}${sw.m3hAsof?' · 3-hour check '+esc(sw.m3hAsof):' · no 3-hour check yet'}.</span></div>`+sw.ideas.map((i,n)=>card(i,n+1)).join('')+also+skip+`<p class="note">A ranking of candidates, not a prediction: in testing, about 4 in 10 comparable swing trades hit their stop within three weeks. Confirm the 3-hour chart before buying, use limit orders (especially on thin stocks), size by the stop, and never risk more than your tier allows. This is a paper ledger's analysis, not advice.</p>`;
+}
 async function main(){
   const db=await claude.use('db');
   if(!db){$('kpis').innerHTML='<div class="empty">Sign in to view the agent data.</div>';return;}
   const g=async n=>{try{const s=await db.doc('agent/'+n).get();return s.exists?s.data():null}catch(e){return null}};
-  const [st,pk,wt,ln,lg]=await Promise.all(['state','picks','weights','learn','log'].map(g));
+  const [st,pk,wt,ln,lg,sw]=await Promise.all(['state','picks','weights','learn','log','swing'].map(g));
   if(!st){$('kpis').innerHTML='<div class="empty">The agent has not run yet. Its first scheduled run will fill this page.</div>';return;}
   const eq=st.curve.length?st.curve[st.curve.length-1][1]:1e6, ret=(eq/1e6-1)*100;
   const m=st.metrics||{};
@@ -78,6 +104,7 @@ async function main(){
     ['Market regime',pk&&pk.regime?(pk.regime.on?'<span class="up">Risk-on</span>':'<span class="dn">Risk-off</span>')+(pk.regime.breadth==null?'':' <span class="sub">'+fmt(pk.regime.breadth*100,0)+'% up</span>'):'–'],
     ['Expectancy / trade',m.expectancy==null?'–':pc(m.expectancy)],['Avg win / avg loss',m.payoff==null?'–':m.avgWin.toFixed(1)+'% / '+m.avgLoss.toFixed(1)+'%']
   ].map(([a,b])=>`<div class="kpi"><span>${a}</span><b>${b}</b></div>`).join('');
+  $('swing').innerHTML=swingHtml(sw);
   $('curve').innerHTML=curve(st.curve||[]);
   const flags=f=>Object.entries(f||{}).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`<span class="chip">${k} ${v.toFixed(2)}</span>`).join('');
   $('picks').innerHTML=pk?table([
