@@ -1,6 +1,6 @@
 // Shared by the private functions: lets only the owner account through. The caller's own sign-in token is used, so the
 // database's row-level rules decide (profiles.role = 'owner'); nothing here trusts what the browser says about itself.
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.3';
+import { createClient } from 'npm:@supabase/supabase-js@2.117.3';
 import { corsHeaders } from './cors.ts';
 
 export const cors = (req: Request) => corsHeaders(req.headers.get('Origin'), Deno.env.get('ALLOWED_ORIGINS'));

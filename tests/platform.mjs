@@ -192,6 +192,23 @@ import { readFileSync } from 'node:fs';
   }
 }
 
+// Server functions import packages by exact version from the npm registry, never from a mutable URL (CLAUDE.md section 3, A06 and A08),
+// and the version is the one package.json pins for the browser, so there is a single version to review
+{
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const root = new URL('../supabase/functions/', import.meta.url);
+  const files = readdirSync(root, { recursive: true }).filter(f => String(f).endsWith('.ts'));
+  const pinned = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dependencies['@supabase/supabase-js'];
+  eq('functions: the server function files are found', files.length >= 5, true);
+  for(const f of files){
+    const src = readFileSync(new URL(f, root), 'utf8');
+    eq(f + ': no import from a web address', /^\s*(import|export)[^\n]*from\s+['"]https?:/m.test(src), false);
+    for(const m of src.matchAll(/from\s+'npm:(@?[^@']+(?:\/[^@']+)?)@([^'/]+)[^']*'/g)) eq(f + ': ' + m[1] + ' is pinned to an exact version', /^\d+\.\d+\.\d+$/.test(m[2]), true);
+  }
+  const owner = readFileSync(new URL('_shared/owner.ts', root), 'utf8');
+  eq('functions: owner.ts imports supabase-js from npm at the version package.json pins', owner.includes("from 'npm:@supabase/supabase-js@" + pinned + "'"), true);
+}
+
 // Security headers: the Cloudflare site must ship the file that sets them
 {
   const { readFileSync } = await import('node:fs');
