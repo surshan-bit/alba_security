@@ -35,7 +35,7 @@ function fiPaint(){
   for(const s of fiCur) pct += s.w * (fiState.status[s.key] === 'done' ? 1 : (fiState.status[s.key] === 'running' ? fiState.frac[s.key] : 0));
   pct = Math.max(0, Math.min(100, Math.round(pct)));
   const fill = fiEl('fiBarFill'), pctEl = fiEl('fiPct'), title = fiEl('fiTitle'), list = fiEl('fiSteps'), bar = fiEl('fiBar');
-  if(fill) fill.style.width = pct + '%';
+  if(fill) fill.style.setProperty('--w', pct + '%');
   if(bar) bar.setAttribute('aria-valuenow', String(pct));
   if(pctEl) pctEl.textContent = pct + '%';
   if(title) title.textContent = fiState.title;

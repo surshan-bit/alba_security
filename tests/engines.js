@@ -2005,6 +2005,94 @@ test('auto reload: it updates by itself when idle, waits while someone types, an
   } finally { if(savedWindow) Object.defineProperty(globalThis, 'window', savedWindow); else delete globalThis.window; delete globalThis.__arDbMake; }
 }));
 
+// ---- progress bars: the width travels as the --w custom property, never an inline width (CLAUDE.md section 2)
+const IMPORT_PANEL = '<div id="fundImportPanel" hidden><div id="fiTitle"></div><div id="fiBar"><div id="fiBarFill" class="fi-bar-fill"></div></div><span id="fiPct"></span><ol id="fiSteps"></ol><div id="fiPrompt"></div><div id="fiResult"></div></div>'
+  + '<div id="ti_fundImportPanel" hidden><div id="ti_fiBarFill"></div></div>';
+test('import progress: the bar width is the weight of the finished steps plus the running one, drawn as --w', () => withPage(IMPORT_PANEL, async (win, spy) => {
+  const P = await loadWithStubs('src/import/panel.js', '', {});
+  const doc = win.document, fill = doc.getElementById('fiBarFill'), steps = [{ key: 'a', label: 'Step A', w: 40 }, { key: 'b', label: 'Step B', w: 60 }];
+  P.fiSet('a', 'done');   // before a job starts there is nothing to draw
+  assert.strictEqual(P.getFiState(), null);
+  P.fiReset('Importing', steps);
+  assert.strictEqual(doc.getElementById('fundImportPanel').hidden, false);
+  assert.strictEqual(fill.style.getPropertyValue('--w'), '0%');
+  P.fiSet('a', 'done', 'read 3 rows');
+  assert.deepStrictEqual([fill.style.getPropertyValue('--w'), doc.getElementById('fiPct').textContent, doc.getElementById('fiBar').getAttribute('aria-valuenow')], ['40%', '40%', '40']);
+  P.fiSet('b', 'running', null, 0.5);
+  assert.strictEqual(fill.style.getPropertyValue('--w'), '70%', 'a running step counts for its fraction');
+  assert.ok(!fill.hasAttribute('data-css') && !/width/.test(fill.getAttribute('style') || ''), 'no inline width, only the custom property');
+  const marks = Array.from(doc.querySelectorAll('#fiSteps .fi-mark')).map(m => m.textContent);
+  assert.deepStrictEqual(marks, ['✓', '…']);
+  assert.strictEqual(doc.querySelector('#fiSteps .fi-detail').textContent, 'read 3 rows');
+  P.fiSet('b', 'error', 'boom');
+  assert.strictEqual(Array.from(doc.querySelectorAll('#fiSteps .fi-mark')).pop().textContent, '✕');
+  P.fiSet('b', 'done'); assert.strictEqual(fill.style.getPropertyValue('--w'), '100%');
+  P.fiSet('b', 'pending'); assert.strictEqual(Array.from(doc.querySelectorAll('#fiSteps .fi-mark')).pop().textContent, '·');
+  P.fiShowResult('ok', [{ text: 'All good' }, { text: 'Note', cls: 'fi-note' }]);
+  assert.deepStrictEqual(Array.from(doc.querySelectorAll('#fiResult div')).map(d => d.className), ['fi-line', 'fi-note']);
+  doc.querySelector('#fiResult button').click(); assert.strictEqual(spy.reloads, 1);
+  P.fiShowResult('error', [{ text: 'Bad <img src=x onerror=alert(1)>' }]);
+  assert.ok(!doc.querySelector('#fiResult button') && doc.querySelector('#fiResult img') === null, 'an error has no reload button and its text stays text');
+  P.fiShowResult('ok', [{ text: 'quiet' }], true); assert.ok(!doc.querySelector('#fiResult button'), 'no reload button when told not to');
+  const yes = P.fiAsk('Overwrite?', 'Yes'); doc.querySelectorAll('#fiPrompt button')[0].click();
+  assert.strictEqual(await yes, true); assert.strictEqual(doc.getElementById('fiPrompt').textContent, '');
+  const no = P.fiAsk('Cancel me', 'Do'); doc.querySelectorAll('#fiPrompt button')[1].click();
+  assert.strictEqual(await no, false);
+  P.setFiPfx('ti_'); P.fiReset('Technical', steps);
+  assert.strictEqual(doc.getElementById('ti_fundImportPanel').hidden, false, 'the prefix picks the panel being drawn');
+  assert.strictEqual(await P.fiAsk('No such panel', 'Ok'), false, 'a missing prompt host answers no');
+  P.fiShowResult('ok', [{ text: 'x' }]);
+}));
+
+// ---- the notification panel (src/ui/activity.js): the progress width is --w, and the bell, badge, Stop, View and Close all work
+const ACTIVITY_PAGE = '<div id="activityWrap"><button id="activityBell" type="button"></button><span id="activityBadge" hidden></span><div id="activityPanel" hidden></div><div id="activityLive"></div></div>'
+  + '<button class="nav-item" data-section="business" type="button"></button><div id="outside"></div>';
+test('activity panel: a running refresh draws its progress as --w (clamped), Stop and View act, and notices are dismissed', () => withPage(ACTIVITY_PAGE, async (win) => {
+  const A = await loadWithStubs('src/ui/activity.js', '', {});
+  const doc = win.document, bell = doc.getElementById('activityBell'), panel = doc.getElementById('activityPanel'), badge = doc.getElementById('activityBadge');
+  const dismissed = []; A.setNoticeDismissHandler(list => dismissed.push(list.map(n => n.title)));
+  A.init_ui_activity();
+  let stops = 0, viewed = 0; doc.querySelector('.nav-item').addEventListener('click', () => { viewed++; });
+  A.activityRun('r1', { title: 'Refreshing', text: '3 of 9', pct: 33.4, section: 'business', onStop: () => { stops++; } });
+  assert.ok(bell.classList.contains('is-running') && /a refresh is running \(33%\)/.test(bell.getAttribute('aria-label')));
+  bell.click();
+  const fill = () => doc.querySelector('.activity-fill');
+  assert.strictEqual(panel.hidden, false);
+  assert.strictEqual(fill().style.getPropertyValue('--w'), '33.4%');
+  assert.strictEqual(fill().hasAttribute('data-css') || /width/.test(fill().getAttribute('style') || ''), false, 'no inline width');
+  A.activityRun('r1', { title: 'Refreshing', text: 'x', pct: 250, section: 'business', onStop: () => { stops++; } }); assert.strictEqual(fill().style.getPropertyValue('--w'), '100%');
+  A.activityRun('r1', { title: 'Refreshing', text: 'x', pct: -4, section: 'business', onStop: () => { stops++; } }); assert.strictEqual(fill().style.getPropertyValue('--w'), '0%');
+  A.activityRun('r1', { title: 'Refreshing', text: 'x', section: 'business', onStop: () => { stops++; }, stopping: true }); assert.strictEqual(fill().style.getPropertyValue('--w'), '0%');
+  assert.deepStrictEqual([doc.querySelector('[data-act="stop"]').textContent, doc.querySelector('[data-act="stop"]').disabled], ['Stopping…', true]);
+  A.activityRun('r1', { title: 'Refreshing', text: 'x', pct: 50, section: 'business', onStop: () => { stops++; } });
+  doc.querySelector('[data-act="stop"]').click(); assert.strictEqual(stops, 1);
+  doc.querySelector('[data-act="view"]').click(); assert.strictEqual(viewed, 1); assert.strictEqual(panel.hidden, true, 'View closes the panel');
+  A.activityEnd('r1'); A.activityEnd('r1');
+  A.activityNotify({ tone: 'ok', title: 'Done <b>1</b>', text: 'all fine', section: '' });
+  A.activityNotify({ tone: 'error', title: 'Failed', text: '', section: 'business' });
+  A.activityNotify({ tone: 'warn', title: 'Quiet', text: 'x', silent: true });
+  assert.strictEqual(doc.getElementById('activityLive').textContent, 'Failed. ', 'a silent notice is not read out');
+  assert.deepStrictEqual([badge.hidden, badge.textContent, badge.className.includes('is-error')], [false, '3', true]);
+  bell.click(); assert.strictEqual(badge.hidden, true, 'opening the panel marks the notices as seen');
+  assert.strictEqual(doc.querySelector('.activity-title').textContent, 'Quiet');
+  assert.ok(!doc.querySelector('.activity-title b'), 'a title is text, never markup');
+  doc.querySelector('.activity-close').click(); assert.deepStrictEqual(dismissed, [['Quiet']]);
+  doc.querySelector('[data-act="view"]').click(); assert.strictEqual(viewed, 2);
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); assert.strictEqual(panel.hidden, true, 'Escape closes the panel');
+  bell.click(); doc.getElementById('outside').dispatchEvent(new win.MouseEvent('mousedown', { bubbles: true })); assert.strictEqual(panel.hidden, true, 'a click outside closes it');
+  bell.click(); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a', bubbles: true })); assert.strictEqual(panel.hidden, false, 'other keys do nothing');
+  doc.querySelector('[data-act="clearall"]').click(); assert.strictEqual(dismissed.length, 2);
+  assert.ok(/Nothing running/.test(panel.textContent));
+  A.activityNotify({ tone: 'ok', title: 'Again', text: '' }); A.activityDropWhere(n => n.title === 'Again'); A.activityDropWhere(() => false);
+  assert.ok(/Nothing running/.test(panel.textContent), 'a notice dropped by another device disappears');
+  for(let i = 0; i < 120; i++) A.activityNotify({ tone: 'ok', title: 'n' + i, text: '', silent: true });
+  bell.click(); bell.click();
+}));
+test('activity panel: a page without the bell is left alone', () => withPage('', async () => {
+  const A = await loadWithStubs('src/ui/activity.js', '', {});
+  assert.doesNotThrow(() => { A.init_ui_activity(); A.activityRun('x', { title: 't' }); A.activityNotify({ tone: 'ok', title: 't' }); });
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

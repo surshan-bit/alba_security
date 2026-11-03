@@ -18,7 +18,7 @@
 .live-stop{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:var(--t-sm);font-weight:600;cursor:pointer;}
 .live-stop:hover{color:var(--text);border-color:var(--muted);}
 .live-progress{height:8px;border-radius:4px;background:var(--panel2);overflow:hidden;border:1px solid var(--line);}
-.live-progress-fill{height:100%;width:0;background:var(--accent);transition:width .35s ease;}
+.live-progress-fill{height:100%;width:var(--w,0%);background:var(--accent);transition:width .35s ease;}
 .live-progress-fill.is-ok{background:var(--buy);}
 .live-progress-fill.is-error{background:var(--avoid);}
 .live-status{font-size:var(--t-sm);line-height:1.5;color:var(--muted);overflow-wrap:anywhere;}

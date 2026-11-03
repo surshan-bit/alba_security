@@ -71,7 +71,7 @@ function paintLivePanel(P){
     }
     if(bar){ bar.hidden = !x; bar.setAttribute('aria-valuenow', String(x ? x.pct : 0)); }
     if(fill){
-      fill.style.width = (x ? x.pct : 0) + '%';
+      fill.style.setProperty('--w', (x ? x.pct : 0) + '%');
       fill.classList.toggle('is-ok', !!x && x.state === 'ok');
       fill.classList.toggle('is-error', !!x && x.state === 'error');
     }

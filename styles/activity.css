@@ -34,7 +34,7 @@
 .activity-time{font-size:var(--t-xs);color:var(--muted);opacity:.8;}
 .activity-time:empty{display:none;}
 .activity-progress{height:6px;margin-top:4px;border-radius:3px;background:var(--panel);border:1px solid var(--line);overflow:hidden;}
-.activity-fill{height:100%;width:0;background:var(--accent);transition:width .35s ease;}
+.activity-fill{height:100%;width:var(--w,0%);background:var(--accent);transition:width .35s ease;}
 .activity-actions{display:flex;align-items:center;gap:8px;flex:none;}
 .activity-btn{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:var(--t-sm);font-weight:600;cursor:pointer;font-family:inherit;}
 .activity-btn:hover:not(:disabled){color:var(--text);border-color:var(--muted);}
