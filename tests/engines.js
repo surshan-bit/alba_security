@@ -1904,6 +1904,107 @@ test('auto reload: a newer published build shows a banner styled by classes, wit
   } finally { if(savedWindow) Object.defineProperty(globalThis, 'window', savedWindow); else delete globalThis.window; delete globalThis.__arDb; delete globalThis.__arBusy; }
 }));
 
+// A page environment for src/ui/deeplink.js: the address, both storages and the calls it makes, restored afterwards.
+async function withDeeplink(win, { hash = '', search = '', top, local = memoryStorage(), session = memoryStorage(), stocks = [{ ticker: 'ABC · Banks', name: 'Abc Ltd' }] }, fn){
+  const calls = { shown: [], opened: [] };
+  globalThis.__dlStocks = stocks; globalThis.__dlCalls = calls;
+  const stubs = { 'core/stocks.js': 'export const stocks = globalThis.__dlStocks;',
+    'navigation.js': "export const appSections = { business: { id: 'business' } }; export const showSection = k => globalThis.__dlCalls.shown.push(k);",
+    'inlinedetail.js': 'export const openStockInline = (sec, label, idx) => globalThis.__dlCalls.opened.push([sec.id, label, idx]);' };
+  const fakeWindow = { location: { hash, search }, sessionStorage: session, history: { state: null, replaceState(){} }, addEventListener(){}, top: undefined };
+  fakeWindow.top = top === undefined ? fakeWindow : top;
+  const saved = ['window', 'history', 'localStorage'].map(k => [k, Object.getOwnPropertyDescriptor(globalThis, k)]);
+  Object.defineProperty(globalThis, 'window', { value: fakeWindow, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'history', { value: fakeWindow.history, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'localStorage', { value: local, configurable: true, writable: true });
+  try { return await fn(await loadWithStubs('src/ui/deeplink.js', '', stubs), calls, fakeWindow); }
+  finally { for(const [k, d] of saved){ if(d) Object.defineProperty(globalThis, k, d); else delete globalThis[k]; } delete globalThis.__dlStocks; delete globalThis.__dlCalls; }
+}
+test('deep link: the code is read from #CODE, #stock=CODE, ?stock= or the page around, and a used code is not acted on twice', () => withPage('', async (win) => {
+  const read = async (opts) => withDeeplink(win, opts, D => D.stockCodeFromAddress());
+  assert.strictEqual(await read({ hash: '#/ABC' }), 'ABC');
+  assert.strictEqual(await read({ hash: '#stock=a%20b' }), 'a b');
+  assert.strictEqual(await read({ search: '?stock=XYZ' }), 'XYZ');
+  assert.strictEqual(await read({ search: '?s=QQ' }), 'QQ');
+  assert.strictEqual(await read({ hash: '#%E0%A4%A' }), '', 'an address that cannot be decoded gives no code');
+  assert.strictEqual(await read({}), '', 'no code in the address');
+  assert.strictEqual(await read({ top: { location: { hash: '#TOPCODE', search: '' } } }), 'TOPCODE', 'the page around the app can carry the code');
+  const unreadable = { get location(){ throw new Error('another site'); } };
+  assert.strictEqual(await read({ top: unreadable }), '', 'a parent page on another site cannot be read');
+  const session = memoryStorage(); session.setItem('alba.usedStockCode', 'ABC');
+  assert.strictEqual(await read({ hash: '#ABC', session }), '', 'a code already used in this tab is ignored on refresh');
+  const broken = { getItem(){ throw new Error('blocked'); }, setItem(){ throw new Error('blocked'); }, removeItem(){} };
+  assert.strictEqual(await read({ hash: '#ABC', session: broken }), 'ABC', 'unavailable storage never stops a link from opening');
+}));
+test('deep link: a note left by another tab opens its stock once; a stock found by exact name; an unknown or empty code opens nothing', () => withPage('', async (win) => {
+  const local = memoryStorage(); local.setItem('alba.openStock', JSON.stringify({ code: 'ABCLTD', from: 'another-tab', at: Date.now() }));
+  await withDeeplink(win, { local }, (D, calls) => {
+    assert.strictEqual(D.stockCodeFromAddress(), 'ABCLTD', 'the hand-off from another tab');
+    assert.strictEqual(local.getItem('alba.openStock'), null, 'a note is read once');
+    D.init_ui_deeplink();
+    assert.deepStrictEqual(calls.opened, [['business', '', 0]], 'found by the stock\'s exact name (Abc Ltd), spaces ignored');
+  });
+  const stale = memoryStorage(); stale.setItem('alba.openStock', JSON.stringify({ code: 'ABC', from: 'another-tab', at: Date.now() - 60000 }));
+  assert.strictEqual(await withDeeplink(win, { local: stale }, D => D.stockCodeFromAddress()), '', 'a note older than 30 seconds is ignored');
+  const garbage = memoryStorage(); garbage.setItem('alba.openStock', '{not json');
+  assert.strictEqual(await withDeeplink(win, { local: garbage }, D => D.stockCodeFromAddress()), '', 'an unreadable note is ignored');
+  await withDeeplink(win, { hash: '#   ' }, (D, calls) => { D.init_ui_deeplink(); assert.strictEqual(calls.opened.length, 0, 'an empty code opens nothing'); });
+  const throwing = { getItem(){ return null; }, setItem(){ throw new Error('full'); }, removeItem(){} };
+  await withDeeplink(win, { local: throwing }, (D) => {
+    win.document.body.innerHTML = '<a class="stock-link" href="#ABC">x</a>';
+    assert.doesNotThrow(() => win.document.querySelector('a').dispatchEvent(new win.MouseEvent('auxclick', { bubbles: true })), 'a full storage never breaks the click');
+  });
+}));
+test('copy text: the clipboard is used when there is one, the hidden box when there is not, and a refused copy rejects', () => withPage('', async (win) => {
+  await withDeeplink(win, {}, async (D) => {
+    const written = []; Object.defineProperty(globalThis, 'navigator', { value: { clipboard: { writeText: t => { written.push(t); return Promise.resolve(); } } }, configurable: true });
+    await D.copyText('via clipboard'); assert.deepStrictEqual(written, ['via clipboard']);
+    Object.defineProperty(globalThis, 'navigator', { value: { clipboard: { writeText(){ throw new Error('denied'); } } }, configurable: true });
+    win.document.execCommand = () => false;
+    await assert.rejects(D.copyText('x'), /copy failed/, 'the fallback reports a refused copy');
+    win.document.execCommand = () => { throw new Error('unsupported'); };
+    await assert.rejects(D.copyText('x'), /unsupported/);
+    delete globalThis.navigator;
+  });
+}));
+test('deep link: the address bar cannot always be changed, and that never throws', () => withPage('', async (win) => {
+  await withDeeplink(win, {}, (D, calls, fakeWindow) => {
+    fakeWindow.history.replaceState = () => { throw new Error('sandboxed'); };
+    assert.doesNotThrow(() => D.syncStockHash({ ticker: 'ABC · Banks', name: 'Abc Ltd' }));
+  });
+}));
+test('auto reload: it updates by itself when idle, waits while someone types, and does nothing without a release record or a script id', () => withPage('<script data-entry="app.js?v=aaa111"></script><textarea id="t"></textarea>', async (win, spy) => {
+  const stubs = { 'core/store.js': 'export const dbCapabilityPromise = globalThis.__arDbMake();', 'core/busy.js': 'export const anyBusy = () => false;' };
+  const savedWindow = Object.getOwnPropertyDescriptor(globalThis, 'window'), session = memoryStorage();
+  Object.defineProperty(globalThis, 'window', { value: { sessionStorage: session, location: globalThis.location }, configurable: true, writable: true });
+  const realTimeout = globalThis.setTimeout, realInterval = globalThis.setInterval, delayed = [];
+  const start = async (makeDb) => {
+    globalThis.__arDbMake = makeDb;   // the database promise is made when the module loads, so a rejection is handled the moment the module awaits it
+    const A = await loadWithStubs('src/boot/autoreload.js', '', stubs);
+    globalThis.setInterval = () => 0;
+    try { A.init_boot_autoreload(); await new Promise(r => realTimeout(r, 20)); } finally { globalThis.setInterval = realInterval; }
+  };
+  try {
+    let onRelease = null; const db = { doc: () => ({ onSnapshot: cb => { onRelease = cb; } }) };
+    await start(() => Promise.resolve(db));
+    const ta = win.document.getElementById('t'); ta.value = 'half-typed note'; ta.focus();
+    onRelease({ exists: true, data: () => ({ build: 'ccc333' }) });
+    assert.ok(/loads when the current work finishes/.test(win.document.getElementById('appUpdateBanner').textContent), 'typing holds the reload back');
+    ta.value = ''; ta.blur(); globalThis.setTimeout = (f, ms) => { delayed.push([f, ms]); return 0; };
+    try { onRelease({ exists: true, data: () => ({ build: 'ccc333' }) }); } finally { globalThis.setTimeout = realTimeout; }
+    assert.strictEqual(session.getItem('albaAutoReload'), 'ccc333', 'one automatic reload per build is recorded');
+    assert.ok(/Updating to the new version/.test(win.document.getElementById('appUpdateBanner').textContent));
+    delayed[0][0](); assert.strictEqual(spy.reloads, 1, 'it reloads after a short pause');
+    onRelease({ exists: false }); onRelease(undefined);
+    await start(() => Promise.reject(new Error('no database'))); await start(() => Promise.resolve(null));
+    await start(() => Promise.resolve({ doc: () => { throw new Error('no such document'); } }));
+    win.document.querySelector('script').removeAttribute('data-entry'); await start(() => Promise.resolve(db));
+    const visibility = []; const realAdd = win.document.addEventListener.bind(win.document); win.document.addEventListener = (t, f) => { visibility.push([t, f]); return realAdd(t, f); };
+    win.document.querySelector('script').setAttribute('data-entry', 'app.js?v=aaa111'); await start(() => Promise.resolve(db));
+    visibility.find(v => v[0] === 'visibilitychange')[1]();
+  } finally { if(savedWindow) Object.defineProperty(globalThis, 'window', savedWindow); else delete globalThis.window; delete globalThis.__arDbMake; }
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
