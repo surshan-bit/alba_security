@@ -1,6 +1,6 @@
 {
  "s0_boot__help": "28445:260ef284c41d",
- "s0_boot__refreshlog": "5870:896e57a4f2f4",
+ "s0_boot__refreshlog": "5858:f6295330bdf0",
  "s0_boot__analysis": "38688:51523830dcd0",
  "s0_boot__business": "193:807331aae101",
  "s0_boot__trackrecord": "1673:42f08068b9cf",
@@ -89,7 +89,7 @@
  "s6w_analysis_strategy__hint": "2001:4c7982038324",
  "s6w_analysis_strategy__saved": "5:c75c31dffb08",
  "s6x_analysis_strategy_off__count": "22:ab4e2b81e025",
- "s7_refreshlog__sec": "10650:130d2a02267d",
+ "s7_refreshlog__sec": "10638:c27db37645e4",
  "s7_business__sec": "30943:aca2702d6f69",
  "s7_trackrecord__sec": "2191:c6e5f67b21d2",
  "s7_help__sec": "28445:260ef284c41d",

@@ -1,5 +1,10 @@
 /* App shell: top bar, left menu, page frame. */
 /* Page shell: top bar, sidebar menu, content wrapper. Bundled in file-name order into styles.css: the order is the cascade, so do not reorder or move rules between files without checking the screens. */
+/* The cover shown while the page starts, or when the stock data cannot be loaded (#bootStatus); Retry is offered with an error. */
+.boot-cover{position:fixed;inset:0;z-index:var(--z-cover);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-4);background:var(--bg);color:var(--text);text-align:center;padding:var(--space-5);}
+.boot-cover[hidden]{display:none;}
+.boot-msg{max-width:480px;line-height:1.5;}
+.boot-retry{background:var(--accent);color:var(--on-accent);border:none;border-radius:var(--radius-md);padding:var(--space-2) var(--space-4);cursor:pointer;}
 .wrap{max-width:1760px;margin:0 auto;padding:0 20px 50px;}
 header{margin-bottom:12px;}
 /* The page name is in the top bar (Alba Securities > Page), so the heading stays only for screen readers and a page keeps just its short description. */

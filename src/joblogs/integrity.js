@@ -36,7 +36,7 @@ function runDataIntegrityCheck(){
   console.warn('[data-integrity] ' + problems.length + ' issue(s) found:', problems);
   const shown = problems.slice(0, 5);
   setHtml(banner, `⚠ Data integrity check found ${problems.length} issue${problems.length === 1 ? '' : 's'} in the published stock data (full list in the browser console): ${shown.map(escapeHtml).join(' · ')}${problems.length > shown.length ? ` · +${problems.length - shown.length} more` : ''}`);
-  banner.style.display = '';
+  banner.hidden = false;
 }
 
 function init_joblogs_integrity(){
