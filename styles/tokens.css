@@ -13,7 +13,7 @@
 
 /* The central design system, part 3: spacing, radius, layers and the colour on an accent fill. Components use these names; add a step here when a new
    one is needed rather than writing a number in a component. */
-:root{--space-2:8px;--space-4:16px;--space-5:24px;--radius-md:8px;--z-cover:90;--on-accent:#fff;--pad-tight:1px var(--space-2);}
+:root{--space-2:8px;--space-4:16px;--space-5:24px;--radius-md:8px;--z-cover:90;--on-accent:#fff;--pad-tight:1px var(--space-2);--shadow-toast:0 8px 24px rgba(0,0,0,.4);}
 
 /* The central design system, part 4: the full-screen sign-in and import pages (styles/gate.css). They are always dark, whatever the app theme. */
 :root{--gate-bg:#121210;--gate-fg:#f2efe6;--gate-accent:#3fa56b;--gate-error:#e8a0a0;--z-gate:99999;}

@@ -796,8 +796,23 @@ test('update banner: it appears once, and its Reload button reloads the page', (
   S.showUpdateBanner(); S.showUpdateBanner();
   assert.strictEqual(win.document.querySelectorAll('#dataUpdateBanner').length, 1);
   assert.strictEqual(win.document.querySelector('#dataUpdateBanner span').textContent, 'Stock data was updated.');
+  assert.strictEqual(win.document.getElementById('dataUpdateBanner').className, 'toast-banner');
+  assert.strictEqual(win.document.querySelector('#dataUpdateBanner button').className, 'toast-banner__btn');
+  assert.strictEqual(win.document.querySelectorAll('[style]').length, 0, 'styled by classes, never inline');
   win.document.querySelector('#dataUpdateBanner button').click();
   assert.strictEqual(spy.reloads, 1);
+}));
+
+test('copy fallback: the hidden text box is styled by a class, holds the text while copying and is removed again', () => withPage('', async (win) => {
+  const stubs = { 'core/stocks.js': 'export const stocks = [];', 'navigation.js': 'export const appSections = []; export const showSection = () => {};', 'inlinedetail.js': 'export const openStockInline = () => {};' };
+  const { copyText } = await loadWithStubs('src/ui/deeplink.js', '', stubs);
+  Object.defineProperty(win.navigator, 'clipboard', { value: undefined, configurable: true });
+  let seen = null;
+  win.document.execCommand = () => { const ta = win.document.querySelector('textarea'); seen = ta && { value: ta.value, cls: ta.className, inline: ta.hasAttribute('style') }; return true; };
+  const prev = globalThis.navigator; Object.defineProperty(globalThis, 'navigator', { value: win.navigator, configurable: true });
+  try { await copyText('https://example.test/#ABC'); } finally { Object.defineProperty(globalThis, 'navigator', { value: prev, configurable: true }); }
+  assert.deepStrictEqual(seen, { value: 'https://example.test/#ABC', cls: 'clipboard-proxy', inline: false });
+  assert.strictEqual(win.document.querySelector('textarea'), null, 'removed after copying');
 }));
 
 test('boot(): it loads the stock list, hands it over and starts the app, with the database loader when none is given', () => withPage(COVER, async (win) => {
