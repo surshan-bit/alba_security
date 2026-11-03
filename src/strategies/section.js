@@ -21,6 +21,7 @@ import { renderTrackPanel, trackPanelHtml, wireTrackPanel } from './trackpanel.j
 import { getStrategiesStatus } from '../identity/strategies.js';
 import { closestEl, targetEl } from '../core/evt.js';
 import { keepScroll } from '../ui/scrollkeep.js';
+import { setHtml } from '../core/safehtml.js';
 
 let whyQuery = '';
 
@@ -83,7 +84,7 @@ function onSaveStatus(){
   prevStatus = st;
   paintSaveNote();
 }
-function paintSaveNote(){ const el = document.getElementById('stratSaveNote'); if(el) el.innerHTML = saveNote(); }
+function paintSaveNote(){ const el = document.getElementById('stratSaveNote'); if(el) setHtml(el, saveNote()); }
 function listHtml(sel){
   const count = st => qualifyingStocks(stocks, st.rules).length;
   /** @type {{ attrs: string, title: string, desc?: string, current?: boolean, cls?: string }[]} */
@@ -148,7 +149,7 @@ function mainHtml(st){
 // Redraws only the picks table (a new sort or more rows), keeping the tick boxes.
 function redrawResults(st){
   syncSelected();
-  document.getElementById('stratResults').innerHTML = resultsHtml(qualifyingStocks(stocks, st.rules), selected);
+  setHtml(document.getElementById('stratResults'), resultsHtml(qualifyingStocks(stocks, st.rules), selected));
   syncSelected();
   syncSelectMode();
 }
@@ -157,8 +158,8 @@ function drawStrategiesSection(){
   const listEl = document.getElementById('stratList'), mainEl = document.getElementById('stratMain');
   if(!listEl || !mainEl) return;
   const sel = selectedStrategy();
-  listEl.innerHTML = listHtml(sel);
-  mainEl.innerHTML = mainHtml(sel);
+  setHtml(listEl, listHtml(sel));
+  setHtml(mainEl, mainHtml(sel));
   renderTrackPanel(sel);
   const pick = listEl.querySelector('.dm'), slot = mainEl.querySelector('.strat-phone-pick');
   if(onPhone() && pick && slot) slot.appendChild(pick);   // the picker joins the buttons on one row (menus open from any place: ui/dropmenu.js)
@@ -240,7 +241,7 @@ function init_strategies_section(){
     else if(targetEl(e).id === 'stratNote' && st){ st.note = targetEl(e).value.trim(); saveStrategies(); }
     else if(targetEl(e).id === 'stratWhy' && st){
       whyQuery = targetEl(e).value;
-      document.getElementById('stratWhyOut').innerHTML = whyHtml(whyQuery, st.rules);
+      setHtml(document.getElementById('stratWhyOut'), whyHtml(whyQuery, st.rules));
     }
   });
 }

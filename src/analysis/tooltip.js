@@ -3,6 +3,7 @@ import { stocks, verdictLabel } from '../core/stocks.js';
 import { isPinned } from '../core/pins.js';
 import { escapeHtml } from '../core/util.js';
 import { mosPct } from '../list/metrics.js';
+import { setHtml } from '../core/safehtml.js';
 
 const TOOLTIP_HTML = '<div class="analysis-tooltip" id="analysisTooltip"></div>';
 
@@ -39,7 +40,7 @@ function createAnalysisTooltip(){
     tooltip.style.top = `${Math.max(8, y)}px`;
   }
   function show(evt, s){
-    tooltip.innerHTML = tooltipContent(s);
+    setHtml(tooltip, tooltipContent(s));
     tooltip.classList.add('show');
     position(evt);
   }

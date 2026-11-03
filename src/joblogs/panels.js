@@ -1,6 +1,7 @@
 // Job and sync log panels on the Data Refresh page.
 import { getDb, watchlistSyncLog } from '../core/store.js';
 import { escapeHtml, formatDeepRefreshTimestamp } from '../core/util.js';
+import { setHtml } from '../core/safehtml.js';
 
 // ---- Shared machinery for the "recent runs" panels on the Data Refresh page (today: the TradingView
 // watchlist sync). A panel shows a history read from a shared-database subscription and differs from
@@ -60,18 +61,18 @@ function renderJobLogPanel(cfg){
   const el = document.getElementById(cfg.runsElId);
   if(!el) return;
   if(!cfg.dbFlagGetter()){
-    el.innerHTML = `<p class="upload-hint">${cfg.notAvailableText}</p>`;
+    setHtml(el, `<p class="upload-hint">${cfg.notAvailableText}</p>`);
     return;
   }
   const allRuns = cfg.logGetter().values();
   if(allRuns.length === 0){
-    el.innerHTML = `<p class="upload-hint">${cfg.noRunsPrefix}</p>`;
+    setHtml(el, `<p class="upload-hint">${cfg.noRunsPrefix}</p>`);
     return;
   }
   const runs = allRuns
     .sort((a, b) => (b.startedAt || '').localeCompare(a.startedAt || ''))
     .slice(0, HISTORY_LIMIT); // keep only the most recent runs on screen — older ones don't add much once things are steady-state
-  el.innerHTML = runs.map(r => {
+  setHtml(el, runs.map(r => {
     const {label: statusLabel, cls: statusClass} = jobStatusInfo(r.status, cfg.statusOverrides);
     const tickers = Array.isArray(cfg.tickersOf(r)) ? cfg.tickersOf(r) : [];
     const shown = tickers.slice(0, 14);
@@ -87,7 +88,7 @@ function renderJobLogPanel(cfg){
         ${shown.length ? `<div class="refreshlog-run-tickers">${shown.map(t => `<span class="refreshlog-ticker-chip">${escapeHtml(t)}</span>`).join('')}${extra > 0 ? `<span class="refreshlog-ticker-chip refreshlog-ticker-more">+${extra} more</span>` : ''}</div>` : ''}
       </div>
     `;
-  }).join('');
+  }).join(''));
 }
 
 

@@ -660,6 +660,87 @@ test('escaping: the Buy / Sell ideas news list still drops a hostile sentiment (
   assert.deepStrictEqual(items.map(x => x.s).sort(), ['', 'neg']);
 });
 
+// =========================================================== safe markup sink (src/core/safehtml.js): markup text becomes elements without script-capable parts
+{
+  const { JSDOM } = require('jsdom');
+  const SH = load('src/core/safehtml.js');
+  // The helper parses with the element's own window, so a throw-away jsdom page is all a test needs.
+  const withDom = fn => () => { const win = new JSDOM('<!doctype html><body></body>').window; fn(win, win.document); };
+  const fill = (doc, html, tag) => { const el = doc.createElement(tag || 'div'); SH.setHtml(el, html); return el; };
+  test('safe markup: ordinary markup, entities and text come through unchanged', withDom((win, doc) => {
+    const el = fill(doc, '<p class="a">x &amp; y&nbsp;<b>z</b></p><!-- note --><ul><li>1</li></ul>');
+    assert.strictEqual(el.innerHTML, '<p class="a">x &amp; y&nbsp;<b>z</b></p><!-- note --><ul><li>1</li></ul>');
+  }));
+  test('safe markup: scripts, frames, plugins, styles and document-level tags are removed with their content', withDom((win, doc) => {
+    ['script', 'iframe', 'object', 'embed', 'style', 'meta', 'link', 'base', 'noscript', 'template', 'frameset'].forEach(tag => {
+      const el = fill(doc, '<' + tag + '>alert(1)</' + tag + '><b>ok</b>');
+      assert.strictEqual(el.querySelector(tag), null, tag); assert.strictEqual(el.querySelector('b').textContent, 'ok', tag);
+    });
+  }));
+  test('safe markup: event-handler attributes are removed, also after an attribute break-out and in odd spellings', withDom((win, doc) => {
+    const el = fill(doc, '<img src="x" onerror="alert(1)"><span class="s-pos" onmouseover="alert(1)">a</span><b ONCLICK="x()" onfocusin=1>b</b><svg onload="x()"><g onclick="y()"></g></svg>');
+    assert.ok(![...el.querySelectorAll('*')].some(e => [...e.attributes].some(a => /^on/i.test(a.name))));
+    assert.strictEqual(el.querySelector('span').className, 's-pos');
+  }));
+  test('safe markup: a value that tries to close the parsing wrapper cannot smuggle an element in', withDom((win, doc) => {
+    const el = fill(doc, 'a</template><img src=x onerror=alert(1)><script>alert(2)</script>');
+    assert.strictEqual(el.querySelector('img'), null); assert.strictEqual(el.querySelector('script'), null);
+  }));
+  test('safe markup: only web, mail, phone, relative and anchor links are kept; script URLs are dropped however they are spelled', withDom((win, doc) => {
+    const keep = ['https://a.example/x?y=1', 'http://a.example', 'mailto:a@b.example', 'tel:+911234', '#section', '/path', 'page.html', '?q=1'];
+    const drop = ['javascript:alert(1)', ' JaVaScRiPt:alert(1)', 'java\tscript:alert(1)', 'java&#10;script:alert(1)', 'vbscript:x', 'data:text/html,<b>x</b>', '\u0001javascript:x'];
+    keep.forEach(u => assert.strictEqual(fill(doc, '<a href="' + u + '">x</a>').querySelector('a').getAttribute('href') !== null, true, u));
+    drop.forEach(u => assert.strictEqual(fill(doc, '<a href="' + u + '">x</a>').querySelector('a').getAttribute('href'), null, u));
+  }));
+  test('safe markup: an image may use a data:image png / jpeg / gif / webp source, but an svg or html data URL is dropped', withDom((win, doc) => {
+    assert.ok(fill(doc, '<img src="data:image/png;base64,AAAA">').querySelector('img').hasAttribute('src'));
+    assert.ok(!fill(doc, '<img src="data:image/svg+xml;base64,AAAA">').querySelector('img').hasAttribute('src'));
+    assert.ok(!fill(doc, '<iframe srcdoc="<b>x</b>"></iframe><form><button formaction="javascript:x">b</button></form>').querySelector('button').hasAttribute('formaction'));
+  }));
+  test('safe markup: svg markup is parsed as svg inside an svg element, and svg script vectors are removed', withDom((win, doc) => {
+    const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    SH.setHtml(svg, '<g><path d="M0 0L5 5"/></g><foreignObject><div>x</div></foreignObject><animate attributeName="href" to="javascript:x"/><a xlink:href="javascript:x"><text>t</text></a><use href="javascript:x"/>');
+    assert.strictEqual(svg.querySelector('path').namespaceURI, 'http://www.w3.org/2000/svg');
+    assert.strictEqual(svg.querySelector('foreignObject'), null); assert.strictEqual(svg.querySelector('animate'), null);
+    assert.ok(![...svg.querySelectorAll('[href],[xlink\\:href]')].some(e => /javascript/i.test(e.getAttribute('href') || e.getAttribute('xlink:href'))));
+    SH.setHtml(svg, '');
+    assert.strictEqual(svg.childNodes.length, 0);
+  }));
+  test('safe markup: table rows and options keep their place when set into a table body or a select', withDom((win, doc) => {
+    const tbody = fill(doc, '<tr><td>1</td><td>2</td></tr><tr><td>3</td></tr>', 'tbody');
+    assert.strictEqual(tbody.rows.length, 2); assert.strictEqual(tbody.rows[0].cells.length, 2);
+    const sel = fill(doc, '<option value="a">A</option><option value="b">B</option>', 'select');
+    assert.strictEqual(sel.options.length, 2);
+  }));
+  test('safe markup: replaceWithHtml, appendHtml and insertHtmlAfter put clean markup in the right place', withDom((win, doc) => {
+    const host = doc.createElement('div'); host.innerHTML = '<i id="a">a</i><i id="b">b</i>'; doc.body.appendChild(host);
+    SH.replaceWithHtml(host.querySelector('#a'), '<u>1</u><u onclick="x()">2</u>');
+    SH.appendHtml(host, '<s>end</s><script>x()</script>');
+    SH.insertHtmlAfter(host.querySelector('#b'), '<em>after b</em>');
+    assert.strictEqual(host.innerHTML, '<u>1</u><u>2</u><i id="b">b</i><em>after b</em><s>end</s>');
+  }));
+  test('safe markup: with no element to fill the helpers fail loudly instead of doing nothing', withDom(() => {
+    assert.throws(() => SH.setHtml(null, 'x'), /no element to fill/);
+    assert.throws(() => SH.replaceWithHtml(null, 'x'), /no element to replace/);
+    assert.throws(() => SH.appendHtml(null, 'x'), /no element to add to/);
+    assert.throws(() => SH.insertHtmlAfter(null, 'x'), /no element to insert after/);
+  }));
+}
+
+test('link guard: a click on a grid link does not reach the row that would open the stock, and the link still follows', async () => {
+  const { JSDOM } = require('jsdom');
+  const win = new JSDOM('<!doctype html><body><table><tbody id="rows"><tr class="analysis-lb-row"><td><a class="analysis-lb-link" href="https://a.example/">Screener</a></td><td class="plain">x</td></tr></tbody></table></body>').window;
+  const had = globalThis.document; globalThis.document = win.document;
+  try {
+    const { init_ui_linkguard } = await loadWithStubs('src/ui/linkguard.js', '', {});
+    init_ui_linkguard();
+    const opened = []; win.document.getElementById('rows').addEventListener('click', e => opened.push(e.target.className));
+    const fire = el => { const e = new win.MouseEvent('click', { bubbles: true, cancelable: true }); el.dispatchEvent(e); return e; };
+    const link = fire(win.document.querySelector('a')); assert.deepStrictEqual(opened, []); assert.strictEqual(link.defaultPrevented, false);
+    fire(win.document.querySelector('.plain')); assert.deepStrictEqual(opened, ['plain']);
+  } finally { if(had === undefined) delete globalThis.document; else globalThis.document = had; }
+});
+
 // =========================================================== score history (recorded by each import)
 const H = load('src/history/scorehistory.js', 'export { BUCKETS, SCORE_ENGINE, addPoint, bucketId, bucketOf, pointFor, tickerKey };');
 test('history: a stock always lands in the same one of 64 buckets', () => {

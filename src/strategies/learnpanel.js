@@ -12,6 +12,7 @@ import { describeRule, qualifyingStocks } from './rules.js';
 import { saveStrategies } from './state.js';
 import { HORIZONS, applyPractice, hasPractice, practiceHtml, runPractice } from './practice.js';
 import { closestEl } from '../core/evt.js';
+import { setHtml } from '../core/safehtml.js';
 
 const results = new Map();    // strategy id -> { key, ... } last result
 const running = new Map();    // strategy id -> progress text
@@ -69,7 +70,7 @@ function modalBodyHtml(st){
 }
 function renderLearnOut(st){
   const el = document.getElementById('stratLearnBody');
-  if(el && st) el.innerHTML = modalBodyHtml(st);
+  if(el && st) setHtml(el, modalBodyHtml(st));
 }
 // The suggestions open in a pop-up so the Goal section stays compact.
 function closeLearnModal(){
@@ -85,7 +86,7 @@ function openLearnModal(st){
   box.className = 'alba-confirm learn-modal';
   box.setAttribute('role', 'dialog');
   box.setAttribute('aria-modal', 'true');
-  box.innerHTML = '<div class="alba-confirm-card learn-modal-card"><div class="learn-modal-head"><div class="analysis-panel-title">Suggested rules</div><button type="button" class="strat-btn" id="stratLearnClose">Close</button></div><div id="stratLearnBody" class="learn-modal-body"></div></div>';
+  setHtml(box, '<div class="alba-confirm-card learn-modal-card"><div class="learn-modal-head"><div class="analysis-panel-title">Suggested rules</div><button type="button" class="strat-btn" id="stratLearnClose">Close</button></div><div id="stratLearnBody" class="learn-modal-body"></div></div>');
   document.body.appendChild(box);
   document.addEventListener('keydown', onLearnKey, true);
   renderLearnOut(st);

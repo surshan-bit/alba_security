@@ -4,6 +4,7 @@ import { getDb, fundamentalCsvUploadLog } from '../core/store.js';
 import { escapeHtml, formatUploadTimestamp } from '../core/util.js';
 import { lockBusy } from './joblock.js';
 import { pruneLogCollection } from '../joblogs/panels.js';
+import { setHtml } from '../core/safehtml.js';
 
 // The job record (importJobs/fundamental) as last read: tells whether an import is running or was interrupted.
 /** @type {any} */
@@ -54,13 +55,13 @@ function renderLastFile(kind){
   if(!host) return;
   const r = newest(k.log);
   const banner = jobBanner();
-  if(!r){ host.innerHTML = '<div class="upload-title">Last file loaded</div><div class="upload-hint">No file has been uploaded yet.</div>' + banner; return; }
+  if(!r){ setHtml(host, '<div class="upload-title">Last file loaded</div><div class="upload-hint">No file has been uploaded yet.</div>' + banner); return; }
   const [cls, head, lines] = describe(r, k);
-  host.innerHTML = '<div class="upload-title">Last file loaded</div>' + banner +
+  setHtml(host, '<div class="upload-title">Last file loaded</div>' + banner +
     '<div class="lf-file">' + escapeHtml(r.filename || 'file') + '</div>' +
     '<div class="upload-hint">Uploaded ' + escapeHtml(formatUploadTimestamp(r.uploadedAt)) + (r.rowCount != null ? ' \u00b7 ' + Number(r.rowCount).toLocaleString('en-IN') + ' rows' : '') + '</div>' +
     '<div class="lf-status lf-' + cls + '">' + escapeHtml(head) + '</div>' +
-    lines.map(t => '<div class="upload-hint lf-line">' + escapeHtml(t) + '</div>').join('');
+    lines.map(t => '<div class="upload-hint lf-line">' + escapeHtml(t) + '</div>').join(''));
 }
 function renderAllLastFiles(){ renderLastFile('fund'); }
 // Reads the job record first, so the cards can say that an import is running or was interrupted.

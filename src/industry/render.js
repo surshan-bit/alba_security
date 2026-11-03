@@ -12,6 +12,7 @@ import { industryFactors, industryGlobal, industryNews, industrySeries } from '.
 import { bindJumpSpy } from '../detail/jumpnav.js';
 import { newsItemHtml } from '../business/newsitem.js';
 import { closestEl } from '../core/evt.js';
+import { appendHtml, setHtml } from '../core/safehtml.js';
 
 const IST = 19800;
 const NEWS_SHOWN = 30;
@@ -87,14 +88,14 @@ function wireStocks(members, openStock){
     const sh = closestEl(e, '[data-sort-col]');
     if(sh){   // a column header: sort the whole list, show the rows drawn so far again in the new order
       sort = nextSort(sort, sh.dataset.sortCol || ''); sorted = sortedBy(members, sort);
-      if(head) head.innerHTML = cols.map(id => columnHeaderHtml(id, sort)).join('');
-      if(body) body.innerHTML = stockRowsHtml(sorted, cols, 0, shown);
+      if(head) setHtml(head, cols.map(id => columnHeaderHtml(id, sort)).join(''));
+      if(body) setHtml(body, stockRowsHtml(sorted, cols, 0, shown));
       return;
     }
     if(closestEl(e, '[data-ind-more]')){
-      body.insertAdjacentHTML('beforeend', stockRowsHtml(sorted, cols, shown, shown + ROW_STEP));
+      appendHtml(body, stockRowsHtml(sorted, cols, shown, shown + ROW_STEP));
       shown = Math.min(shown + ROW_STEP, sorted.length);
-      if(more) more.innerHTML = stocksMoreHtml(shown, sorted.length);
+      if(more) setHtml(more, stocksMoreHtml(shown, sorted.length));
       return;
     }
     const tr = closestEl(e, 'tr.strat-row[data-idx]'); if(tr) open(tr);
@@ -141,7 +142,7 @@ function drawChart(panel, c, series, byBar, lanes, state){
   });
   g += `<line class="pc-xh" y1="${padT}" y2="${H - padB}" opacity="0"/>`;
   const svg = panel.querySelector('svg');
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); setHtml(svg, g);
   state.geo = { W, padL, step, X, off, n, b };
 }
 
@@ -163,8 +164,8 @@ function bindChart(panel, c, series, events, state){
     const xh = panel.querySelector('.pc-xh'); xh.setAttribute('x1', String(G.X(i))); xh.setAttribute('x2', String(G.X(i))); xh.setAttribute('opacity', '1');
     const label = c.k === 'W' ? 'Week of ' + fmtD(r[0], { day: 'numeric', month: 'short', year: 'numeric' }) : fmtD(r[0], { month: 'long', year: 'numeric' });
     const evs = (byBar.get(G.off + i) || []).slice().sort((a, z) => z.t - a.t);
-    tip.innerHTML = `<b>${label}</b><div class="r"><span>Average change</span><span>${sign(r[1], 2)}%</span></div><div class="r"><span>Stocks counted</span><span>${r[2]}</span></div>` +
-      (evs.length ? '<div class="evs">' + evs.slice(0, 5).map(e => `<div class="ev"><span class="pc-evk pc-evk-${e.group}${e.group === 'news' && e.s ? ' s-' + e.s : ''}">${EVENT_GROUPS.find(x => x.id === e.group).glyph}</span><span>${escapeHtml(e.text)}<small>${escapeHtml(e.d + (e.src ? ' · ' + e.src : ''))}</small></span></div>`).join('') + (evs.length > 5 ? `<div class="ev more">+${evs.length - 5} more</div>` : '') + '</div>' : '');
+    setHtml(tip, `<b>${label}</b><div class="r"><span>Average change</span><span>${sign(r[1], 2)}%</span></div><div class="r"><span>Stocks counted</span><span>${r[2]}</span></div>` +
+      (evs.length ? '<div class="evs">' + evs.slice(0, 5).map(e => `<div class="ev"><span class="pc-evk pc-evk-${e.group}${e.group === 'news' && e.s ? ' s-' + e.s : ''}">${EVENT_GROUPS.find(x => x.id === e.group).glyph}</span><span>${escapeHtml(e.text)}<small>${escapeHtml(e.d + (e.src ? ' · ' + e.src : ''))}</small></span></div>`).join('') + (evs.length > 5 ? `<div class="ev more">+${evs.length - 5} more</div>` : '') + '</div>' : ''));
     const tw = tip.offsetWidth, xx = G.X(i) * (rect.width / G.W);
     tip.style.left = Math.max(0, Math.min(rect.width - tw, xx + 14 + tw > rect.width ? xx - tw - 14 : xx + 14)) + 'px'; tip.style.top = '6px'; tip.style.opacity = '1';
   });
@@ -184,16 +185,16 @@ function initCharts(members, events){
   ensureAllPriceBars().then(ok => {
     if(!root.isConnected) return;
     const live = members.filter(s => priceHistoryByTicker[pcTickerKey(s)]);
-    if(!ok || !live.length){ root.innerHTML = '<p class="upload-hint biz-warn">Price history is not available for these stocks yet.</p>'; return; }
-    root.innerHTML = '';
+    if(!ok || !live.length){ setHtml(root, '<p class="upload-hint biz-warn">Price history is not available for these stocks yet.</p>'); return; }
+    root.replaceChildren();
     const ctl = [];
     CHARTS.forEach(c => {
       const series = industrySeries(live.map(s => priceHistoryByTicker[pcTickerKey(s)][c.int]), c.k);
       const panel = document.createElement('div'); panel.className = 'pc-panel';
-      if(series.length < 2){ panel.innerHTML = `<div class="pc-ph"><div class="pc-ptitle">${c.title}</div></div><p class="upload-hint">Not enough price history.</p>`; root.appendChild(panel); return; }
+      if(series.length < 2){ setHtml(panel, `<div class="pc-ph"><div class="pc-ptitle">${c.title}</div></div><p class="upload-hint">Not enough price history.</p>`); root.appendChild(panel); return; }
       const last = series[series.length - 1];
-      panel.innerHTML = `<div class="pc-ph"><div class="pc-ptitle">${c.title}<small>${series.length} bars</small></div><div class="pc-psum"><span class="${last[1] >= 0 ? 'chg-up' : 'chg-down'}">${sign(last[1], 2)}% latest</span></div><div class="pc-pills" role="group" aria-label="${c.title} range">${c.ranges.map((r, i) => `<button type="button" class="pc-pill" data-i="${i}" aria-pressed="${i === c.def}">${r[0]}</button>`).join('')}</div></div>
-        <div class="pc-chart"><svg role="img" aria-label="${c.title} average % change chart"></svg><div class="pc-tip"></div></div>`;
+      setHtml(panel, `<div class="pc-ph"><div class="pc-ptitle">${c.title}<small>${series.length} bars</small></div><div class="pc-psum"><span class="${last[1] >= 0 ? 'chg-up' : 'chg-down'}">${sign(last[1], 2)}% latest</span></div><div class="pc-pills" role="group" aria-label="${c.title} range">${c.ranges.map((r, i) => `<button type="button" class="pc-pill" data-i="${i}" aria-pressed="${i === c.def}">${r[0]}</button>`).join('')}</div></div>
+        <div class="pc-chart"><svg role="img" aria-label="${c.title} average % change chart"></svg><div class="pc-tip"></div></div>`);
       root.appendChild(panel);
       ctl.push(bindChart(panel, c, series, events, { range: c.def, geo: null }));
     });
@@ -207,7 +208,7 @@ function renderIndustryDetail(by, name, backLabel, openStock){
   const members = membersOf(by, name), news = industryNews(members);
   const events = news.map(n => ({ t: Date.parse(n.d + 'T00:00:00+05:30') / 1000, d: n.d, k: n.k, group: n.k, text: n.t, src: n.src || n.stock, s: n.s }));
   const links = [['jump-ind-factors', 'Industry Factors'], ['jump-ind-global', 'Global & Macro'], ['jump-ind-charts', '% change'], ['jump-ind-news', 'News'], ['jump-ind-stocks', 'Stocks']];
-  detailEl.innerHTML = `
+  setHtml(detailEl, `
     <div class="detail-back-bar"><button type="button" class="detail-back" id="detailBackBtn" title="Back (Esc)">&larr; Back to ${escapeHtml(backLabel)}<span class="detail-back-key">Esc</span></button></div>
     <div class="detail-top"><div class="detail-title"><div class="detail-title-text"><div class="detail-name">${escapeHtml(name)}</div><div class="detail-ticker">${by === 'group' ? 'Industry group' : 'Industry'} &middot; ${members.length} stock${members.length === 1 ? '' : 's'}</div></div></div></div>
     <nav class="detail-jump" aria-label="Jump to section"><div class="detail-jump-who"><span class="detail-jump-name">${escapeHtml(name)}</span></div><span class="detail-jump-label">Jump to</span>${links.map(l => `<a href="#" data-jump="${l[0]}">${l[1]}</a>`).join('')}</nav>
@@ -215,7 +216,7 @@ function renderIndustryDetail(by, name, backLabel, openStock){
     ${globalHtml(industryGlobal(members))}
     ${chartsHtml()}
     ${newsHtml(news)}
-    ${stocksHtml(members)}`;
+    ${stocksHtml(members)}`);
   bindJumpSpy(detailEl);
   detailEl.querySelectorAll('.detail-jump a[data-jump]').forEach(a => a.addEventListener('click', (e) => {
     e.preventDefault();

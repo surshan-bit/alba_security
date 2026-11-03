@@ -15,6 +15,7 @@ import { CAP_NAME } from '../core/capclass.js';
 import { nextWeekRead, rankReads } from './nextweek.js';
 import { newsCounts, recentNews } from '../strategies/news.js';
 import { ideasResultsGet, ideasResultsSave } from '../identity/ideasresults.js';
+import { setHtml } from '../core/safehtml.js';
 
 const TOP_N = 5;
 function openTradeByStock(){
@@ -165,7 +166,7 @@ function syncControls(){
 // Only the body: used when trades or prices change, so the strategy list is not rebuilt under an open dropdown.
 function refreshIdeasBody(){
   const host = document.getElementById('tradeIdeasBody');
-  if(host) keepScroll(host, () => { host.innerHTML = bodyHtml(); host.setAttribute('aria-busy', phase === 'running' ? 'true' : 'false'); });
+  if(host) keepScroll(host, () => { setHtml(host, bodyHtml()); host.setAttribute('aria-busy', phase === 'running' ? 'true' : 'false'); });
   syncControls();
 }
 function renderIdeas(){
@@ -175,7 +176,7 @@ function renderIdeas(){
   if(sid && !strategies.some(x => x.id === sid)){ sid = ''; phase = 'idle'; }
   const sel = document.getElementById('tradeIdeasStrategy');
   if(sel){
-    sel.innerHTML = '<option value="">Choose a strategy&hellip;</option>' + strategies.map(x => `<option value="${escapeHtml(x.id)}"${x.id === sid ? ' selected' : ''}>${escapeHtml(x.name)}</option>`).join('');
+    setHtml(sel, '<option value="">Choose a strategy&hellip;</option>' + strategies.map(x => `<option value="${escapeHtml(x.id)}"${x.id === sid ? ' selected' : ''}>${escapeHtml(x.name)}</option>`).join(''));
   }
   refreshIdeasBody();
 }

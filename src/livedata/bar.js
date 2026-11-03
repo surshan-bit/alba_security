@@ -11,6 +11,7 @@ import { getLdBatch, ldBatchPaint } from './batch.js';
 import { activityEnd, activityNotify, activityRun } from '../ui/activity.js';
 import { getRefreshKit } from '../refresh/hook.js';
 import { registerBusy } from '../core/busy.js';
+import { setHtml } from '../core/safehtml.js';
 
 var ldJobs = new Map();    // "<ticker key>|fund" or "|tech" -> { pct, msg, state: 'idle'|'running'|'ok'|'error', at }
 registerBusy(() => { for(const j of ldJobs.values()) if(j && j.state === 'running') return true; return false; });
@@ -148,7 +149,7 @@ function bindLiveDataBar(s){
     tg.setAttribute('aria-expanded', String(ldOpen));
     const grid = document.getElementById('ldGrid'), caret = tg.querySelector('.live-refresh-caret');
     if(grid) grid.hidden = !ldOpen;
-    if(caret) caret.innerHTML = ldOpen ? '&#9662;' : '&#9656;';
+    if(caret) setHtml(caret, ldOpen ? '&#9662;' : '&#9656;');
   };
   const f = document.getElementById('ldBtn-fund'), t = document.getElementById('ldBtn-tech');
   const kit = getRefreshKit();

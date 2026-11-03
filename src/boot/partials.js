@@ -2,6 +2,7 @@
 // <section data-partial="..."> elements. A section that already has content (or was already loaded) is left alone.
 
 // The progress panel of an import or sync job: one template for all three (ids carry the job's prefix).
+import { replaceWithHtml, setHtml } from '../core/safehtml.js';
 function importPanelHtml(pfx, title, label){
   return '<div class="upload-panel fi-panel" id="' + pfx + 'fundImportPanel" hidden aria-live="polite">' +
     '<div class="fi-head"><div class="upload-title" id="' + pfx + 'fiTitle">' + title + '</div><div class="fi-pct" id="' + pfx + 'fiPct">0%</div></div>' +
@@ -11,7 +12,7 @@ function importPanelHtml(pfx, title, label){
 function fillImportPanels(root){
   root.querySelectorAll('[data-import-panel]').forEach(h => {
     const d = h.dataset;
-    h.outerHTML = importPanelHtml(d.importPanel, d.title, d.label);
+    replaceWithHtml(h, importPanelHtml(d.importPanel, d.title, d.label));
   });
 }
 
@@ -28,7 +29,7 @@ function ensurePartial(el){
   if(!el || !el.dataset.partial || el.dataset.partialLoaded || el.innerHTML.trim()) return Promise.resolve();
   if(!loading.has(el)){
     loading.set(el, fetchPartial(el.dataset.partial).then(text => {
-      el.innerHTML = text; fillImportPanels(el); el.dataset.partialLoaded = '1';
+      setHtml(el, text); fillImportPanels(el); el.dataset.partialLoaded = '1';
     }).finally(() => { loading.delete(el); }));
   }
   return loading.get(el);

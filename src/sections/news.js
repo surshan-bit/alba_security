@@ -5,13 +5,14 @@ import { startNewsSync } from '../news/store.js';
 import { refreshPulse } from '../news/pulse.js';
 import { refreshStockEvents } from '../news/stockevents.js';
 import { newsChanged } from '../news/store.js';
+import { setHtml } from '../core/safehtml.js';
 
 const section = () => /** @type {HTMLElement} */ (document.getElementById('section-news'));
 const body = () => document.getElementById('newsBody');
 
 function render(){
   const el = body(); if(!el) return;
-  el.innerHTML = newsHtml();
+  setHtml(el, newsHtml());
 }
 
 function init(){

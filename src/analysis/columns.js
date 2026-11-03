@@ -121,8 +121,8 @@ function analysisLbCellRaw(colId, ctx){
     case 'weekChg': return `<td data-live="weekChg">${pctChangeSpan(r.weekPctChange)}</td>`;
     case 'monthChg': return `<td data-live="monthChg">${pctChangeSpan(r.monthPctChange)}</td>`;
     case 'price': return `<td data-live="price">${price}</td>`;
-    case 'screener': return `<td><a href="${screenerUrl(s)}" target="_blank" rel="noopener noreferrer" class="analysis-lb-link" onclick="event.stopPropagation()">Screener ↗</a></td>`;
-    case 'tv': return `<td><a href="${tvUrlFor(s)}" target="_blank" rel="noopener noreferrer" class="analysis-lb-link" onclick="event.stopPropagation()">TV ↗</a></td>`;
+    case 'screener': return `<td><a href="${screenerUrl(s)}" target="_blank" rel="noopener noreferrer" class="analysis-lb-link">Screener ↗</a></td>`;
+    case 'tv': return `<td><a href="${tvUrlFor(s)}" target="_blank" rel="noopener noreferrer" class="analysis-lb-link">TV ↗</a></td>`;
     default: return '<td></td>';
   }
 }
