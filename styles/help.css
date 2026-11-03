@@ -26,6 +26,7 @@
 .diff-stat{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:8px 14px;font-size:var(--t-sm);color:var(--muted);}
 .diff-stat b{display:block;font-size:var(--t-lg);color:var(--text);font-weight:700;font-family:inherit;}
 .upload-hint{font-size:var(--t-sm);color:var(--muted);line-height:1.5;margin-top:2px;}
+.upload-hint__list{margin:0;padding-left:var(--space-4);}
 .upload-error{font-size:var(--t-sm);color:var(--avoid);}
 @media (max-width:900px){
 .analysis-layout{grid-template-columns:minmax(0,1fr);gap:0;}

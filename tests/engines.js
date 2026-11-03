@@ -660,6 +660,74 @@ test('escaping: the Buy / Sell ideas news list still drops a hostile sentiment (
   assert.deepStrictEqual(items.map(x => x.s).sort(), ['', 'neg']);
 });
 
+// Tests start together, so two that set globalThis.document would overwrite each other's page; those tests take turns through this queue.
+let pageTurn = Promise.resolve();
+const alone = fn => { const run = pageTurn.then(fn); pageTurn = run.catch(() => {}); return run; };
+
+// ---- the page shell has no inline handlers or styles: the Retry button and the integrity banner are driven from code (CLAUDE.md sections 2 and 3)
+const withPage = (html, fn) => alone(async () => {
+  const { JSDOM } = require('jsdom');
+  const win = new JSDOM('<!doctype html><body>' + html + '</body>').window;
+  const had = globalThis.document, hadLocation = globalThis.location, spy = { reloads: 0 };
+  globalThis.document = win.document; globalThis.location = { reload(){ spy.reloads++; } };
+  try { await fn(win, spy); }
+  finally {
+    if(had === undefined) delete globalThis.document; else globalThis.document = had;
+    if(hadLocation === undefined) delete globalThis.location; else globalThis.location = hadLocation;
+  }});
+const COVER = '<div id="bootStatus" hidden><div class="boot-msg"></div><button type="button" class="boot-retry" hidden>Retry</button></div>';
+
+test('boot cover: the Retry button reloads the page from a listener, and a page without the cover is left alone', () => withPage(COVER, async (win, spy) => {
+  const S = load('src/boot/status.js');
+  S.wireBootRetry();
+  win.document.querySelector('.boot-retry').click();
+  assert.strictEqual(spy.reloads, 1);
+  win.document.body.innerHTML = '';   // no cover on the page: nothing to wire, nothing thrown
+  assert.doesNotThrow(() => S.wireBootRetry());
+}));
+
+test('boot cover: boot() wires the Retry button before it loads anything, so a failed start can be retried', () => withPage(COVER, async (win, spy) => {
+  const stubs = { 'stockdata.js': 'export const loadStocks = async () => [];', 'handoff.js': 'export const debugHandle = () => ({}); export const setBootStocks = () => {};',
+    'identity/flush.js': 'export const init_identity_flush = () => {};', 'identity/session.js': 'export const loadIdentity = async () => {}; export const touchUser = () => {};',
+    'identity/prefs.js': 'export const syncPrefs = async () => {};', 'identity/strategies.js': 'export const syncStrategies = async () => {};',
+    'identity/ideasresults.js': 'export const syncIdeasResults = async () => {};', 'main.js': 'export {};' };
+  const failing = await loadWithStubs('src/boot/boot.js', '', stubs);
+  await assert.rejects(failing.boot({ loadStocks: async () => { throw new Error('database down'); } }), /database down/);
+  win.document.querySelector('.boot-retry').click();   // the load failed, and Retry still works
+  assert.strictEqual(spy.reloads, 1);
+}));
+
+const INTEGRITY_BANNER = '<div id="dataIntegrityBanner" hidden></div>';
+const runIntegrity = async (stocks) => {
+  globalThis.__integrityStocks = stocks;
+  const warn = console.warn; console.warn = () => {};   // the check also writes the problems to the console
+  try {
+    const I = await loadWithStubs('src/joblogs/integrity.js', '', { 'core/stocks.js': 'export const stocks = globalThis.__integrityStocks;' });
+    I.init_joblogs_integrity();
+  } finally { console.warn = warn; delete globalThis.__integrityStocks; }
+};
+const BAD_FACTORS = { fundamentals: { factors: [{ weight: 'x', score: 5 }] }, score: 5 };
+
+test('integrity banner: a stock whose factors do not add up un-hides the banner and names the stock', () => withPage(INTEGRITY_BANNER, async (win) => {
+  await runIntegrity([Object.assign({ ticker: 'AAA1 · Chemicals' }, BAD_FACTORS)]);
+  const banner = win.document.getElementById('dataIntegrityBanner');
+  assert.strictEqual(banner.hidden, false);
+  assert.match(banner.textContent, /1 issue/); assert.match(banner.textContent, /AAA1/);
+  assert.strictEqual(banner.hasAttribute('style'), false, 'shown with the hidden attribute, never an inline style');
+}));
+
+test('integrity banner: clean data leaves the banner hidden', () => withPage(INTEGRITY_BANNER, async (win) => {
+  await runIntegrity([{ ticker: 'AAA1 · Chemicals', score: 5 }]);
+  assert.strictEqual(win.document.getElementById('dataIntegrityBanner').hidden, true);
+}));
+
+test('integrity banner: a hostile ticker is shown as text, never as markup', () => withPage(INTEGRITY_BANNER, async (win) => {
+  await runIntegrity([Object.assign({ ticker: '<img src=x onerror=alert(1)> · X' }, BAD_FACTORS)]);
+  const banner = win.document.getElementById('dataIntegrityBanner');
+  assert.strictEqual(banner.querySelector('img'), null);
+  assert.match(banner.textContent, /<img src=x onerror=alert\(1\)>/);
+}));
+
 // =========================================================== safe markup sink (src/core/safehtml.js): markup text becomes elements without script-capable parts
 {
   const { JSDOM } = require('jsdom');
@@ -736,7 +804,7 @@ test('escaping: the Buy / Sell ideas news list still drops a hostile sentiment (
   }));
 }
 
-test('link guard: a click on a grid link does not reach the row that would open the stock, and the link still follows', async () => {
+test('link guard: a click on a grid link does not reach the row that would open the stock, and the link still follows', () => alone(async () => {
   const { JSDOM } = require('jsdom');
   const win = new JSDOM('<!doctype html><body><table><tbody id="rows"><tr class="analysis-lb-row"><td><a class="analysis-lb-link" href="https://a.example/">Screener</a></td><td class="plain">x</td></tr></tbody></table></body>').window;
   const had = globalThis.document; globalThis.document = win.document;
@@ -748,7 +816,7 @@ test('link guard: a click on a grid link does not reach the row that would open 
     const link = fire(win.document.querySelector('a')); assert.deepStrictEqual(opened, []); assert.strictEqual(link.defaultPrevented, false);
     fire(win.document.querySelector('.plain')); assert.deepStrictEqual(opened, ['plain']);
   } finally { if(had === undefined) delete globalThis.document; else globalThis.document = had; }
-});
+}));
 
 // =========================================================== score history (recorded by each import)
 const H = load('src/history/scorehistory.js', 'export { BUCKETS, SCORE_ENGINE, addPoint, bucketId, bucketOf, pointFor, tickerKey };');

@@ -1,6 +1,7 @@
 // The start-up sequence: stock list and (who is viewing -> saved preferences) side by side -> the app (page text is fetched when its page is first opened).
 // The app (src/main.js) is imported last because its modules read the stock list and the saved preferences when they load.
 import { loadStocks as loadStocksFromDatabase } from './stockdata.js';
+import { wireBootRetry } from './status.js';
 import { debugHandle, setBootStocks } from './handoff.js';
 import { init_identity_flush } from '../identity/flush.js';
 import { loadIdentity, touchUser } from '../identity/session.js';
@@ -16,6 +17,7 @@ function atMost(ms, work){
 
 // deps.loadStocks replaces the database loader (the jsdom regression harness hands in its own sample list).
 async function boot(deps){
+  wireBootRetry();   // first: a failed start shows the Retry button, and it must already work
   const loadStocks = (deps && deps.loadStocks) || loadStocksFromDatabase;
   init_identity_flush();
   // The stock list and the viewer's identity and saved preferences do not depend on each other, so they load side by side.
