@@ -5,3 +5,4 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'sha256-pKR3UmZzt8u0ZndeOWmFFteGfzCPnJT9HyQ+X/4ZDHU=' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://djxnoijgwtklszvgunma.supabase.co wss://djxnoijgwtklszvgunma.supabase.co; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'

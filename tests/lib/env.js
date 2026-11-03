@@ -23,19 +23,24 @@ function chromiumOrSkip(label){
 // ---- server: "/" is the inner document of index.html (the saved one has an outer skeleton) plus the skeleton's [hidden] rule.
 // seeds: name -> JSON text served at /__seed/<name>.json; state.appBroken makes /app.js a 404.
 function startServer(){
+  const testStyle = '[hidden]:not([hidden=until-found i]){display:none!important}';
   const raw = fs.readFileSync(path.join(root, 'index.html'), 'utf8'), i0 = raw.indexOf('<!DOCTYPE html>');
-  const indexHtml = (i0 >= 0 ? raw.slice(i0) : raw).replace('</head>', '<style>[hidden]:not([hidden=until-found i]){display:none!important}</style></head>');
+  const indexHtml = (i0 >= 0 ? raw.slice(i0) : raw).replace('</head>', '<style>' + testStyle + '</style></head>');
+  // The site's real Content-Security-Policy (platform/_headers), plus the hash of the one <style> this server adds, so every suite runs under it:
+  // Chromium reports a violation as a console error, which the suites already treat as a failure.
+  const testHash = "'sha256-" + require('crypto').createHash('sha256').update(testStyle).digest('base64') + "'";
+  const policy = /^\s*Content-Security-Policy:\s*(.+)$/m.exec(fs.readFileSync(path.join(root, 'platform', '_headers'), 'utf8'))[1].replace("style-src 'self'", "style-src 'self' " + testHash);
   const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
   const state = { appBroken: false, seeds: new Map(), base: '' };
   const server = http.createServer((req, res) => {
     let p = decodeURIComponent(req.url.split('?')[0]); if(p === '/') p = '/index.html';
-    if(p === '/index.html'){ res.writeHead(200, { 'content-type': 'text/html' }); res.end(indexHtml); return; }
+    if(p === '/index.html'){ res.writeHead(200, { 'content-type': 'text/html', 'content-security-policy': policy }); res.end(indexHtml); return; }
     const sm = /^\/__seed\/(.+)\.json$/.exec(p);
     if(sm){ const t = state.seeds.get(sm[1]); if(t == null){ res.writeHead(404); res.end('nf'); } else { res.writeHead(200, { 'content-type': 'application/json' }); res.end(t); } return; }
     const f = path.join(root, p);
     if(p === '/app.js' && state.appBroken){ res.writeHead(404); res.end('nf'); return; }
     if(!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()){ res.writeHead(404); res.end('nf'); return; }
-    res.writeHead(200, { 'content-type': mime[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-store' }); res.end(fs.readFileSync(f));
+    res.writeHead(200, { 'content-type': mime[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-store', 'content-security-policy': policy }); res.end(fs.readFileSync(f));
   });
   state.listen = () => new Promise(r => server.listen(0, () => { state.base = 'http://localhost:' + server.address().port; r(state.base); }));
   state.close = () => server.close();
