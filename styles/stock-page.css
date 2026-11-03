@@ -51,7 +51,7 @@
 .fund-cell-score.fs-avoid{color:var(--avoid);}
 .fund-cell-score.fs-pending{color:var(--muted);}
 .fund-cell-bar{margin-bottom:10px;height:4px;background:var(--line);border-radius:2px;overflow:hidden;}
-.fund-cell-bar i{display:block;height:100%;}
+.fund-cell-bar i{display:block;height:100%;width:var(--w,0%);}
 .fund-cell-bar i.fs-buy{background:var(--buy);}
 .fund-cell-bar i.fs-mbuy{background:var(--mbuy);}
 .fund-cell-bar i.fs-hold{background:var(--hold);}

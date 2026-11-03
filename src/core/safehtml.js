@@ -38,6 +38,26 @@ function clean(root) {
   }
 }
 
+// Values that differ per element (a bar's width, a marker's place) travel in data-css="--name:value;--other:value" and are applied here, to the nodes
+// in the inert document, before they reach the page. An inline style="" in markup is blocked by a strict Content-Security-Policy, and so is
+// re-reading it from serialised HTML; a custom property set from code is not, and the global stylesheet reads it (width: var(--w)).
+const CSS_VAR_NAME = /^--[a-z][a-z0-9-]*$/;
+const CSS_VAR_VALUE = /^[#%.,()\w\s/+-]{1,64}$/;   // numbers, units, #hex, rgb()/hsl(), ratios: no quotes, semicolons, braces, backslashes or angle brackets
+const CSS_VAR_FORBIDDEN = /url\s*\(|image-set|expression|var\s*\(|attr\s*\(|env\s*\(/i;   // nothing that fetches, or reads something else
+
+/** @param {DocumentFragment} root applies and removes every data-css attribute under `root`; a declaration that is not an accepted custom property is dropped */
+function applyCssVars(root) {
+  for (const el of Array.from(root.querySelectorAll('[data-css]'))) {
+    for (const declaration of String(el.getAttribute('data-css')).split(';')) {
+      const colon = declaration.indexOf(':');
+      if (colon < 1) continue;
+      const name = declaration.slice(0, colon).trim(), value = declaration.slice(colon + 1).trim();
+      if (CSS_VAR_NAME.test(name) && CSS_VAR_VALUE.test(value) && !CSS_VAR_FORBIDDEN.test(value)) /** @type {HTMLElement} */ (el).style.setProperty(name, value);
+    }
+    el.removeAttribute('data-css');
+  }
+}
+
 /**
  * Turns markup text into a clean fragment, ready to insert.
  * @param {string} html the markup
@@ -58,6 +78,7 @@ function htmlFragment(html, anchor, context = anchor) {
     while (wrapper && wrapper.firstChild) fragment.appendChild(wrapper.firstChild);
   }
   clean(fragment);
+  applyCssVars(fragment);
   return fragment;
 }
 

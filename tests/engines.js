@@ -824,6 +824,37 @@ test('boot(): it loads the stock list, hands it over and starts the app, with th
   // The helper parses with the element's own window, so a throw-away jsdom page is all a test needs.
   const withDom = fn => () => { const win = new JSDOM('<!doctype html><body></body>').window; fn(win, win.document); };
   const fill = (doc, html, tag) => { const el = doc.createElement(tag || 'div'); SH.setHtml(el, html); return el; };
+  // Values that differ per element (a bar's width, a marker's place) travel in data-css="--name:value" and are set as custom properties on the nodes
+  // before they reach the page: an inline style="" in markup is blocked by a strict Content-Security-Policy, setting a property from code is not.
+  const cssVar = (el, name) => el.style.getPropertyValue(name);
+  test('safe markup: data-css becomes custom properties on the element, and the attribute is gone', withDom((win, doc) => {
+    const el = fill(doc, '<i class="bar" data-css="--w:42%;--n:3;--c:#c1524a"></i><b data-css="--p:12.5%"></b>');
+    const bar = el.querySelector('i');
+    assert.deepStrictEqual([cssVar(bar, '--w'), cssVar(bar, '--n'), cssVar(bar, '--c')], ['42%', '3', '#c1524a']);
+    assert.strictEqual(cssVar(el.querySelector('b'), '--p'), '12.5%');
+    assert.strictEqual(el.querySelector('[data-css]'), null);
+  }));
+  test('safe markup: replaceWithHtml and SVG markup get the same treatment', withDom((win, doc) => {
+    const host = doc.createElement('div'), old = doc.createElement('span'); host.appendChild(old); doc.body.appendChild(host);
+    SH.replaceWithHtml(old, '<i data-css="--w:7%"></i>');
+    assert.strictEqual(cssVar(host.querySelector('i'), '--w'), '7%');
+    const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg'); SH.setHtml(svg, '<rect data-css="--x:5"></rect>');
+    assert.strictEqual(cssVar(svg.querySelector('rect'), '--x'), '5');
+  }));
+  test('safe markup: only custom properties with plain values are accepted; everything else in data-css is ignored', withDom((win, doc) => {
+    const bad = ['--x:url(https://evil.example/x)', '--x:url(javascript:alert(1))', '--x:expression(alert(1))', '--x:image-set(a 1x)', '--x:var(--y)', '--x:attr(data-a)', '--x:env(a)',
+      '--x:1}body{display:none', '--x:"1"', "--x:'1'", '--x:1\\2f', '--x:<img>', '--x:' + '9'.repeat(65), '--x:', '--X:1', '--1x:1', '-x:1', 'width:50px', 'color:red', 'background:url(x)', 'novalue', ':1', ''];
+    for(const decl of bad){
+      const el = fill(doc, '<i data-css="' + decl.replace(/"/g, '&quot;') + '"></i>').querySelector('i');
+      assert.strictEqual(el.getAttribute('style'), null, 'ignored: ' + decl);
+      assert.strictEqual(el.hasAttribute('data-css'), false, 'attribute removed anyway: ' + decl);
+    }
+  }));
+  test('safe markup: a bad declaration does not stop the good ones next to it', withDom((win, doc) => {
+    const el = fill(doc, '<i data-css="--a:1;color:red;--b:url(x);--c:3; ;--d:4%"></i>').querySelector('i');
+    assert.deepStrictEqual(['--a', '--b', '--c', '--d'].map(n => cssVar(el, n)), ['1', '', '3', '4%']);
+    assert.strictEqual(el.style.color, '');
+  }));
   test('safe markup: ordinary markup, entities and text come through unchanged', withDom((win, doc) => {
     const el = fill(doc, '<p class="a">x &amp; y&nbsp;<b>z</b></p><!-- note --><ul><li>1</li></ul>');
     assert.strictEqual(el.innerHTML, '<p class="a">x &amp; y&nbsp;<b>z</b></p><!-- note --><ul><li>1</li></ul>');

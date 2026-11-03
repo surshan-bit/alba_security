@@ -43,7 +43,7 @@ function techTimeframeSummary(pct, macdState, rsi){
   const cell = (cls, title, key, body) => `<div class="pcs-cell ${cls}" title="${title}"><span class="pcs-key">${key}</span>${body}</div>`;
   return '<div class="pcs">'
     + cell('pcs-chg ' + dir, 'Price change over the period', 'Change', `<span class="pcs-val"><i class="pcs-arrow">${arrow}</i>${pct != null ? Math.abs(pct).toFixed(2) + '%' : 'n/a'}</span>`)
-    + cell('pcs-rsi ' + zone, 'Relative Strength Index (momentum, 0-100): above 70 is stretched, below 30 is oversold', 'RSI', `<span class="pcs-val">${hasRsi ? rsi.toFixed(1) : '&mdash;'}</span>${hasRsi ? `<span class="pcs-gauge" aria-hidden="true"><i style="left:${r}%"></i></span>` : ''}`)
+    + cell('pcs-rsi ' + zone, 'Relative Strength Index (momentum, 0-100): above 70 is stretched, below 30 is oversold', 'RSI', `<span class="pcs-val">${hasRsi ? rsi.toFixed(1) : '&mdash;'}</span>${hasRsi ? `<span class="pcs-gauge" aria-hidden="true"><i data-css="--p:${r}%"></i></span>` : ''}`)
     + cell('pcs-sig ' + (rating ? 'sig-' + rating.cls.slice(2) : ''), 'Trend signal from the MACD', 'Signal', `<span class="pcs-val"><i class="pcs-dot"></i>${rating ? rating.label : '&mdash;'}</span>`)
     + '</div>';
 }

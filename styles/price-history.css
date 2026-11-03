@@ -12,6 +12,8 @@
 .pc-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;margin-bottom:6px;}
 .pc-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:var(--t-sm);color:var(--muted);margin-bottom:10px;}
 .pc-legend i{display:inline-block;width:9px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-2px;}
+.pc-legend i.pc-up{background:var(--buy);}
+.pc-legend i.pc-down{background:var(--avoid);}
 .pc-legend i.pc-vol{background:var(--muted);opacity:.45;}
 .pc-panels{display:flex;flex-direction:column;gap:12px;}
 .pc-panel{min-width:0;}
@@ -109,4 +111,4 @@
 @media (min-width:601px){.tech-panel .pc-head{position:absolute;top:16px;right:0;margin:0;}}
 .tech-panel .pc-head{margin:0 0 8px;justify-content:flex-end;}
 
-.pcs-gauge i{position:absolute;top:50%;border-radius:50%;background:var(--text);border:2px solid var(--panel2);transform:translate(-50%,-50%);box-sizing:content-box;margin:0;width:7px;height:7px;}
+.pcs-gauge i{position:absolute;left:var(--p,0%);top:50%;border-radius:50%;background:var(--text);border:2px solid var(--panel2);transform:translate(-50%,-50%);box-sizing:content-box;margin:0;width:7px;height:7px;}
