@@ -167,9 +167,9 @@ function bindChart(panel, c, series, events, state){
     setHtml(tip, `<b>${label}</b><div class="r"><span>Average change</span><span>${sign(r[1], 2)}%</span></div><div class="r"><span>Stocks counted</span><span>${r[2]}</span></div>` +
       (evs.length ? '<div class="evs">' + evs.slice(0, 5).map(e => `<div class="ev"><span class="pc-evk pc-evk-${e.group}${e.group === 'news' && e.s ? ' s-' + e.s : ''}">${EVENT_GROUPS.find(x => x.id === e.group).glyph}</span><span>${escapeHtml(e.text)}<small>${escapeHtml(e.d + (e.src ? ' · ' + e.src : ''))}</small></span></div>`).join('') + (evs.length > 5 ? `<div class="ev more">+${evs.length - 5} more</div>` : '') + '</div>' : ''));
     const tw = tip.offsetWidth, xx = G.X(i) * (rect.width / G.W);
-    tip.style.left = Math.max(0, Math.min(rect.width - tw, xx + 14 + tw > rect.width ? xx - tw - 14 : xx + 14)) + 'px'; tip.style.top = '6px'; tip.style.opacity = '1';
+    tip.style.setProperty('--x', Math.max(0, Math.min(rect.width - tw, xx + 14 + tw > rect.width ? xx - tw - 14 : xx + 14)) + 'px'); tip.classList.add('is-shown');
   });
-  ch.addEventListener('pointerleave', () => { tip.style.opacity = '0'; panel.querySelector('.pc-xh').setAttribute('opacity', '0'); });
+  ch.addEventListener('pointerleave', () => { tip.classList.remove('is-shown'); panel.querySelector('.pc-xh').setAttribute('opacity', '0'); });
   redraw();
   return { redraw, shown, events };
 }

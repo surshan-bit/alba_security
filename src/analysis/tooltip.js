@@ -36,8 +36,8 @@ function createAnalysisTooltip(){
     const rect = tooltip.getBoundingClientRect();
     if(x + rect.width > window.innerWidth - 8) x = evt.clientX - rect.width - pad;
     if(y + rect.height > window.innerHeight - 8) y = evt.clientY - rect.height - pad;
-    tooltip.style.left = `${Math.max(8, x)}px`;
-    tooltip.style.top = `${Math.max(8, y)}px`;
+    tooltip.style.setProperty('--x', `${Math.max(8, x)}px`);
+    tooltip.style.setProperty('--y', `${Math.max(8, y)}px`);
   }
   function show(evt, s){
     setHtml(tooltip, tooltipContent(s));
