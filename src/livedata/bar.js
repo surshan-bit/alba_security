@@ -123,7 +123,7 @@ function ldPaint(key){
     const pct = j ? Math.max(0, Math.min(100, Math.round(j.pct))) : 0;
     if(bar){ bar.hidden = !j || j.state === 'idle'; bar.setAttribute('aria-valuenow', String(pct)); }
     if(fill){
-      fill.style.width = pct + '%';
+      fill.style.setProperty('--w', pct + '%');
       fill.classList.toggle('is-ok', !!(j && j.state === 'ok'));
       fill.classList.toggle('is-error', !!(j && j.state === 'error'));
     }

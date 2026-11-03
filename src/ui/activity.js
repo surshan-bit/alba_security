@@ -67,7 +67,7 @@ function paintPanel(panel){
     el.querySelector('.activity-text').textContent = i.data.text || '';
     if(i.kind === 'note') el.querySelector('.activity-time').textContent = timeText(i.data.at);
     else {
-      el.querySelector('.activity-fill').style.width = Math.max(0, Math.min(100, i.data.pct || 0)) + '%';
+      el.querySelector('.activity-fill').style.setProperty('--w', Math.max(0, Math.min(100, i.data.pct || 0)) + '%');
       const stop = el.querySelector('[data-act="stop"]');
       if(stop){ stop.hidden = !i.data.onStop; stop.disabled = !!i.data.stopping; stop.textContent = i.data.stopping ? 'Stopping…' : 'Stop'; }
     }
