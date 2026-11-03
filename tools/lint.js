@@ -121,5 +121,27 @@ for(const f of require('fs').readdirSync('styles').filter(x => x.endsWith('.css'
     if(seen.join(',') !== want.join(',')) err('styles.css: the layers come in the order ' + seen.join(', ') + ' but must be ' + want.join(', ') + ' (change the order of the imports in styles/main.css)');
   }
 }
+// 8. the quality ratchet: patterns the engineering standards (CLAUDE.md) retire. Counts may only go down; new code uses safe DOM APIs (textContent, createElement,
+//    an escape helper) and shared CSS classes. Lower the record with node tools/lint.js --ratchet.
+{
+  const file = path.join(root, 'tools', 'quality-ratchet.json');
+  const read = p => { try { return fs.readFileSync(p, 'utf8'); } catch(e){ return ''; } };
+  const markup = [path.join(root, 'index.html')].concat(fs.readdirSync(path.join(root, 'partials')).map(f => path.join(root, 'partials', f)));
+  const srcText = files.map(f => fs.readFileSync(f, 'utf8'));
+  const count = (re, texts) => texts.reduce((n, t) => n + (t.match(re) || []).length, 0);
+  const now = {
+    innerHTMLAssignments: count(/\.(innerHTML|outerHTML)\s*\+?=/g, srcText),
+    evalLike: count(/\beval\(|new Function\(|document\.write\(|insertAdjacentHTML\(/g, srcText),
+    inlineStyleAttrs: count(/\sstyle=/g, srcText.concat(markup.map(read))),
+    inlineStyleScriptWrites: count(/\.style\.(?!setProperty|removeProperty)[a-zA-Z]+\s*=[^=]/g, srcText)
+  };
+  let saved = null;
+  try { saved = JSON.parse(read(file)); } catch(e){ /* first run: nothing recorded yet */ }
+  if(process.argv.includes('--ratchet') || !saved){ fs.writeFileSync(file, JSON.stringify(now, null, 2) + '\n'); console.log('quality ratchet written: ' + JSON.stringify(now)); }
+  else for(const k of Object.keys(now)){
+    if(now[k] > (saved[k] ?? 0)) err('quality: ' + k + ' went up (' + (saved[k] ?? 0) + ' -> ' + now[k] + '). See CLAUDE.md: use safe DOM APIs and shared CSS classes.');
+    else if(now[k] < (saved[k] ?? 0)) warn('quality: ' + k + ' is down to ' + now[k] + ' (was ' + saved[k] + '): run node tools/lint.js --ratchet to lock it in');
+  }
+}
 console.log('lint: ' + mods.size + ' modules, ' + errors + ' errors, ' + warnings + ' warnings');
 process.exit(errors || (process.argv.includes('--strict') && warnings) ? 1 : 0);
