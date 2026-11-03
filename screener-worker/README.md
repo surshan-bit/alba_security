@@ -29,3 +29,7 @@ Screener account, so the Worker must sign in as the same account.
 
 ## Tests
 `npm run screener` in the repo root (uses a pretend Screener, no network).
+
+## Limits
+
+A call is refused before Screener is contacted when it breaks one of these (see `src/limits.js`): a request body over 64 KiB (HTTP 413), more than 2000 symbols, or a symbol that is not an NSE ticker or BSE code (letters, digits and `& . - _`, at most 20 characters). The token can be sent in the `Authorization: Bearer` header instead of the address, which keeps it out of URL logs; use the `/mcp/<token>` address only for connectors that cannot set a header. The Workers free plan has no rate-limit binding here, so there is no per-caller request limit.

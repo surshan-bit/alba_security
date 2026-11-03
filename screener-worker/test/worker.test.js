@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { toNumber, toRecord, norm } from '../src/fields.js';
 import { parseTable, warehouseId, pageHasData } from '../src/html.js';
 import { handle } from '../src/index.js';
+import { MAX_BODY_BYTES, MAX_SYMBOLS, MAX_SYMBOL_LENGTH } from '../src/limits.js';
 
 // The peer table as the PASUPTAC check returned it (headings and the company's own values), plus one made-up peer row.
 const HEADS = ['S.No.', 'Name', 'CMP Rs.', 'P/E', 'Debt / Eq', 'Interest coverage', 'Quick Rat', 'Current ratio', 'Altman Z Scr', 'Debtor days 3yrs', 'Cont Liab Rs.Cr.',
@@ -173,4 +174,46 @@ test('security: a warehouse id that is not a plain number never reaches the peer
   const out = JSON.parse((await callCompany({ fn }, 'PASUPTAC')).result.content[0].text);
   assert.equal(out.error, 'no_warehouse_id');
   assert.ok(seen.every(p => !p.includes('admin') && !p.startsWith('/api/')), 'no peers request: ' + seen);
+});
+
+// ---- request limits (CLAUDE.md section 3, A04): size, count and shape of what a caller may send
+const callBatch = (symbols, name = 'fundamentals_batch', f = fakeScreener({ hasConsolidated: true })) =>
+  handle(post({ jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name, arguments: name === 'diagnose' ? { symbol: symbols } : { symbols } } }), ENV, { fetch: f.fn, gap: 0 }).then(async r => ({ body: await r.json(), calls: f.calls }));
+
+test('limits: a malformed percent escape in the address is refused with 401, not a crash', async () => {
+  const res = await handle(post({ jsonrpc: '2.0', id: 1, method: 'ping' }, '/mcp/%E0%A4%A'), ENV);
+  assert.equal(res.status, 401);
+});
+
+test('limits: a request body over the size limit is refused with 413 before it is parsed', async () => {
+  const big = { jsonrpc: '2.0', id: 1, method: 'ping', pad: 'x'.repeat(MAX_BODY_BYTES) };
+  assert.equal((await handle(post(big), ENV)).status, 413);
+  const declared = new Request('https://w.example/mcp/' + ENV.MCP_TOKEN, { method: 'POST', body: '{}', headers: { 'Content-Length': String(MAX_BODY_BYTES + 1) } });
+  assert.equal((await handle(declared, ENV)).status, 413, 'a declared length over the limit is refused too');
+  assert.equal((await handle(post({ jsonrpc: '2.0', id: 1, method: 'ping' }), ENV)).status, 200, 'a normal request still works');
+});
+
+test('limits: too many symbols, or a symbol of the wrong shape, is an error and Screener is never contacted', async () => {
+  const cases = [Array.from({ length: MAX_SYMBOLS + 1 }, () => 'TCS'), ['../admin'], ['A B'], ['x'.repeat(MAX_SYMBOL_LENGTH + 1)], ['TCS', { a: 1 }], ['TCS', 5], ['a/b'], ['a?b=1'], ['<img>']];
+  for(const symbols of cases){
+    const { body, calls } = await callBatch(symbols);
+    assert.equal(body.result.isError, true, JSON.stringify(symbols).slice(0, 60));
+    assert.deepEqual(calls, [], 'no request to Screener');
+  }
+  const one = await callBatch('../admin', 'diagnose');
+  assert.equal(one.body.result.isError, true); assert.deepEqual(one.calls, []);
+});
+
+test('limits: NSE tickers with & . - _ and numeric BSE codes are accepted; blanks are dropped', async () => {
+  const { body, calls } = await callBatch(['M&M', 'BAJAJ-AUTO', 'GESHIP', '500325', 'AB_C.D', '  ', '']);
+  const out = JSON.parse(body.result.content[0].text);
+  assert.equal(out.processed, 5);
+  assert.ok(calls.length > 0);
+});
+
+test('limits: exactly the largest allowed symbol list is processed', async () => {
+  const symbols = Array.from({ length: MAX_SYMBOLS }, () => 'A'.repeat(MAX_SYMBOL_LENGTH));
+  const { body } = await callBatch(symbols);
+  const out = JSON.parse(body.result.content[0].text);
+  assert.equal(out.processed + out.remaining.length, MAX_SYMBOLS);
 });
