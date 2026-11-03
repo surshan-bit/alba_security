@@ -1,6 +1,8 @@
-# Alba Agent (paper trading)
+# Rocky (paper trading)
 
-Paper-trading swing agent on the Alba dashboard's Positive MoS list. No real orders, ever.
+Persona and mandate: see PERSONA.md.
+
+Rocky is the paper-trading swing agent on the Alba dashboard's Positive MoS list. No real orders, ever.
 
 | File | What |
 |---|---|
