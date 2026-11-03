@@ -7,7 +7,8 @@ Modes (all file based; WORK dir holds the JSON docs):
 """
 import json,glob,sys,os,math,datetime as dt
 CAP=1_000_000; RISK=0.01; MAXPOS=8; POSCAP=0.125; COST=0.005  # round-trip costs+slippage
-TARGET=10.0; TIME_DAYS=30; MAX_PER_GROUP=2
+TIME_DAYS=30; MAX_PER_GROUP=2   # TIME_DAYS: legacy positions opened before the 1:3 gate
+RR_MIN=3.0; GATE_DAYS=70       # 1:3 gate: target = RR_MIN x stop distance; new positions may run 70 days (10 weeks, as tested)
 REGIME_MIN=0.6   # market filter: new entries only while at least this share of the universe has a positive 1-month change
 FEATS=['fund','mos','trend','rsi','mom','near']
 W0={'fund':1.0,'mos':1.0,'trend':1.5,'rsi':0.7,'mom':0.8,'near':0.8}
@@ -93,6 +94,17 @@ def regime(live,comp,minimum=REGIME_MIN):
     b=sum(1 for x in ch if x>0)/len(ch)
     return {'breadth':round(b,3),'n':len(ch),'min':minimum,'on':b>=minimum}
 
+def trade_plan(r,hi):
+    """Entry, stop, target for candidate r under the 1:3 gate. Returns (plan, reason); reason is None when the gate passes.
+    Stop distance = ATR-based, clipped 4.5-9%. Target = entry + RR_MIN x risk. Gate: the 40-week high must leave room for the
+    target, or the stock must already be within 3% of that high (breakout, no overhead). No high on record -> rejected."""
+    atr=r['atr'] or 6.0; sp=clip(atr*0.9,4.5,9.0)
+    entry=r['close']*(1+COST/2); stop=entry*(1-sp/100); target=entry+RR_MIN*(entry-stop)
+    p={'entry':round(entry,2),'stop':round(stop,2),'target':round(target,2),'sp':round(sp,2),'hi':hi}
+    if not hi: return p,'no 40-week high on record'
+    if hi>=target or entry>=0.97*hi: return p,None
+    return p,'40-week high %.0f is below the %.0f target'%(hi,target)
+
 def daily(work,nifty=None):
     comp=J(work+'/agent/compact.json')['stocks']; wts=J(work+'/agent/weights.json',{'w':W0,'v':0})['w']
     live={}
@@ -112,7 +124,7 @@ def daily(work,nifty=None):
         why=None
         if c<=p['stop']: why='stop'
         elif c>=p['target']: why='target'
-        elif held>=TIME_DAYS: why='time'
+        elif held>=p.get('maxd',TIME_DAYS): why='time'
         if why:
             exitp=c*(1-COST/2); pnl=(exitp-p['entry'])*p['q']
             st['cash']+=exitp*p['q']
@@ -131,31 +143,33 @@ def daily(work,nifty=None):
     rows.sort(key=lambda r:-r['score'])
     held={p['k'] for p in keep}; gcount={}
     for p in keep: gcount[p['g']]=gcount.get(p['g'],0)+1
-    picks=[]
+    picks=[]; gated=[]
     for r in rows:
         if r['blocks'] or r['k'] in held: continue
         if gcount.get(r['g'],0)>=MAX_PER_GROUP: continue
         if r['score']<6.0: continue
+        plan,why=trade_plan(r,comp[r['k']].get('hi'))
+        if why:
+            gated.append({**{k:r[k] for k in('k','n','g','close','score')},'stop':plan['stop'],'target':plan['target'],'why':why}); continue
+        r['plan']=plan
         picks.append(r); gcount[r['g']]=gcount.get(r['g'],0)+1
         if len(picks)>=MAXPOS: break
     # 3) open new paper positions
     reg=regime(live,comp)
     slots=(MAXPOS-len(keep)) if reg['on'] else 0; new=[]   # risk-off: manage exits, open nothing
     for r in picks[:max(slots,0)]:
-        atr=r['atr'] or 6.0
-        sp=clip(atr*0.9,4.5,9.0)   # stop distance %, ~weekly range
-        entry=r['close']*(1+COST/2)
-        q=int(min(eq*RISK/(entry*sp/100), eq*POSCAP/entry, st['cash']/entry))
+        pl=r['plan']; entry=pl['entry']
+        q=int(min(eq*RISK/(entry-pl['stop']), eq*POSCAP/entry, st['cash']/entry))
         if q<1: continue
         st['cash']-=q*entry
-        pos={'k':r['k'],'n':r['n'],'g':r['g'],'d':day,'entry':round(entry,2),'q':q,'stop':round(entry*(1-sp/100),2),'target':round(entry*(1+TARGET/100),2),'f':r['f'],'last':r['close']}
+        pos={'k':r['k'],'n':r['n'],'g':r['g'],'d':day,'entry':entry,'q':q,'stop':pl['stop'],'target':pl['target'],'rr':RR_MIN,'maxd':GATE_DAYS,'f':r['f'],'last':r['close']}
         st['open'].append(pos); new.append(pos)
     eq=st['cash']+sum(p.get('last',p['entry'])*p['q'] for p in st['open'])
     ub=[px[k] for k in comp if k in px]
     st['curve']=[x for x in st['curve'] if x[0]!=day]+[[day,round(eq,0),nifty]]
     st['metrics']=metrics(st)
     S(work+'/agent/state.json',st)
-    S(work+'/agent/picks.json',{'asof':day,'dataAsof':asof,'weightsVersion':J(work+'/agent/weights.json',{'v':0})['v'],'top':rows[:15],'picks':[{k:r[k] for k in('k','n','g','close','score','mos','rsiW')} for r in picks],'new':new,'regime':reg,'universe':len(rows),'blocked':sum(1 for r in rows if r['blocks'])})
+    S(work+'/agent/picks.json',{'asof':day,'dataAsof':asof,'weightsVersion':J(work+'/agent/weights.json',{'v':0})['v'],'top':rows[:15],'picks':[{**{k:r[k] for k in('k','n','g','close','score','mos','rsiW')},'stop':r['plan']['stop'],'target':r['plan']['target']} for r in picks],'gated':gated,'new':new,'regime':reg,'universe':len(rows),'blocked':sum(1 for r in rows if r['blocks'])})
     log=[l for l in log if l['d']!=day]+[{'d':day,'equity':round(eq),'open':len(st['open']),'new':[p['k'] for p in new],'closed':[c['k']+':'+c['why'] for c in st['closed'] if c['xd']==day],'regime':reg['on'],'breadth':reg['breadth']}]
     S(work+'/agent/log.json',{'items':log[-120:]})
     print('equity',round(eq),'open',len(st['open']),'new',[p['k'] for p in new],'dataAsof',asof,'regime',reg)

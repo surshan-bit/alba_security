@@ -44,3 +44,6 @@ Weekly: also copy `stockData`, `barsRecent`; run `build` (expect 400-500 stocks,
 - Breakout-on-volume and relative-strength entries were no better than the base entry (trend + RSI + momentum + near highs); the pullback entry had too few trades.
 - Everything still trails an equal-weight buy-and-hold of the same stocks (+192%) in this small-cap bull window. Treat as "less bad", not "proven edge".
 - Live: `REGIME_MIN = 0.6` in agent.py (no new entries when fewer than 60% of the scored universe is up over 1 month; exits still run).
+
+## 1:3 gate (live)
+`trade_plan()` in agent.py: stop = ATR-based 4.5-9%, target = entry + 3 x risk, accepted only if the 40-week high (compact `hi`) >= target or entry is within 3% of that high; no high on record -> rejected. Rejected stocks are listed in picks.json `gated` and on the dashboard. New positions carry `maxd` = 70 days; positions opened before the gate keep the old +10% target and 30-day limit.

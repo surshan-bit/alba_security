@@ -11,7 +11,7 @@ def row(k, close, **kw):
     for i, v in kw.items(): c[int(i[1:])] = v
     return {'k': k, 'c': c}
 
-def comp(k, g='G1', iv=200, sc=8, vd='buy', atr=5.0, hi=110):
+def comp(k, g='G1', iv=200, sc=8, vd='buy', atr=5.0, hi=200):
     return {'n': k, 'g': g, 'sc': sc, 'vd': vd, 'iv': iv, 'atr': atr, 'hi': hi}
 
 class Env:
@@ -48,7 +48,7 @@ class Entries(unittest.TestCase):
     def test_opens_pick_with_risk_sizing_and_cost(self):
         e = Env({'A': comp('A')}, [row('A', 100)]); r = e.run(); p = r['state']['open'][0]
         self.assertAlmostEqual(p['entry'], round(100 * (1 + A.COST / 2), 2))
-        self.assertAlmostEqual(p['target'] / p['entry'] - 1, A.TARGET / 100, places=2)
+        self.assertAlmostEqual((p['target'] - p['entry']) / (p['entry'] - p['stop']), A.RR_MIN, places=1)
         sp = 1 - p['stop'] / p['entry']
         self.assertTrue(.045 - 1e-3 <= sp <= .09 + 1e-3)
         self.assertLessEqual(p['q'] * p['entry'], A.CAP * A.POSCAP + p['entry'])
@@ -81,6 +81,31 @@ class Blocks(unittest.TestCase):
     def test_results_far_away_ok(self):
         ts = (dt.datetime.fromisoformat(DAY) + dt.timedelta(days=30)).replace(tzinfo=dt.timezone.utc).timestamp()
         self.assertFalse(self.blocked(c11=ts))
+
+class Gate(unittest.TestCase):
+    def run1(self, hi, close=100, atr=5.0):
+        return Env({'A': comp('A', hi=hi, atr=atr)}, [row('A', close)]).run()
+    def test_target_is_three_times_stop_distance(self):
+        p = self.run1(200)['state']['open'][0]; self.assertAlmostEqual((p['target'] - p['entry']) / (p['entry'] - p['stop']), 3.0, places=1); self.assertEqual(p['maxd'], A.GATE_DAYS)
+    def test_rejects_when_high_leaves_no_room(self):
+        r = self.run1(110); self.assertEqual(r['state']['open'], []); self.assertEqual(r['picks']['picks'], [])
+        g = r['picks']['gated'][0]; self.assertEqual(g['k'], 'A'); self.assertIn('below', g['why'])
+    def test_accepts_breakout_near_the_high(self):
+        self.assertEqual(len(self.run1(101)['state']['open']), 1)           # entry within 3% of the 40-week high: no overhead
+    def test_rejects_when_no_high_on_record(self):
+        r = self.run1(None); self.assertEqual(r['state']['open'], []); self.assertIn('no 40-week high', r['picks']['gated'][0]['why'])
+    def test_volatile_stock_uses_9pct_stop_and_wider_target(self):
+        p = self.run1(300, atr=20)['state']['open'][0]; self.assertAlmostEqual(1 - p['stop'] / p['entry'], .09, places=2); self.assertAlmostEqual(p['target'] / p['entry'] - 1, .27, places=2)
+    def test_gated_stock_does_not_use_a_group_slot(self):
+        stocks = {'A': comp('A', g='SAME', hi=110), 'B': comp('B', g='SAME'), 'C': comp('C', g='SAME'), 'D': comp('D', g='SAME')}
+        r = Env(stocks, [row(k, 100) for k in stocks]).run(); self.assertEqual(len(r['state']['open']), A.MAX_PER_GROUP)
+    def test_new_position_runs_to_70_days_legacy_to_30(self):
+        new = pos('N', d=days_ago(40)); new['maxd'] = A.GATE_DAYS; old = pos('O', d=days_ago(40))
+        s = Env({}, [row('N', 100), row('O', 100)], st([new, old], cash=0)).run()['state']
+        self.assertEqual([c['k'] for c in s['closed']], ['O']); self.assertEqual([p['k'] for p in s['open']], ['N'])
+    def test_trade_plan_reasons(self):
+        r = {'close': 100, 'atr': 5.0}
+        self.assertIsNone(A.trade_plan(r, 200)[1]); self.assertIsNotNone(A.trade_plan(r, 105)[1]); self.assertIsNotNone(A.trade_plan(r, None)[1])
 
 class Regime(unittest.TestCase):
     def mk(self, up, n=40):

@@ -18,10 +18,10 @@
 ## Gap vs current code (agent.py)
 | Persona | Code today |
 |---|---|
-| Reward:risk >= 1:2.5-3 | Fixed +10% target, 4.5-9% stop = about 1.1-2.2 : 1. Fails the rule. |
-| Target 1 / Target 2, ride the big move | Single +10% target, 30-day time exit |
+| Reward:risk >= 1:2.5-3 | **Done (v: 1:3 gate).** Stop 4.5-9% by volatility, target = 3x stop distance, rejected unless the 40-week high leaves room (or the stock is within 3% of it). |
+| Target 1 / Target 2, ride the big move | Single 3R target, 70-day time exit; no Target 1 / scale-out or trailing stop yet |
 | 50-day SMA trend filter | Weekly/monthly MA vs signal line only |
-| Market -> sector -> stock confluence | No market-regime or sector-strength test; only a 2-per-group cap |
+| Market -> sector -> stock confluence | Market regime filter done (>=60% of universe up over 1 month); no sector-strength test yet; 2-per-group cap |
 | Catalyst required | Only blocks results within 7 days; no positive catalyst |
 | Volume surge | Thin-trading block only |
 | Auditor check (CFO vs profit, dilution, debt maturity) | Fundamental score + "Avoid" verdict; not checked individually |
