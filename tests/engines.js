@@ -817,6 +817,55 @@ test('boot(): it loads the stock list, hands it over and starts the app, with th
   } finally { for(const k of ['__bootDebug', '__bootHanded', '__bootTouched', '__bootMainLoaded']) delete globalThis[k]; }
 }));
 
+// ---- bars whose width is computed: the width travels as data-css (--w), never as an inline style (CLAUDE.md section 2)
+test('rocky: each learned weight gets a bar whose width is its share of the largest weight, and a non-number gets none', async () => {
+  globalThis.__rockyTest = { noDb: false, ready: true, state: { curve: [], closed: [], open: [] }, picks: null, learn: null, weights: { v: 3, w: { momentum: 3, value: 1.5, odd: 'x' } } };
+  try {
+    const { rockyHtml } = await loadWithStubs('src/rocky/render.js', '', { './store.js': 'export const rocky = globalThis.__rockyTest;' });
+    const bars = Array.from(rockyHtml().matchAll(/<div class="rky-bar"><span>(\w+)<\/span><i data-css="--w:(\d+)%"><\/i>/g), m => [m[1], Number(m[2])]);
+    assert.deepStrictEqual(bars, [['momentum', 60], ['value', 30], ['odd', 0]]);
+    assert.ok(!/style=/.test(rockyHtml()), 'no inline style anywhere on the page');
+  } finally { delete globalThis.__rockyTest; }
+});
+
+test('data refresh: the freshness bars scale to the fullest bucket, an empty bucket has no bar, a tiny one is still visible', () => withPage(
+  '<div id="fundFreshnessSummary"></div><div id="fundFreshnessBars"></div><div id="techFreshnessSummary"></div><div id="techFreshnessBars"></div>', async (win) => {
+  const day = 86400000, ago = n => new Date(Date.now() - n * day).toISOString().slice(0, 10);
+  // 40 stocks refreshed 5 days ago ("4-7 days"), one 20 days ago ("15-30 days"), one with a date nobody can read
+  globalThis.__freshStocks = [...Array(40).fill(0).map(() => ({ asof: ago(5) })), { asof: ago(20) }, { asof: 'not a date' }];
+  try {
+    const F = await loadWithStubs('src/joblogs/freshness.js', '', { 'core/stocks.js': 'export const stocks = globalThis.__freshStocks;' });
+    F.paintFreshness();
+  } finally { delete globalThis.__freshStocks; }
+  const bars = win.document.getElementById('fundFreshnessBars'), rows = Array.from(bars.querySelectorAll('.refreshlog-freshness-row'));
+  const fill = r => r.querySelector('.refreshlog-freshness-fill');
+  assert.deepStrictEqual(rows.map(r => [r.querySelector('.refreshlog-freshness-label').textContent, fill(r).style.getPropertyValue('--w')]),
+    [['Today', '0%'], ['1–3 days', '0%'], ['4–7 days', '100%'], ['8–14 days', '0%'], ['15–30 days', '3%'], ['31+ days', '0%']]);
+  assert.ok(rows.every(r => !fill(r).hasAttribute('data-css')), 'the data-css attribute is consumed');
+  assert.match(win.document.getElementById('fundFreshnessSummary').textContent, /1 stock with no parseable refresh date/);
+}));
+
+test('data refresh: a sync run shows its note muted and its error and dropped tickers in the warning colour, all as text', () => withPage('<div id="watchlistSyncLogRuns"></div>', async (win) => {
+  const render = async runs => {
+    globalThis.__syncRuns = runs;
+    try {
+      const P = await loadWithStubs('src/joblogs/panels.js', '', { 'core/store.js': 'export const getDb = () => true; export const watchlistSyncLog = { values: () => globalThis.__syncRuns, entries: () => [], remove: () => {} };' });
+      P.renderWatchlistSyncLogPanel();
+    } finally { delete globalThis.__syncRuns; }
+    return win.document.getElementById('watchlistSyncLogRuns');
+  };
+  const boxes = (el, cls) => Array.from(el.querySelectorAll('.refreshlog-run-stats--' + cls), n => n.textContent.trim());
+  let el = await render([{ startedAt: '2026-10-30T10:00:00+05:30', status: 'partial', note: 'Used the cache', error: 'TradingView said no', droppedTickers: ['AAA', 'BBB'] }]);
+  assert.deepStrictEqual(boxes(el, 'muted'), ['Used the cache']);
+  assert.deepStrictEqual(boxes(el, 'bad'), ['TradingView said no', "Dropped by TradingView, couldn't be resolved: AAA, BBB"]);
+  assert.strictEqual(el.querySelector('[style]'), null, 'no inline style on the run');
+  el = await render([{ startedAt: '2026-10-30T10:00:00+05:30', status: 'completed' }]);
+  assert.deepStrictEqual([boxes(el, 'muted'), boxes(el, 'bad')], [[], []], 'a clean run has neither');
+  el = await render([{ startedAt: '2026-10-30T10:00:00+05:30', status: 'failed', note: '<img src=x onerror=alert(1)>', error: '<b>boom</b>', droppedTickers: ['<i>X</i>'] }]);
+  assert.strictEqual(el.querySelector('img, b, i'), null, 'markup in a run record stays text');
+  assert.match(el.textContent, /<img src=x onerror=alert\(1\)>/);
+}));
+
 // =========================================================== safe markup sink (src/core/safehtml.js): markup text becomes elements without script-capable parts
 {
   const { JSDOM } = require('jsdom');
