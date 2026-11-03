@@ -1,0 +1,27 @@
+/* Rocky page (paper-trading swing agent). Bundled in file-name order into styles.css. */
+.rky-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+.rky-stamp{font-size:var(--t-sm);color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+.rky-sub{font-size:var(--t-sm);color:var(--muted);margin:4px 0;}
+.rky-empty{font-size:var(--t-sm);color:var(--muted);margin:8px 0;}
+.rky-sec{font:700 .72rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px;}
+.rky-h3{font:700 .84rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);margin:14px 0 6px;}
+.rky-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;}
+.rky-tile{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0;}
+.rky-tile b{font-size:var(--t-xs);font-weight:600;color:var(--muted);}
+.rky-tile span{font-size:var(--t-md);font-weight:700;font-variant-numeric:tabular-nums;}
+.rky-up{color:var(--buy);}
+.rky-dn{color:var(--avoid);}
+.rky-curve{width:100%;height:150px;display:block;}
+.rky-curve path{stroke-width:2;}
+.rky-curve .rky-agent{stroke:var(--accent);}
+.rky-curve .rky-nifty{stroke:var(--muted);stroke-dasharray:5 4;}
+.rky-curve .rky-base{stroke:var(--line);stroke-dasharray:4 4;}
+.rky-key{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;}
+.rky-key-agent{background:var(--accent);}
+.rky-key-nifty{background:var(--muted);}
+.rky-table td b{font-weight:700;}
+.rky-bar{display:flex;align-items:center;gap:8px;margin:3px 0;}
+.rky-bar i{display:block;height:8px;background:var(--accent);border-radius:4px;}
+.rky-bar span{width:60px;color:var(--muted);font-size:var(--t-sm);}
+.rky-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+.rky-note{border-left:3px solid var(--accent);padding:8px 12px;background:var(--panel2);border-radius:0 8px 8px 0;color:var(--muted);font-size:var(--t-sm);margin:18px 0 0;line-height:1.45;}

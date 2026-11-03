@@ -17,6 +17,7 @@
 @import "./strategies.css" layer(legacy);
 @import "./business.css" layer(legacy);
 @import "./news.css" layer(legacy);
+@import "./rocky.css" layer(legacy);
 @import "./activity.css" layer(legacy);
 @import "./phone.css" layer(legacy);
 @import "./theme-light.css" layer(legacy);
