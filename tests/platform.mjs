@@ -110,8 +110,16 @@ import { readFileSync } from 'node:fs';
   const miss = await a.read('U1/gone'); eq('read: a missing file answers 404 like /_blob/', [miss.ok, miss.status], [false, 404]);
   await a.delete('U1/ok'); eq('delete', log[log.length - 1], ['remove', ['U1/ok']]);
   const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
-  eq('schema: the file bucket is created private', /values \('assets', 'assets', false\)/.test(schema) && /set public = false/.test(schema) && !/'assets', 'assets', true/.test(schema), true);
+  eq('schema: the file bucket is created private', /values \('assets', 'assets', false,/.test(schema) && /set public = false/.test(schema) && !/'assets', 'assets', true/.test(schema), true);
   eq('migration for existing projects makes it private', /update storage\.buckets set public = false where id = 'assets'/.test(readFileSync(new URL('../supabase/003_private_assets.sql', import.meta.url), 'utf8')), true);
+  // The bucket accepts only what the app uploads (CSV files, see src/import/upload-history.js) and caps their size (CLAUDE.md section 3, A04).
+  const LIMIT_BYTES = 10485760, limits = readFileSync(new URL('../supabase/004_assets_limits.sql', import.meta.url), 'utf8');
+  const uploader = readFileSync(new URL('../src/import/upload-history.js', import.meta.url), 'utf8');
+  eq('schema: the bucket caps the size of a file', schema.includes("file_size_limit") && schema.includes(String(LIMIT_BYTES)), true);
+  eq('schema: the bucket accepts only CSV files', /allowed_mime_types[^;]*array\['text\/csv'\]/.test(schema), true);
+  eq('schema: a re-run keeps the limits in force', /on conflict \(id\) do update set public = false, file_size_limit = \d+, allowed_mime_types = array\['text\/csv'\]/.test(schema), true);
+  eq('migration for existing projects sets the same limits', limits.includes('file_size_limit = ' + LIMIT_BYTES) && /allowed_mime_types = array\['text\/csv'\]/.test(limits) && /where id = 'assets'/.test(limits), true);
+  eq('the app uploads CSV text, which the bucket accepts', /new Blob\(\[text\], \{ type: 'text\/csv' \}\)/.test(uploader), true);
 }
 
 // CORS for the private functions: only the listed pages are answered, never a wildcard

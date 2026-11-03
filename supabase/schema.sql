@@ -78,10 +78,12 @@ drop policy if exists profile_read_own on public.profiles;
 create policy profile_read_own on public.profiles for select to authenticated using (uid = auth.uid());
 -- no insert / update policy: profiles change only through the trigger above, the payment webhook (service key) or the owner in the dashboard.
 
--- file storage: a PRIVATE bucket for uploads (CSV files and full backups of the stock list). Each person reaches only their own
+-- file storage: a PRIVATE bucket for uploads (CSV files of the fundamental import). Each person reaches only their own
 -- folder, using their own sign-in; there are no public links (the app reads files through the storage API, see platform/shim.js).
-insert into storage.buckets (id, name, public) values ('assets', 'assets', false)
-  on conflict (id) do update set public = false;
+-- Only CSV text up to 10 MiB is accepted, so a signed-in user cannot fill the project with other files or very large ones.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('assets', 'assets', false, 10485760, array['text/csv'])
+  on conflict (id) do update set public = false, file_size_limit = 10485760, allowed_mime_types = array['text/csv'];
 drop policy if exists assets_own on storage.objects;
 create policy assets_own on storage.objects for all to authenticated
   using (bucket_id = 'assets' and (storage.foldername(name))[1] = auth.uid()::text)
