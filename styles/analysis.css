@@ -102,7 +102,7 @@ body.lb-full-open{overflow:hidden;}
 /* Analysis dot tooltip (added 2026-09-30): a custom HTML tooltip (not the SVG native <title>,
      which only appears after a ~1s browser delay) that follows the cursor and shows stock
      details on hover, before the person decides whether to click through. */
-.analysis-tooltip{position:fixed;z-index:60;display:none;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-sm);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.35);min-width:180px;max-width:240px;}
+.analysis-tooltip{position:fixed;left:var(--x,0);top:var(--y,0);z-index:60;display:none;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-sm);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.35);min-width:180px;max-width:240px;}
 .analysis-tooltip.show{display:block;}
 .analysis-pinned-mark{color:var(--hold);}
 .rk-headline .biz-showing--flush{margin:0;}

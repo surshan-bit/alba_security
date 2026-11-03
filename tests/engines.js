@@ -2093,6 +2093,73 @@ test('activity panel: a page without the bell is left alone', () => withPage('',
   assert.doesNotThrow(() => { A.init_ui_activity(); A.activityRun('x', { title: 't' }); A.activityNotify({ tone: 'ok', title: 't' }); });
 }));
 
+// ---- floating cards (Analysis hover card, refresh menu): their place is --x / --y, never inline left / top (CLAUDE.md section 2)
+const TOOLTIP_STUBS = { 'core/stocks.js': "export const stocks = [{ name: '<b>Alpha</b>', ticker: 'ALPHA', verdict: 'buy', score: 7.25, technical: { raw: { weekRsi: 55.5, monthRsi: 60.25 } }, valuation: { currentPrice: 1234.5 } }, { name: 'Beta', ticker: 'BETA', verdict: 'avoid', score: null, technical: { raw: { weekRsi: 40, monthRsi: 45 } }, valuation: null }]; export const verdictLabel = { buy: 'Strong', avoid: 'Avoid' };",
+  'core/pins.js': "export const isPinned = s => s.ticker === 'ALPHA';", 'list/metrics.js': 'export const mosPct = s => (s.valuation ? 12.34 : -Infinity);' };
+test('analysis hover card: it follows the pointer as --x / --y, flips at the screen edge, never leaves the screen, and shows the stock as text', () => withPage('<div id="analysisTooltip"></div>', async (win) => {
+  const T = await loadWithStubs('src/analysis/tooltip.js', '', TOOLTIP_STUBS);
+  const el = win.document.getElementById('analysisTooltip'), saved = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { value: { innerWidth: 500, innerHeight: 400 }, configurable: true, writable: true });
+  el.getBoundingClientRect = () => ({ width: 100, height: 60 });
+  try {
+    assert.ok(T.TOOLTIP_HTML.includes('id="analysisTooltip"'));
+    const tip = T.createAnalysisTooltip(), at = (x, y) => (tip.position({ clientX: x, clientY: y }), [el.style.getPropertyValue('--x'), el.style.getPropertyValue('--y')]);
+    assert.deepStrictEqual(at(100, 100), ['116px', '116px'], 'beside the pointer');
+    assert.deepStrictEqual(at(450, 380), ['334px', '304px'], 'flipped to the left and above near the right and bottom edges');
+    assert.deepStrictEqual(at(10, 10), ['26px', '26px']);
+    el.getBoundingClientRect = () => ({ width: 700, height: 60 });
+    assert.strictEqual(at(480, 50)[0], '8px', 'never further left than 8px');
+    assert.ok(!el.hasAttribute('style') || !/(^|;)\s*(left|top)\s*:/.test(el.getAttribute('style')), 'only custom properties, no inline left or top');
+    el.getBoundingClientRect = () => ({ width: 100, height: 60 });
+    tip.show({ clientX: 100, clientY: 100 }, { name: '<b>Alpha</b>', ticker: 'ALPHA', verdict: 'buy', score: 7.25, technical: { raw: { weekRsi: 55.5, monthRsi: 60.25 } }, valuation: { currentPrice: 1234.5 } });
+    assert.ok(el.classList.contains('show') && el.querySelector('.analysis-pinned-mark'), 'shown, and a pinned stock is marked');
+    assert.strictEqual(el.querySelector('.analysis-tooltip-name b'), null, 'a stock name is text, never markup');
+    assert.ok(/₹1,234.5/.test(el.textContent) && /\+12\.3%/.test(el.textContent) && /7\.3|7\.2/.test(el.textContent));
+    tip.show({ clientX: 1, clientY: 1 }, { name: 'Beta', ticker: 'BETA', verdict: 'avoid', score: null, technical: { raw: { weekRsi: 40, monthRsi: 45 } }, valuation: null });
+    assert.ok(/n\/a/.test(el.textContent) && /—/.test(el.textContent) && !el.querySelector('.analysis-pinned-mark'), 'no score, no price, no MoS, not pinned');
+    tip.hide(); assert.ok(!el.classList.contains('show'));
+    // the delegated dot events
+    const group = win.document.createElement('div'); group.innerHTML = '<circle class="analysis-dot" data-idx="1"></circle><i class="other"></i>';
+    const log = []; T.wireDotEvents(group, { show: (e, st) => log.push('show ' + st.name), position: () => log.push('move'), hide: () => log.push('hide') }, i => log.push('open ' + i));
+    const fire = (sel, type) => group.querySelector(sel).dispatchEvent(new win.MouseEvent(type, { bubbles: true }));
+    for(const sel of ['.other', '.analysis-dot']) for(const t of ['mouseover', 'mousemove', 'mouseout', 'click']) fire(sel, t);
+    assert.deepStrictEqual(log, ['show Beta', 'move', 'hide', 'hide', 'open 1'], 'only the dots react');
+  } finally { if(saved) Object.defineProperty(globalThis, 'window', saved); else delete globalThis.window; }
+}));
+test('refresh menu: it opens under its button (or above it, or in the middle with no button) as --x / --y, and is closed and refilled cleanly', () => withPage('<button id="anchor" type="button">Refresh</button>', async (win) => {
+  const M = await loadWithStubs('src/refresh/kit-menu.js', '', {});
+  const doc = win.document, anchor = doc.getElementById('anchor'), saved = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { value: { innerWidth: 1000, innerHeight: 800 }, configurable: true, writable: true });
+  const protoRect = win.Element.prototype.getBoundingClientRect;
+  let anchorRect = { left: 50, right: 150, top: 80, bottom: 100, width: 100, height: 20 };
+  win.Element.prototype.getBoundingClientRect = function(){ return this.id === 'anchor' ? anchorRect : { left: 0, right: 200, top: 0, bottom: 300, width: 200, height: 300 }; };
+  const place = () => [M.menuQuery('.rk-btn') ? 1 : 0, doc.querySelector('.rk-menu').style.getPropertyValue('--x'), doc.querySelector('.rk-menu').style.getPropertyValue('--y')];
+  try {
+    assert.deepStrictEqual([M.menuIsOpen(), M.menuQuery('x'), M.menuQueryAll('x')], [false, null, []]);
+    M.closeMenu(true); M.refillMenu('<p>nothing open</p>');
+    assert.strictEqual(M.item('go', 'data-x="1"', 'Go', 'small text', true).includes('disabled'), true);
+    assert.strictEqual(M.item('go', '', 'Go').includes('<small>'), false);
+    M.openMenu(anchor, '<button class="rk-btn" type="button">One</button><input id="i">', { kind: 'fund' });
+    assert.deepStrictEqual(place(), [1, '50px', '106px'], 'under the button, left edges aligned');
+    assert.ok(!/(^|;)\s*(left|top)\s*:/.test(doc.querySelector('.rk-menu').getAttribute('style') || ''), 'no inline left or top');
+    assert.deepStrictEqual([anchor.getAttribute('aria-expanded'), M.menuIsOpen(), M.menuOpenAt(anchor), M.getMenuAnchor() === anchor, M.getMenuState()], ['true', true, true, true, { kind: 'fund' }]);
+    assert.strictEqual(doc.activeElement.className, 'rk-btn', 'focus moves into the menu');
+    anchorRect = { left: 900, right: 990, top: 700, bottom: 780, width: 90, height: 80 };
+    M.refillMenu('<button class="rk-btn" type="button">Two</button>');
+    assert.deepStrictEqual([doc.querySelector('.rk-menu').style.getPropertyValue('--x'), doc.querySelector('.rk-menu').style.getPropertyValue('--y')], ['792px', '394px'], 'kept on screen: shifted left and flipped above the button');
+    M.closeMenu(false); assert.deepStrictEqual([doc.querySelector('.rk-menu'), anchor.getAttribute('aria-expanded'), M.menuIsOpen(), M.menuOpenAt(anchor)], [null, 'false', false, false]);
+    M.openMenu(anchor, '<p>no buttons</p>'); assert.ok(M.menuIsOpen(), 'a menu with nothing to focus still opens');
+    M.closeMenu(true); assert.strictEqual(doc.activeElement, anchor, 'closing can give focus back to the button');
+    M.openMenu(null, '<button type="button">Free</button>');
+    assert.deepStrictEqual([doc.querySelector('.rk-menu').style.getPropertyValue('--x'), doc.querySelector('.rk-menu').style.getPropertyValue('--y')], ['400px', '166.66666666666666px'], 'with no button it opens in the middle of the window');
+    assert.strictEqual(M.getMenuState().constructor, Object);
+    M.closeMenu(false);
+    anchor.remove(); M.openMenu(anchor, '<button type="button">Detached</button>');
+    assert.strictEqual(doc.querySelector('.rk-menu').style.getPropertyValue('--x'), '400px', 'a button that left the page counts as none');
+    M.closeMenu(false);
+  } finally { win.Element.prototype.getBoundingClientRect = protoRect; if(saved) Object.defineProperty(globalThis, 'window', saved); else delete globalThis.window; }
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

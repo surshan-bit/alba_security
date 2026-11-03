@@ -14,14 +14,14 @@ function placeMenu() {
   if (!menuEl) return;
   const m0 = menuEl.getBoundingClientRect();
   if (!menuAnchor || !menuAnchor.isConnected) {
-    menuEl.style.left = Math.max(8, (window.innerWidth - m0.width) / 2) + "px"; menuEl.style.top = Math.max(8, (window.innerHeight - m0.height) / 3) + "px";
+    menuEl.style.setProperty("--x", Math.max(8, (window.innerWidth - m0.width) / 2) + "px"); menuEl.style.setProperty("--y", Math.max(8, (window.innerHeight - m0.height) / 3) + "px");
     return;
   }
   const r = menuAnchor.getBoundingClientRect(), m = m0;
   const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - m.width - 8));
   let top = r.bottom + 6;
   if (top + m.height > window.innerHeight - 8) top = Math.max(8, r.top - m.height - 6);
-  menuEl.style.left = left + "px"; menuEl.style.top = top + "px";
+  menuEl.style.setProperty("--x", left + "px"); menuEl.style.setProperty("--y", top + "px");
 }
 function openMenu(anchor, html, state) {
   closeMenu(false);

@@ -171,7 +171,7 @@ function initPriceChart(s){
     const label = k === '1W' ? 'Week of ' + fmtD(r[0], {day:'numeric', month:'short', year:'numeric'}) : fmtD(r[0], {month:'long', year:'numeric'});
     setHtml(tip, `<b>${label}</b><div class="r"><span>Open</span><span>${rs(r[1])}</span></div><div class="r"><span>High</span><span>${rs(r[2])}</span></div><div class="r"><span>Low</span><span>${rs(r[3])}</span></div><div class="r"><span>Close</span><span>${rs(r[4])}</span></div><div class="r"><span>Change</span><span>${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div><div class="r"><span>Volume</span><span>${vol(r[5])}</span></div>${macdTipHtml(k, G.off + i)}${eventTipHtml(byBar[k].get(G.off + i), barReaction(bars[k], G.off + i), k === '1W' ? 'week' : 'month')}`);
     const tw = /** @type {HTMLElement} */ (tip).offsetWidth, xx = G.X(i) * (rect.width / G.W);
-    /** @type {HTMLElement} */ (tip).style.left = Math.max(0, Math.min(rect.width - tw, xx + 14 + tw > rect.width ? xx - tw - 14 : xx + 14)) + 'px'; /** @type {HTMLElement} */ (tip).style.top = '6px'; /** @type {HTMLElement} */ (tip).style.opacity = '1';
+    /** @type {HTMLElement} */ (tip).style.setProperty('--x', Math.max(0, Math.min(rect.width - tw, xx + 14 + tw > rect.width ? xx - tw - 14 : xx + 14)) + 'px'); /** @type {HTMLElement} */ (tip).classList.add('is-shown');
   }
   // Colour of a news tag: green / red when all its labelled items agree, amber when they disagree, grey when neutral, purple when unlabelled.
   const sentimentOf = (list) => {
@@ -220,7 +220,7 @@ function initPriceChart(s){
     el.querySelectorAll('.pc-pill').forEach(btn => /** @type {HTMLElement} */ (btn).onclick = () => { state[k] = +/** @type {HTMLElement} */ (btn).dataset.i; el.querySelectorAll('.pc-pill').forEach(x => x.setAttribute('aria-pressed', String(x === btn))); draw(k); });
     const ch = el.querySelector('.pc-chart');
     ch.addEventListener('pointermove', e => { pend[k] = e; if(!raf[k]) raf[k] = requestAnimationFrame(() => { raf[k] = 0; if(pend[k]) onMove(k, pend[k]); }); });
-    ch.addEventListener('pointerleave', () => { pend[k] = null; delete hover[k]; drawBands(); /** @type {HTMLElement} */ (el.querySelector('.pc-tip')).style.opacity = '0'; el.querySelector('.pc-xh').setAttribute('opacity', '0'); });
+    ch.addEventListener('pointerleave', () => { pend[k] = null; delete hover[k]; drawBands(); /** @type {HTMLElement} */ (el.querySelector('.pc-tip')).classList.remove('is-shown'); el.querySelector('.pc-xh').setAttribute('opacity', '0'); });
   });
   order.forEach(draw);
   let rz; pcObserver = new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { if(root.isConnected) order.forEach(draw); }, 80); });
