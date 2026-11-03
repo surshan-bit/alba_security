@@ -57,7 +57,7 @@ function renderFundamentals(s){
             <div class="fund-subsection-title">${g.meta.label}</div>
             ${hasSub ? `<div class="fund-cell-score ${band}">${subscore.toFixed(1)}<span class="fund-cell-max">/10</span></div>` : '<div class="fund-cell-score fs-pending">Not scored</div>'}
           </div>
-          ${hasSub ? `<div class="fund-cell-bar"><i class="${band}" style="width:${Math.round(subscore*10)}%"></i></div>` : ''}
+          ${hasSub ? `<div class="fund-cell-bar"><i class="${band}" data-css="--w:${Math.round(subscore*10)}%"></i></div>` : ''}
           ${renderFundGrid(g.factors)}
         </div>
       `;

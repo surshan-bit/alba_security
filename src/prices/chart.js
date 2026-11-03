@@ -22,7 +22,7 @@ function renderPriceChartMount(s, sums){
   if(!pcHasData(s)) return '';
   return `<div class="pc-block${pcKeyOpen ? ' show-key' : ''}" id="priceChartBlock">
     <div class="pc-head"><button type="button" class="pc-keytoggle" id="pcKeyToggle" aria-expanded="${pcKeyOpen}">${pcKeyOpen ? 'Hide legend' : 'Legend'}</button></div>
-    <div class="pc-legend"><span><i style="background:var(--buy)"></i>Close above open</span><span><i style="background:var(--avoid)"></i>Close below open</span><span><i class="pc-vol"></i>Volume</span><span><i class="pc-lm"></i>MACD</span><span><i class="pc-ls"></i>MACD signal</span></div>
+    <div class="pc-legend"><span><i class="pc-up"></i>Close above open</span><span><i class="pc-down"></i>Close below open</span><span><i class="pc-vol"></i>Volume</span><span><i class="pc-lm"></i>MACD</span><span><i class="pc-ls"></i>MACD signal</span></div>
     ${renderEventToggles(s)}
     <div class="pc-panels"></div>
     <div class="pc-sums" hidden>${['1W', '1M'].map(k => `<div data-k="${k}">${sums && sums[k] || ''}</div>`).join('')}</div></div>`;
@@ -211,8 +211,11 @@ function initPriceChart(s){
   order.forEach(k => {
     const c = cfg[k]; state[k] = c.def;
     const el = document.createElement('div'); el.className = 'pc-panel'; el.dataset.k = k;
-    setHtml(el, `<div class="pc-ph"><div class="pc-ptitle">${c.title}<small>${bars[k].length} bars</small></div><div class="pc-psum">${(root.querySelector('.pc-sums [data-k="' + k + '"]') || {}).innerHTML || ''}</div><div class="pc-pills" role="group" aria-label="${c.title} range">${c.ranges.map((r, i) => `<button type="button" class="pc-pill" data-i="${i}" aria-pressed="${i === state[k]}">${r[0]}</button>`).join('')}</div></div>
+    setHtml(el, `<div class="pc-ph"><div class="pc-ptitle">${c.title}<small>${bars[k].length} bars</small></div><div class="pc-psum"></div><div class="pc-pills" role="group" aria-label="${c.title} range">${c.ranges.map((r, i) => `<button type="button" class="pc-pill" data-i="${i}" aria-pressed="${i === state[k]}">${r[0]}</button>`).join('')}</div></div>
       <div class="pc-chart"><svg role="img" aria-label="${c.title} candlestick chart with volume and MACD"></svg><div class="pc-tip"></div></div>`);
+    // the summary figures are copied as nodes: serialising them to HTML and parsing that again would lose their custom properties under a strict policy
+    const figures = root.querySelector('.pc-sums [data-k="' + k + '"]');
+    if(figures) /** @type {Element} */ (el.querySelector('.pc-psum')).append(...Array.from(figures.childNodes, n => n.cloneNode(true)));
     panels.appendChild(el);
     el.querySelectorAll('.pc-pill').forEach(btn => /** @type {HTMLElement} */ (btn).onclick = () => { state[k] = +/** @type {HTMLElement} */ (btn).dataset.i; el.querySelectorAll('.pc-pill').forEach(x => x.setAttribute('aria-pressed', String(x === btn))); draw(k); });
     const ch = el.querySelector('.pc-chart');
