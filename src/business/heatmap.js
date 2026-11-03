@@ -34,10 +34,11 @@ function layout(items, w, h){
   return out;
 }
 
-function tileColor(mean, period){
-  if(mean === null) return 'var(--panel2)';
-  const t = Math.min(Math.abs(mean) / (SCALE[period] || 10), 1), pct = Math.round(18 + t * 72);
-  return 'color-mix(in srgb, var(' + (mean >= 0 ? '--buy' : '--avoid') + ') ' + pct + '%, var(--bg))';
+// The tile's tone class (which colour) and its strength (how much of it, as the --mix percentage the stylesheet blends in).
+function tileTone(mean, period){
+  if(mean === null) return { cls: 'hm-tile--none', mix: 0 };
+  const t = Math.min(Math.abs(mean) / (SCALE[period] || 10), 1);
+  return { cls: mean >= 0 ? 'hm-tile--up' : 'hm-tile--down', mix: Math.round(18 + t * 72) };
 }
 
 // rows: the industry rows (name, count, mean). width: the pixel width the map will be drawn at (decides which tiles have room for text).
@@ -72,12 +73,14 @@ function heatmapHtml(rows, period, width, size, hRatio){
     const showName = pw > 30 && nameLines >= 1;
     const chg = r.mean === null ? 'n/a' : (r.mean > 0 ? '+' : '') + r.mean.toFixed(2) + '%';
     const tip = r.name + ': ' + chg + ' average ' + period + ', ' + r.count + ' stock' + (r.count === 1 ? '' : 's');
-    return '<button type="button" class="hm-tile" data-biz-heat="' + escapeHtml(r.name) + '" title="' + escapeHtml(tip) + '" style="left:' + (t.x / W * 100).toFixed(3) + '%;top:' + (t.y / H * 100).toFixed(3) + '%;width:' + (t.w / W * 100).toFixed(3) + '%;height:' + (t.h / H * 100).toFixed(3) + '%;background:' + tileColor(r.mean, period) + ';padding:' + (pw < 60 || ph < 40 ? 2 : 5) + 'px ' + (pw < 60 ? 3 : 6) + 'px">'
-      + (showName ? '<span class="hm-name" style="-webkit-line-clamp:' + Math.min(nameLines, 4) + '">' + escapeHtml(r.name) + '</span>' : '') + (showChg ? '<span class="hm-chg">' + chg + '</span>' : '') + (showN ? '<span class="hm-n">' + r.count + ' stock' + (r.count === 1 ? '' : 's') + '</span>' : '') + '</button>';
+    const tone = tileTone(r.mean, period);
+    const place = '--x:' + (t.x / W * 100).toFixed(3) + '%;--y:' + (t.y / H * 100).toFixed(3) + '%;--w:' + (t.w / W * 100).toFixed(3) + '%;--h:' + (t.h / H * 100).toFixed(3) + '%;--mix:' + tone.mix + '%;--pad:' + (pw < 60 || ph < 40 ? 2 : 5) + 'px ' + (pw < 60 ? 3 : 6) + 'px';
+    return '<button type="button" class="hm-tile ' + tone.cls + '" data-biz-heat="' + escapeHtml(r.name) + '" title="' + escapeHtml(tip) + '" data-css="' + place + '">'
+      + (showName ? '<span class="hm-name" data-css="--lines:' + Math.min(nameLines, 4) + '">' + escapeHtml(r.name) + '</span>' : '') + (showChg ? '<span class="hm-chg">' + chg + '</span>' : '') + (showN ? '<span class="hm-n">' + r.count + ' stock' + (r.count === 1 ? '' : 's') + '</span>' : '') + '</button>';
   };
   const s = SCALE[period] || 10;
   const legend = '<div class="hm-legend"><span>−' + s + '%</span><i class="hm-bar"></i><span>+' + s + '%</span><span class="hm-note">' + (bySize ? 'Tile size grows with the size of the average change; risers are grouped on the left, fallers on the right.' : 'Tile size grows with the number of stocks (scaled so small industries stay readable).') + ' Colour = average ' + period + ' change. Tap a tile to open the industry.</span></div>';
-  return '<div class="hm-wrap" style="aspect-ratio:' + W + '/' + H + '">' + tiles.map(tile).join('') + '</div>' + legend;
+  return '<div class="hm-wrap" data-css="--ratio:' + W + '/' + H + '">' + tiles.map(tile).join('') + '</div>' + legend;
 }
 
 export { heatmapHtml };

@@ -226,10 +226,13 @@ html{scrollbar-color:var(--line) transparent;}
 
 .analysis-chart-block{margin:16px 0 16px;flex:none;}
 /* Industry heat map */
-.hm-wrap{position:relative;width:100%;margin-top:12px;border-radius:6px;overflow:hidden;}
-.hm-tile{position:absolute;box-sizing:border-box;border:1px solid var(--bg);padding:4px 6px;margin:0;overflow:hidden;cursor:pointer;color:var(--text);font:inherit;text-align:left;display:flex;flex-direction:column;justify-content:flex-start;gap:1px;}
+.hm-wrap{position:relative;width:100%;aspect-ratio:var(--ratio,4/3);margin-top:12px;border-radius:6px;overflow:hidden;}
+.hm-tile{position:absolute;box-sizing:border-box;border:1px solid var(--bg);padding:var(--pad,4px 6px);left:var(--x,0);top:var(--y,0);width:var(--w,0);height:var(--h,0);margin:0;overflow:hidden;cursor:pointer;color:var(--text);font:inherit;text-align:left;display:flex;flex-direction:column;justify-content:flex-start;gap:1px;}
+.hm-tile--up{background:color-mix(in srgb,var(--buy) var(--mix,18%),var(--bg));}
+.hm-tile--down{background:color-mix(in srgb,var(--avoid) var(--mix,18%),var(--bg));}
+.hm-tile--none{background:var(--panel2);}
 .hm-tile:hover,.hm-tile:focus-visible{outline:2px solid var(--text);outline-offset:-2px;z-index:1;}
-.hm-name{font-size:1em;font-weight:700;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;word-break:break-word;hyphens:auto;}
+.hm-name{-webkit-line-clamp:var(--lines,1);font-size:1em;font-weight:700;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;word-break:break-word;hyphens:auto;}
 .hm-chg{font-size:1em;font-weight:700;font-variant-numeric:tabular-nums;}
 .hm-n{font-size:.85em;opacity:.8;}
 .hm-legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:var(--t-sm);color:var(--muted);}

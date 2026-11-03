@@ -1772,6 +1772,33 @@ test('trade call: history keeps one point a day and lists when the call changed'
   });
 }
 
+// ---- industry heat map: tile place, colour strength and name clamp travel as data-css, the colour tone as a class (CLAUDE.md section 2)
+test('heat map: tiles carry their place, strength and tone as data-css and classes, never an inline style', async () => {
+  const { heatmapHtml } = await import('../src/business/heatmap.js');
+  const rows = [{ name: 'Banks', count: 9, mean: 4 }, { name: 'Steel', count: 5, mean: -6 }, { name: 'Gaps', count: 2, mean: null }];
+  const html = heatmapHtml(rows, '1M', 1000, 'chg', .5);
+  assert.ok(!/\sstyle=/.test(html), 'no style attribute');
+  assert.ok(html.includes('<div class="hm-wrap" data-css="--ratio:1000/500">'));
+  const tile = name => html.match(new RegExp('<button[^>]*data-biz-heat="' + name + '"[^>]*>'))[0];
+  assert.ok(tile('Banks').includes('hm-tile--up') && tile('Steel').includes('hm-tile--down') && tile('Gaps').includes('hm-tile--none'));
+  assert.match(tile('Banks'), /data-css="--x:[\d.]+%;--y:[\d.]+%;--w:[\d.]+%;--h:[\d.]+%;--mix:\d+%;--pad:\d+px \d+px"/);
+  assert.match(html, /<span class="hm-name" data-css="--lines:[1-4]">/);
+});
+test('heat map: a stronger move mixes more colour, capped at 90%, and count sizing still tones every tile', async () => {
+  const { heatmapHtml } = await import('../src/business/heatmap.js');
+  const mix = (mean) => Number(heatmapHtml([{ name: 'A', count: 3, mean }], '1M', 1000, 'count').match(/--mix:(\d+)%/)[1]);
+  assert.strictEqual(mix(0), 18);
+  assert.strictEqual(mix(5), 54);
+  assert.strictEqual(mix(500), 90);
+  assert.strictEqual(mix(-500), 90);
+});
+test('heat map: a hostile industry name is escaped in the title and the attribute', async () => {
+  const { heatmapHtml } = await import('../src/business/heatmap.js');
+  const html = heatmapHtml([{ name: '<img src=x onerror=alert(1)>', count: 4, mean: 2 }], '1W', 1000, 'chg');
+  assert.ok(!html.includes('<img'), 'the name never becomes markup');
+  assert.ok(html.includes('&lt;img'));
+});
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
