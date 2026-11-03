@@ -9,6 +9,7 @@ import json,glob,sys,os,math,datetime as dt
 CAP=1_000_000; RISK=0.01; MAXPOS=8; POSCAP=0.125; COST=0.005  # round-trip costs+slippage
 TIME_DAYS=30; MAX_PER_GROUP=2   # TIME_DAYS: legacy positions opened before the 1:3 gate
 RSI_LO=45; RSI_HI=75; NEAR_HIGH=0.85   # hard entry filters (see entry_blocks)
+RISK_HIGH=0.005; HIGH_MRSI=70           # high-risk tier: monthly RSI above 70 (or unknown) risks half as much per trade
 RR_MIN=3.0; GATE_DAYS=70       # 1:3 gate: target = RR_MIN x stop distance; new positions may run 70 days (10 weeks, as tested)
 REGIME_MIN=0.6   # market filter: new entries only while at least this share of the universe has a positive 1-month change
 FEATS=['fund','mos','trend','rsi','mom','near']
@@ -112,6 +113,11 @@ def regime(live,comp,minimum=REGIME_MIN):
     b=sum(1 for x in ch if x>0)/len(ch)
     return {'breadth':round(b,3),'n':len(ch),'min':minimum,'on':b>=minimum}
 
+def risk_tier(mrsi):
+    """'high' when the monthly RSI is above HIGH_MRSI or unknown. Backtest: such stocks reach +10% in 3 weeks more often (38% vs 27-35%)
+    but are down 7% at some point in half of the trades (36% at monthly RSI under 50), so they get half the risk per trade."""
+    return 'high' if (mrsi is None or mrsi>HIGH_MRSI) else 'standard'
+
 def trade_plan(r,hi):
     """Entry, stop, target for candidate r under the 1:3 gate. Returns (plan, reason); reason is None when the gate passes.
     Stop distance = ATR-based, clipped 4.5-9%. Target = entry + RR_MIN x risk. Gate: the 40-week high must leave room for the
@@ -157,7 +163,7 @@ def daily(work,nifty=None):
         if not c or not c[0]: continue
         f,mos,bl=feats(k,m,c)
         sc=sum(wts[n]*f[n] for n in FEATS)/sum(wts.values())*10
-        rows.append({'k':k,'n':m['n'],'g':m['g'],'close':c[0],'mos':round(mos,1),'score':round(sc,2),'f':{a:round(b,3) for a,b in f.items()},'blocks':bl,'atr':m['atr'],'rsiW':c[5]})
+        rows.append({'k':k,'n':m['n'],'g':m['g'],'close':c[0],'mos':round(mos,1),'score':round(sc,2),'f':{a:round(b,3) for a,b in f.items()},'blocks':bl,'atr':m['atr'],'rsiW':c[5],'mrsi':None if c[6] is None else round(c[6],1),'tier':risk_tier(c[6])})
     rows.sort(key=lambda r:-r['score'])
     held={p['k'] for p in keep}; gcount={}
     for p in keep: gcount[p['g']]=gcount.get(p['g'],0)+1
@@ -177,17 +183,18 @@ def daily(work,nifty=None):
     slots=(MAXPOS-len(keep)) if reg['on'] else 0; new=[]   # risk-off: manage exits, open nothing
     for r in picks[:max(slots,0)]:
         pl=r['plan']; entry=pl['entry']
-        q=int(min(eq*RISK/(entry-pl['stop']), eq*POSCAP/entry, st['cash']/entry))
+        rk=RISK_HIGH if r['tier']=='high' else RISK
+        q=int(min(eq*rk/(entry-pl['stop']), eq*POSCAP*(rk/RISK)/entry, st['cash']/entry))   # the high-risk tier halves both the risk and the position-size cap
         if q<1: continue
         st['cash']-=q*entry
-        pos={'k':r['k'],'n':r['n'],'g':r['g'],'d':day,'entry':entry,'q':q,'stop':pl['stop'],'target':pl['target'],'rr':RR_MIN,'maxd':GATE_DAYS,'f':r['f'],'last':r['close']}
+        pos={'k':r['k'],'n':r['n'],'g':r['g'],'d':day,'entry':entry,'q':q,'stop':pl['stop'],'target':pl['target'],'rr':RR_MIN,'maxd':GATE_DAYS,'tier':r['tier'],'risk':rk,'mrsi':r['mrsi'],'f':r['f'],'last':r['close']}
         st['open'].append(pos); new.append(pos)
     eq=st['cash']+sum(p.get('last',p['entry'])*p['q'] for p in st['open'])
     ub=[px[k] for k in comp if k in px]
     st['curve']=[x for x in st['curve'] if x[0]!=day]+[[day,round(eq,0),nifty]]
     st['metrics']=metrics(st)
     S(work+'/agent/state.json',st)
-    S(work+'/agent/picks.json',{'asof':day,'dataAsof':asof,'weightsVersion':J(work+'/agent/weights.json',{'v':0})['v'],'top':rows[:15],'picks':[{**{k:r[k] for k in('k','n','g','close','score','mos','rsiW')},'stop':r['plan']['stop'],'target':r['plan']['target']} for r in picks],'gated':gated,'new':new,'regime':reg,'universe':len(rows),'blocked':sum(1 for r in rows if r['blocks'])})
+    S(work+'/agent/picks.json',{'asof':day,'dataAsof':asof,'weightsVersion':J(work+'/agent/weights.json',{'v':0})['v'],'top':rows[:15],'picks':[{**{k:r[k] for k in('k','n','g','close','score','mos','rsiW','mrsi','tier')},'stop':r['plan']['stop'],'target':r['plan']['target']} for r in picks],'gated':gated,'new':new,'regime':reg,'universe':len(rows),'blocked':sum(1 for r in rows if r['blocks'])})
     log=[l for l in log if l['d']!=day]+[{'d':day,'equity':round(eq),'open':len(st['open']),'new':[p['k'] for p in new],'closed':[c['k']+':'+c['why'] for c in st['closed'] if c['xd']==day],'regime':reg['on'],'breadth':reg['breadth']}]
     S(work+'/agent/log.json',{'items':log[-120:]})
     print('equity',round(eq),'open',len(st['open']),'new',[p['k'] for p in new],'dataAsof',asof,'regime',reg)

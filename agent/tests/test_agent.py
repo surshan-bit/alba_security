@@ -123,6 +123,29 @@ class Build(unittest.TestCase):
         json.dump({'rows': [{'k': 'AAA', 'w': [[i, 1, 11, 1, 10, 1] for i in range(9)]}]}, open(w + '/barsRecent/c001.json', 'w'))
         A.build(w, w); m = A.J(w + '/agent/compact.json')['stocks']['AAA']; self.assertIsNone(m['ma10']); self.assertIsNone(m['ma10p'])
 
+class Tier(unittest.TestCase):
+    def one(self, **c):
+        r = Env({'A': comp('A')}, [row('A', 100, **c)]).run(); return r, r['state']['open'][0]
+    def test_standard_tier_risks_one_percent(self):
+        r, p = self.one(c6=55); self.assertEqual(p['tier'], 'standard'); self.assertEqual(p['risk'], A.RISK); self.assertEqual(r['picks']['picks'][0]['tier'], 'standard')
+    def test_high_tier_when_monthly_rsi_above_70(self):
+        r, p = self.one(c6=75); self.assertEqual(p['tier'], 'high'); self.assertEqual(p['risk'], A.RISK_HIGH); self.assertEqual(r['picks']['picks'][0]['tier'], 'high'); self.assertEqual(p['mrsi'], 75)
+    def test_exactly_70_is_standard(self):
+        self.assertEqual(self.one(c6=70)[1]['tier'], 'standard'); self.assertEqual(self.one(c6=70.1)[1]['tier'], 'high')
+    def test_unknown_monthly_rsi_is_treated_as_high(self):
+        self.assertEqual(self.one(c6=None)[1]['tier'], 'high')
+    def test_high_tier_gets_about_half_the_shares(self):
+        qs = self.one(c6=55)[1]['q']; qh = self.one(c6=75)[1]['q']
+        self.assertAlmostEqual(qh / qs, A.RISK_HIGH / A.RISK, delta=0.03)
+    def test_high_tier_never_exceeds_half_the_risk_or_half_the_position_cap(self):
+        p = self.one(c6=75)[1]
+        self.assertLessEqual(p['q'] * (p['entry'] - p['stop']) / A.CAP, A.RISK_HIGH + 1e-4); self.assertLessEqual(p['q'] * p['entry'] / A.CAP, A.POSCAP / 2 + 1e-3)
+    def test_high_tier_with_a_wide_stop_risks_half_a_percent(self):
+        r = Env({'A': comp('A', atr=20, hi=101)}, [row('A', 100, c6=75)]).run(); p = r['state']['open'][0]     # 9% stop: the risk limit binds, not the cap
+        self.assertAlmostEqual(p['q'] * (p['entry'] - p['stop']) / A.CAP, A.RISK_HIGH, delta=0.0003)
+    def test_risk_tier_function(self):
+        self.assertEqual(A.risk_tier(69.9), 'standard'); self.assertEqual(A.risk_tier(80), 'high'); self.assertEqual(A.risk_tier(None), 'high')
+
 class Gate(unittest.TestCase):
     def run1(self, hi, close=100, atr=5.0):
         return Env({'A': comp('A', hi=hi, atr=atr)}, [row('A', close)]).run()
