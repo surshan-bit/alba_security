@@ -12,6 +12,7 @@ TIME_DAYS=30; MAX_PER_GROUP=2   # TIME_DAYS: legacy positions opened before the 
 RSI_LO=45; RSI_HI=75; NEAR_HIGH=0.85   # hard entry filters (see entry_blocks)
 TIER_RISK={'low':0.01,'medium':0.0075,'high':0.005}; MRSI_HIGH=70; MRSI_MEDIUM=60   # risk-reward tiers by monthly RSI: above 70 high, above 60 medium, otherwise low (unknown counts as high)
 RR_MIN=3.0; GATE_DAYS=70       # 1:3 gate: target = RR_MIN x stop distance; new positions may run 70 days (10 weeks, as tested)
+SPIKE_PG=300; SPIKE_PENALTY=25   # earnings-spike check: trailing profit growth above 300% costs 25 points and carries a warning
 SWING_MRSI=(66,76); LIQ_LAKH=50; T1_PCT=10.0; T2_PCT=20.0; CAPITALS=(500000,1000000)   # swing ideas: monthly-RSI band, liquid = turnover of at least Rs 50 lakh a day, targets, capitals shown
 REGIME_MIN=0.6   # market filter: new entries only while at least this share of the universe has a positive 1-month change
 FEATS=['fund','mos','trend','rsi','mom','near']
@@ -44,13 +45,13 @@ def metrics(st):
     return m
 
 def build_watch(work,D):
-    """Every stock with an intrinsic value (not only Rocky's filtered universe): {ticker: [name, group, intrinsic value, score, verdict]}.
+    """Every stock with an intrinsic value (not only Rocky's filtered universe): {ticker: [name, group, intrinsic value, score, verdict, trailing profit growth %]}.
     The swing ideas need it to find stocks such as thinly traded ones that the universe leaves out."""
     w={}
     for f in sorted(glob.glob(D+'/stockData/c*.json')):
         for s in J(f)['stocks']:
             v=s.get('valuation') or {}; iv=v.get('intrinsicValue')
-            if isinstance(iv,(int,float)) and iv>0: w[s['ticker'].split(' ·')[0].strip()]=[(s.get('name') or '')[:24],s.get('industryGroup'),iv,s.get('score'),s.get('verdict')]
+            if isinstance(iv,(int,float)) and iv>0: pg=v.get('profitGrowth'); w[s['ticker'].split(' ·')[0].strip()]=[(s.get('name') or '')[:24],s.get('industryGroup'),iv,s.get('score'),s.get('verdict'),round(pg) if isinstance(pg,(int,float)) else None]
     S(work+'/agent/watch.json',{'built':today(),'w':w}); print('watch',len(w))
 
 # ---- 3-hour MACD (12, 26, 9) ----
@@ -96,7 +97,8 @@ def swing_ideas(live,comp,wl,m3h=None,held=(),sym=None):
     the 3-hour MACD state and liquidity. Entry zone = last close to +1%; stop = Rocky's volatility stop; Target 1 = +10%, Target 2 = +20%.
     Sizing follows the monthly-RSI risk tier. A ranking of candidates, not a prediction."""
     m3h=m3h or {}; sym=sym or {}; ideas=[]; skipped=[]; pool=0
-    for k,(n,g,iv,sc,vd) in wl.items():
+    for k,v in wl.items():
+        n,g,iv,sc,vd=v[:5]; pg=v[5] if len(v)>5 else None
         c=live.get(k)
         if not c or not c[0] or c[6] is None: continue
         close=c[0]; mrsi=c[6]; mos=(iv-close)/iv*100
@@ -110,12 +112,13 @@ def swing_ideas(live,comp,wl,m3h=None,held=(),sym=None):
         turn=(c[9] or 0)*close/1e5; thin=turn<LIQ_LAKH
         atr=m.get('atr') if m else None; sp=clip(atr*0.9,4.5,9.0) if atr else 8.0
         entry=close; stop=entry*(1-sp/100); tier=risk_tier(mrsi); rk=TIER_RISK[tier]
-        st=m3h.get(k)
-        score=(sc or 0)/10*30+min(mos,50)/50*15+(25 if m else 10)+(5 if 69<=mrsi<=72 else 0)+M3H_POINTS[st['kind'] if st else None]-(15 if thin else 0)
+        st=m3h.get(k); spike=isinstance(pg,(int,float)) and pg>SPIKE_PG
+        score=(sc or 0)/10*30+min(mos,50)/50*15+(25 if m else 10)+(5 if 69<=mrsi<=72 else 0)+M3H_POINTS[st['kind'] if st else None]-(15 if thin else 0)-(SPIKE_PENALTY if spike else 0)
         why=['Fundamentals: %s (score %s)'%(vd,sc),'Margin of safety %d%%'%round(mos),'Monthly RSI %d, inside your 66-76 band'%round(mrsi)]
         why.append('Passes Rocky\'s trend filters (above a rising 10-week average, weekly RSI %d)'%round(c[5]) if m else 'Trend not checked: outside Rocky\'s filtered universe')
         if st: why.append(m3h_text(st))
         warns=[]
+        if spike: warns.append('Earnings spike: trailing profit growth %s%%. Check what the revenue is made of and the latest quarter before buying'%format(pg,',.0f'))
         if thin: warns.append('Thinly traded (about Rs %d lakh a day): exits may be hard, use limit orders'%round(turn))
         if not m: warns.append('Outside Rocky\'s universe, so its trend filters were not applied')
         if not atr: warns.append('Stop is an estimate (8%%): no volatility data')
@@ -123,7 +126,7 @@ def swing_ideas(live,comp,wl,m3h=None,held=(),sym=None):
         qty={}
         for cap in CAPITALS: qty[str(cap)]=int(min(cap*rk/(entry-stop),cap*POSCAP*(rk/RISK)/entry))
         ideas.append({'k':k,'y':sym.get(k),'n':n,'g':g,'close':round(close,2),'mrsi':round(mrsi,1),'mos':round(mos),'sc':sc,'vd':vd,'wrsi':None if c[5] is None else round(c[5]),'turn':round(turn),'thin':thin,'inU':bool(m),
-            'tier':tier,'risk':rk,'score':round(max(0,min(100,score)),1),'m3h':st,'action':M3H_ACTION[st['kind'] if st else None],
+            'tier':tier,'risk':rk,'score':round(max(0,min(100,score)),1),'m3h':st,'action':M3H_ACTION[st['kind'] if st else None]+(' (verify earnings first)' if spike else ''),'pg':round(pg) if isinstance(pg,(int,float)) else None,'spike':spike,
             'entry':[round(entry,2),round(entry*1.01,2)],'stop':round(stop,2),'stopPct':round(sp,1),'t1':round(entry*(1+T1_PCT/100),2),'t2':round(entry*(1+T2_PCT/100),2),'rr':round(T2_PCT/sp,1),'qty':qty,'why':why,'warn':warns})
     ideas.sort(key=lambda x:-x['score'])
     return {'band':list(SWING_MRSI),'pool':pool,'ideas':ideas[:5],'also':[{k:i[k] for k in('k','n','score','close','mrsi','mos','vd','thin','action')} for i in ideas[5:12]],'skipped':skipped[:10],

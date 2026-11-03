@@ -933,6 +933,11 @@ test('rocky page: a swing idea shows rank, action, score, tier, the levels in ru
   assert.ok(html.includes('<li>Fundamentals: buy (score 7)</li>') && /22 stocks fit your rule today \(monthly RSI 66-76/.test(html));
   assert.ok(/Data as of 2026-11-03 · 3-hour check 2026-11-03/.test(html) && /not a prediction/.test(html) && !/style=/.test(html));
 });
+test('rocky page: an idea with an earnings spike carries its chip and warning, and one without does not', async () => {
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ k: 'SPK', spike: true, pg: 6354, action: 'Buy zone (verify earnings first)', warn: ['Earnings spike: trailing profit growth 6,354%'] }), IDEA({ k: 'OK1', spike: false })] }) });
+  assert.strictEqual((html.match(/Earnings spike<\/span>/g) || []).length, 1, 'only the idea with a spike gets the chip');
+  assert.ok(html.includes('rky-act rky-act-buy">Buy zone (verify earnings first)') && html.includes('Earnings spike: trailing profit growth 6,354%'));
+});
 test('rocky page: only the first idea is marked as the top one; thin, outside-universe and unrated ideas carry their flags and warnings', async () => {
   const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA(), IDEA({ k: 'BBB', thin: true, inU: false, tier: 'medium', action: 'Wait: momentum fading', warn: ['Thinly traded', 'Stop is an estimate'] }), IDEA({ k: 'CCC', tier: 'low', action: 'Check the 3-hour chart' }), IDEA({ k: 'DDD', tier: 'odd', action: undefined })] }) });
   assert.strictEqual((html.match(/rky-idea-top/g) || []).length, 1);

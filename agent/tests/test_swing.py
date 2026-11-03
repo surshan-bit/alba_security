@@ -70,6 +70,29 @@ class Ideas(unittest.TestCase):
         r = A.swing_ideas(live, cp, big); self.assertEqual(len(r['ideas']), 5); self.assertEqual(len(r['also']), 4); self.assertEqual(r['pool'], 9)
         self.assertEqual([i['k'] for i in r['ideas']], ['S8', 'S7', 'S6', 'S5', 'S4'])
 
+class Spike(unittest.TestCase):
+    def one(self, pg, **kw): return A.swing_ideas({'A': row()}, comp(), {'A': ['Aaa', 'G', 200, 8.0, 'buy', pg]}, **kw)['ideas'][0]
+    def test_trailing_growth_above_300_is_flagged_with_a_warning_and_the_action_is_qualified(self):
+        i = self.one(6354); self.assertTrue(i['spike']); self.assertEqual(i['pg'], 6354)
+        self.assertTrue(any('Earnings spike: trailing profit growth 6,354%' in w for w in i['warn'])); self.assertEqual(i['action'], 'Check the 3-hour chart (verify earnings first)')
+    def test_boundary(self):
+        self.assertFalse(self.one(300)['spike']); self.assertTrue(self.one(300.1)['spike']); self.assertFalse(self.one(-50)['spike'])
+    def test_missing_or_old_style_entries_are_not_flagged(self):
+        self.assertFalse(self.one(None)['spike']); self.assertIsNone(self.one(None)['pg'])
+        old = A.swing_ideas({'A': row()}, comp(), {'A': ['Aaa', 'G', 200, 8.0, 'buy']})['ideas'][0]; self.assertFalse(old['spike']); self.assertEqual(old['action'], 'Check the 3-hour chart')
+    def test_the_penalty_lowers_the_score_by_25(self):
+        self.assertAlmostEqual(self.one(None)['score'] - self.one(5000)['score'], A.SPIKE_PENALTY, places=1)
+    def test_a_spike_stock_no_longer_wins_over_a_clean_one_with_the_same_setup(self):
+        both = {'A': ['Aaa', 'G', 200, 8.37, 'buy', 6354], 'B': ['Bbb', 'G', 200, 7.0, 'buy', 40]}; live = {'A': row(), 'B': row()}; cp = {**comp('A'), **comp('B')}
+        r = A.swing_ideas(live, cp, both); self.assertEqual([i['k'] for i in r['ideas']], ['B', 'A'])
+    def test_a_buy_zone_stock_with_a_spike_keeps_the_buy_colour_prefix_but_says_to_verify(self):
+        m = {'A': {'kind': 'rising', 'h': 1, 'hp': 1, 'since': 9, 'dir': 'up', 'flip': 90, 'zero': True, 'last': 100}}
+        self.assertEqual(self.one(900, m3h=m)['action'], 'Buy zone (verify earnings first)')
+    def test_build_watch_stores_the_rounded_trailing_profit_growth(self):
+        w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); os.makedirs(w + '/stockData')
+        json.dump({'stocks': [{'ticker': 'AAA', 'name': 'Aaa', 'industryGroup': 'G', 'score': 7, 'verdict': 'buy', 'valuation': {'intrinsicValue': 200, 'profitGrowth': 6353.55}}, {'ticker': 'BBB', 'valuation': {'intrinsicValue': 50}}]}, open(w + '/stockData/c001.json', 'w'))
+        A.build_watch(w, w); d = A.J(w + '/agent/watch.json')['w']; self.assertEqual(d['AAA'][5], 6354); self.assertIsNone(d['BBB'][5])
+
 class Files(unittest.TestCase):
     def mk(self):
         w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); os.makedirs(w + '/liveSnapshot'); os.makedirs(w + '/stockData')
@@ -77,7 +100,7 @@ class Files(unittest.TestCase):
         json.dump({'asof': A.today(), 'rows': [{'k': 'AAA', 'y': 'NSE:AAA', 'c': row()}]}, open(w + '/liveSnapshot/c001.json', 'w'))
         json.dump({'stocks': {}}, open(w + '/agent/compact.json', 'w')); return w
     def test_build_watch_keeps_only_stocks_with_an_intrinsic_value(self):
-        w = self.mk(); A.build_watch(w, w); d = A.J(w + '/agent/watch.json')['w']; self.assertEqual(list(d), ['AAA']); self.assertEqual(d['AAA'], ['Aaa Ltd', 'G', 200, 7, 'buy'])
+        w = self.mk(); A.build_watch(w, w); d = A.J(w + '/agent/watch.json')['w']; self.assertEqual(list(d), ['AAA']); self.assertEqual(d['AAA'], ['Aaa Ltd', 'G', 200, 7, 'buy', None])
     def test_swing_run_writes_swing_json(self):
         w = self.mk(); A.build_watch(w, w); o = A.swing_run(w); self.assertEqual(A.J(w + '/agent/swing.json')['ideas'][0]['k'], 'AAA'); self.assertEqual(o['need3h'], [{'k': 'AAA', 'y': 'NSE:AAA'}])
     def test_swing_run_without_a_watch_file_does_nothing(self):

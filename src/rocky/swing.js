@@ -24,7 +24,7 @@ function levels(i, caps){
 
 function chips(i){
   return '<span class="rky-act ' + actionClass(i.action) + '">' + e(i.action) + '</span><span class="rky-chip">Score ' + fmt(i.score) + '</span>' +
-    '<span class="rky-chip">' + e(TIER_LABEL[i.tier] || 'Unrated') + ' risk tier</span>' + (i.thin ? '<span class="rky-chip">Thin</span>' : '') + (i.inU ? '' : '<span class="rky-chip">Outside Rocky universe</span>');
+    '<span class="rky-chip">' + e(TIER_LABEL[i.tier] || 'Unrated') + ' risk tier</span>' + (i.thin ? '<span class="rky-chip">Thin</span>' : '') + (i.spike ? '<span class="rky-chip">Earnings spike</span>' : '') + (i.inU ? '' : '<span class="rky-chip">Outside Rocky universe</span>');
 }
 
 function ideaCard(i, n, caps){
