@@ -93,6 +93,50 @@ class Spike(unittest.TestCase):
         json.dump({'stocks': [{'ticker': 'AAA', 'name': 'Aaa', 'industryGroup': 'G', 'score': 7, 'verdict': 'buy', 'valuation': {'intrinsicValue': 200, 'profitGrowth': 6353.55}}, {'ticker': 'BBB', 'valuation': {'intrinsicValue': 50}}]}, open(w + '/stockData/c001.json', 'w'))
         A.build_watch(w, w); d = A.J(w + '/agent/watch.json')['w']; self.assertEqual(d['AAA'][5], 6354); self.assertIsNone(d['BBB'][5])
 
+class LiquidityCap(unittest.TestCase):
+    def one(self, vol, **kw): return A.swing_ideas({'A': row(vol=vol)}, comp(atr=5.0), wl(), **kw)['ideas'][0]
+    def test_a_liquid_stock_is_not_capped(self):
+        i = self.one(10_000_000); self.assertFalse(i['liqLimited']); self.assertGreater(i['qty']['1000000'], i['qty']['500000']); self.assertFalse(any('Size limited' in w for w in i['warn']))
+    def test_a_thin_stock_is_limited_to_ten_percent_of_daily_volume(self):
+        i = self.one(2000); self.assertTrue(i['liqLimited']); self.assertEqual(i['qty'], {'500000': 200, '1000000': 200}); self.assertTrue(any('Size limited to 200 shares' in w and 'about Rs 20,000' in w for w in i['warn']))
+    def test_only_the_larger_capital_is_limited_when_that_is_all_that_binds(self):
+        free = self.one(10_000_000)['qty']; v = int((free['500000'] + free['1000000']) / 2 / A.LIQ_PART)
+        i = self.one(v); self.assertEqual(i['qty']['500000'], free['500000']); self.assertEqual(i['qty']['1000000'], int(v * A.LIQ_PART)); self.assertTrue(i['liqLimited'])
+    def test_unknown_volume_leaves_the_size_alone(self):
+        i = A.swing_ideas({'A': [100, 2, 1, 2, 1, 58, 70, 1, 5, None, 1e4, None]}, comp(), wl())['ideas'][0]; self.assertFalse(i['liqLimited']); self.assertGreater(i['qty']['500000'], 0)
+
+class DailyMacd(unittest.TestCase):
+    def one(self, d1, **kw):
+        r = A.swing_ideas({'A': row()}, comp(), wl(), d1=d1, **kw); return r
+    def test_points_scale_with_the_gap(self):
+        self.assertEqual(A.d1_points(0.0), 20); self.assertEqual(A.d1_points(0.5), 20); self.assertAlmostEqual(A.d1_points(1.75), 10); self.assertEqual(A.d1_points(3.0), 0); self.assertEqual(A.d1_points(9), 0)
+    def test_not_checked_is_neutral_and_listed_for_the_daily_run(self):
+        r = self.one(None); i = r['ideas'][0]; self.assertIsNone(i['d1']); self.assertEqual(r['need1d'], [{'k': 'A', 'y': None}]); self.assertIn('Daily MACD not checked', i['warn'])
+        self.assertEqual(self.one({}, sym={'A': 'NSE:AAA'})['need1d'], [{'k': 'A', 'y': 'NSE:AAA'}])
+    def test_below_or_at_the_signal_line_is_skipped_with_a_reason(self):
+        for macd in (0.5, 0.99, 1.0):
+            r = self.one({'A': [macd, 1.0]}); self.assertEqual(r['ideas'], []); self.assertEqual(r['skipped'][0]['why'], 'Daily MACD below its signal line'); self.assertEqual(r['need1d'], [])
+    def test_above_the_signal_line_records_the_gap_and_the_reason(self):
+        i = self.one({'A': [1.5, 1.0]})['ideas'][0]; self.assertEqual(i['d1'], {'macd': 1.5, 'sig': 1.0, 'gap': 0.5}); self.assertNotIn('Daily MACD not checked', i['warn'])
+        self.assertTrue(any('gap 0.50% of price: close to the cross' in w for w in i['why']))
+        self.assertTrue(any('already stretched' in w for w in self.one({'A': [4.0, 1.0]})['ideas'][0]['why']))
+    def test_the_closest_to_the_signal_ranks_first(self):
+        both = wl(B=['Bbb', 'G', 200, 8.0, 'buy']); live = {'A': row(), 'B': row()}; cp = {**comp('A'), **comp('B')}
+        r = A.swing_ideas(live, cp, both, d1={'A': [3.0, 1.0], 'B': [1.2, 1.0]}); self.assertEqual([i['k'] for i in r['ideas']], ['B', 'A']); self.assertGreater(r['ideas'][0]['score'], r['ideas'][1]['score'])
+    def test_a_checked_fresh_cross_outscores_an_unchecked_one(self):
+        self.assertGreater(self.one({'A': [1.2, 1.0]})['ideas'][0]['score'], self.one(None)['ideas'][0]['score'])
+    def test_m1d_run_writes_the_states_and_ignores_malformed_entries(self):
+        w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); os.makedirs(w + '/liveSnapshot'); os.makedirs(w + '/stockData')
+        json.dump({'stocks': [{'ticker': 'AAA', 'name': 'Aaa', 'industryGroup': 'G', 'score': 7, 'verdict': 'buy', 'valuation': {'intrinsicValue': 200}}]}, open(w + '/stockData/c001.json', 'w'))
+        json.dump({'asof': A.today(), 'rows': [{'k': 'AAA', 'y': 'NSE:AAA', 'c': row()}]}, open(w + '/liveSnapshot/c001.json', 'w')); json.dump({'stocks': {}}, open(w + '/agent/compact.json', 'w')); A.build_watch(w, w)
+        json.dump({'AAA': [1.5, 1.0], 'BAD': 'x', 'BAD2': [1], 'BAD3': ['a', 'b']}, open(w + '/agent/macd1d.json', 'w'))
+        o = A.m1d_run(w); self.assertEqual(A.J(w + '/agent/d1.json')['s'], {'AAA': [1.5, 1.0]}); self.assertEqual(o['ideas'][0]['d1']['gap'], 0.5); self.assertEqual(o['d1Asof'], A.today()); self.assertEqual(o['need1d'], [])
+    def test_stale_daily_states_are_ignored(self):
+        w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); os.makedirs(w + '/liveSnapshot'); os.makedirs(w + '/stockData')
+        json.dump({'stocks': [{'ticker': 'AAA', 'name': 'Aaa', 'industryGroup': 'G', 'score': 7, 'verdict': 'buy', 'valuation': {'intrinsicValue': 200}}]}, open(w + '/stockData/c001.json', 'w'))
+        json.dump({'asof': A.today(), 'rows': [{'k': 'AAA', 'y': 'NSE:AAA', 'c': row()}]}, open(w + '/liveSnapshot/c001.json', 'w')); json.dump({'stocks': {}}, open(w + '/agent/compact.json', 'w')); A.build_watch(w, w)
+        json.dump({'d': '2000-01-01', 's': {'AAA': [0, 1]}}, open(w + '/agent/d1.json', 'w')); o = A.swing_run(w); self.assertEqual(len(o['ideas']), 1); self.assertIsNone(o['d1Asof'])
+
 class Files(unittest.TestCase):
     def mk(self):
         w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); os.makedirs(w + '/liveSnapshot'); os.makedirs(w + '/stockData')

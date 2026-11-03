@@ -2,7 +2,7 @@
 // Pure: takes that document, returns markup (all saved text is escaped). A ranking of candidates, not a prediction.
 import { TIER_LABEL, e, fmt, list, num, table } from './fmt.js';
 
-const NO_IDEAS = 'No stock fits today: monthly RSI 66-76, positive margin of safety and the entry filters. Staying in cash is a valid call.';
+const NO_IDEAS = 'No stock fits today: monthly RSI 66-76, positive margin of safety, daily MACD above its signal line and the entry filters. Staying in cash is a valid call.';
 const NOT_YET = 'The best swing trades appear after the next daily run.';
 const CAVEAT = 'A ranking of candidates, not a prediction: in testing, about 4 in 10 comparable swing trades hit their stop within three weeks. Confirm the 3-hour chart before buying, use limit orders (especially on thin stocks), size by the stop and never risk more than your tier allows. This is a paper ledger\'s analysis, not advice.';
 
@@ -48,7 +48,7 @@ function skippedNote(skipped){
 
 function summary(sw){
   const when = sw.m3hAsof ? ' · 3-hour check ' + e(sw.m3hAsof) : ' · no 3-hour check yet';
-  return '<p class="rky-sub">' + e(sw.pool) + ' stocks fit your rule today (monthly RSI ' + e(list(sw.band)[0]) + '-' + e(list(sw.band)[1]) + ', positive margin of safety). Data as of ' + e(sw.dataAsof || '?') + when + '.</p>';
+  return '<p class="rky-sub">' + e(sw.pool) + ' stocks fit your rule today (monthly RSI ' + e(list(sw.band)[0]) + '-' + e(list(sw.band)[1]) + ', positive margin of safety, daily MACD above its signal line). Data as of ' + e(sw.dataAsof || '?') + when + '.</p>';
 }
 
 function swingHtml(sw){

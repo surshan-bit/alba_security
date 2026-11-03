@@ -921,7 +921,7 @@ const SWING = (o) => Object.assign({ asof: '2026-11-03', dataAsof: '2026-11-03',
 test('rocky page: best swing trades say so when the document is missing or the day has no idea', async () => {
   const none = await rockyPage({ state: EMPTY_ST });
   assert.ok(/Best swing trades for the day/.test(none) && /appear after the next daily run/.test(none));
-  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [] }) }), /No stock fits today: monthly RSI 66-76/);
+  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [] }) }), /No stock fits today: monthly RSI 66-76, positive margin of safety, daily MACD above its signal line/);
   assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: undefined }) }), /No stock fits today/);
 });
 test('rocky page: a swing idea shows rank, action, score, tier, the levels in rupees, shares for both capitals, the reasons and the caveat', async () => {

@@ -4,6 +4,7 @@ Modes (all file based; WORK dir holds the JSON docs):
   build   WORK  ALBADATA   -> writes WORK/compact.json (static fundamentals + bar stats for the Positive MoS universe)
   daily   WORK  [--nifty X] -> reads WORK/live/*.json (liveSnapshot docs), compact, state, weights -> updates state.json, picks.json, log.json
   weekly  WORK             -> recalibrates weights.json from closed paper trades, writes learn.json
+  m1d     WORK             -> reads WORK/agent/macd1d.json ({key: [daily MACD, daily signal]}), writes d1.json and refreshes swing.json
   m3h     WORK             -> reads WORK/agent/bars3h.json ({key: [3-hour closes]}), writes m3h.json and refreshes swing.json (best swing trades of the day)
 """
 import json,glob,sys,os,math,datetime as dt
@@ -13,6 +14,8 @@ RSI_LO=45; RSI_HI=75; NEAR_HIGH=0.85   # hard entry filters (see entry_blocks)
 TIER_RISK={'low':0.01,'medium':0.0075,'high':0.005}; MRSI_HIGH=70; MRSI_MEDIUM=60   # risk-reward tiers by monthly RSI: above 70 high, above 60 medium, otherwise low (unknown counts as high)
 RR_MIN=3.0; GATE_DAYS=70       # 1:3 gate: target = RR_MIN x stop distance; new positions may run 70 days (10 weeks, as tested)
 SPIKE_PG=300; SPIKE_PENALTY=25   # earnings-spike check: trailing profit growth above 300% costs 25 points and carries a warning
+LIQ_PART=0.10   # a position may be at most 10% of the stock's average daily volume, so it can be sold without moving the price
+D1_FRESH=(0.5,3.0)   # daily-MACD gap as a percent of price: at or under 0.5 earns full points, 3 or more none (closest to the signal line ranks highest)
 SWING_MRSI=(66,76); LIQ_LAKH=50; T1_PCT=10.0; T2_PCT=20.0; CAPITALS=(500000,1000000)   # swing ideas: monthly-RSI band, liquid = turnover of at least Rs 50 lakh a day, targets, capitals shown
 REGIME_MIN=0.6   # market filter: new entries only while at least this share of the universe has a positive 1-month change
 FEATS=['fund','mos','trend','rsi','mom','near']
@@ -91,12 +94,17 @@ def m3h_text(st):
 M3H_POINTS={'fresh_up':25,'rising':25,'fading':12,'down':0,None:10}
 M3H_ACTION={'fresh_up':'Buy zone','rising':'Buy zone','fading':'Wait: momentum fading','down':'Wait for a 3-hour cross-up',None:'Check the 3-hour chart'}
 
-def swing_ideas(live,comp,wl,m3h=None,held=(),sym=None):
+def d1_points(gap):
+    """0-20 points for how close the daily MACD is to its signal line (gap in percent of price): a fresh cross-up scores highest."""
+    lo,hi=D1_FRESH
+    return 20*clip(1-(gap-lo)/(hi-lo),0,1)
+
+def swing_ideas(live,comp,wl,m3h=None,held=(),sym=None,d1=None):
     """Best swing trades of the day. Pool: monthly RSI 66-76, positive margin of safety, not an 'Avoid' verdict. Stocks inside Rocky's universe must also pass its
     hard entry filters (otherwise they are listed as skipped); others are kept with 'trend not checked'. Ranked by fundamentals, margin of safety, trend,
     the 3-hour MACD state and liquidity. Entry zone = last close to +1%; stop = Rocky's volatility stop; Target 1 = +10%, Target 2 = +20%.
     Sizing follows the monthly-RSI risk tier. A ranking of candidates, not a prediction."""
-    m3h=m3h or {}; sym=sym or {}; ideas=[]; skipped=[]; pool=0
+    m3h=m3h or {}; sym=sym or {}; d1=d1 or {}; ideas=[]; skipped=[]; pool=0; need1d=[]
     for k,v in wl.items():
         n,g,iv,sc,vd=v[:5]; pg=v[5] if len(v)>5 else None
         c=live.get(k)
@@ -109,28 +117,38 @@ def swing_ideas(live,comp,wl,m3h=None,held=(),sym=None):
         if m:
             bl=entry_blocks(m,close,c[5],c[8])
             if bl: skipped.append({'k':k,'n':n,'why':'; '.join(bl)}); continue
+        dd=d1.get(k)
+        if not dd: need1d.append({'k':k,'y':sym.get(k)})
+        elif dd[0]<=dd[1]: skipped.append({'k':k,'n':n,'why':'Daily MACD below its signal line'}); continue
+        gap=None if not dd else (dd[0]-dd[1])/close*100
         turn=(c[9] or 0)*close/1e5; thin=turn<LIQ_LAKH
         atr=m.get('atr') if m else None; sp=clip(atr*0.9,4.5,9.0) if atr else 8.0
         entry=close; stop=entry*(1-sp/100); tier=risk_tier(mrsi); rk=TIER_RISK[tier]
         st=m3h.get(k); spike=isinstance(pg,(int,float)) and pg>SPIKE_PG
-        score=(sc or 0)/10*30+min(mos,50)/50*15+(25 if m else 10)+(5 if 69<=mrsi<=72 else 0)+M3H_POINTS[st['kind'] if st else None]-(15 if thin else 0)-(SPIKE_PENALTY if spike else 0)
+        score=(sc or 0)/10*30+min(mos,50)/50*15+(25 if m else 10)+(5 if 69<=mrsi<=72 else 0)+M3H_POINTS[st['kind'] if st else None]+(10 if gap is None else d1_points(gap))-(15 if thin else 0)-(SPIKE_PENALTY if spike else 0)
         why=['Fundamentals: %s (score %s)'%(vd,sc),'Margin of safety %d%%'%round(mos),'Monthly RSI %d, inside your 66-76 band'%round(mrsi)]
         why.append('Passes Rocky\'s trend filters (above a rising 10-week average, weekly RSI %d)'%round(c[5]) if m else 'Trend not checked: outside Rocky\'s filtered universe')
+        if gap is not None: why.append('Daily MACD above its signal line (gap %.2f%% of price: %s)'%(gap,'close to the cross' if gap<=D1_FRESH[1]/2 else 'already stretched from the cross'))
         if st: why.append(m3h_text(st))
         warns=[]
         if spike: warns.append('Earnings spike: trailing profit growth %s%%. Check what the revenue is made of and the latest quarter before buying'%format(pg,',.0f'))
+        if gap is None: warns.append('Daily MACD not checked')
         if thin: warns.append('Thinly traded (about Rs %d lakh a day): exits may be hard, use limit orders'%round(turn))
         if not m: warns.append('Outside Rocky\'s universe, so its trend filters were not applied')
         if not atr: warns.append('Stop is an estimate (8%%): no volatility data')
         if k in held: warns.append('Already held in Rocky\'s paper ledger')
-        qty={}
-        for cap in CAPITALS: qty[str(cap)]=int(min(cap*rk/(entry-stop),cap*POSCAP*(rk/RISK)/entry))
+        qty={}; maxq=int(c[9]*LIQ_PART) if c[9] else None; limited=False
+        for cap in CAPITALS:
+            q=int(min(cap*rk/(entry-stop),cap*POSCAP*(rk/RISK)/entry))
+            if maxq is not None and q>maxq: q=maxq; limited=True
+            qty[str(cap)]=q
+        if limited: warns.append('Size limited to %s shares (10%% of the average daily volume) so you can exit: about Rs %s'%(format(maxq,','),format(round(maxq*entry),',')))
         ideas.append({'k':k,'y':sym.get(k),'n':n,'g':g,'close':round(close,2),'mrsi':round(mrsi,1),'mos':round(mos),'sc':sc,'vd':vd,'wrsi':None if c[5] is None else round(c[5]),'turn':round(turn),'thin':thin,'inU':bool(m),
-            'tier':tier,'risk':rk,'score':round(max(0,min(100,score)),1),'m3h':st,'action':M3H_ACTION[st['kind'] if st else None]+(' (verify earnings first)' if spike else ''),'pg':round(pg) if isinstance(pg,(int,float)) else None,'spike':spike,
-            'entry':[round(entry,2),round(entry*1.01,2)],'stop':round(stop,2),'stopPct':round(sp,1),'t1':round(entry*(1+T1_PCT/100),2),'t2':round(entry*(1+T2_PCT/100),2),'rr':round(T2_PCT/sp,1),'qty':qty,'why':why,'warn':warns})
+            'tier':tier,'risk':rk,'score':round(max(0,min(100,score)),1),'m3h':st,'action':M3H_ACTION[st['kind'] if st else None]+(' (verify earnings first)' if spike else ''),'pg':round(pg) if isinstance(pg,(int,float)) else None,'spike':spike,'d1':None if gap is None else {'macd':round(dd[0],2),'sig':round(dd[1],2),'gap':round(gap,2)},
+            'entry':[round(entry,2),round(entry*1.01,2)],'stop':round(stop,2),'stopPct':round(sp,1),'t1':round(entry*(1+T1_PCT/100),2),'t2':round(entry*(1+T2_PCT/100),2),'rr':round(T2_PCT/sp,1),'qty':qty,'liqLimited':limited,'why':why,'warn':warns})
     ideas.sort(key=lambda x:-x['score'])
     return {'band':list(SWING_MRSI),'pool':pool,'ideas':ideas[:5],'also':[{k:i[k] for k in('k','n','score','close','mrsi','mos','vd','thin','action')} for i in ideas[5:12]],'skipped':skipped[:10],
-            'need3h':[{'k':i['k'],'y':i['y']} for i in ideas[:6] if not i['m3h']],'capitals':list(CAPITALS)}
+            'need3h':[{'k':i['k'],'y':i['y']} for i in ideas[:6] if not i['m3h']],'need1d':need1d,'capitals':list(CAPITALS)}
 
 def swing_run(work):
     wl=J(work+'/agent/watch.json'); comp=(J(work+'/agent/compact.json') or {}).get('stocks',{})
@@ -140,9 +158,15 @@ def swing_run(work):
         d=J(f); asof=max(asof or '',d.get('asof') or '')
         for r in d['rows']: live[r['k']]=(r['c']+[None]*12)[:12]; sym[r['k']]=r.get('y')
     m=J(work+'/agent/m3h.json',{}); m3h=m.get('s',{}) if m.get('d')==today() else {}
+    dm=J(work+'/agent/d1.json',{}); d1=dm.get('s',{}) if dm.get('d')==today() else {}
     held={o['k'] for o in (J(work+'/agent/state.json',{}) or {}).get('open',[])}
-    out=swing_ideas(live,comp,wl['w'],m3h,held,sym); out.update({'asof':today(),'dataAsof':asof,'m3hAsof':m.get('d') if m3h else None})
-    S(work+'/agent/swing.json',out); print('swing pool',out['pool'],'ideas',[i['k']+':'+str(i['score']) for i in out['ideas']],'need3h',[x['k'] for x in out['need3h']]); return out
+    out=swing_ideas(live,comp,wl['w'],m3h,held,sym,d1); out.update({'asof':today(),'dataAsof':asof,'m3hAsof':m.get('d') if m3h else None,'d1Asof':dm.get('d') if d1 else None})
+    S(work+'/agent/swing.json',out); print('swing pool',out['pool'],'need1d',len(out['need1d']),'ideas',[i['k']+':'+str(i['score']) for i in out['ideas']],'need3h',[x['k'] for x in out['need3h']]); return out
+
+def m1d_run(work):
+    raw=J(work+'/agent/macd1d.json',{}) or {}
+    res={k:[v[0],v[1]] for k,v in raw.items() if isinstance(v,(list,tuple)) and len(v)>=2 and all(isinstance(x,(int,float)) for x in v[:2])}
+    S(work+'/agent/d1.json',{'d':today(),'s':res}); print('daily MACD for',len(res),'stocks'); return swing_run(work)
 
 def m3h_run(work):
     bars=J(work+'/agent/bars3h.json',{}) or {}; res={}
@@ -340,3 +364,4 @@ if __name__=='__main__':
         daily(w,n)
     elif m=='weekly': weekly(w)
     elif m=='m3h': m3h_run(w)
+    elif m=='m1d': m1d_run(w)
