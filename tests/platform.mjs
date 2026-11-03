@@ -220,6 +220,19 @@ import { readFileSync } from 'node:fs';
   }
 }
 
+// Realtime sends inserts and updates only. A delete event is not filtered by row-level security, so it would show every signed-in user the path
+// (and so the trade symbol and date) of a document someone deleted. The setting covers the whole publication, so it is applied only when
+// docs is the only table in it.
+{
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'), mig = readFileSync(new URL('../supabase/008_realtime_no_deletes.sql', import.meta.url), 'utf8');
+  for(const [name, sql] of [['schema', schema], ['migration', mig]]){
+    eq(name + ': the publication sends inserts and updates only', /alter publication supabase_realtime set \(publish = 'insert, update'\)/.test(sql), true);
+    eq(name + ': it is applied only when docs is published and is the only published table', /if exists \(select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'docs'\)\s*and not exists \(select 1 from pg_publication_tables where pubname = 'supabase_realtime' and not \(schemaname = 'public' and tablename = 'docs'\)\)\s*then\s*alter publication supabase_realtime set/.test(sql), true);
+    eq(name + ': a project with other published tables is told, not changed silently', /raise warning/.test(sql), true);
+  }
+}
+
 // Security headers: the Cloudflare site must ship the file that sets them
 {
   const { readFileSync } = await import('node:fs');
