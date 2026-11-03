@@ -55,7 +55,9 @@ These rules apply to every change in this repository. They are requirements, not
 - Bug fix = a failing regression test first, then the fix.
 - Tests are deterministic, isolated and fast: no real network, clocks or randomness; use `tests/fixtures` and `tests/lib` helpers.
 - Golden snapshots (`tests/golden*.json*`) change only when behaviour is meant to change; review the diff and say why before `npm run update-golden`.
-- The global coverage floor ratchets up and never drops. If a line truly cannot be unit tested, say so explicitly in the PR with the reason.
+- Measure it with `npm run coverage` (c8 over `tests/engines.js`, mapped back to `src/`). The global floor lives in `tools/coverage-ratchet.json`: it ratchets up and never drops (`node tools/coverage.js --update` locks in a gain). `npm run coverage -- --changed` fails if any line you added or changed in `src/` has no unit test; CI runs it on every pull request.
+- Only `tests/engines.js` counts toward coverage. Test DOM-heavy modules with `loadWithStubs()` from `tests/lib/load.js` (it swaps page-level imports such as `core/store.js` for small stand-ins). The jsdom and Chromium suites protect behaviour but are not measured yet.
+- If a line truly cannot be unit tested, say so explicitly in the PR with the reason.
 
 ## 6. Definition of done (run all, report results)
 1. `npm run lint` (no errors; lower ratchets if counts dropped)
@@ -63,7 +65,7 @@ These rules apply to every change in this repository. They are requirements, not
 3. `npm run check` (build + golden + regression harness) and `npm run platform`
 4. `npm run browser` / `npm run state` where UI or state changed
 5. `npm audit --omit=dev --audit-level=high`
-6. Tests added for every changed module; coverage on changed code at 100%
+6. Tests added for every changed module; `npm run coverage` and `npm run coverage -- --changed` pass (changed code at 100%)
 7. Security self-review against section 3 written in the PR description
 8. Diff reviewed: nothing unrelated, no secrets, no debug output
 

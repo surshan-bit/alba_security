@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-24.04   # Playwright 1.56 does not support ubuntu-latest (26.04) yet
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with: { fetch-depth: 0 }   # the changed-lines coverage check compares with the base branch
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with: { node-version: 22, cache: npm }
       - run: npm ci
@@ -19,6 +20,9 @@ jobs:
       - run: npx playwright install --with-deps chromium   # the Playwright version is pinned in package.json
       - run: npm run check -- --part=main
       - run: npm run platform
+      - run: npm run coverage   # unit-test coverage of src/ may never fall below tools/coverage-ratchet.json
+      - if: github.event_name == 'pull_request'
+        run: npm run coverage -- --changed=origin/${{ github.base_ref }}   # every line this pull request adds or changes in src/ must be covered by a unit test
   # The import flows in Chromium: by far the slowest suite (about 7 minutes), so it runs beside the rest.
   check-imports:
     runs-on: ubuntu-24.04   # Playwright 1.56 does not support ubuntu-latest (26.04) yet
