@@ -59,7 +59,7 @@ function leaderboardHtml(chartBlock, viewHtml){
         <div class="analysis-actions">
           ${iconBtn('analysisColumnsBtn', 'columns', 'Columns', 'Columns: choose and reorder the grid columns', ` aria-pressed="${getAnalysisColumnsPanelOpen()}"`)}
           ${iconBtn('analysisChartToggle', 'chart', 'Show chart', 'Show chart', ' aria-expanded="false"')}
-          ${iconBtn('analysisFullscreenBtn', lbFull ? 'shrink' : 'expand', fullscreenLabel(lbFull), fullscreenLabel(lbFull) + ' (Esc to leave)', ` aria-pressed="${lbFull}"`)}
+          ${iconBtn('analysisFullscreenBtn', lbFull ? 'shrink' : 'expand', fullscreenLabel(lbFull), fullscreenLabel(lbFull) + ' (Esc to leave)', ` data-analysis-full aria-pressed="${lbFull}"`)}
           ${kit ? kit.barHtml('analysis') : ''}
         </div>
       </div>
