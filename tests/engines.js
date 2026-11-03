@@ -1887,7 +1887,9 @@ test('auto reload: a newer published build shows a banner styled by classes, wit
   const release = build => onRelease({ exists: true, data: () => ({ build }) });
   try {
     const A = await loadWithStubs('src/boot/autoreload.js', '', stubs);
-    A.init_boot_autoreload(); await new Promise(r => setTimeout(r, 20));
+    const realInterval = globalThis.setInterval, timers = []; globalThis.setInterval = f => { timers.push(f); return 0; };   // the 5-second re-check runs when the test says so, never after the page is gone
+    try { A.init_boot_autoreload(); await new Promise(r => setTimeout(r, 20)); } finally { globalThis.setInterval = realInterval; }
+    assert.strictEqual(timers.length, 1, 'one periodic re-check is scheduled');
     release('aaa111'); assert.strictEqual(win.document.getElementById('appUpdateBanner'), null, 'the same build shows nothing');
     globalThis.__arBusy = true; release('bbb222');
     const banner = () => win.document.getElementById('appUpdateBanner');
@@ -1897,7 +1899,8 @@ test('auto reload: a newer published build shows a banner styled by classes, wit
     assert.ok(/new version is available/.test(banner().textContent) && btn.className === 'toast-banner__btn' && btn.textContent === 'Reload now', 'already reloaded once: a Reload button instead of a loop');
     assert.strictEqual(win.document.querySelectorAll('[style]').length, 0, 'styled by classes, never inline');
     btn.click(); assert.strictEqual(spy.reloads, 1);
-    release(null); release('bbb222');
+    release(null); timers[0]();   // no release record: the periodic re-check has nothing to show
+    assert.strictEqual(spy.reloads, 1);
   } finally { if(savedWindow) Object.defineProperty(globalThis, 'window', savedWindow); else delete globalThis.window; delete globalThis.__arDb; delete globalThis.__arBusy; }
 }));
 
