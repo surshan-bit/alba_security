@@ -4,6 +4,7 @@ import { createDocStore, createMemoryBackend } from '../platform/docstore.js';
 import { installPlatform } from '../platform/shim.js';
 import { corsHeaders } from '../supabase/functions/_shared/cors.ts';
 import { readPrompt, MAX_PROMPT_CHARS } from '../supabase/functions/_shared/prompt.ts';
+import { allowedMethod, quotaConfig, quotaDecision, DEFAULT_MAX_CALLS, DEFAULT_WINDOW_MINUTES } from '../supabase/functions/_shared/guard.ts';
 let fails = 0;
 const eq = (name, a, b) => { const ok = JSON.stringify(a) === JSON.stringify(b); if(!ok){ fails++; console.log('FAIL', name, JSON.stringify(a), '!=', JSON.stringify(b)); } };
 const tick = () => new Promise(r => setTimeout(r, 5));
@@ -141,6 +142,28 @@ import { readFileSync } from 'node:fs';
   eq('prompt: the longest allowed prompt passes', bad({ prompt: 'a'.repeat(MAX_PROMPT_CHARS) }), 0);
   eq('prompt: one character too many is a 413', bad({ prompt: 'a'.repeat(MAX_PROMPT_CHARS + 1) }), 413);
   eq('prompt: the error carries a code and a user-safe message', readPrompt(null), { code: 'invalid_request', message: 'Bad request.', status: 400 });
+}
+
+// Guards in front of the Claude function: method, a per-owner call quota (counted in the database) and what a failed count means
+{
+  eq('guard: POST is allowed', allowedMethod('POST'), true);
+  for(const m of ['GET', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'post', '']) eq('guard: ' + (m || 'empty method') + ' is refused', allowedMethod(m), false);
+  eq('quota: defaults when nothing is set', quotaConfig(undefined, undefined), { maxCalls: DEFAULT_MAX_CALLS, windowMinutes: DEFAULT_WINDOW_MINUTES });
+  eq('quota: secrets are read as whole numbers', quotaConfig('50', '10'), { maxCalls: 50, windowMinutes: 10 });
+  for(const bad of ['', 'abc', '0', '-5', '1.5', '1e3', 'NaN', '99999999']) eq('quota: "' + bad + '" falls back to the default', quotaConfig(bad, bad), { maxCalls: DEFAULT_MAX_CALLS, windowMinutes: DEFAULT_WINDOW_MINUTES });
+  eq('quota: a counted call inside the limit is allowed', quotaDecision({ data: true, error: null }), 'allowed');
+  eq('quota: a refused slot is limited', quotaDecision({ data: false, error: null }), 'limited');
+  for(const r of [{ data: null, error: { message: 'x' } }, { data: true, error: { message: 'x' } }, { data: null, error: null }, { data: 'true', error: null }, { data: 1, error: null }]) eq('quota: ' + JSON.stringify(r) + ' fails closed', quotaDecision(r), 'unavailable');
+}
+{
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'), mig = readFileSync(new URL('../supabase/005_sample_quota.sql', import.meta.url), 'utf8');
+  for(const [name, sql] of [['schema', schema], ['migration', mig]]){
+    eq(name + ': the usage table has row level security and no policy', /alter table public\.sample_usage enable row level security/.test(sql) && !/on public\.sample_usage/.test(sql), true);
+    eq(name + ': the slot function is owner-only, with an empty search path', /function public\.take_sample_slot\([^)]*\)[\s\S]*?security definer set search_path = ''[\s\S]*?is_owner\(\)/.test(sql), true);
+    eq(name + ': only signed-in users may run it', /revoke all on function public\.take_sample_slot\(integer, interval\) from public, anon/.test(sql) && /grant execute on function public\.take_sample_slot\(integer, interval\) to authenticated/.test(sql), true);
+    eq(name + ': the table is not readable by clients', !/grant [^;]*sample_usage/.test(sql), true);
+  }
 }
 
 // Security headers: the Cloudflare site must ship the file that sets them

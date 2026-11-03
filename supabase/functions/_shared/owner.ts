@@ -7,11 +7,15 @@ export const cors = (req: Request) => corsHeaders(req.headers.get('Origin'), Den
 export const reply = (req: Request, body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'Content-Type': 'application/json' } });
 
+// A database client that acts as the caller (their own sign-in token), so row-level rules apply to it.
+export const callerClient = (auth: string) =>
+  createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } });
+
 // Returns null when the caller is the owner, otherwise a ready-made error response.
 export async function requireOwner(req: Request): Promise<Response | null> {
   const auth = req.headers.get('Authorization');
   if (!auth) return reply(req, { code: 'session_expired', message: 'Please sign in again.' }, 401);
-  const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } });
+  const sb = callerClient(auth);
   const { data, error } = await sb.from('profiles').select('role').maybeSingle();
   if (error || !data) return reply(req, { code: 'session_expired', message: 'Please sign in again.' }, 401);
   if (data.role !== 'owner') return reply(req, { code: 'not_granted', message: 'Only the owner can run refreshes.' }, 403);
