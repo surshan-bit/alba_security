@@ -9,6 +9,7 @@ import { closestEl } from '../core/evt.js';
 import { getScope, getToolbar, isExternalSelection, scopeStocks, sectionOf, selKeys, selectedStocks, stockByKey } from './kit-lookup.js';
 import { closeMenu, getMenuAnchor, getMenuState, item, menuIsOpen, menuOpenAt, menuQuery, menuQueryAll, openMenu, refillMenu } from './kit-menu.js';
 import { CHUNK, KIND_LABEL, busyIn, flushQueue, getActiveJob, persistIfRunning, queuedJobs, request, setQueueHooks } from './kit-queue.js';
+import { setHtml } from '../core/safehtml.js';
 
 const esc = escapeHtml;
 // Only the screen that started the refresh shows the spinner; the other screens keep a normal Refresh button.
@@ -79,17 +80,17 @@ function repaint() {
     paintQueued = false;
     document.querySelectorAll("[data-rk-bar]").forEach((el) => {
       const html = barInner(/** @type {HTMLElement} */ (el).dataset.rkBar);
-      if (/** @type {any} */ (el).__rk !== html) { /** @type {any} */ (el).__rk = html; el.innerHTML = html; }
+      if (/** @type {any} */ (el).__rk !== html) { /** @type {any} */ (el).__rk = html; setHtml(el, html); }
     });
     document.querySelectorAll("[data-rk-selbar]").forEach((el) => {
       const html = selbarInner(/** @type {HTMLElement} */ (el).dataset.rkSelbar);
-      if (/** @type {any} */ (el).__rk !== html) { /** @type {any} */ (el).__rk = html; el.innerHTML = html; }
+      if (/** @type {any} */ (el).__rk !== html) { /** @type {any} */ (el).__rk = html; setHtml(el, html); }
     });
     /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".rk-toolbtn,.rk-choicebtn,.rk-barbtn")).forEach((b) => {
       const sc = b.dataset.rkScope ? getScope(b.dataset.rkScope) : null, sec = sc ? sectionOf(sc.source) : "business";
       const busy = busyIn(sec) ? "1" : "0";
       if (b.dataset.rkBusy === busy) return;
-      b.dataset.rkBusy = busy; b.innerHTML = refreshLabel(sec);
+      b.dataset.rkBusy = busy; setHtml(b, refreshLabel(sec));
     });
     persistIfRunning();
   });

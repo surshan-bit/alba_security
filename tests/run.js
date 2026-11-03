@@ -425,6 +425,9 @@ const typeInto = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('inpu
     typeInto($('#globalSearch'), stocks[7].name); await sleep(150);
     $('#globalSearch').dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await sleep(600);
     snap('s9c_lazy', { chart: !!win.document.querySelector('#priceChartBlock'), panels: win.document.querySelectorAll('#priceChartBlock .pc-panels > *').length, reads: JSON.stringify(__reads.filter(r => r.startsWith('priceHistory'))), tk });
+    // the summary figures in each chart's header are copied as nodes (not as HTML text): a styled figure, the RSI gauge, must arrive with its custom property
+    { const blk = win.document.querySelector('#priceChartBlock');
+      snap('s9c_summary', { panels: blk ? Array.from(blk.querySelectorAll('.pc-panel .pc-psum')).map(e => e.innerHTML) : 'no chart' }); }
     { const blk = win.document.querySelector('#priceChartBlock'); const q = sel => blk ? blk.querySelectorAll(sel).length : -1;
       snap('s9d_events', { stats: blk ? (blk.querySelector('.pc-evstats') || { innerHTML: 'none' }).innerHTML : 'no chart', legend: blk ? (blk.querySelector('.pc-evlegend') || { outerHTML: 'none' }).outerHTML : 'no chart', tags: q('.pc-ev'), news: q('.pc-evk-news.pc-ev'), svg: html$('#priceChartBlock .pc-panel svg') });
       const tg = blk && blk.querySelector('.pc-evtoggle[data-g="news"]'); if(tg){ click(tg); await sleep(50); }

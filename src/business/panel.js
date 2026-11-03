@@ -19,6 +19,7 @@ import { PERIODS, industryTable, needsBars, periodOf } from './calc.js';
 import { closestEl } from '../core/evt.js';
 import { dropMenuHtml } from '../ui/dropmenu.js';
 import { isRebound } from '../list/rebound.js';
+import { insertHtmlAfter, setHtml } from '../core/safehtml.js';
 
 const KEY = 'albaDashboard.business.v1';
 let bizFull = false;   // the table (or the heat map) fills the whole window
@@ -113,7 +114,7 @@ function runNews(spec){
 }
 function paintNewsStatus(){
   const el = document.getElementById('bizNewsStatus'), html = newsStatusHtml();
-  if(el && html){ const t = document.createElement('div'); t.innerHTML = html; el.replaceWith(t.firstChild); } else render();
+  if(el && html){ const t = document.createElement('div'); setHtml(t, html); el.replaceWith(t.firstChild); } else render();
   document.querySelectorAll('.biz-newsbtn').forEach(b => { /** @type {HTMLButtonElement} */ (b).disabled = true; });
 }
 
@@ -152,7 +153,7 @@ function detailHtml(r, cols){
     const scores = detailAllCols ? '' : '<span class="biz-ft">Fund ' + (ctx.scoreLabel || 'n/a') + ' · Tech ' + (ts === null ? 'n/a' : ts.toFixed(1)) + '</span>';
     return '<tr class="strat-row' + (x.match ? ' biz-match' : '') + '" data-idx="' + idx + '" tabindex="0">' + colIds.map(id => { const c = analysisLbCell(id, ctx); return id === 'stock' && scores ? c.replace(/<\/td>$/, scores + '</td>') : c; }).join('') + (showPeriod ? '<td class="num">' + pct(x.change) + '</td>' : '') + '</tr>';
   }).join('');
-  const grid = '<div class="strat-table-wrap' + (detailAllCols ? '' : ' biz-lean') + '" style="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + colIds.map(id => columnHeaderHtml(id, detailSort)).join('') + (showPeriod ? sortHeaderHtml('periodChg', p.key + ' chg', detailSort, ' class="num"') : '') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  const grid = '<div class="strat-table-wrap' + (detailAllCols ? '' : ' biz-lean') + '" data-css="--biz-rows:' + (rows.split('</tr>').length - 1) + '"><table class="strat-table"><thead><tr>' + colIds.map(id => columnHeaderHtml(id, detailSort)).join('') + (showPeriod ? sortHeaderHtml('periodChg', p.key + ' chg', detailSort, ' class="num"') : '') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   const card = (label, value) => '<div class="biz-kpi"><small>' + label + '</small><span>' + value + '</span></div>';
   const vsInd = r.matches && r.matchMean !== null && r.mean !== null ? r.matchMean - r.mean : null;
   const lastCard = strategyOn()
@@ -171,18 +172,18 @@ function openStockFromBusiness(idx){
 function breadth(r){
   if(!r.known) return '';
   const u = r.up / r.known * 100, d = r.down / r.known * 100;
-  return '<span class="biz-breadth" title="' + r.up + ' up, ' + r.down + ' down, ' + (r.known - r.up - r.down) + ' unchanged"><i class="up" style="width:' + u + '%"></i><i class="down" style="width:' + d + '%"></i></span> ' + r.up + '↑ ' + r.down + '↓';
+  return '<span class="biz-breadth" title="' + r.up + ' up, ' + r.down + ' down, ' + (r.known - r.up - r.down) + ' unchanged"><i class="up" data-css="--w:' + u + '%"></i><i class="down" data-css="--w:' + d + '%"></i></span> ' + r.up + '↑ ' + r.down + '↓';
 }
 
 // Strategy choice as buttons, like the Analysis filter: "All" (no strategy) or one of your strategies, each with how many stocks qualify today.
 function strategyGroupHtml(){
   const chosen = chosenStrategy();
-  const btn = (value, label, n, active, dot, title) => '<button type="button" class="filter-btn' + (active ? ' active' : '') + '" data-biz-strat="' + escapeHtml(value) + '" title="' + title + '"><span class="filter-dot" style="background:' + dot + '"></span>' + label + '<span class="filter-n">' + n + '</span></button>';
-  const list = [btn('', 'All', stocks.length, !chosen, 'var(--text)', 'Do not highlight by a strategy')].concat(publishedStrategies().map(x => {
+  const btn = (value, label, n, active, dot, title) => '<button type="button" class="filter-btn' + (active ? ' active' : '') + '" data-biz-strat="' + escapeHtml(value) + '" title="' + title + '"><span class="filter-dot filter-dot--' + dot + '"></span>' + label + '<span class="filter-n">' + n + '</span></button>';
+  const list = [btn('', 'All', stocks.length, !chosen, 'text', 'Do not highlight by a strategy')].concat(publishedStrategies().map(x => {
     const set = strategyStockSet(x.id);
-    return btn(x.id, '<span class="filter-label">' + escapeHtml(x.name) + '</span>', set ? set.size : 0, x.id === chosen, 'var(--accent)', 'Highlight the stocks that qualify for this strategy today');
+    return btn(x.id, '<span class="filter-label">' + escapeHtml(x.name) + '</span>', set ? set.size : 0, x.id === chosen, 'accent', 'Highlight the stocks that qualify for this strategy today');
   }));
-  const rb = '<div class="filter-group"><h2>Weekly Move</h2><div class="filter-group-row"><button type="button" class="filter-btn' + (rebound ? ' active' : '') + '" data-biz-rebound="1" aria-pressed="' + rebound + '" title="Down last week, up this week"><span class="filter-dot" style="background:var(--buy)"></span>Rebound<span class="filter-n">' + stocks.filter(isRebound).length + '</span></button></div></div>';
+  const rb = '<div class="filter-group"><h2>Weekly Move</h2><div class="filter-group-row"><button type="button" class="filter-btn' + (rebound ? ' active' : '') + '" data-biz-rebound="1" aria-pressed="' + rebound + '" title="Down last week, up this week"><span class="filter-dot filter-dot--buy"></span>Rebound<span class="filter-n">' + stocks.filter(isRebound).length + '</span></button></div></div>';
   return '<div class="filters analysis-filters-panel biz-strategy-panel"><div class="filter-group"><h2>Strategy</h2><div class="filter-group-row">' + list.join('') + '</div></div>' + rb + '</div>';
 }
 // The view, period, grouping and strategy controls sit in a column beside the content, like the Analysis filters.
@@ -244,7 +245,7 @@ function draw(el){
     const isOpen = open.has(r.name);
     return '<tr class="biz-row' + (isOpen ? ' open' : '') + '" data-biz-name="' + escapeHtml(r.name) + '" tabindex="0" role="button" aria-expanded="' + isOpen + '"><td class="biz-name">' + '<button type="button" class="biz-open" data-biz-open="' + escapeHtml(r.name) + '" title="Open the industry page: factors, news and charts">' + escapeHtml(r.name) + '</button></td><td class="num">' + r.count + '</td><td class="num">' + pct(r.mean) + '</td><td class="num">' + pct(r.median) + '</td><td>' + breadth(r) + '</td><td class="num">' + (r.news.length ? r.news.length + (r.pos || r.neg ? ' <span class="news-pos">+' + r.pos + '</span> <span class="news-neg">&minus;' + r.neg + '</span>' : '') : '') + '</td>' + (strategyOn() ? '<td class="num">' + (r.matches ? '<b class="biz-matchcount">' + r.matches + '</b> of ' + r.count : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null ? pct(r.matchMean) : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null && r.mean !== null ? signedPp(r.matchMean - r.mean) : '') + '</td>' : '') + '</tr>' + (isOpen ? detailHtml(r, cols) : '');
   }).join('');
-  if(view === 'heat'){ el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + (embed ? moreMenu : viewToggle + sizeToggle + fullBtn) + '</div></div>' + heatMap(rows, p, el)); syncSheets(); return; }
+  if(view === 'heat'){ setHtml(el, layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + (embed ? moreMenu : viewToggle + sizeToggle + fullBtn) + '</div></div>' + heatMap(rows, p, el))); syncSheets(); return; }
   kit.defineToolbar('biz', () => {
     const st = r => r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock), out = [];
     if(strategyOn()) out.push({ id: 'matched', label: 'Matched stocks', stocks: () => rows.flatMap(r => r.items.filter(x => x.match).map(x => x.stock)) });
@@ -253,7 +254,7 @@ function draw(el){
     out.push({ id: 'all', label: 'Every stock in the table', stocks: () => rows.flatMap(st) });
     return out;
   });
-  el.innerHTML = layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + (embed ? moreMenu : expandBtn) + kit.toolbarButton('biz') + '</div></div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + kit.selbarSlot('biz'));
+  setHtml(el, layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + (embed ? moreMenu : expandBtn) + kit.toolbarButton('biz') + '</div></div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + kit.selbarSlot('biz')));
   syncSheets();
   const chip = embed ? document.getElementById('analysisFiltersCount') : null;   // a phone shows the count inside the Filters chip (phone.css)
   if(chip) chip.textContent = strategyOn() ? total + ' of ' + stocks.length : '';
@@ -272,7 +273,7 @@ function toggleRow(row){
   if(!r){ render(); return; }   // not drawn from the rows we know (should not happen): redraw as before
   const next = row.nextElementSibling;
   if(next && next.classList.contains('biz-detail')) next.remove();
-  if(isOpen) row.insertAdjacentHTML('afterend', detailHtml(r, drawnCols));
+  if(isOpen) insertHtmlAfter(row, detailHtml(r, drawnCols));
   row.classList.toggle('open', isOpen);
   row.setAttribute('aria-expanded', String(isOpen));
   const all = /** @type {HTMLElement | null} */ (document.querySelector('#businessBody [data-biz-all]'));
@@ -345,12 +346,12 @@ const hostActive = () => { const s = hostSection(); return !!s && s.classList.co
 // After a refresh started here has saved its stocks, redraw so the grid shows the new numbers.
 document.addEventListener('alba-batch-done', (e) => { if(/** @type {CustomEvent} */ (e).detail && /^biz-/.test(/** @type {CustomEvent} */ (e).detail.source) && hostActive()) render(); });
 function show(){
-  if(embed && embed.el.isConnected) embed.el.innerHTML = '';   // Analysis is not on screen now; its copy of the table must not clash with this page's
+  if(embed && embed.el.isConnected) embed.el.textContent = '';   // Analysis is not on screen now; its copy of the table must not clash with this page's
   embed = null; render(); ensureData();
 }
 // The same table inside Analysis: `cfg` = { el (where to draw), by ('industry' | 'group'), section, label, stocksNow() (the stocks that pass the Analysis filters) }. Wired once per element.
 function showIn(cfg){
-  const own = document.getElementById('businessBody'); if(own) own.innerHTML = '';   // Explorer's own copy (hidden) would share element ids with this one
+  const own = document.getElementById('businessBody'); if(own) own.textContent = '';   // Explorer's own copy (hidden) would share element ids with this one
   if(!embed || embed.by !== cfg.by) open.clear();
   if(!cfg.el.dataset.bizWired){ cfg.el.dataset.bizWired = '1'; wire(cfg.el); }
   embed = Object.assign({ set: new Set(), on: false }, cfg);

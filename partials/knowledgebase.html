@@ -251,6 +251,23 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.350 &middot; 2026-11-03</h3>
+            <ul>
+              <li><strong>Stricter limits on the test website (nothing changes in claude.ai):</strong> the copy of Alba that runs outside claude.ai now refuses a single saved document over 1 MB, more than 10,000 saved documents per person, and uploaded files that are not CSV or are over 10 MB. Asking Claude from that website is limited to 1,000 calls an hour, and a deleted trade or other private document is no longer announced to other signed-in users.</li>
+              <li><strong>Safer helper services (nothing looks different):</strong> the Screener helper only talks to screener.in, rejects malformed requests and limits how often one caller can ask, and the packages the server functions use are now checked against recorded fingerprints on every build.</li>
+            </ul>
+            <h3>v1.349 &middot; 2026-11-03</h3>
+            <ul>
+              <li><strong>Safer page drawing (nothing looks different):</strong> every screen that is drawn from saved or imported text now goes through one checked step that removes anything able to run code (scripts, hidden event handlers, unsafe links) before it reaches the page. The 81 places that used to write raw HTML directly are down to none. One behaviour was kept on purpose: clicking the Screener or TV link on a stock row still opens the link without also opening the stock.</li>
+            </ul>
+            <h3>v1.348 &middot; 2026-11-03</h3>
+            <ul>
+              <li><strong>Safer news tags (nothing looks different):</strong> the positive / negative / neutral tag saved on news items is now checked against those three values before it is used to colour the news dots on the price charts and the industry news list. Anything else is ignored, so a badly formed saved tag can no longer affect the page.</li>
+            </ul>
+            <h3>v1.347 &middot; 2026-11-03</h3>
+            <ul>
+              <li><strong>Engineering standards (nothing looks different):</strong> the project now has written standards for how it is built &mdash; modular code, one global stylesheet, OWASP security rules, code quality and unit-test coverage. The build also gained a check that stops new inline styles, unsafe HTML writes and <code>eval</code>-style code from creeping in; the existing ones can only go down.</li>
+            </ul>
             <h3>v1.346 &middot; 2026-11-03</h3>
             <ul>
               <li><strong>New Rocky page:</strong> the paper-trading swing agent now has its own page in the menu. It shows Rocky&rsquo;s paper equity against Nifty, today&rsquo;s picks with their stops and targets, stocks that failed the 1:3 reward-to-risk gate (with the reason), open and closed paper trades, the market regime (risk-on or risk-off), drawdown, expectancy and how its factor weights are learning. Rocky never places real orders. The page only reads Rocky&rsquo;s saved ledger; the daily run keeps it up to date.</li>

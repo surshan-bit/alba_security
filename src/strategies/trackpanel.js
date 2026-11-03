@@ -6,6 +6,7 @@ import { deleteRun, evaluateRun, loadRuns, makeRun, saveRun, savesToAccount } fr
 import { loadPriceSet } from './pricedata.js';
 import { qualifyingStocks } from './rules.js';
 import { askConfirm, tellUser } from '../ui/confirm.js';
+import { setHtml } from '../core/safehtml.js';
 
 const open = new Set();      // run ids whose pick list is expanded
 let renderToken = 0;
@@ -76,7 +77,7 @@ const LOAD_MS = 25000;
 async function renderTrackPanel(st){
   if(!st || !document.getElementById('stratTrackBody')) return;
   const token = ++renderToken;
-  const show = (html) => { const b = document.getElementById('stratTrackBody'); if(b && token === renderToken) b.innerHTML = html; };
+  const show = (html) => { const b = document.getElementById('stratTrackBody'); if(b && token === renderToken) setHtml(b, html); };
   let stage = 'reading your saved lists';
   try {
     const all = await within(loadRuns(), LOAD_MS);

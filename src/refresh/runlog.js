@@ -2,6 +2,7 @@
 // under each option. Kind: 'snapshot' (Refresh all stocks, including its price-bar stages). Only the newest
 // KEEP records of each kind are kept; older ones are deleted when a new one is saved.
 import { escapeHtml, formatUploadTimestamp } from '../core/util.js';
+import { setHtml } from '../core/safehtml.js';
 
 const KEEP = 2;
 const KINDS = ['snapshot'];
@@ -40,7 +41,7 @@ async function paintLastRuns(db){
   for(const [kind, el] of hosts){
     const host = /** @type {HTMLElement} */ (el);
     const mine = docs ? docs.filter(r => r.kind === kind).sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt))).slice(0, KEEP) : [];
-    host.innerHTML = '<div class="refreshlog-runs-title">Last ' + KEEP + ' runs</div>' + (mine.length ? mine.map(runLine).join('') : '<p class="upload-hint">' + (docs ? 'No runs yet.' : 'Not available in this view.') + '</p>');
+    setHtml(host, '<div class="refreshlog-runs-title">Last ' + KEEP + ' runs</div>' + (mine.length ? mine.map(runLine).join('') : '<p class="upload-hint">' + (docs ? 'No runs yet.' : 'Not available in this view.') + '</p>'));
   }
 }
 

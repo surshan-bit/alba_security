@@ -11,6 +11,7 @@ import { refreshIdeasBody } from './ideas.js';
 import { compareBy, nextSort, sortHeaderHtml } from '../analysis/columns.js';
 import { addSignalPoint, callChanges, factsFor, tradeSignal } from './signals.js';
 import { closestEl } from '../core/evt.js';
+import { setHtml } from '../core/safehtml.js';
 
 // Which view the panel shows: 'cards' or 'table'. Only this panel uses it, so it is kept here (the saved choice
 // is read once, when the page loads; the Cards / Table buttons change it).
@@ -68,7 +69,7 @@ const tlInr = (n) => n == null ? '—' : '₹' + n.toLocaleString('en-IN', {maxi
 function tlScoreCell(snap){
   const sc = snap && snap.score != null ? snap.score.toFixed(2) : '—';
   const v = snap && snap.verdict;
-  return v ? `${sc} <span class="badge b-${v}" style="padding:1px 8px;">${verdictLabel[v] || v}</span>` : sc;
+  return v ? `${sc} <span class="badge badge--tight b-${v}">${verdictLabel[v] || v}</span>` : sc;
 }
 // Everything a trade's card or table row needs, computed once per trade (the markup builders
 // below only format it). A trade counts as closed only when it has a sell record.
@@ -250,12 +251,12 @@ function renderTradeLogPanel(){
   const el = document.getElementById('tradeLogPanelBody');
   if(!el) return;
   if(!getTradeDb()){
-    el.innerHTML = `<p class="upload-hint">The Trade Log needs a signed-in view: open this dashboard on claude.ai.</p>`;
+    setHtml(el, `<p class="upload-hint">The Trade Log needs a signed-in view: open this dashboard on claude.ai.</p>`);
     return;
   }
   const trades = allTrades();
   if(trades.length === 0){
-    el.innerHTML = `<p class="upload-hint">No trades yet. Use &ldquo;+ Add trade&rdquo; to log a position.</p>`;
+    setHtml(el, `<p class="upload-hint">No trades yet. Use &ldquo;+ Add trade&rdquo; to log a position.</p>`);
     return;
   }
   const models = trades
@@ -279,7 +280,7 @@ function renderTradeLogPanel(){
         const avg = rets.reduce((a, b) => a + b, 0) / rets.length;
         return `<span class="data-chip">${verdictLabel[v] || v}: <b>${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%</b> avg (${rets.length} trade${rets.length === 1 ? '' : 's'})</span>`;
       }).join('');
-      aggregateHtml = `<div class="data-chips" style="margin:0 0 14px;">${chips}</div>`;
+      aggregateHtml = `<div class="data-chips data-chips--spaced">${chips}</div>`;
     }
   }
 
@@ -297,7 +298,7 @@ function renderTradeLogPanel(){
       </table>
     </div>`;
   }
-  keepScroll(el, () => { el.innerHTML = aggregateHtml + listHtml + tlPhoneHtml(models); });
+  keepScroll(el, () => { setHtml(el, aggregateHtml + listHtml + tlPhoneHtml(models)); });
   const posTab = document.getElementById('tlTabPositions');
   if(posTab) posTab.textContent = 'Positions ' + models.filter(m => !m.isClosed).length;
   syncSignals(models);

@@ -1,5 +1,11 @@
 // What the person sees while the page starts: the loading / error cover, and the "data updated" banner.
 
+// The cover's Retry button reloads the page. It is wired from code, not an inline handler, and boot() does it first, before anything can fail.
+function wireBootRetry(){
+  const btn = document.querySelector('#bootStatus .boot-retry');
+  if(btn) btn.addEventListener('click', () => location.reload());
+}
+
 // Shows `text` on the cover (#bootStatus in index.html); with isError a Retry button is offered.
 function bootMessage(text, isError){
   const el = document.getElementById('bootStatus'); if(!el) return;
@@ -29,4 +35,4 @@ function showUpdateBanner(){
   b.appendChild(t); b.appendChild(btn); document.body.appendChild(b);
 }
 
-export { bootMessage, hideBootMessage, showBootFailure, showUpdateBanner };
+export { bootMessage, hideBootMessage, showBootFailure, showUpdateBanner, wireBootRetry };

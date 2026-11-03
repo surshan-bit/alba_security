@@ -27,6 +27,7 @@ import { analysisControlsHtml, wireAnalysisControls } from './controls.js';
 import { TOOLTIP_HTML, createAnalysisTooltip, wireDotEvents } from './tooltip.js';
 import { leaderboardHtml, renderLeaderboardRows, wireLeaderboard } from './leaderboard.js';
 import { keepScroll, redrawWhenIdle } from '../ui/scrollkeep.js';
+import { setHtml } from '../core/safehtml.js';
 
 function openStockFromAnalysis(idx){
   openStockInline(appSections.analysis, 'Analysis', idx);
@@ -98,7 +99,7 @@ function paintIndustryView(m, el){
   syncSheets();
 }
 function drawIndustryView(body){
-  body.innerHTML = toolbarOnlyHtml() + `<div id="analysisIndustryBody" class="analysis-industry">${industryMod ? '' : '<p class="upload-hint">Loading…</p>'}</div>`;
+  setHtml(body, toolbarOnlyHtml() + `<div id="analysisIndustryBody" class="analysis-industry">${industryMod ? '' : '<p class="upload-hint">Loading…</p>'}</div>`);
   wireViewBar(body);
   const el = document.getElementById('analysisIndustryBody');
   if(!el) return;
@@ -106,7 +107,7 @@ function drawIndustryView(body){
   loadIndustryMod().then((m) => {
     if(!el.isConnected || analysisFilters.view === 'stocks') return;
     paintIndustryView(m, el);
-  }).catch((e) => { el.innerHTML = '<p class="upload-hint">Could not load this view. Please try again.</p>'; console.error('Could not load the industry view', e); });
+  }).catch((e) => { setHtml(el, '<p class="upload-hint">Could not load this view. Please try again.</p>'); console.error('Could not load the industry view', e); });
   syncSheets();
 }
 
@@ -145,7 +146,7 @@ function drawAnalysisSection(){
 
   if(analysisFilters.view !== 'stocks'){ drawIndustryView(body); return; }
   if(bucket.length === 0){
-    body.innerHTML = toolbarOnlyHtml() + `<p class="analysis-panel-sub">No stocks match the current filters, so there's nothing to plot.</p>`;
+    setHtml(body, toolbarOnlyHtml() + `<p class="analysis-panel-sub">No stocks match the current filters, so there's nothing to plot.</p>`);
     wireViewBar(body);
     return;
   }
@@ -153,19 +154,19 @@ function drawAnalysisSection(){
   const geo = chartGeometry(body, plottable);
 
   // The RSI Quadrant (its sliders, axis choices and the scatter plot) sits inside the leaderboard, opened by its "Show chart" button.
-  body.innerHTML = `
+  setHtml(body, `
     ${leaderboardHtml(`<div class="analysis-chart-block">
       ${analysisControlsHtml(geo.mosBoundLo, geo.mosBoundHi)}
       ${chartHtml(geo)}
     </div>`, viewBarHtml())}
     ${TOOLTIP_HTML}
-  `;
+  `);
 
   function updateAnalysisChart(){
     // Saving is done by the controls' own 'change' handlers (once per drag, on release), not here: this runs on
     // every 'input' tick, and a synchronous localStorage write per tick was a measurable drag-performance cost.
     const filtered = stocksInRange(bucket);
-    document.getElementById('analysisDots').innerHTML = dotsSvg(filtered, geo);
+    setHtml(document.getElementById('analysisDots'), dotsSvg(filtered, geo));
     renderLeaderboardRows(filtered);
   }
 

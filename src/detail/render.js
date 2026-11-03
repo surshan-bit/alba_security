@@ -22,6 +22,7 @@ import { bindLiveDataBar } from '../livedata/bar.js';
 import { showSection } from '../ui/navigation.js';
 import { copyText, stockShareLink, syncStockHash } from '../ui/deeplink.js';
 import { getRefreshKit } from '../refresh/hook.js';
+import { setHtml } from '../core/safehtml.js';
 
 // Set when a stock is opened from the Analysis screen (chart dot or leaderboard row), so the detail
 // view can offer a one-tap "Back to Analysis" that returns to the same filters and scroll position.
@@ -132,7 +133,7 @@ function renderDetail(idx){
   shownIdx = idx;
   const s = stocks[idx];
   if(detailOpenHook) detailOpenHook(s);
-  detailEl.innerHTML = detailHtml(s, idx, isPinned(s));
+  setHtml(detailEl, detailHtml(s, idx, isPinned(s)));
 
   initPriceChart(s);
   loadPriceBarsFor(s, idx);

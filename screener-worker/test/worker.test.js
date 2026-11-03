@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { toNumber, toRecord, norm } from '../src/fields.js';
 import { parseTable, warehouseId, pageHasData } from '../src/html.js';
 import { handle } from '../src/index.js';
+import { MAX_BODY_BYTES, MAX_SYMBOLS, MAX_SYMBOL_LENGTH } from '../src/limits.js';
 
 // The peer table as the PASUPTAC check returned it (headings and the company's own values), plus one made-up peer row.
 const HEADS = ['S.No.', 'Name', 'CMP Rs.', 'P/E', 'Debt / Eq', 'Interest coverage', 'Quick Rat', 'Current ratio', 'Altman Z Scr', 'Debtor days 3yrs', 'Cont Liab Rs.Cr.',
@@ -127,4 +128,136 @@ test('server: a saved session cookie is used without logging in; no login at all
   const bad = await (await handle(post({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'diagnose', arguments: { symbol: 'X' } } }), { MCP_TOKEN: ENV.MCP_TOKEN }, { fetch: f.fn, gap: 0 })).json();
   assert.equal(bad.result.isError, true);
   assert.match(bad.result.content[0].text, /No Screener login/);
+});
+
+// A pretend Screener whose company page redirects somewhere else; `seen` lists every URL the worker tried to fetch.
+function redirectingScreener(location){
+  const seen = [];
+  const fn = async (url, init = {}) => {
+    seen.push({ url: String(url), cookie: String((init.headers && init.headers.Cookie) || '') });
+    if(new URL(url).hostname !== 'www.screener.in') return new Response('<h1>evil</h1>', { status: 200 });
+    return new Response('', { status: 302, headers: { Location: location } });
+  };
+  return { fn, seen };
+}
+const SESSION_ENV = { MCP_TOKEN: ENV.MCP_TOKEN, SCREENER_SESSIONID: 'SESS' };
+const callCompany = (f, symbol) => handle(post({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'diagnose', arguments: { symbol } } }), SESSION_ENV, { fetch: f.fn, gap: 0 }).then(r => r.json());
+
+test('security: a redirect to another host is not followed and the session cookie never leaves screener.in', async () => {
+  for(const loc of ['https://evil.example/steal', '//evil.example/steal', 'http://evil.example/steal']){
+    const f = redirectingScreener(loc);
+    const out = JSON.parse((await callCompany(f, 'PASUPTAC')).result.content[0].text);
+    assert.equal(out.ok, false, loc);
+    assert.ok(f.seen.every(c => new URL(c.url).hostname === 'www.screener.in'), 'only screener.in is contacted: ' + loc);
+  }
+});
+
+test('security: a redirect inside screener.in is still followed', async () => {
+  const seen = [];
+  const fn = async (url) => {
+    const p = new URL(url).pathname; seen.push(p);
+    if(p === '/company/PASUPTAC/consolidated/') return new Response('', { status: 302, headers: { Location: '/company/PASUPTAC/' } });
+    if(p === '/company/PASUPTAC/') return new Response(COMPANY_HTML);
+    if(p === '/api/company/777/peers/') return new Response(PEERS_HTML);
+    return new Response('missing', { status: 404 });
+  };
+  const out = JSON.parse((await callCompany({ fn }, 'PASUPTAC')).result.content[0].text);
+  assert.equal(out.ok, true);
+});
+
+test('security: a warehouse id that is not a plain number never reaches the peers URL', async () => {
+  assert.equal(warehouseId('<div id="company-info" data-warehouse-id="../../admin?x="></div>'), null);
+  assert.equal(warehouseId('<div id="company-info" data-warehouse-id="12/../3"></div>'), null);
+  assert.equal(warehouseId('<div id="company-info" data-warehouse-id="777"></div>'), '777');
+  const seen = [];
+  const fn = async (url) => { seen.push(new URL(url).pathname); return new Response('<h1>X</h1><ul id="top-ratios"><li>Current Price</li></ul><div id="company-info" data-warehouse-id="../../admin"></div>'); };
+  const out = JSON.parse((await callCompany({ fn }, 'PASUPTAC')).result.content[0].text);
+  assert.equal(out.error, 'no_warehouse_id');
+  assert.ok(seen.every(p => !p.includes('admin') && !p.startsWith('/api/')), 'no peers request: ' + seen);
+});
+
+// ---- request limits (CLAUDE.md section 3, A04): size, count and shape of what a caller may send
+const callBatch = (symbols, name = 'fundamentals_batch', f = fakeScreener({ hasConsolidated: true })) =>
+  handle(post({ jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name, arguments: name === 'diagnose' ? { symbol: symbols } : { symbols } } }), ENV, { fetch: f.fn, gap: 0 }).then(async r => ({ body: await r.json(), calls: f.calls }));
+
+test('limits: a malformed percent escape in the address is refused with 401, not a crash', async () => {
+  const res = await handle(post({ jsonrpc: '2.0', id: 1, method: 'ping' }, '/mcp/%E0%A4%A'), ENV);
+  assert.equal(res.status, 401);
+});
+
+test('limits: a request body over the size limit is refused with 413 before it is parsed', async () => {
+  const big = { jsonrpc: '2.0', id: 1, method: 'ping', pad: 'x'.repeat(MAX_BODY_BYTES) };
+  assert.equal((await handle(post(big), ENV)).status, 413);
+  const declared = new Request('https://w.example/mcp/' + ENV.MCP_TOKEN, { method: 'POST', body: '{}', headers: { 'Content-Length': String(MAX_BODY_BYTES + 1) } });
+  assert.equal((await handle(declared, ENV)).status, 413, 'a declared length over the limit is refused too');
+  assert.equal((await handle(post({ jsonrpc: '2.0', id: 1, method: 'ping' }), ENV)).status, 200, 'a normal request still works');
+});
+
+test('limits: too many symbols, or a symbol of the wrong shape, is an error and Screener is never contacted', async () => {
+  const cases = [Array.from({ length: MAX_SYMBOLS + 1 }, () => 'TCS'), ['../admin'], ['A B'], ['x'.repeat(MAX_SYMBOL_LENGTH + 1)], ['TCS', { a: 1 }], ['TCS', 5], ['a/b'], ['a?b=1'], ['<img>']];
+  for(const symbols of cases){
+    const { body, calls } = await callBatch(symbols);
+    assert.equal(body.result.isError, true, JSON.stringify(symbols).slice(0, 60));
+    assert.deepEqual(calls, [], 'no request to Screener');
+  }
+  const one = await callBatch('../admin', 'diagnose');
+  assert.equal(one.body.result.isError, true); assert.deepEqual(one.calls, []);
+});
+
+test('limits: NSE tickers with & . - _ and numeric BSE codes are accepted; blanks are dropped', async () => {
+  const { body, calls } = await callBatch(['M&M', 'BAJAJ-AUTO', 'GESHIP', '500325', 'AB_C.D', '  ', '']);
+  const out = JSON.parse(body.result.content[0].text);
+  assert.equal(out.processed, 5);
+  assert.ok(calls.length > 0);
+});
+
+test('limits: exactly the largest allowed symbol list is processed', async () => {
+  const symbols = Array.from({ length: MAX_SYMBOLS }, () => 'A'.repeat(MAX_SYMBOL_LENGTH));
+  const { body } = await callBatch(symbols);
+  const out = JSON.parse(body.result.content[0].text);
+  assert.equal(out.processed + out.remaining.length, MAX_SYMBOLS);
+});
+
+// ---- per-caller rate limit (CLAUDE.md section 3, A04): Cloudflare's Rate Limiting binding, counted per client address
+function fakeLimiter(limit){
+  const used = new Map(), keys = [];
+  return { keys, limit: async ({ key }) => { keys.push(key); used.set(key, (used.get(key) || 0) + 1); return { success: used.get(key) <= limit }; } };
+}
+const fromIp = (ip, body = { jsonrpc: '2.0', id: 1, method: 'ping' }, path = '/mcp/' + ENV.MCP_TOKEN) =>
+  new Request('https://w.example' + path, { method: 'POST', body: JSON.stringify(body), headers: ip ? { 'CF-Connecting-IP': ip } : {} });
+
+test('rate limit: a caller inside the limit is served, the next one gets 429 with Retry-After and Screener is never contacted', async () => {
+  const env = { ...ENV, RATE_LIMITER: fakeLimiter(2) }, f = fakeScreener({ hasConsolidated: true });
+  const call = () => handle(fromIp('1.2.3.4', { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'fundamentals_batch', arguments: { symbols: ['PASUPTAC'] } } }), env, { fetch: f.fn, gap: 0 });
+  assert.equal((await call()).status, 200); assert.equal((await call()).status, 200);
+  const before = f.calls.length, limited = await call();
+  assert.equal(limited.status, 429); assert.equal(limited.headers.get('Retry-After'), '60');
+  assert.equal(f.calls.length, before, 'no request to Screener once limited');
+});
+
+test('rate limit: each client address has its own count, and the address is the key', async () => {
+  const limiter = fakeLimiter(1), env = { ...ENV, RATE_LIMITER: limiter };
+  assert.equal((await handle(fromIp('1.1.1.1'), env)).status, 200);
+  assert.equal((await handle(fromIp('2.2.2.2'), env)).status, 200, 'another address is not held back');
+  assert.equal((await handle(fromIp('1.1.1.1'), env)).status, 429);
+  assert.equal((await handle(fromIp(null), env)).status, 200); assert.equal((await handle(fromIp(null), env)).status, 429, 'callers without an address share one count');
+  assert.deepEqual(limiter.keys.slice(0, 3), ['1.1.1.1', '2.2.2.2', '1.1.1.1']);
+});
+
+test('rate limit: it comes before the token check, so guessing the token is limited too', async () => {
+  const env = { ...ENV, RATE_LIMITER: fakeLimiter(1) }, wrong = () => handle(fromIp('9.9.9.9', undefined, '/mcp/wrong-token-wrong-token'), env);
+  assert.equal((await wrong()).status, 401);
+  assert.equal((await wrong()).status, 429);
+});
+
+test('rate limit: the health address is not limited, and a worker without the binding still works', async () => {
+  const limiter = fakeLimiter(0), env = { ...ENV, RATE_LIMITER: limiter };
+  assert.equal((await handle(new Request('https://w.example/'), env)).status, 200);
+  assert.deepEqual(limiter.keys, []);
+  assert.equal((await handle(fromIp('1.1.1.1'), ENV)).status, 200);
+});
+
+test('rate limit: if the limiter itself fails the request is refused (503), not let through', async () => {
+  const env = { ...ENV, RATE_LIMITER: { limit: async () => { throw new Error('binding down'); } } };
+  assert.equal((await handle(fromIp('1.1.1.1'), env)).status, 503);
 });

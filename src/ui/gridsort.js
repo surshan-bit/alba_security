@@ -2,6 +2,7 @@
 // place in the list) and its <table> carries data-cols (the column ids, comma separated). A click on a header sorts the rows in place; a second click reverses.
 import { stocks } from '../core/stocks.js';
 import { columnHeaderHtml, compareByColumn, nextSort } from '../analysis/columns.js';
+import { setHtml } from '../core/safehtml.js';
 
 // A header state with no column picked yet: the headers are clickable, none shows an arrow.
 const NO_SORT = { col: '', dir: 'desc' };
@@ -19,7 +20,7 @@ function wireStockGridSort(table){
       .sort((a, b) => cmp(stocks[Number(a.dataset.idx)], stocks[Number(b.dataset.idx)]))
       .forEach(r => body.appendChild(r));
     body.querySelectorAll('.analysis-lb-rank').forEach((td, i) => { td.textContent = String(i + 1); });
-    head.innerHTML = colIds.map(id => columnHeaderHtml(id, sort)).join('');
+    setHtml(head, colIds.map(id => columnHeaderHtml(id, sort)).join(''));
   });
 }
 

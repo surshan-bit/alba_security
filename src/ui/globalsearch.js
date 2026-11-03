@@ -4,6 +4,7 @@ import { buildSuggestions, sgMark } from './suggest.js';
 import { appSections, showSection } from './navigation.js';
 import { openStockInline } from './inlinedetail.js';
 import { closestEl } from '../core/evt.js';
+import { setHtml } from '../core/safehtml.js';
 
 function init_ui_globalsearch(){
   const input = document.getElementById('globalSearch'), box = document.getElementById('globalSuggest'), clear = document.getElementById('globalSearchClear');
@@ -24,11 +25,11 @@ function init_ui_globalsearch(){
     clear.classList.toggle('show', /** @type {HTMLInputElement} */ (input).value.length > 0);
     if(!q){ hide(); return; }
     items = buildSuggestions(q); active = -1;
-    if(!items.length){ box.innerHTML = '<div class="sg-empty">No stock found</div>'; box.classList.add('show'); return; }
-    box.innerHTML = items.map((s, i) => {
+    if(!items.length){ setHtml(box, '<div class="sg-empty">No stock found</div>'); box.classList.add('show'); return; }
+    setHtml(box, items.map((s, i) => {
       const parts = String(s.ticker || '').split('·'), sub = parts[0].trim() + (parts[1] ? ' · ' + parts[1].trim() : '');
       return '<div class="sg-item" role="option" data-i="' + i + '"><div class="sg-main"><div class="sg-name">' + sgMark(s.name || '', q) + '</div><div class="sg-sub">' + sgMark(sub, q) + '</div></div><div class="sg-score">' + Number(s.score).toFixed(2) + '</div></div>';
-    }).join('');
+    }).join(''));
     box.classList.add('show'); input.setAttribute('aria-expanded', 'true');
   };
   const pick = (s) => {

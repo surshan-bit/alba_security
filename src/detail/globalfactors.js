@@ -27,7 +27,7 @@ function renderGlobalFactorsPanel(s){
       <div class="global-panel-head">
         <div class="global-panel-title">${panelIcon('global')}Global &amp; Macro Information</div>
       </div>
-      <div class="global-cols" style="--n:${Math.max(1, g.positive?.length || 0, g.negative?.length || 0)}">
+      <div class="global-cols" data-css="--n:${Math.max(1, g.positive?.length || 0, g.negative?.length || 0)}">
         <div class="global-col">
           <div class="global-col-title pos">&#9650; Positive / tailwind</div>
           <ul class="global-list">${g.positive?.length ? g.positive.map(item).join('') : '<li class="global-item">None identified.</li>'}</ul>

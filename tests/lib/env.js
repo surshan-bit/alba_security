@@ -168,7 +168,7 @@ async function openPage(ctx, base, cfg, label, errsOut){
   const page = await ctx.newPage();
   const errs = errsOut || [];
   page.blobs = new Map();
-  page.on('pageerror', e => errs.push(label + ' pageerror: ' + e.message));
+  page.on('pageerror', e => errs.push(label + ' pageerror: ' + e.message + (e.stack ? ' | ' + String(e.stack).split('\n').slice(1, 5).map(l => l.trim()).join(' <- ') : '')));   // the first stack lines say which call failed
   page.on('console', m => { if(m.type() === 'error') errs.push(label + ' console.error: ' + m.text().slice(0, 300)); });
   await page.exposeFunction('__blobPut', (id, text) => { page.blobs.set(id, text); });
   await page.exposeFunction('__blobDel', id => { page.blobs.delete(id); });

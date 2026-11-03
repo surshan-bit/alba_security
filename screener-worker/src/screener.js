@@ -4,6 +4,9 @@ import { parseTable, warehouseId, pageHasData, pageTitle } from './html.js';
 import { toRecord } from './fields.js';
 
 const BASE = 'https://www.screener.in';
+const BASE_ORIGIN = new URL(BASE).origin;
+// The session cookie must only ever go to screener.in; a redirect or a link pointing elsewhere is refused, never followed.
+const resolveOnSite = target => { try { const u = new URL(target, BASE); return u.origin === BASE_ORIGIN ? u.href : null; } catch(e){ return null; } };   // an unparsable address is treated as off-site
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -22,12 +25,14 @@ export class Screener {
     if(env.SCREENER_SESSIONID){ this.jar.sessionid = env.SCREENER_SESSIONID; this.loggedIn = true; }
   }
   async raw(path, init = {}, retries = 3){
+    const url = resolveOnSite(path);
+    if(!url) throw new Error('Refusing to contact a host other than screener.in.');
     const wait = this.gap - (Date.now() - this.last);
     if(wait > 0) await sleep(wait);
     this.last = Date.now();
     this.requests++;
     const headers = Object.assign({ 'User-Agent': UA, 'Accept-Language': 'en-IN,en;q=0.9', Referer: BASE + '/', Cookie: cookieHeader(this.jar) }, init.headers || {});
-    const res = await this.fetch(path.startsWith('http') ? path : BASE + path, Object.assign({ redirect: 'manual' }, init, { headers }));
+    const res = await this.fetch(url, Object.assign({ redirect: 'manual' }, init, { headers }));
     Object.assign(this.jar, cookiesFrom(res));
     if((res.status === 429 || res.status === 503) && retries > 0){
       const ra = Number(res.headers.get('retry-after'));
@@ -42,7 +47,8 @@ export class Screener {
     if(res.status >= 300 && res.status < 400){
       const loc = res.headers.get('location') || '';
       if(/\/login\//.test(loc)) return { status: 401, text: '', login: true };
-      if(hops > 0 && loc) return this.get(loc.startsWith('http') ? loc : BASE + loc, init, hops - 1);
+      if(loc && !resolveOnSite(loc)) return { status: 502, text: '', login: false };   // redirected off screener.in: reported as a failed request
+      if(hops > 0 && loc) return this.get(resolveOnSite(loc), init, hops - 1);
     }
     return { status: res.status, text: await res.text(), login: false };
   }

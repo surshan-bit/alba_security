@@ -10,7 +10,7 @@ const D = createData(20261010);
 const { TV_HEADER, FUND_HEADER, tvCsv, fundCsv, fundRow, rv } = D;
 const rd = f => fs.readFileSync(path.join(root, f), 'utf8');
 
-const { load } = require('./lib/load.js');
+const { load, loadWithStubs } = require('./lib/load.js');
 const F = load('src/import/fund-engine.js', 'export { FundEngine };');
 const P = load('src/import/csvparse.js');
 const Fe = F.FundEngine;
@@ -632,6 +632,407 @@ test('escaping: safeText turns raw < and > into text and never escapes twice', (
   assert.strictEqual(U.safeText('<b>a</b> &amp; &lt;x'), '&lt;b&gt;a&lt;/b&gt; &amp; &lt;x');
   assert.strictEqual(U.safeText(null), '');
 });
+
+// core/store.js, research/status.js and list/metrics.js reach the page at start-up; the event logic under test needs none of them.
+const EVENT_STUBS = { 'core/store.js': 'export const allTrades = () => [];', 'research/status.js': 'export const stockResearchAsof = () => null;', 'list/metrics.js': 'export const mosPct = () => null; export const scoreBand = () => "";' };
+const HOSTILE_SENTIMENT = 'pos" onmouseover="alert(1)';
+test('escaping: cleanSentiment keeps pos / neg / neu and drops anything else, so a saved tag can never leave its class attribute', () => {
+  const { cleanSentiment } = load('src/core/sentiment.js');
+  ['pos', 'neg', 'neu'].forEach(v => assert.strictEqual(cleanSentiment(v), v));
+  [HOSTILE_SENTIMENT, '"><img src=x onerror=alert(1)>', 'mix', 'POS', '', null, undefined, 7, {}, ['pos']].forEach(v => assert.strictEqual(cleanSentiment(v), ''));
+});
+test('escaping: a hostile sentiment saved on a news event is dropped before the price chart can draw it', async () => {
+  const E = await loadWithStubs('src/prices/events.js', '', EVENT_STUBS);
+  const stock = { ticker: 'AAA1', __events: [{ k: 'news', d: '2026-01-05', t: 'Results beat', src: 'Wire', s: HOSTILE_SENTIMENT }, { k: 'news', d: '2026-01-06', t: 'Order win', s: 'pos' }] };
+  const evs = E.stockChartEvents(stock);
+  assert.deepStrictEqual(evs.map(e => e.s).sort(), ['', 'pos']);
+  assert.ok(evs.every(e => !/["<>]/.test(e.s)));
+});
+test('escaping: a hostile sentiment saved on a news event is dropped before the industry news list can draw it', async () => {
+  const C = await loadWithStubs('src/industry/calc.js', '', EVENT_STUBS);
+  const items = C.industryNews([{ ticker: 'AAA1', name: 'Alpha', __events: [{ k: 'news', d: '2026-01-05', t: 'Results beat', s: HOSTILE_SENTIMENT }, { k: 'earn', d: '2026-01-04', t: 'Q3 results', s: 'neg' }] }]);
+  assert.deepStrictEqual(items.map(x => x.s), ['', 'neg']);
+});
+test('escaping: the Buy / Sell ideas news list still drops a hostile sentiment (shared helper, same result as before)', () => {
+  const NEWSMOD = load('src/strategies/news.js');
+  const today = new Date().toISOString().slice(0, 10);
+  const items = NEWSMOD.recentNews({ ticker: 'AAA1', __events: [{ k: 'news', d: today, t: 'Headline', s: HOSTILE_SENTIMENT }, { k: 'news', d: today, t: 'Other', s: 'neg' }] });
+  assert.deepStrictEqual(items.map(x => x.s).sort(), ['', 'neg']);
+});
+
+// Tests start together, so two that set globalThis.document would overwrite each other's page; those tests take turns through this queue.
+let pageTurn = Promise.resolve();
+const alone = fn => { const run = pageTurn.then(fn); pageTurn = run.catch(() => {}); return run; };
+
+// ---- the page shell has no inline handlers or styles: the Retry button and the integrity banner are driven from code (CLAUDE.md sections 2 and 3)
+const withPage = (html, fn) => alone(async () => {
+  const { JSDOM } = require('jsdom');
+  const win = new JSDOM('<!doctype html><body>' + html + '</body>').window;
+  const had = globalThis.document, hadLocation = globalThis.location, spy = { reloads: 0 };
+  globalThis.document = win.document; globalThis.location = { reload(){ spy.reloads++; } };
+  try { await fn(win, spy); }
+  finally {
+    if(had === undefined) delete globalThis.document; else globalThis.document = had;
+    if(hadLocation === undefined) delete globalThis.location; else globalThis.location = hadLocation;
+  }});
+const COVER = '<div id="bootStatus" hidden><div class="boot-msg"></div><button type="button" class="boot-retry" hidden>Retry</button></div>';
+
+test('boot cover: the Retry button reloads the page from a listener, and a page without the cover is left alone', () => withPage(COVER, async (win, spy) => {
+  const S = load('src/boot/status.js');
+  S.wireBootRetry();
+  win.document.querySelector('.boot-retry').click();
+  assert.strictEqual(spy.reloads, 1);
+  win.document.body.innerHTML = '';   // no cover on the page: nothing to wire, nothing thrown
+  assert.doesNotThrow(() => S.wireBootRetry());
+}));
+
+test('boot cover: boot() wires the Retry button before it loads anything, so a failed start can be retried', () => withPage(COVER, async (win, spy) => {
+  const stubs = { 'stockdata.js': 'export const loadStocks = async () => [];', 'handoff.js': 'export const debugHandle = () => ({}); export const setBootStocks = () => {};',
+    'identity/flush.js': 'export const init_identity_flush = () => {};', 'identity/session.js': 'export const loadIdentity = async () => {}; export const touchUser = () => {};',
+    'identity/prefs.js': 'export const syncPrefs = async () => {};', 'identity/strategies.js': 'export const syncStrategies = async () => {};',
+    'identity/ideasresults.js': 'export const syncIdeasResults = async () => {};', 'main.js': 'export {};' };
+  const failing = await loadWithStubs('src/boot/boot.js', '', stubs);
+  await assert.rejects(failing.boot({ loadStocks: async () => { throw new Error('database down'); } }), /database down/);
+  win.document.querySelector('.boot-retry').click();   // the load failed, and Retry still works
+  assert.strictEqual(spy.reloads, 1);
+}));
+
+const INTEGRITY_BANNER = '<div id="dataIntegrityBanner" hidden></div>';
+const runIntegrity = async (stocks) => {
+  globalThis.__integrityStocks = stocks;
+  const warn = console.warn; console.warn = () => {};   // the check also writes the problems to the console
+  try {
+    const I = await loadWithStubs('src/joblogs/integrity.js', '', { 'core/stocks.js': 'export const stocks = globalThis.__integrityStocks;' });
+    I.init_joblogs_integrity();
+  } finally { console.warn = warn; delete globalThis.__integrityStocks; }
+};
+const BAD_FACTORS = { fundamentals: { factors: [{ weight: 'x', score: 5 }] }, score: 5 };
+
+test('integrity banner: a stock whose factors do not add up un-hides the banner and names the stock', () => withPage(INTEGRITY_BANNER, async (win) => {
+  await runIntegrity([Object.assign({ ticker: 'AAA1 · Chemicals' }, BAD_FACTORS)]);
+  const banner = win.document.getElementById('dataIntegrityBanner');
+  assert.strictEqual(banner.hidden, false);
+  assert.match(banner.textContent, /1 issue/); assert.match(banner.textContent, /AAA1/);
+  assert.strictEqual(banner.hasAttribute('style'), false, 'shown with the hidden attribute, never an inline style');
+}));
+
+test('integrity banner: clean data leaves the banner hidden', () => withPage(INTEGRITY_BANNER, async (win) => {
+  await runIntegrity([{ ticker: 'AAA1 · Chemicals', score: 5 }]);
+  assert.strictEqual(win.document.getElementById('dataIntegrityBanner').hidden, true);
+}));
+
+test('integrity banner: a hostile ticker is shown as text, never as markup', () => withPage(INTEGRITY_BANNER, async (win) => {
+  await runIntegrity([Object.assign({ ticker: '<img src=x onerror=alert(1)> · X' }, BAD_FACTORS)]);
+  const banner = win.document.getElementById('dataIntegrityBanner');
+  assert.strictEqual(banner.querySelector('img'), null);
+  assert.match(banner.textContent, /<img src=x onerror=alert\(1\)>/);
+}));
+
+test('integrity banner: nothing to show it in is not an error', () => withPage('', async () => {
+  await runIntegrity([Object.assign({ ticker: 'AAA1 · X' }, BAD_FACTORS)]);   // no banner on the page: the check returns quietly
+}));
+
+test('integrity banner: a stock with a valuation but no pillar score is reported, one with no valuation is not', () => withPage(INTEGRITY_BANNER, async (win) => {
+  const banner = () => win.document.getElementById('dataIntegrityBanner');
+  await runIntegrity([{ ticker: 'NOVAL · X', score: 5, pillars: {} }]);   // no Intrinsic Value: no anchor by design
+  assert.strictEqual(banner().hidden, true);
+  await runIntegrity([{ ticker: 'P1 · X', score: 5, pillars: { val: NaN }, valuation: { intrinsicValue: 100, currentPrice: 90 } }]);
+  assert.strictEqual(banner().hidden, false);
+  assert.match(banner().textContent, /P1: pillars\.val is missing\/non-numeric/);
+}));
+
+test('integrity banner: factors that add up to the stored score pass, ones that do not are reported with the score they add up to', () => withPage(INTEGRITY_BANNER, async (win) => {
+  const banner = () => win.document.getElementById('dataIntegrityBanner');
+  const stock = score => ({ ticker: 'M1 · X', score, fundamentals: { factors: [{ weight: 1, score: 0.8, key: 'roe' }] } });
+  await runIntegrity([stock(8)]);
+  assert.strictEqual(banner().hidden, true, 'matches');
+  await runIntegrity([stock(5)]);
+  assert.strictEqual(banner().hidden, false);
+  assert.match(banner().textContent, /M1: fundamentals factor scores \(8\.00 over the factors that count\) don't match stock\.score \(5\)/);
+}));
+
+test('integrity banner: several problems are counted, five are listed and the rest are summed up', () => withPage(INTEGRITY_BANNER, async (win) => {
+  const stocks = Array.from({ length: 7 }, (_, i) => Object.assign({ ticker: 'S' + i + ' · X' }, BAD_FACTORS));
+  await runIntegrity(stocks);
+  const text = win.document.getElementById('dataIntegrityBanner').textContent;
+  assert.match(text, /found 7 issues in/);
+  assert.ok(text.includes('S4:') && !text.includes('S5:'), 'the first five are named');
+  assert.match(text, / · \+2 more$/);
+}));
+
+test('integrity banner: a stock whose ticker is missing is reported under a placeholder, not a crash', () => withPage(INTEGRITY_BANNER, async (win) => {
+  await runIntegrity([Object.assign({}, BAD_FACTORS)]);
+  assert.match(win.document.getElementById('dataIntegrityBanner').textContent, /\(unknown\): fundamentals factor scores/);
+}));
+
+test('boot cover: it shows a message, offers Retry only for an error, and hides again', () => withPage(COVER, async (win) => {
+  const S = load('src/boot/status.js'), cover = win.document.getElementById('bootStatus'), retry = win.document.querySelector('.boot-retry');
+  S.bootMessage('Loading stock data…');
+  assert.strictEqual(cover.hidden, false); assert.strictEqual(retry.hidden, true); assert.strictEqual(cover.classList.contains('boot-error'), false);
+  assert.strictEqual(win.document.querySelector('.boot-msg').textContent, 'Loading stock data…');
+  S.bootMessage('Could not load the stock data: down.', true);
+  assert.strictEqual(retry.hidden, false); assert.strictEqual(cover.classList.contains('boot-error'), true);
+  S.hideBootMessage();
+  assert.strictEqual(cover.hidden, true);
+  win.document.body.innerHTML = '';   // a page without the cover: all three are quiet
+  assert.doesNotThrow(() => { S.bootMessage('x'); S.hideBootMessage(); S.showBootFailure(new Error('x')); });
+}));
+
+test('boot cover: a failed start says why, but keeps a more specific stock-data message; text stays text', () => withPage(COVER, async (win) => {
+  const S = load('src/boot/status.js'), cover = win.document.getElementById('bootStatus'), msg = win.document.querySelector('.boot-msg');
+  S.showBootFailure(new Error('boom'));
+  assert.strictEqual(cover.hidden, false); assert.strictEqual(msg.textContent, 'Could not start the dashboard: boom.');
+  S.showBootFailure('plain text failure');
+  assert.strictEqual(msg.textContent, 'Could not start the dashboard: plain text failure.');
+  S.bootMessage('Could not load the stock data: down.', true);
+  S.showBootFailure(new Error('later'));
+  assert.strictEqual(msg.textContent, 'Could not load the stock data: down.');
+  S.showBootFailure(new Error('<img src=x onerror=alert(1)>'));   // an error message is data, never markup
+  assert.strictEqual(msg.querySelector('img'), null);
+}));
+
+test('update banner: it appears once, and its Reload button reloads the page', () => withPage('', async (win, spy) => {
+  const S = load('src/boot/status.js');
+  S.showUpdateBanner(); S.showUpdateBanner();
+  assert.strictEqual(win.document.querySelectorAll('#dataUpdateBanner').length, 1);
+  assert.strictEqual(win.document.querySelector('#dataUpdateBanner span').textContent, 'Stock data was updated.');
+  win.document.querySelector('#dataUpdateBanner button').click();
+  assert.strictEqual(spy.reloads, 1);
+}));
+
+test('boot(): it loads the stock list, hands it over and starts the app, with the database loader when none is given', () => withPage(COVER, async (win) => {
+  const stubs = { 'stockdata.js': "export const loadStocks = async () => [{ ticker: 'FROM-DB' }];",
+    'handoff.js': 'export const debugHandle = () => globalThis.__bootDebug; export const setBootStocks = l => { globalThis.__bootHanded = l; };',
+    'identity/flush.js': 'export const init_identity_flush = () => {};', 'identity/session.js': 'export const loadIdentity = async () => {}; export const touchUser = () => { globalThis.__bootTouched = true; };',
+    'identity/prefs.js': 'export const syncPrefs = async () => {};', 'identity/strategies.js': 'export const syncStrategies = async () => {};',
+    'identity/ideasresults.js': 'export const syncIdeasResults = async () => {};', 'main.js': 'globalThis.__bootMainLoaded = true; export {};' };
+  try {
+    const B = await loadWithStubs('src/boot/boot.js', '', stubs);
+    globalThis.__bootDebug = {};
+    await B.boot({ loadStocks: async () => [{ ticker: 'GIVEN' }] });
+    assert.deepStrictEqual(globalThis.__bootHanded, [{ ticker: 'GIVEN' }]); assert.deepStrictEqual(globalThis.__bootDebug.stocks, [{ ticker: 'GIVEN' }]);
+    assert.strictEqual(globalThis.__bootTouched, true); assert.strictEqual(globalThis.__bootMainLoaded, true);
+    await B.boot();
+    assert.deepStrictEqual(globalThis.__bootHanded, [{ ticker: 'FROM-DB' }]);
+  } finally { for(const k of ['__bootDebug', '__bootHanded', '__bootTouched', '__bootMainLoaded']) delete globalThis[k]; }
+}));
+
+// ---- bars whose width is computed: the width travels as data-css (--w), never as an inline style (CLAUDE.md section 2)
+test('data refresh: the freshness bars scale to the fullest bucket, an empty bucket has no bar, a tiny one is still visible', () => withPage(
+  '<div id="fundFreshnessSummary"></div><div id="fundFreshnessBars"></div><div id="techFreshnessSummary"></div><div id="techFreshnessBars"></div>', async (win) => {
+  const day = 86400000, ago = n => new Date(Date.now() - n * day).toISOString().slice(0, 10);
+  // 40 stocks refreshed 5 days ago ("4-7 days"), one 20 days ago ("15-30 days"), one with a date nobody can read
+  globalThis.__freshStocks = [...Array(40).fill(0).map(() => ({ asof: ago(5) })), { asof: ago(20) }, { asof: 'not a date' }];
+  try {
+    const F = await loadWithStubs('src/joblogs/freshness.js', '', { 'core/stocks.js': 'export const stocks = globalThis.__freshStocks;' });
+    F.paintFreshness();
+  } finally { delete globalThis.__freshStocks; }
+  const bars = win.document.getElementById('fundFreshnessBars'), rows = Array.from(bars.querySelectorAll('.refreshlog-freshness-row'));
+  const fill = r => r.querySelector('.refreshlog-freshness-fill');
+  assert.deepStrictEqual(rows.map(r => [r.querySelector('.refreshlog-freshness-label').textContent, fill(r).style.getPropertyValue('--w')]),
+    [['Today', '0%'], ['1–3 days', '0%'], ['4–7 days', '100%'], ['8–14 days', '0%'], ['15–30 days', '3%'], ['31+ days', '0%']]);
+  assert.ok(rows.every(r => !fill(r).hasAttribute('data-css')), 'the data-css attribute is consumed');
+  assert.match(win.document.getElementById('fundFreshnessSummary').textContent, /1 stock with no parseable refresh date/);
+}));
+
+test('data refresh: a sync run shows its note muted and its error and dropped tickers in the warning colour, all as text', () => withPage('<div id="watchlistSyncLogRuns"></div>', async (win) => {
+  const render = async runs => {
+    globalThis.__syncRuns = runs;
+    try {
+      const P = await loadWithStubs('src/joblogs/panels.js', '', { 'core/store.js': 'export const getDb = () => true; export const watchlistSyncLog = { values: () => globalThis.__syncRuns, entries: () => [], remove: () => {} };' });
+      P.renderWatchlistSyncLogPanel();
+    } finally { delete globalThis.__syncRuns; }
+    return win.document.getElementById('watchlistSyncLogRuns');
+  };
+  const boxes = (el, cls) => Array.from(el.querySelectorAll('.refreshlog-run-stats--' + cls), n => n.textContent.trim());
+  let el = await render([{ startedAt: '2026-10-30T10:00:00+05:30', status: 'partial', note: 'Used the cache', error: 'TradingView said no', droppedTickers: ['AAA', 'BBB'] }]);
+  assert.deepStrictEqual(boxes(el, 'muted'), ['Used the cache']);
+  assert.deepStrictEqual(boxes(el, 'bad'), ['TradingView said no', "Dropped by TradingView, couldn't be resolved: AAA, BBB"]);
+  assert.strictEqual(el.querySelector('[style]'), null, 'no inline style on the run');
+  el = await render([{ startedAt: '2026-10-30T10:00:00+05:30', status: 'completed' }]);
+  assert.deepStrictEqual([boxes(el, 'muted'), boxes(el, 'bad')], [[], []], 'a clean run has neither');
+  el = await render([{ startedAt: '2026-10-30T10:00:00+05:30', status: 'failed', note: '<img src=x onerror=alert(1)>', error: '<b>boom</b>', droppedTickers: ['<i>X</i>'] }]);
+  assert.strictEqual(el.querySelector('img, b, i'), null, 'markup in a run record stays text');
+  assert.match(el.textContent, /<img src=x onerror=alert\(1\)>/);
+}));
+
+// ---- the Rocky page, whole: every state of the store, every table, every wording; markup in saved data stays text
+const rockyPage = (store) => alone(async () => {
+  globalThis.__rockyTest = Object.assign({ noDb: false, ready: true, state: null, picks: null, weights: null, learn: null }, store);
+  try { return (await loadWithStubs('src/rocky/render.js', '', { './store.js': 'export const rocky = globalThis.__rockyTest;' })).rockyHtml(); }
+  finally { delete globalThis.__rockyTest; }
+});
+const HOSTILE = '<img src=x onerror=alert(1)>';
+test('rocky page: each learned weight gets a bar whose width is its share of the largest weight, and a non-number gets none', async () => {
+  const html = await rockyPage({ state: { curve: [], closed: [], open: [] }, weights: { v: 3, w: { momentum: 3, value: 1.5, odd: 'x' } } });
+  const bars = Array.from(html.matchAll(/<div class="rky-bar"><span>(\w+)<\/span><i data-css="--w:(\d+)%"><\/i>/g), m => [m[1], Number(m[2])]);
+  assert.deepStrictEqual(bars, [['momentum', 60], ['value', 30], ['odd', 0]]);
+  assert.ok(!/style=/.test(html), 'no inline style anywhere on the page');
+});
+test('rocky page: signed out, still loading and not-yet-run each say so', async () => {
+  assert.match(await rockyPage({ noDb: true }), /Sign in to view Rocky/);
+  assert.match(await rockyPage({ ready: false }), /Loading/);
+  assert.match(await rockyPage({}), /Rocky has not run yet/);
+});
+test('rocky page: the equity curve needs two runs, draws Nifty only when it has Nifty closes, and says which', async () => {
+  const st = curve => ({ curve, closed: [], open: [] });
+  assert.match(await rockyPage({ state: st([['2026-10-01', 1000000]]) }), /curve starts drawing after the second daily run/);
+  const noNifty = await rockyPage({ state: st([['2026-10-01', 1000000], ['2026-10-02', 1010000]]) });
+  assert.ok(noNifty.includes('<svg class="rky-curve"') && /Nifty line appears once/.test(noNifty));
+  const withNifty = await rockyPage({ state: st([['2026-10-01', 1000000, 24000], ['2026-10-02', 1010000, null], ['2026-10-03', 990000, 24240]]) });
+  assert.ok(/Nifty, rebased to Rocky on 2026-10-01/.test(withNifty) && withNifty.includes('rky-key-nifty'));
+});
+test('rocky page: the tiles show return, hit rate, regime, metrics and the weights version, and "–" where there is nothing', async () => {
+  const empty = await rockyPage({ state: { curve: [], closed: [], open: [] } });
+  assert.ok(/Hit rate<\/b><span>–/.test(empty) && /Weights version<\/b><span>v0/.test(empty) && /Alpha vs Nifty<\/b><span>–/.test(empty));
+  const full = await rockyPage({ weights: { v: 4, w: {} }, picks: { asof: '2026-10-03', universe: 9, blocked: 2, regime: { on: true, breadth: 0.62 }, picks: [] },
+    state: { curve: [['d1', 1000000], ['d2', 1100000]], open: [{ k: 'A', d: 'd1', q: 1 }], closed: [{ k: 'W', ret: 5, pnl: 100 }, { k: 'L', ret: -2, pnl: -50 }],
+      metrics: { alpha: 1.5, niftyRet: 3, maxDD: -4, curDD: -1, expectancy: 1.2, avgWin: 5, avgLoss: -2 } } });
+  assert.ok(/Weights version<\/b><span>v4/.test(full) && /Hit rate<\/b><span>50%/.test(full) && /Open positions<\/b><span>1 \/ 8/.test(full) && /Risk-on/.test(full) && /62% up/.test(full));
+  assert.ok(/rky-up">\+10\.00%/.test(full) && /Avg win \/ avg loss<\/b><span>5\.0% \/ -2\.0%/.test(full));
+  const off = await rockyPage({ state: { curve: [], closed: [], open: [] }, picks: { asof: 'd', universe: 1, blocked: 0, regime: { on: false, min: 0.4 }, picks: [] } });
+  assert.ok(/Risk-off/.test(off) && /fewer than 40% of stocks are up/.test(off));
+});
+test('rocky page: picks, rejected picks, open and closed positions are tables, and saved text in them stays text', async () => {
+  const html = await rockyPage({ state: { curve: [], open: [{ k: HOSTILE, d: 'd1', q: 10, entry: 100, last: 110, stop: 90, target: 130 }, { k: 'NOPRICE', d: 'd1', q: 1 }],
+      closed: Array.from({ length: 30 }, (_, i) => ({ k: 'C' + i, d: 'a', xd: 'b', why: HOSTILE, ret: i - 10, pnl: i })) },
+    picks: { asof: 'd3', dataAsof: null, universe: 5, blocked: 1, picks: [{ k: HOSTILE, n: HOSTILE, g: HOSTILE, close: 50, score: 7.5, mos: 20, rsiW: 55, stop: 45, target: 65 }, { k: 'NOSTOP', score: 'x' }],
+      gated: [{ k: 'G', score: 6, close: 10, stop: 9, target: 11, why: HOSTILE }] },
+    weights: null, learn: { d: '2026-10-01', note: HOSTILE } });
+  assert.ok(!html.includes('<img'), 'no markup from saved data');
+  assert.ok(/data as of \?/.test(html), 'a missing data date is shown as ?');
+  assert.ok(/Passed the checks, failed the 1:3 gate/.test(html) && /Why rejected/.test(html));
+  assert.ok(/rky-up">\+10\.00%/.test(html), 'open position P&L');
+  assert.ok(html.includes('C29') && !html.includes('C4<') && /C5</.test(html), 'only the latest 25 closed trades, newest first');
+  assert.ok(/Last review 2026-10-01: &lt;img/.test(html), 'the learning note is escaped');
+});
+test('rocky page: the learning line reads the review figures when there is no written note, and no page-stamp without picks', async () => {
+  const st = { curve: [], closed: [], open: [] };
+  assert.match(await rockyPage({ state: st, learn: { d: '2026-10-01', hit: 55, avg: 1.2 } }), /hit rate 55%, average 1\.2% per trade, weights updated/);
+  const none = await rockyPage({ state: st });
+  assert.ok(/No picks yet/.test(none) && !/Last review/.test(none));
+});
+
+// =========================================================== safe markup sink (src/core/safehtml.js): markup text becomes elements without script-capable parts
+{
+  const { JSDOM } = require('jsdom');
+  const SH = load('src/core/safehtml.js');
+  // The helper parses with the element's own window, so a throw-away jsdom page is all a test needs.
+  const withDom = fn => () => { const win = new JSDOM('<!doctype html><body></body>').window; fn(win, win.document); };
+  const fill = (doc, html, tag) => { const el = doc.createElement(tag || 'div'); SH.setHtml(el, html); return el; };
+  // Values that differ per element (a bar's width, a marker's place) travel in data-css="--name:value" and are set as custom properties on the nodes
+  // before they reach the page: an inline style="" in markup is blocked by a strict Content-Security-Policy, setting a property from code is not.
+  const cssVar = (el, name) => el.style.getPropertyValue(name);
+  test('safe markup: data-css becomes custom properties on the element, and the attribute is gone', withDom((win, doc) => {
+    const el = fill(doc, '<i class="bar" data-css="--w:42%;--n:3;--c:#c1524a"></i><b data-css="--p:12.5%"></b>');
+    const bar = el.querySelector('i');
+    assert.deepStrictEqual([cssVar(bar, '--w'), cssVar(bar, '--n'), cssVar(bar, '--c')], ['42%', '3', '#c1524a']);
+    assert.strictEqual(cssVar(el.querySelector('b'), '--p'), '12.5%');
+    assert.strictEqual(el.querySelector('[data-css]'), null);
+  }));
+  test('safe markup: replaceWithHtml and SVG markup get the same treatment', withDom((win, doc) => {
+    const host = doc.createElement('div'), old = doc.createElement('span'); host.appendChild(old); doc.body.appendChild(host);
+    SH.replaceWithHtml(old, '<i data-css="--w:7%"></i>');
+    assert.strictEqual(cssVar(host.querySelector('i'), '--w'), '7%');
+    const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg'); SH.setHtml(svg, '<rect data-css="--x:5"></rect>');
+    assert.strictEqual(cssVar(svg.querySelector('rect'), '--x'), '5');
+  }));
+  test('safe markup: only custom properties with plain values are accepted; everything else in data-css is ignored', withDom((win, doc) => {
+    const bad = ['--x:url(https://evil.example/x)', '--x:url(javascript:alert(1))', '--x:expression(alert(1))', '--x:image-set(a 1x)', '--x:var(--y)', '--x:attr(data-a)', '--x:env(a)',
+      '--x:1}body{display:none', '--x:"1"', "--x:'1'", '--x:1\\2f', '--x:<img>', '--x:' + '9'.repeat(65), '--x:', '--X:1', '--1x:1', '-x:1', 'width:50px', 'color:red', 'background:url(x)', 'novalue', ':1', ''];
+    for(const decl of bad){
+      const el = fill(doc, '<i data-css="' + decl.replace(/"/g, '&quot;') + '"></i>').querySelector('i');
+      assert.strictEqual(el.getAttribute('style'), null, 'ignored: ' + decl);
+      assert.strictEqual(el.hasAttribute('data-css'), false, 'attribute removed anyway: ' + decl);
+    }
+  }));
+  test('safe markup: a bad declaration does not stop the good ones next to it', withDom((win, doc) => {
+    const el = fill(doc, '<i data-css="--a:1;color:red;--b:url(x);--c:3; ;--d:4%"></i>').querySelector('i');
+    assert.deepStrictEqual(['--a', '--b', '--c', '--d'].map(n => cssVar(el, n)), ['1', '', '3', '4%']);
+    assert.strictEqual(el.style.color, '');
+  }));
+  test('safe markup: ordinary markup, entities and text come through unchanged', withDom((win, doc) => {
+    const el = fill(doc, '<p class="a">x &amp; y&nbsp;<b>z</b></p><!-- note --><ul><li>1</li></ul>');
+    assert.strictEqual(el.innerHTML, '<p class="a">x &amp; y&nbsp;<b>z</b></p><!-- note --><ul><li>1</li></ul>');
+  }));
+  test('safe markup: scripts, frames, plugins, styles and document-level tags are removed with their content', withDom((win, doc) => {
+    ['script', 'iframe', 'object', 'embed', 'style', 'meta', 'link', 'base', 'noscript', 'template', 'frameset'].forEach(tag => {
+      const el = fill(doc, '<' + tag + '>alert(1)</' + tag + '><b>ok</b>');
+      assert.strictEqual(el.querySelector(tag), null, tag); assert.strictEqual(el.querySelector('b').textContent, 'ok', tag);
+    });
+  }));
+  test('safe markup: event-handler attributes are removed, also after an attribute break-out and in odd spellings', withDom((win, doc) => {
+    const el = fill(doc, '<img src="x" onerror="alert(1)"><span class="s-pos" onmouseover="alert(1)">a</span><b ONCLICK="x()" onfocusin=1>b</b><svg onload="x()"><g onclick="y()"></g></svg>');
+    assert.ok(![...el.querySelectorAll('*')].some(e => [...e.attributes].some(a => /^on/i.test(a.name))));
+    assert.strictEqual(el.querySelector('span').className, 's-pos');
+  }));
+  test('safe markup: a value that tries to close the parsing wrapper cannot smuggle an element in', withDom((win, doc) => {
+    const el = fill(doc, 'a</template><img src=x onerror=alert(1)><script>alert(2)</script>');
+    assert.strictEqual(el.querySelector('img'), null); assert.strictEqual(el.querySelector('script'), null);
+  }));
+  test('safe markup: only web, mail, phone, relative and anchor links are kept; script URLs are dropped however they are spelled', withDom((win, doc) => {
+    const keep = ['https://a.example/x?y=1', 'http://a.example', 'mailto:a@b.example', 'tel:+911234', '#section', '/path', 'page.html', '?q=1'];
+    const drop = ['javascript:alert(1)', ' JaVaScRiPt:alert(1)', 'java\tscript:alert(1)', 'java&#10;script:alert(1)', 'vbscript:x', 'data:text/html,<b>x</b>', '\u0001javascript:x'];
+    keep.forEach(u => assert.strictEqual(fill(doc, '<a href="' + u + '">x</a>').querySelector('a').getAttribute('href') !== null, true, u));
+    drop.forEach(u => assert.strictEqual(fill(doc, '<a href="' + u + '">x</a>').querySelector('a').getAttribute('href'), null, u));
+  }));
+  test('safe markup: an image may use a data:image png / jpeg / gif / webp source, but an svg or html data URL is dropped', withDom((win, doc) => {
+    assert.ok(fill(doc, '<img src="data:image/png;base64,AAAA">').querySelector('img').hasAttribute('src'));
+    assert.ok(!fill(doc, '<img src="data:image/svg+xml;base64,AAAA">').querySelector('img').hasAttribute('src'));
+    assert.ok(!fill(doc, '<iframe srcdoc="<b>x</b>"></iframe><form><button formaction="javascript:x">b</button></form>').querySelector('button').hasAttribute('formaction'));
+  }));
+  test('safe markup: svg markup is parsed as svg inside an svg element, and svg script vectors are removed', withDom((win, doc) => {
+    const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    SH.setHtml(svg, '<g><path d="M0 0L5 5"/></g><foreignObject><div>x</div></foreignObject><animate attributeName="href" to="javascript:x"/><a xlink:href="javascript:x"><text>t</text></a><use href="javascript:x"/>');
+    assert.strictEqual(svg.querySelector('path').namespaceURI, 'http://www.w3.org/2000/svg');
+    assert.strictEqual(svg.querySelector('foreignObject'), null); assert.strictEqual(svg.querySelector('animate'), null);
+    assert.ok(![...svg.querySelectorAll('[href],[xlink\\:href]')].some(e => /javascript/i.test(e.getAttribute('href') || e.getAttribute('xlink:href'))));
+    SH.setHtml(svg, '');
+    assert.strictEqual(svg.childNodes.length, 0);
+  }));
+  test('safe markup: table rows and options keep their place when set into a table body or a select', withDom((win, doc) => {
+    const tbody = fill(doc, '<tr><td>1</td><td>2</td></tr><tr><td>3</td></tr>', 'tbody');
+    assert.strictEqual(tbody.rows.length, 2); assert.strictEqual(tbody.rows[0].cells.length, 2);
+    const sel = fill(doc, '<option value="a">A</option><option value="b">B</option>', 'select');
+    assert.strictEqual(sel.options.length, 2);
+  }));
+  test('safe markup: replaceWithHtml, appendHtml and insertHtmlAfter put clean markup in the right place', withDom((win, doc) => {
+    const host = doc.createElement('div'); host.innerHTML = '<i id="a">a</i><i id="b">b</i>'; doc.body.appendChild(host);
+    SH.replaceWithHtml(host.querySelector('#a'), '<u>1</u><u onclick="x()">2</u>');
+    SH.appendHtml(host, '<s>end</s><script>x()</script>');
+    SH.insertHtmlAfter(host.querySelector('#b'), '<em>after b</em>');
+    assert.strictEqual(host.innerHTML, '<u>1</u><u>2</u><i id="b">b</i><em>after b</em><s>end</s>');
+  }));
+  test('safe markup: a redraw triggered while the old children are being removed does not break the fill (Chromium 141 failed replaceChildren here)', withDom((win, doc) => {
+    const el = doc.createElement('div'); el.innerHTML = '<input value="focused field">';
+    const text = Object.getOwnPropertyDescriptor(win.Node.prototype, 'textContent'); let redraws = 0;
+    // stands in for a blur / change handler that fires when the focused field is removed and redraws the same element
+    Object.defineProperty(el, 'textContent', { configurable: true, get(){ return text.get.call(this); }, set(v){ text.set.call(this, v); if(!redraws++) SH.setHtml(el, '<p>redrawn by the handler</p>'); } });
+    SH.setHtml(el, '<p>drawn first</p>');
+    assert.strictEqual(redraws, 2);   // the handler's own fill clears too
+    assert.strictEqual(el.innerHTML, '<p>drawn first</p>');   // the fill that was asked for last wins, as with innerHTML
+  }));
+  test('safe markup: with no element to fill the helpers fail loudly instead of doing nothing', withDom(() => {
+    assert.throws(() => SH.setHtml(null, 'x'), /no element to fill/);
+    assert.throws(() => SH.replaceWithHtml(null, 'x'), /no element to replace/);
+    assert.throws(() => SH.appendHtml(null, 'x'), /no element to add to/);
+    assert.throws(() => SH.insertHtmlAfter(null, 'x'), /no element to insert after/);
+  }));
+}
+
+test('link guard: a click on a grid link does not reach the row that would open the stock, and the link still follows', () => alone(async () => {
+  const { JSDOM } = require('jsdom');
+  const win = new JSDOM('<!doctype html><body><table><tbody id="rows"><tr class="analysis-lb-row"><td><a class="analysis-lb-link" href="https://a.example/">Screener</a></td><td class="plain">x</td></tr></tbody></table></body>').window;
+  const had = globalThis.document; globalThis.document = win.document;
+  try {
+    const { init_ui_linkguard } = await loadWithStubs('src/ui/linkguard.js', '', {});
+    init_ui_linkguard();
+    const opened = []; win.document.getElementById('rows').addEventListener('click', e => opened.push(e.target.className));
+    const fire = el => { const e = new win.MouseEvent('click', { bubbles: true, cancelable: true }); el.dispatchEvent(e); return e; };
+    const link = fire(win.document.querySelector('a')); assert.deepStrictEqual(opened, []); assert.strictEqual(link.defaultPrevented, false);
+    fire(win.document.querySelector('.plain')); assert.deepStrictEqual(opened, ['plain']);
+  } finally { if(had === undefined) delete globalThis.document; else globalThis.document = had; }
+}));
 
 // =========================================================== score history (recorded by each import)
 const H = load('src/history/scorehistory.js', 'export { BUCKETS, SCORE_ENGINE, addPoint, bucketId, bucketOf, pointFor, tickerKey };');
@@ -1370,6 +1771,33 @@ test('trade call: history keeps one point a day and lists when the call changed'
     assert.deepStrictEqual(r.hard, []);
   });
 }
+
+// ---- industry heat map: tile place, colour strength and name clamp travel as data-css, the colour tone as a class (CLAUDE.md section 2)
+test('heat map: tiles carry their place, strength and tone as data-css and classes, never an inline style', async () => {
+  const { heatmapHtml } = await import('../src/business/heatmap.js');
+  const rows = [{ name: 'Banks', count: 9, mean: 4 }, { name: 'Steel', count: 5, mean: -6 }, { name: 'Gaps', count: 2, mean: null }];
+  const html = heatmapHtml(rows, '1M', 1000, 'chg', .5);
+  assert.ok(!/\sstyle=/.test(html), 'no style attribute');
+  assert.ok(html.includes('<div class="hm-wrap" data-css="--ratio:1000/500">'));
+  const tile = name => html.match(new RegExp('<button[^>]*data-biz-heat="' + name + '"[^>]*>'))[0];
+  assert.ok(tile('Banks').includes('hm-tile--up') && tile('Steel').includes('hm-tile--down') && tile('Gaps').includes('hm-tile--none'));
+  assert.match(tile('Banks'), /data-css="--x:[\d.]+%;--y:[\d.]+%;--w:[\d.]+%;--h:[\d.]+%;--mix:\d+%;--pad:\d+px \d+px"/);
+  assert.match(html, /<span class="hm-name" data-css="--lines:[1-4]">/);
+});
+test('heat map: a stronger move mixes more colour, capped at 90%, and count sizing still tones every tile', async () => {
+  const { heatmapHtml } = await import('../src/business/heatmap.js');
+  const mix = (mean) => Number(heatmapHtml([{ name: 'A', count: 3, mean }], '1M', 1000, 'count').match(/--mix:(\d+)%/)[1]);
+  assert.strictEqual(mix(0), 18);
+  assert.strictEqual(mix(5), 54);
+  assert.strictEqual(mix(500), 90);
+  assert.strictEqual(mix(-500), 90);
+});
+test('heat map: a hostile industry name is escaped in the title and the attribute', async () => {
+  const { heatmapHtml } = await import('../src/business/heatmap.js');
+  const html = heatmapHtml([{ name: '<img src=x onerror=alert(1)>', count: 4, mean: 2 }], '1W', 1000, 'chg');
+  assert.ok(!html.includes('<img'), 'the name never becomes markup');
+  assert.ok(html.includes('&lt;img'));
+});
 
 (async () => {
 await Promise.all(pending);

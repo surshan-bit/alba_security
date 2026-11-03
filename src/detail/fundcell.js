@@ -81,7 +81,7 @@ function renderFundFactorCell(f, wide){
         <div class="fund-cell-label">${f.name}${(() => { const missing = f.research ? [] : fundMissingMetrics(f); return missing.length ? `<span class="incomplete-tag" title="Missing from this run's data: ${missing.join(', ')} — scored on whichever metrics were available, see 'How is this calculated?'">Incomplete data</span>` : ''; })()}</div>
         ${f.excluded ? '<div class="fund-cell-score fs-pending">Not scored</div>' : `<div class="fund-cell-score ${band}">${f.score.toFixed(2)}<span class="fund-cell-max">/${f.weight}</span></div>`}
       </div>
-      ${f.excluded ? '' : `<div class="fund-cell-bar"><i class="${band}" style="width:${pct}%"></i></div>`}
+      ${f.excluded ? '' : `<div class="fund-cell-bar"><i class="${band}" data-css="--w:${pct}%"></i></div>`}
       <div class="fund-cell-cols">
       <div class="data-chips">
         ${f.metrics.map(([k,v])=>chipHtml(f, view, k, v)).join('')}${view.facts.map(factHtml).join('')}

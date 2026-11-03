@@ -21,7 +21,7 @@
 .rky-key-nifty{background:var(--muted);}
 .rky-table td b{font-weight:700;}
 .rky-bar{display:flex;align-items:center;gap:8px;margin:3px 0;}
-.rky-bar i{display:block;height:8px;background:var(--accent);border-radius:4px;}
+.rky-bar i{display:block;height:8px;width:var(--w,0%);background:var(--accent);border-radius:4px;}
 .rky-bar span{width:60px;color:var(--muted);font-size:var(--t-sm);}
 .rky-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
 .rky-note{border-left:3px solid var(--accent);padding:8px 12px;background:var(--panel2);border-radius:0 8px 8px 0;color:var(--muted);font-size:var(--t-sm);margin:18px 0 0;line-height:1.45;}

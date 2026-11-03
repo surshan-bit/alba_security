@@ -4,6 +4,7 @@ import { pcTickerKey, priceHistoryByTicker } from './store.js';
 import { followPrice, periodStartSec } from './periodmove.js';
 import { EVENT_GROUPS, barReaction, eventsByBar, stockChartEvents } from './events.js';
 import { techMacdSeries } from '../engine/technical.js';
+import { setHtml } from '../core/safehtml.js';
 
 var pcObserver = null;
 var pcKeyOpen = false;   // the colour key and event-tag buttons under "Price history" start hidden
@@ -21,7 +22,7 @@ function renderPriceChartMount(s, sums){
   if(!pcHasData(s)) return '';
   return `<div class="pc-block${pcKeyOpen ? ' show-key' : ''}" id="priceChartBlock">
     <div class="pc-head"><button type="button" class="pc-keytoggle" id="pcKeyToggle" aria-expanded="${pcKeyOpen}">${pcKeyOpen ? 'Hide legend' : 'Legend'}</button></div>
-    <div class="pc-legend"><span><i style="background:var(--buy)"></i>Close above open</span><span><i style="background:var(--avoid)"></i>Close below open</span><span><i class="pc-vol"></i>Volume</span><span><i class="pc-lm"></i>MACD</span><span><i class="pc-ls"></i>MACD signal</span></div>
+    <div class="pc-legend"><span><i class="pc-up"></i>Close above open</span><span><i class="pc-down"></i>Close below open</span><span><i class="pc-vol"></i>Volume</span><span><i class="pc-lm"></i>MACD</span><span><i class="pc-ls"></i>MACD signal</span></div>
     ${renderEventToggles(s)}
     <div class="pc-panels"></div>
     <div class="pc-sums" hidden>${['1W', '1M'].map(k => `<div data-k="${k}">${sums && sums[k] || ''}</div>`).join('')}</div></div>`;
@@ -63,7 +64,7 @@ function initPriceChart(s){
         G.b.forEach((r, i) => { const [s0, s1] = span(k, G.off + i); if(s0 < t1 && s1 > t0){ if(a < 0) a = i; z = i; } });
         if(a >= 0) out += `<rect x="${G.X(a) - G.step / 2}" y="8" width="${(z - a + 1) * G.step}" height="${G.H - 30}" class="pc-bandrect"/>`;
       }
-      g.innerHTML = out;
+      setHtml(g, out);
     });
   }
   function draw(k){
@@ -156,7 +157,7 @@ function initPriceChart(s){
       });
     }
     g += `<line class="pc-xh" y1="${padT}" y2="${H - padB}" opacity="0"/>`;
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); setHtml(svg, g);
     geo[k] = {W, H, padL, step, X, off, n, b};
     drawBands();
   }
@@ -168,7 +169,7 @@ function initPriceChart(s){
     const xh = el.querySelector('.pc-xh'); xh.setAttribute('x1', String(G.X(i))); xh.setAttribute('x2', String(G.X(i))); xh.setAttribute('opacity', '1');
     const prev = bars[k][G.off + i - 1], chg = (r[4] / (prev && prev[4] > 0 ? prev[4] : r[1]) - 1) * 100, tip = el.querySelector('.pc-tip');
     const label = k === '1W' ? 'Week of ' + fmtD(r[0], {day:'numeric', month:'short', year:'numeric'}) : fmtD(r[0], {month:'long', year:'numeric'});
-    tip.innerHTML = `<b>${label}</b><div class="r"><span>Open</span><span>${rs(r[1])}</span></div><div class="r"><span>High</span><span>${rs(r[2])}</span></div><div class="r"><span>Low</span><span>${rs(r[3])}</span></div><div class="r"><span>Close</span><span>${rs(r[4])}</span></div><div class="r"><span>Change</span><span>${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div><div class="r"><span>Volume</span><span>${vol(r[5])}</span></div>${macdTipHtml(k, G.off + i)}${eventTipHtml(byBar[k].get(G.off + i), barReaction(bars[k], G.off + i), k === '1W' ? 'week' : 'month')}`;
+    setHtml(tip, `<b>${label}</b><div class="r"><span>Open</span><span>${rs(r[1])}</span></div><div class="r"><span>High</span><span>${rs(r[2])}</span></div><div class="r"><span>Low</span><span>${rs(r[3])}</span></div><div class="r"><span>Close</span><span>${rs(r[4])}</span></div><div class="r"><span>Change</span><span>${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div><div class="r"><span>Volume</span><span>${vol(r[5])}</span></div>${macdTipHtml(k, G.off + i)}${eventTipHtml(byBar[k].get(G.off + i), barReaction(bars[k], G.off + i), k === '1W' ? 'week' : 'month')}`);
     const tw = /** @type {HTMLElement} */ (tip).offsetWidth, xx = G.X(i) * (rect.width / G.W);
     /** @type {HTMLElement} */ (tip).style.left = Math.max(0, Math.min(rect.width - tw, xx + 14 + tw > rect.width ? xx - tw - 14 : xx + 14)) + 'px'; /** @type {HTMLElement} */ (tip).style.top = '6px'; /** @type {HTMLElement} */ (tip).style.opacity = '1';
   }
@@ -210,8 +211,11 @@ function initPriceChart(s){
   order.forEach(k => {
     const c = cfg[k]; state[k] = c.def;
     const el = document.createElement('div'); el.className = 'pc-panel'; el.dataset.k = k;
-    el.innerHTML = `<div class="pc-ph"><div class="pc-ptitle">${c.title}<small>${bars[k].length} bars</small></div><div class="pc-psum">${(root.querySelector('.pc-sums [data-k="' + k + '"]') || {}).innerHTML || ''}</div><div class="pc-pills" role="group" aria-label="${c.title} range">${c.ranges.map((r, i) => `<button type="button" class="pc-pill" data-i="${i}" aria-pressed="${i === state[k]}">${r[0]}</button>`).join('')}</div></div>
-      <div class="pc-chart"><svg role="img" aria-label="${c.title} candlestick chart with volume and MACD"></svg><div class="pc-tip"></div></div>`;
+    setHtml(el, `<div class="pc-ph"><div class="pc-ptitle">${c.title}<small>${bars[k].length} bars</small></div><div class="pc-psum"></div><div class="pc-pills" role="group" aria-label="${c.title} range">${c.ranges.map((r, i) => `<button type="button" class="pc-pill" data-i="${i}" aria-pressed="${i === state[k]}">${r[0]}</button>`).join('')}</div></div>
+      <div class="pc-chart"><svg role="img" aria-label="${c.title} candlestick chart with volume and MACD"></svg><div class="pc-tip"></div></div>`);
+    // the summary figures are copied as nodes: serialising them to HTML and parsing that again would lose their custom properties under a strict policy
+    const figures = root.querySelector('.pc-sums [data-k="' + k + '"]');
+    if(figures) /** @type {Element} */ (el.querySelector('.pc-psum')).append(...Array.from(figures.childNodes, n => n.cloneNode(true)));
     panels.appendChild(el);
     el.querySelectorAll('.pc-pill').forEach(btn => /** @type {HTMLElement} */ (btn).onclick = () => { state[k] = +/** @type {HTMLElement} */ (btn).dataset.i; el.querySelectorAll('.pc-pill').forEach(x => x.setAttribute('aria-pressed', String(x === btn))); draw(k); });
     const ch = el.querySelector('.pc-chart');

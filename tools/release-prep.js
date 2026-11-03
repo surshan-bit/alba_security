@@ -21,7 +21,7 @@ try { git('rev-parse', '--verify', since + '^{commit}'); } catch(e){ console.err
 
 // Only these kinds of files go to the artifact (the rest of the repo is not part of the page), and never these.
 const SENT = [/^(src|styles|partials|types)\//, /^tests\//, /^tools\//, /^(README\.md|package\.json|package-lock\.json|tsconfig\.json)$/];
-const REPO_ONLY = [/^tests\/out\//, /^tests\/platform\.mjs$/, /\.gz$/, /^tools\/(dist|export-pack|export-settings)\.js$/, /^tools\/daily-refresh\.mjs$/, /^tools\/alba-/];
+const REPO_ONLY = [/^tests\/out\//, /^tests\/platform\.mjs$/, /^tests\/(rls\.mjs|rls\/|lib\/pgtemp\.mjs)/, /\.gz$/, /^tools\/(dist|export-pack|export-settings)\.js$/, /^tools\/daily-refresh\.mjs$/, /^tools\/alba-/];
 
 fs.mkdirSync(out, { recursive: true });
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');

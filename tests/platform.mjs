@@ -3,6 +3,8 @@
 import { createDocStore, createMemoryBackend } from '../platform/docstore.js';
 import { installPlatform } from '../platform/shim.js';
 import { corsHeaders } from '../supabase/functions/_shared/cors.ts';
+import { readPrompt, MAX_PROMPT_CHARS } from '../supabase/functions/_shared/prompt.ts';
+import { allowedMethod, quotaConfig, quotaDecision, DEFAULT_MAX_CALLS, DEFAULT_WINDOW_MINUTES } from '../supabase/functions/_shared/guard.ts';
 let fails = 0;
 const eq = (name, a, b) => { const ok = JSON.stringify(a) === JSON.stringify(b); if(!ok){ fails++; console.log('FAIL', name, JSON.stringify(a), '!=', JSON.stringify(b)); } };
 const tick = () => new Promise(r => setTimeout(r, 5));
@@ -109,8 +111,16 @@ import { readFileSync } from 'node:fs';
   const miss = await a.read('U1/gone'); eq('read: a missing file answers 404 like /_blob/', [miss.ok, miss.status], [false, 404]);
   await a.delete('U1/ok'); eq('delete', log[log.length - 1], ['remove', ['U1/ok']]);
   const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
-  eq('schema: the file bucket is created private', /values \('assets', 'assets', false\)/.test(schema) && /set public = false/.test(schema) && !/'assets', 'assets', true/.test(schema), true);
+  eq('schema: the file bucket is created private', /values \('assets', 'assets', false,/.test(schema) && /set public = false/.test(schema) && !/'assets', 'assets', true/.test(schema), true);
   eq('migration for existing projects makes it private', /update storage\.buckets set public = false where id = 'assets'/.test(readFileSync(new URL('../supabase/003_private_assets.sql', import.meta.url), 'utf8')), true);
+  // The bucket accepts only what the app uploads (CSV files, see src/import/upload-history.js) and caps their size (CLAUDE.md section 3, A04).
+  const LIMIT_BYTES = 10485760, limits = readFileSync(new URL('../supabase/004_assets_limits.sql', import.meta.url), 'utf8');
+  const uploader = readFileSync(new URL('../src/import/upload-history.js', import.meta.url), 'utf8');
+  eq('schema: the bucket caps the size of a file', schema.includes("file_size_limit") && schema.includes(String(LIMIT_BYTES)), true);
+  eq('schema: the bucket accepts only CSV files', /allowed_mime_types[^;]*array\['text\/csv'\]/.test(schema), true);
+  eq('schema: a re-run keeps the limits in force', /on conflict \(id\) do update set public = false, file_size_limit = \d+, allowed_mime_types = array\['text\/csv'\]/.test(schema), true);
+  eq('migration for existing projects sets the same limits', limits.includes('file_size_limit = ' + LIMIT_BYTES) && /allowed_mime_types = array\['text\/csv'\]/.test(limits) && /where id = 'assets'/.test(limits), true);
+  eq('the app uploads CSV text, which the bucket accepts', /new Blob\(\[text\], \{ type: 'text\/csv' \}\)/.test(uploader), true);
 }
 
 // CORS for the private functions: only the listed pages are answered, never a wildcard
@@ -122,6 +132,152 @@ import { readFileSync } from 'node:fs';
   eq('cors: never a wildcard', corsHeaders(other, '*')['Access-Control-Allow-Origin'], undefined);
   eq('cors: a listed origin is echoed back', corsHeaders('https://b.example', ' https://a.example , https://b.example ')['Access-Control-Allow-Origin'], 'https://b.example');
   eq('cors: the answer varies by Origin', corsHeaders(site).Vary, 'Origin');
+}
+
+// Reading the prompt of a request to the Claude function: any malformed body is a clean 400/413, never a crash
+{
+  const bad = body => { const r = readPrompt(body); return 'status' in r ? r.status : 0; };
+  eq('prompt: a plain prompt is accepted', readPrompt({ prompt: 'hello' }), { prompt: 'hello' });
+  for(const body of [null, undefined, 7, 'text', true, [], ['prompt'], {}, { prompt: '' }, { prompt: 5 }, { prompt: null }, { prompt: { a: 1 } }]) eq('prompt: ' + JSON.stringify(body) + ' is a 400', bad(body), 400);
+  eq('prompt: the longest allowed prompt passes', bad({ prompt: 'a'.repeat(MAX_PROMPT_CHARS) }), 0);
+  eq('prompt: one character too many is a 413', bad({ prompt: 'a'.repeat(MAX_PROMPT_CHARS + 1) }), 413);
+  eq('prompt: the error carries a code and a user-safe message', readPrompt(null), { code: 'invalid_request', message: 'Bad request.', status: 400 });
+}
+
+// Guards in front of the Claude function: method, a per-owner call quota (counted in the database) and what a failed count means
+{
+  eq('guard: POST is allowed', allowedMethod('POST'), true);
+  for(const m of ['GET', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'post', '']) eq('guard: ' + (m || 'empty method') + ' is refused', allowedMethod(m), false);
+  eq('quota: defaults when nothing is set', quotaConfig(undefined, undefined), { maxCalls: DEFAULT_MAX_CALLS, windowMinutes: DEFAULT_WINDOW_MINUTES });
+  eq('quota: secrets are read as whole numbers', quotaConfig('50', '10'), { maxCalls: 50, windowMinutes: 10 });
+  for(const bad of ['', 'abc', '0', '-5', '1.5', '1e3', 'NaN', '99999999']) eq('quota: "' + bad + '" falls back to the default', quotaConfig(bad, bad), { maxCalls: DEFAULT_MAX_CALLS, windowMinutes: DEFAULT_WINDOW_MINUTES });
+  eq('quota: a counted call inside the limit is allowed', quotaDecision({ data: true, error: null }), 'allowed');
+  eq('quota: a refused slot is limited', quotaDecision({ data: false, error: null }), 'limited');
+  for(const r of [{ data: null, error: { message: 'x' } }, { data: true, error: { message: 'x' } }, { data: null, error: null }, { data: 'true', error: null }, { data: 1, error: null }]) eq('quota: ' + JSON.stringify(r) + ' fails closed', quotaDecision(r), 'unavailable');
+}
+{
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'), mig = readFileSync(new URL('../supabase/005_sample_quota.sql', import.meta.url), 'utf8');
+  for(const [name, sql] of [['schema', schema], ['migration', mig]]){
+    eq(name + ': the usage table has row level security and no policy', /alter table public\.sample_usage enable row level security/.test(sql) && !/create policy [^;]*on public\.sample_usage/.test(sql), true);
+    eq(name + ': the slot function is owner-only, with an empty search path', /function public\.take_sample_slot\([^)]*\)[\s\S]*?security definer set search_path = ''[\s\S]*?is_owner\(\)/.test(sql), true);
+    eq(name + ': only signed-in users may run it', /revoke all on function public\.take_sample_slot\(integer, interval\) from public, anon/.test(sql) && /grant execute on function public\.take_sample_slot\(integer, interval\) to authenticated/.test(sql), true);
+    eq(name + ': the table is not readable by clients', !/grant [^;]*sample_usage/.test(sql), true);
+    eq(name + ': anon has no access to the usage table', /revoke all on public\.sample_usage from anon/.test(sql), true);
+  }
+}
+
+// The three security-definer functions run with an empty search path and are not callable by the public (CLAUDE.md section 3)
+{
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'), mig = readFileSync(new URL('../supabase/006_definer_search_path.sql', import.meta.url), 'utf8');
+  for(const [name, sql] of [['schema', schema], ['migration', mig]]){
+    for(const fn of ['on_new_user', 'is_owner', 'has_pro']){
+      eq(name + ': ' + fn + ' is security definer with an empty search path', new RegExp('function public\\.' + fn + '\\(\\)[^;]*?security definer set search_path = \'\' as').test(sql), true);
+      eq(name + ': ' + fn + ' is not callable by the public or anon', new RegExp('revoke all on function public\\.' + fn + '\\(\\) from public, anon').test(sql), true);
+    }
+    for(const fn of ['is_owner', 'has_pro']) eq(name + ': ' + fn + ' stays callable by signed-in users (the row-level rules call it)', new RegExp('grant execute on function public\\.' + fn + '\\(\\) to authenticated').test(sql), true);
+    eq(name + ': no definer function keeps search_path = public', !/security definer set search_path = public/.test(sql), true);
+  }
+}
+
+// Every numbered migration can be run again: a policy is dropped before it is created, so a second run does not stop with "already exists"
+{
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = new URL('../supabase/', import.meta.url);
+  const files = readdirSync(dir).filter(f => /^\d{3}_.*\.sql$/.test(f));
+  eq('migrations: the numbered files are found', files.length >= 5, true);
+  for(const f of files){
+    const sql = readFileSync(new URL(f, dir), 'utf8');
+    for(const m of sql.matchAll(/^create policy (\w+) on ([\w.]+)/gm)) eq(f + ': policy ' + m[1] + ' is dropped first', new RegExp('drop policy if exists ' + m[1] + ' on ' + m[2].replace('.', '\\.') + ';\\s*create policy ' + m[1] + ' on').test(sql), true);
+  }
+}
+
+// Server functions import packages by exact version from the npm registry, never from a mutable URL (CLAUDE.md section 3, A06 and A08),
+// and the version is the one package.json pins for the browser, so there is a single version to review
+{
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const root = new URL('../supabase/functions/', import.meta.url);
+  const files = readdirSync(root, { recursive: true }).filter(f => String(f).endsWith('.ts'));
+  const pinned = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dependencies['@supabase/supabase-js'];
+  eq('functions: the server function files are found', files.length >= 5, true);
+  for(const f of files){
+    const src = readFileSync(new URL(f, root), 'utf8');
+    eq(f + ': no import from a web address', /^\s*(import|export)[^\n]*from\s+['"]https?:/m.test(src), false);
+    for(const m of src.matchAll(/from\s+'npm:(@?[^@']+(?:\/[^@']+)?)@([^'/]+)[^']*'/g)) eq(f + ': ' + m[1] + ' is pinned to an exact version', /^\d+\.\d+\.\d+$/.test(m[2]), true);
+  }
+  const owner = readFileSync(new URL('_shared/owner.ts', root), 'utf8');
+  eq('functions: owner.ts imports supabase-js from npm at the version package.json pins', owner.includes("from 'npm:@supabase/supabase-js@" + pinned + "'"), true);
+}
+
+// A signed-in user cannot store a document bigger than 1 MiB under their own paths (CLAUDE.md section 3, A04); the one number lives in doc_size_ok
+{
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'), mig = readFileSync(new URL('../supabase/007_doc_size_limit.sql', import.meta.url), 'utf8');
+  for(const [name, sql] of [['schema', schema], ['migration', mig]]){
+    eq(name + ': doc_size_ok caps a document at 1 MiB, with an empty search path', /function public\.doc_size_ok\(d jsonb\)[^;]*?immutable[^;]*?set search_path = ''[^;]*?octet_length\(d::text\) <= 1048576/.test(sql), true);
+    for(const policy of ['own_docs_all', 'own_user_record']) eq(name + ': ' + policy + ' checks the size of what is written', new RegExp('create policy ' + policy + ' on public\\.docs[\\s\\S]*?with check \\([^;]*public\\.doc_size_ok\\(data\\)\\);').test(sql), true);
+    eq(name + ': the owner\'s shared-data policy is not size-capped', !/create policy shared_write_owner[^;]*doc_size_ok/.test(sql), true);
+  }
+}
+
+// Realtime sends inserts and updates only. A delete event is not filtered by row-level security, so it would show every signed-in user the path
+// (and so the trade symbol and date) of a document someone deleted. The setting covers the whole publication, so it is applied only when
+// docs is the only table in it.
+{
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'), mig = readFileSync(new URL('../supabase/008_realtime_no_deletes.sql', import.meta.url), 'utf8');
+  for(const [name, sql] of [['schema', schema], ['migration', mig]]){
+    eq(name + ': the publication sends inserts and updates only', /alter publication supabase_realtime set \(publish = 'insert, update'\)/.test(sql), true);
+    eq(name + ': it is applied only when docs is published and is the only published table', /if exists \(select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'docs'\)\s*and not exists \(select 1 from pg_publication_tables where pubname = 'supabase_realtime' and not \(schemaname = 'public' and tablename = 'docs'\)\)\s*then\s*alter publication supabase_realtime set/.test(sql), true);
+    eq(name + ': a project with other published tables is told, not changed silently', /raise warning/.test(sql), true);
+  }
+}
+
+// A signed-in user keeps at most 10000 documents under their own private path; a trigger-kept counter does the counting (CLAUDE.md section 3, A04)
+{
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'), mig = readFileSync(new URL('../supabase/009_doc_row_limit.sql', import.meta.url), 'utf8');
+  for(const [name, sql] of [['schema', schema], ['migration', mig]]){
+    eq(name + ': the limit is one named function, 10000', /function public\.doc_row_limit\(\)[^;]*?immutable[^;]*?set search_path = ''[\s\S]*?select 10000;/.test(sql), true);
+    eq(name + ': only data/users/<uuid>/ paths are counted', /regexp_match\(p_path, '\^data\/users\/\(\[0-9a-f\]\{8\}-/.test(sql), true);
+    eq(name + ': counting runs after the insert, so a rewrite of a stored document is not counted again', /create trigger docs_count_insert after insert on public\.docs for each row/.test(sql), true);
+    eq(name + ': a delete frees a place', /create trigger docs_count_delete after delete on public\.docs for each row/.test(sql), true);
+    eq(name + ': the trigger functions are definer functions with an empty search path', ['count_doc_insert', 'count_doc_delete'].every(fn => new RegExp('function public\\.' + fn + '\\(\\) returns trigger[^;]*?security definer set search_path = \'\' as').test(sql)), true);
+    eq(name + ': the counter table has row-level security, no policy and no anon access', /alter table public\.doc_counts enable row level security/.test(sql) && /revoke all on public\.doc_counts from anon/.test(sql) && !/on public\.doc_counts for/.test(sql), true);
+    eq(name + ': the trigger functions are not callable by the public', /revoke all on function public\.count_doc_insert\(\) from public, anon/.test(sql) && /revoke all on function public\.count_doc_delete\(\) from public, anon/.test(sql), true);
+  }
+}
+
+// The server functions' packages are recorded with their hashes in supabase/deno.lock, and CI checks them with --frozen: a package whose
+// content no longer matches its recorded hash, or a new package nobody reviewed, fails the check (CLAUDE.md section 3, A06 and A08)
+{
+  const { readFileSync } = await import('node:fs');
+  const lock = JSON.parse(readFileSync(new URL('../supabase/deno.lock', import.meta.url), 'utf8'));
+  const pinned = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dependencies['@supabase/supabase-js'];
+  const npmPackages = Object.entries(lock.npm || {});
+  eq('lock: supabase-js is recorded at the version package.json pins', Object.keys(lock.npm || {}).includes('@supabase/supabase-js@' + pinned), true);
+  eq('lock: every package has a hash', npmPackages.length > 1 && npmPackages.every(([, p]) => /^sha512-/.test(p.integrity)), true);
+  for(const file of ['ci.yml', 'functions.yml']){
+    const wf = readFileSync(new URL('../.github/workflows/' + file, import.meta.url), 'utf8');
+    eq(file + ': Deno is installed by an action pinned to a commit', /uses: denoland\/setup-deno@[0-9a-f]{40} # v\d+\.\d+\.\d+/.test(wf), true);
+    eq(file + ': Deno itself is pinned to an exact version', /deno-version: \d+\.\d+\.\d+/.test(wf), true);
+    eq(file + ': the function is checked against the lock without being allowed to change it', /deno check --frozen --node-modules-dir=none --lock=supabase\/deno\.lock supabase\/functions\/sample\/index\.ts/.test(wf), true);
+  }
+}
+
+// Playwright 1.56 does not support ubuntu-latest (now Ubuntu 26.04), so every job runs on a pinned runner. functions.yml was missed once: its check
+// job died at `playwright install` and the deploy that depends on it was skipped.
+{
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = new URL('../.github/workflows/', import.meta.url);
+  const files = readdirSync(dir).filter(f => /\.ya?ml$/.test(f));
+  eq('workflows: the workflow files are found', files.length >= 2, true);
+  for(const f of files){
+    const runners = [...readFileSync(new URL(f, dir), 'utf8').matchAll(/^\s*runs-on:\s*(\S+)/gm)].map(m => m[1]);
+    eq(f + ': has at least one job with a runner', runners.length > 0, true);
+    eq(f + ': every job runs on ubuntu-24.04, never ubuntu-latest', runners.every(r => r === 'ubuntu-24.04'), true);
+  }
 }
 
 // Security headers: the Cloudflare site must ship the file that sets them

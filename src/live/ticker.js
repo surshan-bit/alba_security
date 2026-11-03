@@ -15,6 +15,7 @@ import { pctChangeSpan } from '../core/util.js';
 import { ldQuote, ldSymOk, ldVerifiedSymbol } from '../livedata/symbols.js';
 import { getLdBatch } from '../livedata/batch.js';
 import { analysisRowContext } from '../analysis/columns.js';
+import { setHtml } from '../core/safehtml.js';
 
 const INTERVAL_MS = 20000, BACKOFF_MS = 120000, MAX_ROWS = 50, PARALLEL = 3;
 // Always starts off, on every load: live prices call TradingView, so they run only after the button is pressed, and only until the page is closed or reloaded.
@@ -88,8 +89,8 @@ function paintRow(tr, s, idx, changed){
   const wk = tr.querySelector('[data-live="weekChg"]'), mo = tr.querySelector('[data-live="monthChg"]');
   if(mos){ mos.textContent = ctx.mosLabel; mos.className = mos.className.replace(/\bmos-\w+\b/g, '').trim() + ' ' + ctx.mosClass; }
   if(px) px.textContent = ctx.price;
-  if(wk) wk.innerHTML = pctChangeSpan(ctx.r.weekPctChange);
-  if(mo) mo.innerHTML = pctChangeSpan(ctx.r.monthPctChange);
+  if(wk) setHtml(wk, pctChangeSpan(ctx.r.weekPctChange));
+  if(mo) setHtml(mo, pctChangeSpan(ctx.r.monthPctChange));
   [[mos, changed.price], [px, changed.price], [wk, changed.week], [mo, changed.month]].forEach(([c, on]) => { if(c && on){ c.classList.remove('live-flash'); void c.offsetWidth; c.classList.add('live-flash'); } });
 }
 // A small live price beside the open stock's ticker (the stock page itself is only redrawn when it is opened again).
