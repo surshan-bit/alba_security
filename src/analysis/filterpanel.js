@@ -105,30 +105,30 @@ function facetCounts(){
 
 // ---- markup ----
 const TECH_BUTTONS = [
-  ['bull_above', 'var(--buy)', 'Bullish', 'MACD above its signal line and above zero'],
-  ['bull_below', 'var(--mbuy)', 'Turning Up', 'MACD crossed above its signal line but is still below zero'],
-  ['bear_above', 'var(--hold)', 'Weakening', 'MACD below its signal line but still above zero'],
-  ['bear_below', 'var(--avoid)', 'Bearish', 'MACD below its signal line and below zero']
+  ['bull_above', 'buy', 'Bullish', 'MACD above its signal line and above zero'],
+  ['bull_below', 'mbuy', 'Turning Up', 'MACD crossed above its signal line but is still below zero'],
+  ['bear_above', 'hold', 'Weakening', 'MACD below its signal line but still above zero'],
+  ['bear_below', 'avoid', 'Bearish', 'MACD below its signal line and below zero']
 ];
 const VERDICT_BUTTONS = [
-  ['buy', 'var(--buy)', 'Strong'],
-  ['mbuy', 'var(--mbuy)', 'Good'],
-  ['hold', 'var(--hold)', 'Hold'],
-  ['avoid', 'var(--avoid)', 'Avoid']
+  ['buy', 'buy', 'Strong'],
+  ['mbuy', 'mbuy', 'Good'],
+  ['hold', 'hold', 'Hold'],
+  ['avoid', 'avoid', 'Avoid']
 ];
 const MOS_BUTTONS = [
-  ['green', 'var(--buy)', 'Green', 'Trading at or above CSV intrinsic value (MoS ≥ 0%)'],
-  ['orange', 'var(--tech-sell)', 'Orange', '-25% ≤ MoS &lt; 0%'],
-  ['red', 'var(--avoid)', 'Red', 'MoS &lt; -25%']
+  ['green', 'buy', 'Green', 'Trading at or above CSV intrinsic value (MoS ≥ 0%)'],
+  ['orange', 'tech-sell', 'Orange', '-25% ≤ MoS &lt; 0%'],
+  ['red', 'avoid', 'Red', 'MoS &lt; -25%']
 ];
 
 function filterButton(attr, value, active, dot, label, count, title){
-  return `<button class="filter-btn${active ? ' active' : ''}" data-${attr}="${value}"${title ? ` title="${title}"` : ''}><span class="filter-dot" style="background:${dot}"></span>${label}<span class="filter-n">${count}</span></button>`;
+  return `<button class="filter-btn${active ? ' active' : ''}" data-${attr}="${value}"${title ? ` title="${title}"` : ''}><span class="filter-dot filter-dot--${dot}"></span>${label}<span class="filter-n">${count}</span></button>`;
 }
 
 // One filter group: an "All" button (active when nothing is chosen) followed by the choices.
 function filterGroup(id, heading, attr, chosen, choices, facetCount){
-  const buttons = [filterButton(attr, 'all', chosen.length === 0, 'var(--text)', 'All', facetCount(attr, 'all'))]
+  const buttons = [filterButton(attr, 'all', chosen.length === 0, 'text', 'All', facetCount(attr, 'all'))]
     .concat(choices.map(([value, dot, label, title]) => filterButton(attr, value, chosen.includes(value), dot, label, facetCount(attr, value), title)));
   return `<div class="filter-group" id="${id}">
         <h2>${heading}</h2>
@@ -143,8 +143,8 @@ function reboundGroup(facetCount){
   return `<div class="filter-group" id="analysisReboundFilter">
         <h2>Weekly Move</h2>
         <div class="filter-group-row">
-          ${filterButton('arebound', 'all', !analysisFilters.rebound, 'var(--text)', 'All', facetCount('arebound', 'all'))}
-          ${filterButton('arebound', 'on', analysisFilters.rebound, 'var(--buy)', 'Rebound', facetCount('arebound', 'on'), 'Down last week, up this week')}
+          ${filterButton('arebound', 'all', !analysisFilters.rebound, 'text', 'All', facetCount('arebound', 'all'))}
+          ${filterButton('arebound', 'on', analysisFilters.rebound, 'buy', 'Rebound', facetCount('arebound', 'on'), 'Down last week, up this week')}
         </div>
       </div>`;
 }
@@ -162,8 +162,8 @@ function strategyGroup(){
     strategies.forEach(x => { if(sets.get(x.id).has(s)) counts.set(x.id, counts.get(x.id) + 1); });
   });
   const hiddenNoteHtml = hiddenNote();
-  const buttons = [filterButton('astrat', 'all', !chosen, 'var(--text)', 'All', all, 'Do not narrow Analysis by a strategy')]
-    .concat(strategies.map(x => filterButton('astrat', escapeHtml(x.id), x.id === chosen, 'var(--accent)', `<span class="filter-label">${escapeHtml(x.name)}</span>`, counts.get(x.id), 'Only stocks that qualify for this strategy today')));
+  const buttons = [filterButton('astrat', 'all', !chosen, 'text', 'All', all, 'Do not narrow Analysis by a strategy')]
+    .concat(strategies.map(x => filterButton('astrat', escapeHtml(x.id), x.id === chosen, 'accent', `<span class="filter-label">${escapeHtml(x.name)}</span>`, counts.get(x.id), 'Only stocks that qualify for this strategy today')));
   return `<div class="filter-group scope-analysis-strategy-filter" id="analysisStrategyFilter">
         <h2>Strategy</h2>
         <div class="filter-group-row">
@@ -174,7 +174,7 @@ function strategyGroup(){
 
 // Optional: only the stocks in the Upward trend or Early trend list from Process in the Trade Log (for the chosen strategy, else the newest result).
 // Each number is how many of those stocks the other Analysis filters leave in. Handy before a Refresh: it works on just the shortlist.
-const IDEAS_BUTTONS = [['up', 'var(--buy)', 'Upward Trend', 'The Upward trend list from the last Process'], ['early', 'var(--hold)', 'Early Trend', 'The Early trend (weekly up, monthly not yet) list from the last Process']];
+const IDEAS_BUTTONS = [['up', 'buy', 'Upward Trend', 'The Upward trend list from the last Process'], ['early', 'hold', 'Early Trend', 'The Early trend (weekly up, monthly not yet) list from the last Process']];
 function ideasGroup(){
   const inStrategy = strategyPassSet(), chosen = analysisFilters.ideas;
   const c = { all: 0, up: 0, early: 0 };
@@ -189,7 +189,7 @@ function ideasGroup(){
   const note = !chosen.length ? '' : source.snap
     ? `<p class="filter-note" id="analysisIdeasNote">From &ldquo;${escapeHtml(source.name)}&rdquo;, processed ${escapeHtml(ideasWhen(source.snap))}. Process again in the Trade Log to update the list.</p>`
     : `<p class="filter-note" id="analysisIdeasNote">No Buy / Sell result is saved yet${analysisFilters.strategyId && source.name ? ' for &ldquo;' + escapeHtml(source.name) + '&rdquo;' : ''}. Open the Trade Log, choose a strategy and press Process.</p>`;
-  const buttons = [filterButton('aideas', 'all', !chosen.length, 'var(--text)', 'All', c.all, 'Do not narrow Analysis by the Buy / Sell ideas')]
+  const buttons = [filterButton('aideas', 'all', !chosen.length, 'text', 'All', c.all, 'Do not narrow Analysis by the Buy / Sell ideas')]
     .concat(IDEAS_BUTTONS.map(([v, dot, label, title]) => filterButton('aideas', v, chosen.includes(v), dot, label, c[v], title)));
   return `<div class="filter-group" id="analysisIdeasFilter">
         <h2>Buy / Sell ideas</h2>
