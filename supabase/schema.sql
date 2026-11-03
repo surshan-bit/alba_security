@@ -40,6 +40,11 @@ create or replace function public.has_pro() returns boolean language sql stable 
     and (role = 'owner' or (plan = 'pro' and pro_until > now()) or (plan = 'trial' and trial_end > now())));
 $$;
 
+-- the most a signed-in user may store in one document (1 MiB of JSON text); the app's largest documents are a small fraction of this
+create or replace function public.doc_size_ok(d jsonb) returns boolean language sql immutable set search_path = '' as $$
+  select octet_length(d::text) <= 1048576;
+$$;
+
 -- definer functions run with the owner's rights, so they get an empty search path and are not open to the public; only signed-in users
 -- need is_owner / has_pro (the row-level rules below call them), and the sign-up trigger needs no caller at all
 revoke all on function public.on_new_user() from public, anon;
@@ -62,7 +67,7 @@ alter table public.profiles enable row level security;
 drop policy if exists own_docs_all on public.docs;
 create policy own_docs_all on public.docs for all to authenticated
   using (path like 'data/users/' || auth.uid()::text || '/%')
-  with check (path like 'data/users/' || auth.uid()::text || '/%');
+  with check (path like 'data/users/' || auth.uid()::text || '/%' and public.doc_size_ok(data));
 
 -- shared stock data: everyone signed in may read the free part; Pro / trial users and the owner read all; only the owner writes
 drop policy if exists shared_read_free on public.docs;
@@ -77,7 +82,7 @@ create policy shared_write_owner on public.docs for all to authenticated
 
 drop policy if exists own_user_record on public.docs;
 create policy own_user_record on public.docs for all to authenticated
-  using (path = 'users/' || auth.uid()::text) with check (path = 'users/' || auth.uid()::text);
+  using (path = 'users/' || auth.uid()::text) with check (path = 'users/' || auth.uid()::text and public.doc_size_ok(data));
 drop policy if exists owner_read_users on public.docs;
 create policy owner_read_users on public.docs for select to authenticated
   using (public.is_owner() and path like 'users/%');

@@ -209,6 +209,17 @@ import { readFileSync } from 'node:fs';
   eq('functions: owner.ts imports supabase-js from npm at the version package.json pins', owner.includes("from 'npm:@supabase/supabase-js@" + pinned + "'"), true);
 }
 
+// A signed-in user cannot store a document bigger than 1 MiB under their own paths (CLAUDE.md section 3, A04); the one number lives in doc_size_ok
+{
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'), mig = readFileSync(new URL('../supabase/007_doc_size_limit.sql', import.meta.url), 'utf8');
+  for(const [name, sql] of [['schema', schema], ['migration', mig]]){
+    eq(name + ': doc_size_ok caps a document at 1 MiB, with an empty search path', /function public\.doc_size_ok\(d jsonb\)[^;]*?immutable[^;]*?set search_path = ''[^;]*?octet_length\(d::text\) <= 1048576/.test(sql), true);
+    for(const policy of ['own_docs_all', 'own_user_record']) eq(name + ': ' + policy + ' checks the size of what is written', new RegExp('create policy ' + policy + ' on public\\.docs[\\s\\S]*?with check \\([^;]*public\\.doc_size_ok\\(data\\)\\);').test(sql), true);
+    eq(name + ': the owner\'s shared-data policy is not size-capped', !/create policy shared_write_owner[^;]*doc_size_ok/.test(sql), true);
+  }
+}
+
 // Security headers: the Cloudflare site must ship the file that sets them
 {
   const { readFileSync } = await import('node:fs');
