@@ -128,3 +128,49 @@ test('server: a saved session cookie is used without logging in; no login at all
   assert.equal(bad.result.isError, true);
   assert.match(bad.result.content[0].text, /No Screener login/);
 });
+
+// A pretend Screener whose company page redirects somewhere else; `seen` lists every URL the worker tried to fetch.
+function redirectingScreener(location){
+  const seen = [];
+  const fn = async (url, init = {}) => {
+    seen.push({ url: String(url), cookie: String((init.headers && init.headers.Cookie) || '') });
+    if(new URL(url).hostname !== 'www.screener.in') return new Response('<h1>evil</h1>', { status: 200 });
+    return new Response('', { status: 302, headers: { Location: location } });
+  };
+  return { fn, seen };
+}
+const SESSION_ENV = { MCP_TOKEN: ENV.MCP_TOKEN, SCREENER_SESSIONID: 'SESS' };
+const callCompany = (f, symbol) => handle(post({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'diagnose', arguments: { symbol } } }), SESSION_ENV, { fetch: f.fn, gap: 0 }).then(r => r.json());
+
+test('security: a redirect to another host is not followed and the session cookie never leaves screener.in', async () => {
+  for(const loc of ['https://evil.example/steal', '//evil.example/steal', 'http://evil.example/steal']){
+    const f = redirectingScreener(loc);
+    const out = JSON.parse((await callCompany(f, 'PASUPTAC')).result.content[0].text);
+    assert.equal(out.ok, false, loc);
+    assert.ok(f.seen.every(c => new URL(c.url).hostname === 'www.screener.in'), 'only screener.in is contacted: ' + loc);
+  }
+});
+
+test('security: a redirect inside screener.in is still followed', async () => {
+  const seen = [];
+  const fn = async (url) => {
+    const p = new URL(url).pathname; seen.push(p);
+    if(p === '/company/PASUPTAC/consolidated/') return new Response('', { status: 302, headers: { Location: '/company/PASUPTAC/' } });
+    if(p === '/company/PASUPTAC/') return new Response(COMPANY_HTML);
+    if(p === '/api/company/777/peers/') return new Response(PEERS_HTML);
+    return new Response('missing', { status: 404 });
+  };
+  const out = JSON.parse((await callCompany({ fn }, 'PASUPTAC')).result.content[0].text);
+  assert.equal(out.ok, true);
+});
+
+test('security: a warehouse id that is not a plain number never reaches the peers URL', async () => {
+  assert.equal(warehouseId('<div id="company-info" data-warehouse-id="../../admin?x="></div>'), null);
+  assert.equal(warehouseId('<div id="company-info" data-warehouse-id="12/../3"></div>'), null);
+  assert.equal(warehouseId('<div id="company-info" data-warehouse-id="777"></div>'), '777');
+  const seen = [];
+  const fn = async (url) => { seen.push(new URL(url).pathname); return new Response('<h1>X</h1><ul id="top-ratios"><li>Current Price</li></ul><div id="company-info" data-warehouse-id="../../admin"></div>'); };
+  const out = JSON.parse((await callCompany({ fn }, 'PASUPTAC')).result.content[0].text);
+  assert.equal(out.error, 'no_warehouse_id');
+  assert.ok(seen.every(p => !p.includes('admin') && !p.startsWith('/api/')), 'no peers request: ' + seen);
+});
