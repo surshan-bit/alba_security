@@ -1,0 +1,28 @@
+stocks 580 | tradable weeks 231 | equal-weight universe buy&hold over the window: 191.9%
+
+== all ==
+rule                                   trades     hit%  avgRet%  avgWin% avgLoss%     expR       PF   total%    CAGR%   maxDD%    stop%  target%
+A current (+10% fixed, ATR stop, 5w)      621     43.8    -0.78    11.16   -10.09    -0.08     0.85    -46.2    -13.1    -63.5       55       42
+B 1:3 target, ATR stop, 10w               378     28.0     -0.7    22.69    -9.82    -0.07     0.88    -33.1     -8.7    -61.5       71       23
+C B + headroom gate                       348     31.9     0.42    21.18     -9.3     0.06     1.01      5.5      1.2    -44.0       66       24
+D C + breakeven at +1.5R                  384     22.9    -0.08    24.23     -7.3    -0.01     0.95    -10.0     -2.4    -44.3       77       20
+E D + market regime filter                231     28.1     1.29    22.95    -7.19     0.18     1.18     33.2      6.7    -33.3       71       25
+F 1:3 + swing-low stop + trail            235     39.1    -0.49    18.68   -12.82    -0.03     0.92    -10.5     -2.5    -31.3       63        8
+
+== firstHalf ==
+rule                                   trades     hit%  avgRet%  avgWin% avgLoss%     expR       PF   total%    CAGR%   maxDD%    stop%  target%
+A current (+10% fixed, ATR stop, 5w)      284     45.4     -0.7    10.65   -10.15    -0.07     0.87    -22.3    -10.7    -39.7       54       44
+B 1:3 target, ATR stop, 10w               165     30.3     0.25    23.49    -9.85     0.03     0.99      1.6      0.7    -32.1       68       25
+C B + headroom gate                       165     38.2     2.74     22.7    -9.59     0.34     1.35     55.6     21.9    -19.5       61       32
+D C + breakeven at +1.5R                  182     26.4     1.22    24.79    -7.23     0.14     1.17     25.1     10.6    -18.6       74       25
+E D + market regime filter                132     30.3     1.98    23.62    -7.43     0.25     1.26     32.3     13.4    -28.8       70       28
+F 1:3 + swing-low stop + trail            107     44.9     1.52    19.29   -12.93     0.13     1.18     13.1      5.7    -14.5       62       10
+
+== secondHalf ==
+rule                                   trades     hit%  avgRet%  avgWin% avgLoss%     expR       PF   total%    CAGR%   maxDD%    stop%  target%
+A current (+10% fixed, ATR stop, 5w)      339     42.8    -0.76    11.66   -10.04    -0.08     0.83    -28.9    -14.3    -41.5       56       41
+B 1:3 target, ATR stop, 10w               209     26.8    -1.29    21.99     -9.8    -0.13     0.79    -28.9    -14.3    -40.0       72       22
+C B + headroom gate                       184     25.5    -1.83    19.46    -9.13    -0.21     0.71    -32.5    -16.3    -38.1       72       16
+D C + breakeven at +1.5R                  204     19.6    -1.28    23.41     -7.3    -0.15     0.75    -26.7    -13.1    -35.3       80       16
+E D + market regime filter                 98     25.5     0.45     22.1    -6.96     0.08     1.08      5.6      2.5    -10.1       73       21
+F 1:3 + swing-low stop + trail            124     33.9    -2.37    16.84   -12.21    -0.17     0.71    -19.5     -9.3    -27.2       65        6

@@ -5,19 +5,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Alba Securities - Stock Analyzer</title>
-<link rel="stylesheet" href="styles.css?v=ff0a10ba">
+<link rel="stylesheet" href="styles.css?v=eb2e5d46">
 <!--build:preload-->
-<link rel="modulepreload" href="app.js?v=ff0a10ba">
+<link rel="modulepreload" href="app.js?v=eb2e5d46">
 <link rel="modulepreload" href="chunks/chunk-ADXICG4Q.js">
 <link rel="modulepreload" href="chunks/chunk-LWDZFE6T.js">
 <link rel="modulepreload" href="chunks/chunk-LDVI5725.js">
-<link rel="modulepreload" href="chunks/main-6RLLJTSL.js">
-<link rel="modulepreload" href="chunks/chunk-JELPL5A6.js">
-<link rel="modulepreload" href="chunks/chunk-FDEYZLC5.js">
-<link rel="modulepreload" href="chunks/chunk-A5DDCSHY.js">
-<link rel="modulepreload" href="chunks/chunk-YB6J52NZ.js">
-<link rel="modulepreload" href="chunks/chunk-TVX63N7D.js">
-<link rel="modulepreload" href="chunks/chunk-44MI2KRN.js">
+<link rel="modulepreload" href="chunks/main-7SD45G2P.js">
+<link rel="modulepreload" href="chunks/chunk-4BY5HJ3X.js">
+<link rel="modulepreload" href="chunks/chunk-GFQFX7DX.js">
+<link rel="modulepreload" href="chunks/chunk-QI5LCDZQ.js">
+<link rel="modulepreload" href="chunks/chunk-53WBZXAA.js">
+<link rel="modulepreload" href="chunks/chunk-5VAMMWTQ.js">
+<link rel="modulepreload" href="chunks/chunk-L37TXTP5.js">
+<link rel="modulepreload" href="chunks/chunk-IRR5SAY3.js">
 <!--/build:preload-->
 </head>
 <body>
@@ -62,7 +63,7 @@
       </g>
       <circle cx="100" cy="100" r="50" fill="url(#brandSunGrad)"/>
     </svg>
-    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.345 &mdash; tagged 2026-10-31">v1.345</span></div>
+    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.346 &mdash; tagged 2026-11-03">v1.346</span></div>
   </div>
   <div class="sidebar-nav">
     <div class="nav-section-label">Menu</div>
@@ -95,6 +96,12 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
       </span>
       Trade Log
+    </button>
+    <button type="button" class="nav-item" data-section="rocky">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>
+      </span>
+      Rocky
     </button>
     <!-- Tools: a drop-down in the top bar. -->
     <div class="nav-tools-group" id="navToolsGroup">
@@ -180,6 +187,15 @@
     </div>
   </section>
 
+  <section class="app-section" id="section-rocky">
+    <header>
+      <h1>Rocky</h1>
+    </header>
+    <div class="analysis-panel card">
+      <div class="scope-rocky-body" id="rockyBody" aria-live="polite"><p class="upload-hint">Loading…</p></div>
+    </div>
+  </section>
+
   <section class="app-section scope-section-trackrecord" id="section-trackrecord" data-tl-tab="positions">
     <header>
       <h1>Trade Log</h1>
@@ -224,7 +240,7 @@
   <div class="boot-msg" style="max-width:480px;line-height:1.5;"></div>
   <button type="button" class="boot-retry" hidden style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;" onclick="location.reload()">Retry</button>
 </div>
-<script src="js/loader.js" data-entry="app.js?v=ff0a10ba"></script>
+<script src="js/loader.js" data-entry="app.js?v=eb2e5d46"></script>
 </body>
 </html>
 

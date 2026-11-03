@@ -29,7 +29,7 @@ async function scenario(name, cfg, docs, fn, allowedError){
     if(docs){ srv.seeds.set(name, JSON.stringify({ docs })); o.seedUrl = base + '/__seed/' + encodeURIComponent(name) + '.json'; }
     const ctx = await browser.newContext({ viewport: (cfg && cfg.viewport) || { width: 1280, height: 900 } }), errs = [];
     s = { ctx, errs };
-    if(cfg && cfg.delayChunks) await ctx.route(/\/chunks\/(strategies|news|tradelog|refreshlog)-/, async r => { await new Promise(x => setTimeout(x, cfg.delayChunks)); r.continue(); });   // a slow download of the lazy pages
+    if(cfg && cfg.delayChunks) await ctx.route(/\/chunks\/(strategies|news|tradelog|rocky|refreshlog)-/, async r => { await new Promise(x => setTimeout(x, cfg.delayChunks)); r.continue(); });   // a slow download of the lazy pages
     const { page } = await openPage(ctx, base, o, name, errs);
     await page.waitForFunction(() => window.__alba && window.__alba.stocks && document.querySelector('.app-section.active'), null, { timeout: 20000 });
     await fn(page);
@@ -409,14 +409,47 @@ async function inactiveScenario(){
   });
 }
 
+// ---------------------------------------------------------------- Rocky page
+// v1.346: the paper-trading agent's ledger, read from the `rocky` collection (written by Rocky's daily run).
+async function rockyScenarios(){
+  const st = { cash: 45000, started: '2026-10-31', curve: [['2026-10-31', 997620, null], ['2026-11-03', 1010672, 23440.8], ['2026-11-04', 1022000, 23600]],
+    open: [{ k: 'IGIL', n: 'Intl Gemmological', g: 'Diversified', d: '2026-10-31', q: 100, entry: 400, last: 420, stop: 376, target: 472 }], closed: [{ k: 'TANLA', d: '2026-10-31', xd: '2026-11-04', why: 'target', ret: 12.5, pnl: 5000 }],
+    metrics: { maxDD: -0.24, curDD: 0, expectancy: 12.5, avgWin: 12.5, avgLoss: null, payoff: null, niftyRet: 0.68, agentRet: 1.12, alpha: 0.44, since: '2026-11-03' } };
+  const pk = { asof: '2026-11-04', dataAsof: '2026-11-03', universe: 474, blocked: 328, regime: { on: true, breadth: 0.7, min: 0.6 },
+    picks: [{ k: 'AAAA', n: 'Aaaa Ltd', g: 'Gas', close: 100, score: 6.5, mos: 30, rsiW: 58, stop: 95, target: 115 }],
+    gated: [{ k: 'PASUPTAC', n: 'Pasupati Acrylon', g: 'Chemicals', close: 72.2, score: 6.37, stop: 65.9, target: 91.9, why: '40-week high 86 is below the 92 target' }] };
+  const docs = { 'rocky/state': st, 'rocky/picks': pk, 'rocky/weights': { v: 0, w: { fund: 1, mos: 1, trend: 1.5, rsi: 0.7, mom: 0.8, near: 0.8 }, hist: [] }, 'rocky/learn': { d: '2026-11-03', note: 'Fewer than 20 closed paper trades; weights unchanged.' } };
+  await scenario('rocky: shows the ledger, picks, the 1:3 gate list and the regime', { section: 'rocky' }, docs, async page => {
+    await goto(page, 'rocky');
+    await until(page, () => document.querySelectorAll('#rockyBody .rky-tile').length >= 10, null, 'the tiles are drawn from the database');
+    const t = await page.evaluate(() => document.getElementById('rockyBody').innerText);
+    ok(/10,22,000/.test(t), 'paper equity comes from the last point of the curve');
+    ok(/Risk-on/.test(t) && /70% up/.test(t), 'the market regime and its breadth are shown');
+    ok(/AAAA/.test(t) && /95\.00 \/ 115\.00/.test(t), 'a pick shows its stop and target');
+    ok(/Passed the checks, failed the 1:3 gate/.test(t) && /PASUPTAC/.test(t) && /below the 92 target/.test(t), 'a stock that failed the gate is listed with the reason');
+    ok(/IGIL/.test(t) && /\+5\.00%/.test(t), 'an open position shows its profit');
+    ok(/TANLA/.test(t) && /\+12\.50%/.test(t), 'a closed trade shows its return');
+    ok(await page.evaluate(() => document.querySelectorAll('#rockyBody svg.rky-curve path').length === 2), 'the curve draws Rocky and the Nifty line');
+    ok(/Learning starts after 20|Fewer than 20/.test(t), 'the learning note is shown');
+  });
+  await scenario('rocky: before the first run the page says so', { section: 'rocky' }, null, async page => {
+    await goto(page, 'rocky');
+    await until(page, () => /has not run yet/.test(document.getElementById('rockyBody').innerText), null, 'an empty database shows the not-run-yet message');
+  });
+  await scenario('rocky: risk-off explains why nothing opens', { section: 'rocky' }, { 'rocky/state': st, 'rocky/picks': Object.assign({}, pk, { picks: [], regime: { on: false, breadth: 0.4, min: 0.6 } }) }, async page => {
+    await goto(page, 'rocky');
+    await until(page, () => /Risk-off: fewer than 60% of stocks are up/.test(document.getElementById('rockyBody').innerText), null, 'the risk-off reason is shown');
+  });
+}
+
 // v1.323: the pages loaded on first use (Strategies, News, Trade Log, Data Refresh) are downloaded while the app is idle, so opening one draws it at once instead of
 // showing it empty or as "Loading…" until a download ends (the flicker); and room for the page scrollbar is always kept, so a page tall enough to scroll does not shift the
 // layout sideways next to a short one. Here each chunk takes 350 ms to arrive, as on a slow connection.
 async function lazyPagesScenario(){
   await scenario('navigation: lazy pages draw at once on first open', { delayChunks: 350 }, null, async page => {
     ok(await page.evaluate(() => getComputedStyle(document.documentElement).scrollbarGutter.startsWith('stable')), 'the page keeps room for its scrollbar');
-    await until(page, () => ['strategies', 'news', 'tradelog', 'refreshlog'].every(n => performance.getEntriesByType('resource').some(e => e.name.includes('/chunks/' + n + '-') && e.responseEnd > 0)), null, 'the four lazy pages are downloaded while idle, before they are opened');
-    for(const k of ['strategies', 'news', 'trackrecord', 'refreshlog']){
+    await until(page, () => ['strategies', 'news', 'tradelog', 'rocky', 'refreshlog'].every(n => performance.getEntriesByType('resource').some(e => e.name.includes('/chunks/' + n + '-') && e.responseEnd > 0)), null, 'the four lazy pages are downloaded while idle, before they are opened');
+    for(const k of ['strategies', 'news', 'trackrecord', 'rocky', 'refreshlog']){
       const blank = await page.evaluate(k => new Promise(res => {
         let bad = 0; const t0 = performance.now();
         document.querySelector('.nav-item[data-section="' + k + '"]').click();
@@ -529,7 +562,7 @@ async function tradeLogPhoneScenarios(){
 
 async function main(){
   base = await srv.listen(); browser = await chromium.launch();
-  try { await pinScenarios(); await tradeScenarios(); await tradeLogPhoneScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); await bulletsWithoutSourcesScenario(); await lazyPagesScenario(); await phoneLayoutScenarios(); } finally { await browser.close(); srv.close(); }
+  try { await pinScenarios(); await tradeScenarios(); await tradeLogPhoneScenarios(); await inactiveScenario(); await ideasFilterScenarios(); await heldTagScenario(); await sourceTagsScenario(); await bulletsWithoutSourcesScenario(); await lazyPagesScenario(); await rockyScenarios(); await phoneLayoutScenarios(); } finally { await browser.close(); srv.close(); }
   if(problems.length){ console.error('state tests FAILED (' + problems.length + ' problems, ' + checks + ' checks):\n  ' + problems.join('\n  ')); process.exit(1); }
   console.log('state tests: ' + checks + ' checks passed');
 }

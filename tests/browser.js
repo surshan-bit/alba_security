@@ -107,7 +107,7 @@ async function bootTests(browser){
 }
 
 // ---------------------------------------------------------------- 2. layout
-const SECTIONS = ['analysis', 'business', 'strategies', 'trackrecord', 'refreshlog', 'help', 'knowledgebase', 'settings'];
+const SECTIONS = ['analysis', 'business', 'strategies', 'trackrecord', 'rocky', 'refreshlog', 'help', 'knowledgebase', 'settings'];
 const goto = (page, k) => page.evaluate(k => document.querySelector('.nav-item[data-section="' + k + '"]').click(), k);
 // elements whose right edge is past the screen, ignoring ones that scroll inside their own box or are hidden
 const sticksOut = page => page.evaluate(() => {
