@@ -50,3 +50,7 @@ Weekly: also copy `stockData`, `barsRecent`; run `build` (expect 400-500 stocks,
 
 ## 1:3 gate (live)
 `trade_plan()` in agent.py: stop = ATR-based 4.5-9%, target = entry + 3 x risk, accepted only if the 40-week high (compact `hi`) >= target or entry is within 3% of that high; no high on record -> rejected. Rejected stocks are listed in picks.json `gated` and on the dashboard. New positions carry `maxd` = 70 days; positions opened before the gate keep the old +10% target and 30-day limit.
+
+## Entry filters (live since the 6th version of the agent code)
+`entry_blocks()` in agent.py blocks a stock unless: price is above a **rising 10-week average** (`ma10`, `ma10p` in compact.json, from the weekly bars), **weekly RSI is 45-75**, the **1-month change is positive**, and price is **within 15% of the 40-week high**. Missing data blocks the stock. Backtest (`backtest.py`, 8 random orderings, 1:3 gate + regime filter): hard entry filters beat a liquidity-only entry (profit factor 1.39 vs 1.19, 8/8 vs 7/8 seeds positive, median +44% vs +23%); a nearer-resistance check did not help and was not added. Results are noisy; one regime of about 4 years.
+Needs the weekly run to have rebuilt compact.json (until then every stock is blocked as 'No trend data').

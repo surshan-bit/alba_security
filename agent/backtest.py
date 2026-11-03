@@ -49,10 +49,13 @@ def signal(bars, i, kind='base', rs=None):
     hi52 = max(x[2] for x in w[-52:]); hi40 = max(x[2] for x in w[-40:])
     atr = sum((x[2] - x[3]) / x[4] for x in w[-8:]) / 8 * 100
     vr = w[-1][5] / max(sum(x[5] for x in w[-9:-1]) / 8, 1)
-    out = {'close': close, 'atr': atr, 'hi52': hi52, 'low3': min(x[3] for x in w[-3:]), 'volup': vr > 1.2, 'rsi': r}
+    out = {'res1': first_resistance(w, close), 'close': close, 'atr': atr, 'hi52': hi52, 'low3': min(x[3] for x in w[-3:]), 'volup': vr > 1.2, 'rsi': r}
     ret13 = close / c[-14] - 1
-    if kind == 'base':
-        if s10 > close or s10 < sma(c[:-3], 10): return None                        # >10w SMA (~50 DMA) and rising
+    if kind == 'loose':                                                             # liquidity only: what the live agent's soft scoring would let through
+        out['score'] = ret13 * 100 + 20 * (close / hi40); return out
+    if kind in ('base', 'base_nosma', 'base_above'):
+        if kind == 'base' and (s10 > close or s10 < sma(c[:-3], 10)): return None   # >10w SMA (~50 DMA) and rising
+        if kind == 'base_above' and s10 > close: return None                         # >10w SMA only
         if not 45 <= r <= 75: return None
         m4 = close / c[-5] - 1
         if m4 <= 0: return None
@@ -73,6 +76,15 @@ def signal(bars, i, kind='base', rs=None):
         if not 40 <= r <= 58 or ret13 < 0.15: return None
         out['score'] = ret13 * 100; return out
     raise ValueError(kind)
+
+def first_resistance(w, close, look=52, wing=3):
+    """Lowest swing high (a weekly high not exceeded in the 3 weeks either side) above the close within the last `look` weeks; None if there is none."""
+    n = len(w); lo = max(wing, n - look); out = None
+    for j in range(lo, n - wing):
+        h = w[j][2]
+        if h > close * 1.01 and all(h >= w[k][2] for k in range(j - wing, j + wing + 1)):
+            if out is None or h < out: out = h
+    return out
 
 _XS = {}
 def cross_section(S):
@@ -97,6 +109,8 @@ def plan(rule, s, entry):
     ok = True
     if rule.get('gate'):                                                          # headroom to resistance for the target
         ok = (s['hi52'] >= target) or (entry >= 0.97 * s['hi52'])
+    if rule.get('res_min') and s.get('res1') is not None and entry < 0.97 * s['hi52']:   # first swing-high overhead must leave res_min x risk of room
+        if s['res1'] < entry + rule['res_min'] * risk: ok = False
     if rule.get('need_volup') and not s['volup']: ok = False
     return stop, target, ok
 

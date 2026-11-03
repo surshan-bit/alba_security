@@ -11,8 +11,8 @@ def row(k, close, **kw):
     for i, v in kw.items(): c[int(i[1:])] = v
     return {'k': k, 'c': c}
 
-def comp(k, g='G1', iv=200, sc=8, vd='buy', atr=5.0, hi=200):
-    return {'n': k, 'g': g, 'sc': sc, 'vd': vd, 'iv': iv, 'atr': atr, 'hi': hi}
+def comp(k, g='G1', iv=200, sc=8, vd='buy', atr=5.0, hi=116, ma10=95, ma10p=94):
+    return {'n': k, 'g': g, 'sc': sc, 'vd': vd, 'iv': iv, 'atr': atr, 'hi': hi, 'ma10': ma10, 'ma10p': ma10p}
 
 class Env:
     def __init__(self, stocks, rows, state=None, weights=None):
@@ -54,7 +54,7 @@ class Entries(unittest.TestCase):
         self.assertLessEqual(p['q'] * p['entry'], A.CAP * A.POSCAP + p['entry'])
     def test_stop_distance_clipped(self):
         for atr, lo, hi in ((1, .045, .045), (20, .09, .09)):
-            e = Env({'A': comp('A', atr=atr)}, [row('A', 100)]); p = e.run()['state']['open'][0]
+            e = Env({'A': comp('A', atr=atr, hi=101)}, [row('A', 100)]); p = e.run()['state']['open'][0]
             self.assertAlmostEqual(1 - p['stop'] / p['entry'], lo, places=2)
     def test_group_cap(self):
         stocks = {k: comp(k, g='SAME') for k in 'ABCD'}
@@ -82,20 +82,61 @@ class Blocks(unittest.TestCase):
         ts = (dt.datetime.fromisoformat(DAY) + dt.timedelta(days=30)).replace(tzinfo=dt.timezone.utc).timestamp()
         self.assertFalse(self.blocked(c11=ts))
 
+class EntryFilters(unittest.TestCase):
+    def blocked(self, m=None, **c):
+        e = Env({'A': m or comp('A')}, [row('A', 100, **c)]); r = e.run()
+        return (not r['state']['open'] and r['picks']['blocked'] == 1), r
+    def test_passes_with_everything_in_order(self):
+        ok, r = self.blocked(); self.assertFalse(ok); self.assertEqual(len(r['state']['open']), 1)
+    def test_below_the_10_week_average(self): self.assertTrue(self.blocked(comp('A', ma10=105, ma10p=104))[0])
+    def test_at_the_10_week_average_is_blocked(self): self.assertTrue(self.blocked(comp('A', ma10=100, ma10p=99))[0])
+    def test_falling_10_week_average(self): self.assertTrue(self.blocked(comp('A', ma10=95, ma10p=96))[0])
+    def test_flat_10_week_average_is_fine(self): self.assertFalse(self.blocked(comp('A', ma10=95, ma10p=95))[0])
+    def test_missing_trend_data_blocks(self): self.assertTrue(self.blocked(comp('A', ma10=None, ma10p=None))[0])
+    def test_rsi_band_edges(self):
+        self.assertFalse(self.blocked(c5=45)[0]); self.assertFalse(self.blocked(c5=75)[0])
+        self.assertTrue(self.blocked(c5=44.9)[0]); self.assertTrue(self.blocked(c5=75.1)[0]); self.assertTrue(self.blocked(c5=None)[0])
+    def test_needs_positive_one_month_momentum(self):
+        self.assertTrue(self.blocked(c8=0)[0]); self.assertTrue(self.blocked(c8=None)[0]); self.assertFalse(self.blocked(c8=0.1)[0])
+    def test_must_be_within_15pct_of_the_40_week_high(self):
+        self.assertTrue(self.blocked(comp('A', hi=118))[0])      # 100 < 0.85 x 118
+        self.assertFalse(self.blocked(comp('A', hi=117))[0])     # 100 >= 0.85 x 117 = 99.45
+    def test_reasons_are_recorded(self):
+        _, r = self.blocked(comp('A', ma10=105, ma10p=104), c5=80)
+        why = r['picks']['top'][0]['blocks']; self.assertIn('Below the 10-week average', why); self.assertIn('Weekly RSI outside 45-75', why)
+
+class Build(unittest.TestCase):
+    def test_compact_carries_the_10_week_averages(self):
+        import tempfile
+        w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); os.makedirs(w + '/stockData'); os.makedirs(w + '/liveSnapshot'); os.makedirs(w + '/barsRecent')
+        json.dump({'stocks': [{'ticker': 'AAA', 'name': 'Aaa', 'industryGroup': 'G', 'score': 7, 'verdict': 'buy', 'valuation': {'intrinsicValue': 200, 'currentPrice': 100, 'fiiHolding': 1}}]}, open(w + '/stockData/c001.json', 'w'))
+        json.dump({'rows': [{'k': 'AAA', 'c': [100, 2, 1, 2, 1, 58, 55, 1, 10, 200000, 1e4, None]}]}, open(w + '/liveSnapshot/c001.json', 'w'))
+        bars = [[i, 1, 11 + i, 1, 10 + i, 1] for i in range(40)]            # closes 10, 11, ... 49
+        json.dump({'rows': [{'k': 'AAA', 'w': bars}]}, open(w + '/barsRecent/c001.json', 'w'))
+        A.build(w, w); m = A.J(w + '/agent/compact.json')['stocks']['AAA']
+        self.assertAlmostEqual(m['ma10'], sum(range(40, 50)) / 10); self.assertAlmostEqual(m['ma10p'], sum(range(37, 47)) / 10)
+    def test_short_history_leaves_the_averages_empty(self):
+        import tempfile
+        w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); os.makedirs(w + '/stockData'); os.makedirs(w + '/liveSnapshot'); os.makedirs(w + '/barsRecent')
+        json.dump({'stocks': [{'ticker': 'AAA', 'name': 'Aaa', 'industryGroup': 'G', 'score': 7, 'verdict': 'buy', 'valuation': {'intrinsicValue': 200, 'currentPrice': 100, 'fiiHolding': 1}}]}, open(w + '/stockData/c001.json', 'w'))
+        json.dump({'rows': [{'k': 'AAA', 'c': [100, 2, 1, 2, 1, 58, 55, 1, 10, 200000, 1e4, None]}]}, open(w + '/liveSnapshot/c001.json', 'w'))
+        json.dump({'rows': [{'k': 'AAA', 'w': [[i, 1, 11, 1, 10, 1] for i in range(9)]}]}, open(w + '/barsRecent/c001.json', 'w'))
+        A.build(w, w); m = A.J(w + '/agent/compact.json')['stocks']['AAA']; self.assertIsNone(m['ma10']); self.assertIsNone(m['ma10p'])
+
 class Gate(unittest.TestCase):
     def run1(self, hi, close=100, atr=5.0):
         return Env({'A': comp('A', hi=hi, atr=atr)}, [row('A', close)]).run()
     def test_target_is_three_times_stop_distance(self):
-        p = self.run1(200)['state']['open'][0]; self.assertAlmostEqual((p['target'] - p['entry']) / (p['entry'] - p['stop']), 3.0, places=1); self.assertEqual(p['maxd'], A.GATE_DAYS)
+        p = self.run1(116)['state']['open'][0]; self.assertAlmostEqual((p['target'] - p['entry']) / (p['entry'] - p['stop']), 3.0, places=1); self.assertEqual(p['maxd'], A.GATE_DAYS)
     def test_rejects_when_high_leaves_no_room(self):
         r = self.run1(110); self.assertEqual(r['state']['open'], []); self.assertEqual(r['picks']['picks'], [])
         g = r['picks']['gated'][0]; self.assertEqual(g['k'], 'A'); self.assertIn('below', g['why'])
     def test_accepts_breakout_near_the_high(self):
         self.assertEqual(len(self.run1(101)['state']['open']), 1)           # entry within 3% of the 40-week high: no overhead
-    def test_rejects_when_no_high_on_record(self):
-        r = self.run1(None); self.assertEqual(r['state']['open'], []); self.assertIn('no 40-week high', r['picks']['gated'][0]['why'])
+    def test_no_high_on_record_blocks_the_stock(self):
+        r = self.run1(None); self.assertEqual(r['state']['open'], []); self.assertEqual(r['picks']['blocked'], 1)
     def test_volatile_stock_uses_9pct_stop_and_wider_target(self):
-        p = self.run1(300, atr=20)['state']['open'][0]; self.assertAlmostEqual(1 - p['stop'] / p['entry'], .09, places=2); self.assertAlmostEqual(p['target'] / p['entry'] - 1, .27, places=2)
+        p = self.run1(101, atr=20)['state']['open'][0]; self.assertAlmostEqual(1 - p['stop'] / p['entry'], .09, places=2); self.assertAlmostEqual(p['target'] / p['entry'] - 1, .27, places=2)
     def test_gated_stock_does_not_use_a_group_slot(self):
         stocks = {'A': comp('A', g='SAME', hi=110), 'B': comp('B', g='SAME'), 'C': comp('C', g='SAME'), 'D': comp('D', g='SAME')}
         r = Env(stocks, [row(k, 100) for k in stocks]).run(); self.assertEqual(len(r['state']['open']), A.MAX_PER_GROUP)

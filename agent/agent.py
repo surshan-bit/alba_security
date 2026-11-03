@@ -8,6 +8,7 @@ Modes (all file based; WORK dir holds the JSON docs):
 import json,glob,sys,os,math,datetime as dt
 CAP=1_000_000; RISK=0.01; MAXPOS=8; POSCAP=0.125; COST=0.005  # round-trip costs+slippage
 TIME_DAYS=30; MAX_PER_GROUP=2   # TIME_DAYS: legacy positions opened before the 1:3 gate
+RSI_LO=45; RSI_HI=75; NEAR_HIGH=0.85   # hard entry filters (see entry_blocks)
 RR_MIN=3.0; GATE_DAYS=70       # 1:3 gate: target = RR_MIN x stop distance; new positions may run 70 days (10 weeks, as tested)
 REGIME_MIN=0.6   # market filter: new entries only while at least this share of the universe has a positive 1-month change
 FEATS=['fund','mos','trend','rsi','mom','near']
@@ -56,12 +57,29 @@ def build(work,D):
         m=(i-p)/i*100
         if m<-25 or s.get('score') is None or s['score']<2: continue
         if c[6] is None or not 30<=c[6]<=80 or c[9] is None or c[9]<50000 or (v.get('fiiHolding') or 0)<0.1 or c[10] is None: continue
-        w=bars.get(k,[]); atr=None; off=None
+        w=bars.get(k,[]); atr=None; off=None; ma10=ma10p=None
         if len(w)>=8:
             atr=sum((b[2]-b[3])/b[4] for b in w[-8:] if b[4])/8*100
             hi=max(b[2] for b in w[-40:]); off=(w[-1][4]/hi-1)*100
-        out[k]={'n':s.get('name'),'g':s.get('industryGroup'),'sc':s['score'],'vd':s.get('verdict'),'iv':i,'atr':atr,'hi':max(b[2] for b in w[-40:]) if w else None}
+        if len(w)>=13:
+            ma10=sum(b[4] for b in w[-10:])/10; ma10p=sum(b[4] for b in w[-13:-3])/10   # 10-week average now and 3 weeks ago
+        out[k]={'n':s.get('name'),'g':s.get('industryGroup'),'sc':s['score'],'vd':s.get('verdict'),'iv':i,'atr':atr,'hi':max(b[2] for b in w[-40:]) if w else None,'ma10':ma10,'ma10p':ma10p}
     S('%s/agent/compact.json'%work,{'built':today(),'stocks':out}); print('compact',len(out))
+
+def entry_blocks(m,close,rw,ch1m):
+    """Hard entry filters, the same ones the backtest tested: above a rising 10-week average, weekly RSI 45-75,
+    positive 1-month change, within 15% of the 40-week high. Missing data blocks the stock (never buys unchecked)."""
+    b=[]
+    ma,mp=m.get('ma10'),m.get('ma10p')
+    if ma is None or mp is None: b.append('No trend data (needs a rebuild)')
+    else:
+        if close<=ma: b.append('Below the 10-week average')
+        elif ma<mp: b.append('10-week average falling')
+    if rw is None or not RSI_LO<=rw<=RSI_HI: b.append('Weekly RSI outside %d-%d'%(RSI_LO,RSI_HI))
+    if ch1m is None or ch1m<=0: b.append('No positive 1-month momentum')
+    hi=m.get('hi')
+    if not hi or close<NEAR_HIGH*hi: b.append('More than 15% below the 40-week high')
+    return b
 
 def feats(k,m,c):
     close,wm,ws,mm,ms,rw,rm,ch1w,ch1m,vol,mc,earn=c
@@ -76,7 +94,7 @@ def feats(k,m,c):
     blocks=[]
     if m['vd']=='avoid': blocks.append('Avoid verdict')
     if wb is False and mb is False: blocks.append('Downtrend')
-    if rw is not None and rw>=80: blocks.append('Weekly RSI stretched')
+    blocks+=entry_blocks(m,close,rw,ch1m)
     if (ch1m or 0)<=-15: blocks.append('Falling >15% in a month')
     if vol is not None and vol*close/1e5<50: blocks.append('Thin trading')
     if earn:
