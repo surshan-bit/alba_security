@@ -81,7 +81,7 @@ function progressHtml(st){
   const pct = !n ? 100 : reading ? Math.round(90 * barsDone / n) : 95;
   const step = (state, label, detail) => `<li class="fi-step fi-${state}"><span class="fi-mark" aria-hidden="true">${state === 'done' ? '&#10003;' : state === 'running' ? '&#9679;' : '&#9675;'}</span><span>${label}</span><span class="fi-detail">${detail}</span></li>`;
   return `<div class="tl-ideas-progress" role="status"><div class="fi-head"><b>Processing &ldquo;${escapeHtml(st.name)}&rdquo;</b><span class="fi-pct">${pct}%</span></div>
-    <div class="fi-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><div class="fi-bar-fill" style="width:${pct}%"></div></div>
+    <div class="fi-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><div class="fi-bar-fill" data-css="--w:${pct}%"></div></div>
     <ul class="fi-steps">${step('done', 'Find the stocks that qualify', n + ' stocks')}
     ${step(reading ? 'running' : 'done', 'Read their weekly prices', barsDone + ' of ' + n)}
     ${step(reading ? 'pending' : 'running', 'Work out each trend, rank and apply the checks', reading ? '' : 'almost done')}</ul></div>`;

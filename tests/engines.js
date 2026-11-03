@@ -817,6 +817,102 @@ test('boot(): it loads the stock list, hands it over and starts the app, with th
   } finally { for(const k of ['__bootDebug', '__bootHanded', '__bootTouched', '__bootMainLoaded']) delete globalThis[k]; }
 }));
 
+// ---- bars whose width is computed: the width travels as data-css (--w), never as an inline style (CLAUDE.md section 2)
+test('data refresh: the freshness bars scale to the fullest bucket, an empty bucket has no bar, a tiny one is still visible', () => withPage(
+  '<div id="fundFreshnessSummary"></div><div id="fundFreshnessBars"></div><div id="techFreshnessSummary"></div><div id="techFreshnessBars"></div>', async (win) => {
+  const day = 86400000, ago = n => new Date(Date.now() - n * day).toISOString().slice(0, 10);
+  // 40 stocks refreshed 5 days ago ("4-7 days"), one 20 days ago ("15-30 days"), one with a date nobody can read
+  globalThis.__freshStocks = [...Array(40).fill(0).map(() => ({ asof: ago(5) })), { asof: ago(20) }, { asof: 'not a date' }];
+  try {
+    const F = await loadWithStubs('src/joblogs/freshness.js', '', { 'core/stocks.js': 'export const stocks = globalThis.__freshStocks;' });
+    F.paintFreshness();
+  } finally { delete globalThis.__freshStocks; }
+  const bars = win.document.getElementById('fundFreshnessBars'), rows = Array.from(bars.querySelectorAll('.refreshlog-freshness-row'));
+  const fill = r => r.querySelector('.refreshlog-freshness-fill');
+  assert.deepStrictEqual(rows.map(r => [r.querySelector('.refreshlog-freshness-label').textContent, fill(r).style.getPropertyValue('--w')]),
+    [['Today', '0%'], ['1–3 days', '0%'], ['4–7 days', '100%'], ['8–14 days', '0%'], ['15–30 days', '3%'], ['31+ days', '0%']]);
+  assert.ok(rows.every(r => !fill(r).hasAttribute('data-css')), 'the data-css attribute is consumed');
+  assert.match(win.document.getElementById('fundFreshnessSummary').textContent, /1 stock with no parseable refresh date/);
+}));
+
+test('data refresh: a sync run shows its note muted and its error and dropped tickers in the warning colour, all as text', () => withPage('<div id="watchlistSyncLogRuns"></div>', async (win) => {
+  const render = async runs => {
+    globalThis.__syncRuns = runs;
+    try {
+      const P = await loadWithStubs('src/joblogs/panels.js', '', { 'core/store.js': 'export const getDb = () => true; export const watchlistSyncLog = { values: () => globalThis.__syncRuns, entries: () => [], remove: () => {} };' });
+      P.renderWatchlistSyncLogPanel();
+    } finally { delete globalThis.__syncRuns; }
+    return win.document.getElementById('watchlistSyncLogRuns');
+  };
+  const boxes = (el, cls) => Array.from(el.querySelectorAll('.refreshlog-run-stats--' + cls), n => n.textContent.trim());
+  let el = await render([{ startedAt: '2026-10-30T10:00:00+05:30', status: 'partial', note: 'Used the cache', error: 'TradingView said no', droppedTickers: ['AAA', 'BBB'] }]);
+  assert.deepStrictEqual(boxes(el, 'muted'), ['Used the cache']);
+  assert.deepStrictEqual(boxes(el, 'bad'), ['TradingView said no', "Dropped by TradingView, couldn't be resolved: AAA, BBB"]);
+  assert.strictEqual(el.querySelector('[style]'), null, 'no inline style on the run');
+  el = await render([{ startedAt: '2026-10-30T10:00:00+05:30', status: 'completed' }]);
+  assert.deepStrictEqual([boxes(el, 'muted'), boxes(el, 'bad')], [[], []], 'a clean run has neither');
+  el = await render([{ startedAt: '2026-10-30T10:00:00+05:30', status: 'failed', note: '<img src=x onerror=alert(1)>', error: '<b>boom</b>', droppedTickers: ['<i>X</i>'] }]);
+  assert.strictEqual(el.querySelector('img, b, i'), null, 'markup in a run record stays text');
+  assert.match(el.textContent, /<img src=x onerror=alert\(1\)>/);
+}));
+
+// ---- the Rocky page, whole: every state of the store, every table, every wording; markup in saved data stays text
+const rockyPage = (store) => alone(async () => {
+  globalThis.__rockyTest = Object.assign({ noDb: false, ready: true, state: null, picks: null, weights: null, learn: null }, store);
+  try { return (await loadWithStubs('src/rocky/render.js', '', { './store.js': 'export const rocky = globalThis.__rockyTest;' })).rockyHtml(); }
+  finally { delete globalThis.__rockyTest; }
+});
+const HOSTILE = '<img src=x onerror=alert(1)>';
+test('rocky page: each learned weight gets a bar whose width is its share of the largest weight, and a non-number gets none', async () => {
+  const html = await rockyPage({ state: { curve: [], closed: [], open: [] }, weights: { v: 3, w: { momentum: 3, value: 1.5, odd: 'x' } } });
+  const bars = Array.from(html.matchAll(/<div class="rky-bar"><span>(\w+)<\/span><i data-css="--w:(\d+)%"><\/i>/g), m => [m[1], Number(m[2])]);
+  assert.deepStrictEqual(bars, [['momentum', 60], ['value', 30], ['odd', 0]]);
+  assert.ok(!/style=/.test(html), 'no inline style anywhere on the page');
+});
+test('rocky page: signed out, still loading and not-yet-run each say so', async () => {
+  assert.match(await rockyPage({ noDb: true }), /Sign in to view Rocky/);
+  assert.match(await rockyPage({ ready: false }), /Loading/);
+  assert.match(await rockyPage({}), /Rocky has not run yet/);
+});
+test('rocky page: the equity curve needs two runs, draws Nifty only when it has Nifty closes, and says which', async () => {
+  const st = curve => ({ curve, closed: [], open: [] });
+  assert.match(await rockyPage({ state: st([['2026-10-01', 1000000]]) }), /curve starts drawing after the second daily run/);
+  const noNifty = await rockyPage({ state: st([['2026-10-01', 1000000], ['2026-10-02', 1010000]]) });
+  assert.ok(noNifty.includes('<svg class="rky-curve"') && /Nifty line appears once/.test(noNifty));
+  const withNifty = await rockyPage({ state: st([['2026-10-01', 1000000, 24000], ['2026-10-02', 1010000, null], ['2026-10-03', 990000, 24240]]) });
+  assert.ok(/Nifty, rebased to Rocky on 2026-10-01/.test(withNifty) && withNifty.includes('rky-key-nifty'));
+});
+test('rocky page: the tiles show return, hit rate, regime, metrics and the weights version, and "–" where there is nothing', async () => {
+  const empty = await rockyPage({ state: { curve: [], closed: [], open: [] } });
+  assert.ok(/Hit rate<\/b><span>–/.test(empty) && /Weights version<\/b><span>v0/.test(empty) && /Alpha vs Nifty<\/b><span>–/.test(empty));
+  const full = await rockyPage({ weights: { v: 4, w: {} }, picks: { asof: '2026-10-03', universe: 9, blocked: 2, regime: { on: true, breadth: 0.62 }, picks: [] },
+    state: { curve: [['d1', 1000000], ['d2', 1100000]], open: [{ k: 'A', d: 'd1', q: 1 }], closed: [{ k: 'W', ret: 5, pnl: 100 }, { k: 'L', ret: -2, pnl: -50 }],
+      metrics: { alpha: 1.5, niftyRet: 3, maxDD: -4, curDD: -1, expectancy: 1.2, avgWin: 5, avgLoss: -2 } } });
+  assert.ok(/Weights version<\/b><span>v4/.test(full) && /Hit rate<\/b><span>50%/.test(full) && /Open positions<\/b><span>1 \/ 8/.test(full) && /Risk-on/.test(full) && /62% up/.test(full));
+  assert.ok(/rky-up">\+10\.00%/.test(full) && /Avg win \/ avg loss<\/b><span>5\.0% \/ -2\.0%/.test(full));
+  const off = await rockyPage({ state: { curve: [], closed: [], open: [] }, picks: { asof: 'd', universe: 1, blocked: 0, regime: { on: false, min: 0.4 }, picks: [] } });
+  assert.ok(/Risk-off/.test(off) && /fewer than 40% of stocks are up/.test(off));
+});
+test('rocky page: picks, rejected picks, open and closed positions are tables, and saved text in them stays text', async () => {
+  const html = await rockyPage({ state: { curve: [], open: [{ k: HOSTILE, d: 'd1', q: 10, entry: 100, last: 110, stop: 90, target: 130 }, { k: 'NOPRICE', d: 'd1', q: 1 }],
+      closed: Array.from({ length: 30 }, (_, i) => ({ k: 'C' + i, d: 'a', xd: 'b', why: HOSTILE, ret: i - 10, pnl: i })) },
+    picks: { asof: 'd3', dataAsof: null, universe: 5, blocked: 1, picks: [{ k: HOSTILE, n: HOSTILE, g: HOSTILE, close: 50, score: 7.5, mos: 20, rsiW: 55, stop: 45, target: 65 }, { k: 'NOSTOP', score: 'x' }],
+      gated: [{ k: 'G', score: 6, close: 10, stop: 9, target: 11, why: HOSTILE }] },
+    weights: null, learn: { d: '2026-10-01', note: HOSTILE } });
+  assert.ok(!html.includes('<img'), 'no markup from saved data');
+  assert.ok(/data as of \?/.test(html), 'a missing data date is shown as ?');
+  assert.ok(/Passed the checks, failed the 1:3 gate/.test(html) && /Why rejected/.test(html));
+  assert.ok(/rky-up">\+10\.00%/.test(html), 'open position P&L');
+  assert.ok(html.includes('C29') && !html.includes('C4<') && /C5</.test(html), 'only the latest 25 closed trades, newest first');
+  assert.ok(/Last review 2026-10-01: &lt;img/.test(html), 'the learning note is escaped');
+});
+test('rocky page: the learning line reads the review figures when there is no written note, and no page-stamp without picks', async () => {
+  const st = { curve: [], closed: [], open: [] };
+  assert.match(await rockyPage({ state: st, learn: { d: '2026-10-01', hit: 55, avg: 1.2 } }), /hit rate 55%, average 1\.2% per trade, weights updated/);
+  const none = await rockyPage({ state: st });
+  assert.ok(/No picks yet/.test(none) && !/Last review/.test(none));
+});
+
 // =========================================================== safe markup sink (src/core/safehtml.js): markup text becomes elements without script-capable parts
 {
   const { JSDOM } = require('jsdom');

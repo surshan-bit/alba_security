@@ -69,7 +69,7 @@ const tlInr = (n) => n == null ? '—' : '₹' + n.toLocaleString('en-IN', {maxi
 function tlScoreCell(snap){
   const sc = snap && snap.score != null ? snap.score.toFixed(2) : '—';
   const v = snap && snap.verdict;
-  return v ? `${sc} <span class="badge b-${v}" style="padding:1px 8px;">${verdictLabel[v] || v}</span>` : sc;
+  return v ? `${sc} <span class="badge badge--tight b-${v}">${verdictLabel[v] || v}</span>` : sc;
 }
 // Everything a trade's card or table row needs, computed once per trade (the markup builders
 // below only format it). A trade counts as closed only when it has a sell record.
@@ -280,7 +280,7 @@ function renderTradeLogPanel(){
         const avg = rets.reduce((a, b) => a + b, 0) / rets.length;
         return `<span class="data-chip">${verdictLabel[v] || v}: <b>${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%</b> avg (${rets.length} trade${rets.length === 1 ? '' : 's'})</span>`;
       }).join('');
-      aggregateHtml = `<div class="data-chips" style="margin:0 0 14px;">${chips}</div>`;
+      aggregateHtml = `<div class="data-chips data-chips--spaced">${chips}</div>`;
     }
   }
 

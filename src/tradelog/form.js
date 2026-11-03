@@ -51,7 +51,7 @@ function tlOpenAddForm(){
       <div class="tl-form-title">Add a trade (buy)</div>
       <div class="tl-grid">
         <label class="tl-wide">Stock
-          <div class="search-box" style="flex:none;width:100%;min-width:0;">
+          <div class="search-box search-box--block">
             <input id="tlStock" class="search-input" type="text" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="tlSuggest" placeholder="Search by ticker or company name…">
             <div class="search-suggest" id="tlSuggest" role="listbox"></div>
           </div>

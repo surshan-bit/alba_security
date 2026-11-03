@@ -39,7 +39,7 @@ function clean(root) {
 }
 
 // Values that differ per element (a bar's width, a marker's place) travel in data-css="--name:value;--other:value" and are applied here, to the nodes
-// in the inert document, before they reach the page. An inline style="" in markup is blocked by a strict Content-Security-Policy, and so is
+// in the inert document, before they reach the page. An inline style attribute in markup is blocked by a strict Content-Security-Policy, and so is
 // re-reading it from serialised HTML; a custom property set from code is not, and the global stylesheet reads it (width: var(--w)).
 const CSS_VAR_NAME = /^--[a-z][a-z0-9-]*$/;
 const CSS_VAR_VALUE = /^[#%.,()\w\s/+-]{1,64}$/;   // numbers, units, #hex, rgb()/hsl(), ratios: no quotes, semicolons, braces, backslashes or angle brackets
