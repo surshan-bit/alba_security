@@ -166,6 +166,20 @@ import { readFileSync } from 'node:fs';
   }
 }
 
+// The three security-definer functions run with an empty search path and are not callable by the public (CLAUDE.md section 3)
+{
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'), mig = readFileSync(new URL('../supabase/006_definer_search_path.sql', import.meta.url), 'utf8');
+  for(const [name, sql] of [['schema', schema], ['migration', mig]]){
+    for(const fn of ['on_new_user', 'is_owner', 'has_pro']){
+      eq(name + ': ' + fn + ' is security definer with an empty search path', new RegExp('function public\\.' + fn + '\\(\\)[^;]*?security definer set search_path = \'\' as').test(sql), true);
+      eq(name + ': ' + fn + ' is not callable by the public or anon', new RegExp('revoke all on function public\\.' + fn + '\\(\\) from public, anon').test(sql), true);
+    }
+    for(const fn of ['is_owner', 'has_pro']) eq(name + ': ' + fn + ' stays callable by signed-in users (the row-level rules call it)', new RegExp('grant execute on function public\\.' + fn + '\\(\\) to authenticated').test(sql), true);
+    eq(name + ': no definer function keeps search_path = public', !/security definer set search_path = public/.test(sql), true);
+  }
+}
+
 // Security headers: the Cloudflare site must ship the file that sets them
 {
   const { readFileSync } = await import('node:fs');
