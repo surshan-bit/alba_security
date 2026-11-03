@@ -251,6 +251,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.349 &middot; 2026-11-03</h3>
+            <ul>
+              <li><strong>Safer page drawing (nothing looks different):</strong> every screen that is drawn from saved or imported text now goes through one checked step that removes anything able to run code (scripts, hidden event handlers, unsafe links) before it reaches the page. The 81 places that used to write raw HTML directly are down to none. One behaviour was kept on purpose: clicking the Screener or TV link on a stock row still opens the link without also opening the stock.</li>
+            </ul>
             <h3>v1.348 &middot; 2026-11-03</h3>
             <ul>
               <li><strong>Safer news tags (nothing looks different):</strong> the positive / negative / neutral tag saved on news items is now checked against those three values before it is used to colour the news dots on the price charts and the industry news list. Anything else is ignored, so a badly formed saved tag can no longer affect the page.</li>
