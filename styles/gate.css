@@ -1,0 +1,17 @@
+/* The full-screen pages shown before the app: sign-in and the owner's data import (platform/gate.js). */
+.gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--gate-bg);color:var(--gate-fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;z-index:var(--z-gate);padding:var(--space-4);}
+.gate--scroll{display:block;overflow:auto;padding:var(--space-5);}
+.gate__card{width:100%;}
+.gate__card--narrow{max-width:360px;text-align:center;}
+.gate__card--wide{max-width:560px;margin:40px auto;}
+.gate__eyebrow{font-size:var(--t-sm);letter-spacing:.14em;text-transform:uppercase;opacity:.65;}
+.gate__title{font-size:var(--t-xl);margin:10px 0 var(--space-2);font-weight:600;}
+.gate__title--small{font-size:var(--t-lg);margin:0;}
+.gate__text{opacity:.75;line-height:1.5;margin:var(--space-2) 0;}
+.gate__text--spaced{margin:0 0 26px;}
+.gate__button{padding:11px 18px;border-radius:var(--radius-md);border:0;background:var(--gate-accent);color:var(--on-accent);font-size:var(--t-md);font-weight:600;cursor:pointer;}
+.gate__button--wide{width:100%;padding:13px var(--space-4);}
+.gate__button:disabled{opacity:.5;cursor:default;}
+.gate__file{display:block;margin:14px 0;}
+.gate__message{color:var(--gate-error);min-height:20px;margin:var(--space-4) 0 0;font-size:var(--t-sm);}
+.gate__log{white-space:pre-wrap;margin-top:18px;font-size:var(--t-sm);line-height:1.5;}

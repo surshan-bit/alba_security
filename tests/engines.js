@@ -1799,6 +1799,30 @@ test('heat map: a hostile industry name is escaped in the title and the attribut
   assert.ok(html.includes('&lt;img'));
 });
 
+// ---- the sign-in and import pages: built with createElement, styled by classes, never an inline style or innerHTML (CLAUDE.md sections 2 and 3)
+test('gate: the sign-in page has the button and message nodes the boot code wires up, and no inline style', () => withPage('', async (win) => {
+  const { buildSignInPage } = await import('../platform/gate.js');
+  const { page, button, message } = buildSignInPage(win.document);
+  assert.strictEqual(page.id, 'albaSignIn');
+  assert.ok(button.id === 'albaGoogle' && button.type === 'button' && button.textContent === 'Continue with Google');
+  assert.ok(message.id === 'albaSignInMsg' && message.textContent === '');
+  assert.ok(page.querySelector('h1').textContent === 'Stock Analyzer' && page.textContent.includes('Sign in with your Gmail account'));
+  assert.strictEqual(page.querySelectorAll('[style]').length, 0);
+  message.textContent = '<img src=x onerror=alert(1)>';
+  assert.strictEqual(page.querySelector('img'), null, 'a message is text, never markup');
+}));
+test('gate: the import page has the file picker, button and log, and no inline style', () => withPage('', async (win) => {
+  const { buildImportPage } = await import('../platform/gate.js');
+  const { page, file, button, log } = buildImportPage(win.document);
+  assert.ok(file.id === 'impFile' && file.type === 'file' && file.accept === '.gz,.json');
+  assert.ok(button.id === 'impGo' && button.type === 'button' && button.textContent === 'Import');
+  assert.ok(log.id === 'impLog' && log.tagName === 'PRE');
+  assert.ok(page.textContent.includes('alba-data.json.gz') && page.querySelector('b').textContent === 'alba-data.json.gz');
+  assert.strictEqual(page.querySelectorAll('[style]').length, 0);
+  log.textContent = '<script>alert(1)</script>';
+  assert.strictEqual(page.querySelector('script'), null, 'the log is text, never markup');
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
