@@ -21,6 +21,10 @@
 .filter-dot--text{background:var(--text);}
 .filter-dot--accent{background:var(--accent);}
 .filter-dot--buy{background:var(--buy);}
+.filter-dot--mbuy{background:var(--mbuy);}
+.filter-dot--hold{background:var(--hold);}
+.filter-dot--avoid{background:var(--avoid);}
+.filter-dot--tech-sell{background:var(--tech-sell);}
 .filter-n{margin-left:auto;color:var(--muted);font-size:var(--t-sm);}
 .search-box{position:relative;flex:1 1 200px;min-width:160px;}
 .search-box--block{flex:none;width:100%;min-width:0;}

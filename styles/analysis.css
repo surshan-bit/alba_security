@@ -104,6 +104,8 @@ body.lb-full-open{overflow:hidden;}
      details on hover, before the person decides whether to click through. */
 .analysis-tooltip{position:fixed;z-index:60;display:none;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-sm);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.35);min-width:180px;max-width:240px;}
 .analysis-tooltip.show{display:block;}
+.analysis-pinned-mark{color:var(--hold);}
+.rk-headline .biz-showing--flush{margin:0;}
 .analysis-tooltip-name{font-weight:700;margin-bottom:2px;line-height:1.3;}
 .analysis-tooltip-ticker{color:var(--muted);font-size:var(--t-xs);margin-bottom:8px;}
 .analysis-tooltip-row{display:flex;justify-content:space-between;gap:14px;padding:2px 0;}
