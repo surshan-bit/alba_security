@@ -68,6 +68,13 @@ function newerValuation(real, snap, snapAt){
 }
 const newerByAsof = (real, snap) => (real && typeof real === 'object' && typeof real.asof === 'string' && real.asof > snap.asof ? real : snap);
 
+// The weekly MACD 30/60/5 state is read again for every stock on every run and saved with its technical block, so a snapshot block that takes the place of an
+// older saved block keeps that state (the snapshot itself has no reading of it).
+function withCrossState(snapBlock, saved){
+  const cross = saved && saved.states && saved.states.weekMacd3060;
+  return cross ? Object.assign({}, snapBlock, { states: Object.assign({}, snapBlock.states, { weekMacd3060: cross }) }) : snapBlock;
+}
+
 // One stock's saved update (`real`, may be undefined) combined with its snapshot row ({ row, asof, at }, may be undefined).
 // Everything in `real` that the snapshot does not cover (Global factors, notes, price history flags) is kept as it is.
 function mergedDoc(s, real, snap){
@@ -83,7 +90,7 @@ function mergedDoc(s, real, snap){
     // A saved technical block wins when it is a completed-weeks score from the last 3 days, is dated later, or is dated the same day and
     // did not come from an earlier snapshot (an imported file or a bars refresh).
     const realWins = !!rt && typeof rt === 'object' && (techKeepsBarsBlock(rt, snap.asof) || (typeof rt.asof === 'string' && (rt.asof > snap.asof || (rt.asof === snap.asof && rt.src !== 'snapshot'))));
-    out.technical = realWins ? rt : u.technical;
+    out.technical = realWins ? rt : withCrossState(u.technical, rt);
   }
   if(u.pctChange) out.pctChange = newerByAsof(real && real.pctChange, u.pctChange);
   return out;

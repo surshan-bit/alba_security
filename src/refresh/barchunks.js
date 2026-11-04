@@ -1,12 +1,13 @@
 // Steps 2 and 3 of Refresh all stocks (v1.208): the new weekly and monthly bars, then the technical scores, are saved in records of 50 stocks instead of
 // two or three saves per stock. The database takes only a few saves a second, so about 90 saves replace about 6,000.
 //   barsRecent/<c001...>  the newest bars of every stock (see prices/recent.js)
-//   techBlocks/<c001...>  { v: 1, asof, at, rows: [ { k, t } ] }: each stock's completed-weeks technical block (laid on the stock by overlays/updates.js)
+//   techBlocks/<c001...>  { v: 1, asof, at, rows: [ { k, t } ] }: each stock's completed-weeks technical block (laid on the stock by overlays/updates.js), plus its
+//                         weekly MACD 30/60/5 state, which is read again for every stock on every run (saveCrossStates)
 import { stocks } from '../core/stocks.js';
 import { sanitizeDocId, sleep, tickerSymbol } from '../core/util.js';
 import { priceApply, pcTickerKey, priceHistoryByTicker, priceSymbolByTicker } from '../prices/store.js';
 import { noteRecentSaved, recentRow } from '../prices/recent.js';
-import { computeTechnical } from '../engine/technical.js';
+import { computeTechnical, techLiveCrossState } from '../engine/technical.js';
 
 const CHUNK = 50;          // stocks per record
 const WORKERS = 6;         // records saved at the same time
@@ -65,23 +66,18 @@ async function saveRecentBars(db, ready, progress){
   return out;
 }
 
-// Step 3. Calculates the completed-weeks technical block of each stock in `done` ([{ s, W, M }]) from its bars and saves the blocks, 50 stocks to a record, next to
-// the blocks of the other stocks (read from the records already saved). Returns { computed, records, chunksWritten, failed }.
-async function saveTechBlocks(db, done, today, progress){
-  const old = await readChunks(db, 'techBlocks');
+// The technical blocks saved so far, by stock key.
+function techRowsOf(old){
   const rows = new Map();
   old.forEach(c => { if(c && Array.isArray(c.rows)) c.rows.forEach(r => { if(r && typeof r.k === 'string' && r.t) rows.set(r.k, r.t); }); });
-  let computed = 0;
-  for(const { s, W, M } of done){
-    const pv = s.pillars && typeof s.pillars.val === 'number' ? s.pillars.val : null;
-    if(pv == null) continue;
-    let t = null;
-    try { t = computeTechnical(W, M, pv, today); } catch(e){ console.error('Technical score failed for ' + tickerSymbol(s), e); }
-    if(t){ rows.set(sanitizeDocId(tickerSymbol(s)), t); computed++; }
-  }
+  return rows;
+}
+// Saves the blocks in `rows` (stock key -> block) 50 stocks to a record, skipping the records that already hold exactly these rows (`old` = the records read before).
+// Returns { records, chunksWritten, failed }.
+async function writeTechChunks(db, { old, rows }, today, progress){
   const keys = [...rows.keys()].sort();
   const n = Math.ceil(keys.length / CHUNK);
-  const out = { computed, records: n, chunksWritten: 0, failed: 0 };
+  const out = { records: n, chunksWritten: 0, failed: 0 };
   await runChunks(n, progress, async i => {
     const recs = keys.slice(i * CHUNK, (i + 1) * CHUNK).map(k => ({ k, t: rows.get(k) }));
     const o = old.get(idOf(i));
@@ -91,4 +87,38 @@ async function saveTechBlocks(db, done, today, progress){
   return out;
 }
 
-export { saveRecentBars, saveTechBlocks, sameValue };
+// Step 3. Calculates the completed-weeks technical block of each stock in `done` ([{ s, W, M }]) from its bars and saves the blocks, 50 stocks to a record, next to
+// the blocks of the other stocks (read from the records already saved). Returns { computed, records, chunksWritten, failed }.
+async function saveTechBlocks(db, done, today, progress){
+  const old = await readChunks(db, 'techBlocks');
+  const rows = techRowsOf(old);
+  let computed = 0;
+  for(const { s, W, M } of done){
+    const pv = s.pillars && typeof s.pillars.val === 'number' ? s.pillars.val : null;
+    if(pv == null) continue;
+    let t = null;
+    try { t = computeTechnical(W, M, pv, today); } catch(e){ console.error('Technical score failed for ' + tickerSymbol(s), e); }
+    if(t){ rows.set(sanitizeDocId(tickerSymbol(s)), t); computed++; }
+  }
+  return Object.assign({ computed }, await writeTechChunks(db, { old, rows }, today, progress));
+}
+
+// Step 4. The weekly MACD 30/60/5 state of EVERY stock in `items` ([{ key, W, px }]: its saved weekly bars and today's price), whether or not its bars changed,
+// because the week in progress moves every day. Only the `weekMacd3060` state of a stock's saved block changes (its completed-weeks score and date stay as they
+// are); a stock with no saved block, or too few bars, is left alone. Returns { read, changed, records, chunksWritten, failed }.
+async function saveCrossStates(db, items, today, progress){
+  const old = await readChunks(db, 'techBlocks');
+  const rows = techRowsOf(old);
+  let read = 0, changed = 0;
+  for(const { key, W, px } of items){
+    const t = rows.get(key), state = t ? techLiveCrossState(W, px, today) : null;
+    if(state == null) continue;
+    read++;
+    if(t.states && t.states.weekMacd3060 === state) continue;
+    rows.set(key, Object.assign({}, t, { states: Object.assign({}, t.states, { weekMacd3060: state }) }));
+    changed++;
+  }
+  return Object.assign({ read, changed }, await writeTechChunks(db, { old, rows }, today, progress));
+}
+
+export { saveCrossStates, saveRecentBars, saveTechBlocks, sameValue };
