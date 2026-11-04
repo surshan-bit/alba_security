@@ -17,11 +17,12 @@ import { refreshOneNow, priceJobs, saveFullBars } from '../prices/refresh.js';
 import { COMPACT_LAG, lagOf } from '../prices/recent.js';
 import { saveRecentBars, saveTechBlocks, sameValue } from './barchunks.js';
 import { isinOf, isinSymbolCached, resolveIsinSymbols, useSavedSymbols } from '../tv/isin.js';
-import { tvCall, tvErrorText, tvIsFatal, tvIsQuota, tvIstDate, tvMcp } from '../tv/connector.js';
+import { tvCall, tvErrorText, tvIsQuota, tvIstDate, tvMcp } from '../tv/connector.js';
 import { loadRuns } from '../strategies/tracking.js';
 import { priorityOrder } from './freshness.js';
 import { planHistory, weekStartS, monthStartS, BAR_COLUMNS, TOLERANCE } from './historyplan.js';
 import { collectBatchBars, isPriced, skippedForFailure, snapshotRows } from './snapshotrows.js';
+import { setWithRetry, settleBatch, snapshotFetcher } from './snapshotcall.js';
 import { buildTech2Chunks } from '../engine/techscore2.js';
 import { debugHandle } from '../boot/handoff.js';
 import { getFiDb, getFiOwner, getFiRunning, setFiRunning } from '../import/fund-import.js';
@@ -29,7 +30,6 @@ import { fiEl, fiReset, fiSet, fiShowResult, setFiPfx } from '../import/panel.js
 import { registerBusy } from '../core/busy.js';
 import { duration, paintLastRuns, saveRunLog } from './runlog.js';
 
-const FETCH_GAP_MS = 300, ERROR_BACKOFF_MS = 1500, RETRY_PAUSE_MS = 1000, SAVE_RETRY_PAUSE_MS = 1500, MAX_FAILED_BATCHES = 3;   // pacing of the snapshot calls, in ms
 const BATCH = 50;                 // symbols per TradingView call (the tool's limit)
 const SKIP_RETRY_DAYS = 14;       // a stock whose history download failed is not tried again for this long
 const FULL_WORKERS = 2;           // stocks whose full history is downloaded at the same time (a big download each)
@@ -192,47 +192,16 @@ async function rsFillHistory(run){
 }
 
 // 2. Snapshot of every stock, 50 per call (about 44 calls); it is what the screens show every day, so it goes before the long bar update.
-// The next batch is requested while the current one is being saved. TradingView answers "Too Many Requests" when called back to back, so a request
-// waits until 300 ms after the previous one started (longer after a failed call).
-function snapshotFetcher(columns){
-  const pace = { lastStart: 0, backoff: 0 };
-  const call = (symbols) => tvCall('mcp-tv-get-symbol-data-batch', { symbols, columns });
-  return {
-    call,
-    slowDown(){ pace.backoff = ERROR_BACKOFF_MS; },
-    touch(){ pace.lastStart = Date.now(); },
-    /** @returns {Promise<{ payload?: any, error?: any }>} */
-    async fetch(batch){
-      const wait = Math.max(FETCH_GAP_MS, pace.backoff) - (Date.now() - pace.lastStart);
-      pace.backoff = 0;
-      if(wait > 0) await sleep(wait);
-      pace.lastStart = Date.now();
-      try { return { payload: await call(batch.map(x => x.sym)) }; }
-      catch(e){ return { error: e }; }
-    },
-  };
-}
-
+// The next batch is requested while the current one is being saved (see snapshotcall.js for the pacing).
 // A stock TradingView leaves out of an answer is usually a one-off miss: ask again for just those symbols before giving up.
 async function askAgain(run, fetcher, batch, data){
   const lacking = batch.filter(x => !isPriced(data, x));
   if(!lacking.length || stopAsked) return;
-  await sleep(RETRY_PAUSE_MS);
   try {
-    const again = await fetcher.call(lacking.map(x => x.sym));
+    const again = await fetcher.again(lacking.map(x => x.sym));
     Object.assign(data, (again && again.data) || {});
     run.retried += lacking.length; run.answeredAgain += lacking.filter(x => isPriced(data, x)).length;
   } catch(e){ console.error('Retry of the missing stocks failed', e); }
-  fetcher.touch();
-}
-
-// Saves a record, trying twice. Returns the last error, or null when it was saved.
-async function setWithRetry(db, path, doc){
-  let err = null;
-  for(let attempt = 0; attempt < 2; attempt++){
-    try { await db.doc(path).set(doc); return null; } catch(e){ err = e; if(attempt === 0) await sleep(SAVE_RETRY_PAUSE_MS); }
-  }
-  return err;
 }
 
 // Saves one batch's rows as record liveSnapshot/<id> unless it already holds exactly these rows today.
@@ -245,15 +214,6 @@ async function saveSnapshotChunk(run, id, batch, built){
   if(!err){ run.stored.set(id, doc); run.updated += rows.length; run.scored += built.scored; run.kept += built.kept; run.chunksSaved++; return; }
   const why = 'could not be saved: ' + String((err && err.message) || err).slice(0, 80);
   run.skipped.push(...skippedForFailure(batch.filter(x => rows.some(r => r.k === sanitizeDocId(tickerSymbol(x.s)))), why));
-}
-
-// Records a failed batch (stopping the run when it was fatal or the third in a row). Returns the answer's payload, or null when this batch failed.
-function settleBatch(run, state, batch, res){
-  if(!res.error){ state.failed = 0; return res.payload || {}; }
-  if(tvIsFatal(res.error)) throw res.error;
-  if(++state.failed >= MAX_FAILED_BATCHES) throw new Error(tvErrorText(res.error) + ' Three batches in a row failed, so the run stopped.');
-  run.skipped.push(...skippedForFailure(batch, tvErrorText(res.error)));
-  return null;
 }
 
 // One batch's answer (job = { batch, payload, bi }): ask again for what is missing, save the rows, and take the bars it carried.
