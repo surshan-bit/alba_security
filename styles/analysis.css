@@ -28,8 +28,8 @@
 .range-slider input[type=range]{appearance:none;position:absolute;left:0;top:0;width:100%;height:20px;margin:0;background:transparent;-webkit-appearance:none;pointer-events:none;}
 .range-slider input[type=range]::-webkit-slider-runnable-track{background:transparent;height:20px;}
 .range-slider input[type=range]::-moz-range-track{background:transparent;height:20px;}
-.range-slider input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;pointer-events:auto;width:16px;height:16px;border-radius:50%;margin-top:2px;background:var(--accent);border:2px solid var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.4);cursor:pointer;}
-.range-slider input[type=range]::-moz-range-thumb{pointer-events:auto;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.4);cursor:pointer;}
+.range-slider input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;pointer-events:auto;width:16px;height:16px;border-radius:50%;margin-top:2px;background:var(--accent);border:2px solid var(--panel);box-shadow:0 1px 3px rgb(var(--rgb-0-0-0) / .4);cursor:pointer;}
+.range-slider input[type=range]::-moz-range-thumb{pointer-events:auto;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);box-shadow:0 1px 3px rgb(var(--rgb-0-0-0) / .4);cursor:pointer;}
 .range-slider input.range-min{z-index:1;}
 .range-slider input.range-max{z-index:2;}
 .analysis-reset-btn{border-radius:6px;height:36px;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:8px 16px;font-size:var(--t-sm);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;flex:0 0 auto;}
@@ -58,7 +58,7 @@
 .analysis-color-toggle-btns{background:var(--panel2);display:inline-flex;gap:0;padding:3px;align-self:flex-start;border:1px solid var(--line);border-radius:999px;}
 .analysis-color-btn{background:transparent;border:none;color:var(--muted);border-radius:999px;padding:7px 16px;font-size:var(--t-sm);font-weight:600;cursor:pointer;white-space:nowrap;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;transition:background .15s,color .15s,box-shadow .15s;}
 .analysis-color-btn:hover{color:var(--text);}
-.analysis-color-btn.active{background:var(--accent);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);}
+.analysis-color-btn.active{background:var(--accent);color:var(--on-accent);box-shadow:0 1px 3px rgb(var(--rgb-0-0-0) / .35);}
 .analysis-color-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
 /* Analysis leaderboard (added 2026-09-30): the same stocks currently plotted (i.e. respecting
      the RSI range sliders), ranked by Margin of Safety, so the "biggest MoS in view" question
@@ -81,7 +81,7 @@ body.lb-full-open{overflow:hidden;}
 .analysis-lb-mos.mos-red{color:var(--avoid);}
 .analysis-lb-mos.mos-none{color:var(--muted);font-weight:500;}
 .analysis-lb-empty{color:var(--muted);font-style:italic;}
-.analysis-lb-row.pinned td{background:rgba(201,162,39,.08);}
+.analysis-lb-row.pinned td{background:rgb(var(--rgb-201-162-39) / .08);}
 /* Multi-select research (added 2026-10-07): Select mode on the Analysis leaderboard. */
 .analysis-lb-industry{white-space:nowrap;color:var(--muted);font-size:var(--t-sm);}
 /* "Researched" column (added 2026-10-07): days since the stock's stockResearch document was saved,
@@ -102,7 +102,7 @@ body.lb-full-open{overflow:hidden;}
 /* Analysis dot tooltip (added 2026-09-30): a custom HTML tooltip (not the SVG native <title>,
      which only appears after a ~1s browser delay) that follows the cursor and shows stock
      details on hover, before the person decides whether to click through. */
-.analysis-tooltip{position:fixed;left:var(--x,0);top:var(--y,0);z-index:60;display:none;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-sm);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.35);min-width:180px;max-width:240px;}
+.analysis-tooltip{position:fixed;left:var(--x,0);top:var(--y,0);z-index:60;display:none;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-sm);color:var(--text);box-shadow:0 6px 20px rgb(var(--rgb-0-0-0) / .35);min-width:180px;max-width:240px;}
 .analysis-tooltip.show{display:block;}
 .analysis-pinned-mark{color:var(--hold);}
 .rk-headline .biz-showing--flush{margin:0;}
@@ -180,7 +180,7 @@ body.biz-full-open{overflow:hidden;}
 .dm-btn b{font-weight:600;}
 .dm-caret{font-size:var(--t-xs);color:var(--muted);}
 .dm-more .dm-btn{width:36px;padding:0;justify-content:center;font-size:var(--t-lg);line-height:1;}
-.dm-pop{position:absolute;top:calc(100% + 4px);left:0;z-index:40;min-width:230px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 0;box-shadow:0 8px 24px rgba(0,0,0,.28);}
+.dm-pop{position:absolute;top:calc(100% + 4px);left:0;z-index:40;min-width:230px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 0;box-shadow:0 8px 24px rgb(var(--rgb-0-0-0) / .28);}
 .dm-pop[hidden]{display:none;}
 .dm-right .dm-pop{left:auto;right:0;min-width:190px;}
 .dm-item{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;box-sizing:border-box;padding:8px 14px;background:none;border:0;color:var(--text);font:inherit;font-size:var(--t-sm);text-align:left;cursor:pointer;}
@@ -205,10 +205,10 @@ body.biz-full-open{overflow:hidden;}
 .analysis-industry .biz-table > tbody > .biz-row > td,.analysis-industry .biz-table > tbody > .biz-row > .biz-name .biz-open{vertical-align:middle;}
 /* v1.280: every control on the Analysis toolbar (View, Filters, Period, Matched only, ⋯, icon buttons, Refresh) shares one height, border, radius and type in all three themes, in the Stocks and Industry views alike. */
 .panel-body :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){height:36px;min-height:36px;box-sizing:border-box;border-radius:6px;}
-:root[data-theme="white"] .panel-body :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){border:1px solid #c9cfdf;background:#fff;}
+:root[data-theme="white"] .panel-body :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){border:1px solid var(--c-c9cfdf);background:var(--panel);}
 :root[data-theme="white"] .panel-body :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle):hover,:root[data-theme="white"] .panel-body :is(.dm-btn,.analysis-icon-btn)[aria-expanded="true"]{border-color:var(--accent);}
 :root[data-theme="white"] .panel-body .biz-field select{border:0;background:transparent;}
-:root[data-theme="white"] body .panel-body.panel-body :is(.rk-toolbtn,.rk-main,.rk-barbtn){display:inline-flex;align-items:center;justify-content:center;height:36px;min-height:36px;padding:0 14px;letter-spacing:normal;text-transform:none;color:#1b1f2a;}
+:root[data-theme="white"] body .panel-body.panel-body :is(.rk-toolbtn,.rk-main,.rk-barbtn){display:inline-flex;align-items:center;justify-content:center;height:36px;min-height:36px;padding:0 14px;letter-spacing:normal;text-transform:none;color:var(--text);}
 :root[data-theme="white"] .panel-body :is(.rk-toolbtn,.rk-main):hover:not(:disabled){color:var(--accent);}
 .analysis-industry .biz-showing,.analysis-count,.analysis-toolbar .rk-headline{display:inline-flex;align-items:center;min-height:36px;}
 .panel-body{display:flow-root;}   /* the first block's top margin stays inside, so Stocks and Industry start at the same height */

@@ -27,7 +27,7 @@ h1{margin:0 0 6px;font-size:var(--t-lg);font-weight:600;letter-spacing:.2px;}
 .topbar-brand{color:var(--muted);font-weight:600;font-size:inherit;}
 .topbar-sep{font-size:0;line-height:0;align-self:center;display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;}
 .topbar-section{overflow:hidden;text-overflow:ellipsis;}
-.sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:30;}
+.sidebar-overlay{position:fixed;inset:0;background:rgb(var(--rgb-0-0-0) / .55);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:30;}
 .sidebar-overlay.show{opacity:1;pointer-events:auto;}
 .sidebar{position:fixed;top:0;left:0;bottom:0;width:280px;max-width:82vw;background:var(--panel);border-right:1px solid var(--line);transform:translateX(-100%);transition:transform .25s ease;z-index:31;display:flex;flex-direction:column;padding:22px 16px;gap:26px;overflow-y:auto;}
 .sidebar.open{transform:translateX(0);}
@@ -46,7 +46,7 @@ h1{margin:0 0 6px;font-size:var(--t-lg);font-weight:600;letter-spacing:.2px;}
 .app-section{display:none;}
 .app-section.active{display:block;}
 .section-load-error{display:flex;gap:12px;align-items:center;margin:12px 0;padding:10px 14px;border:1px solid var(--accent);border-radius:10px;background:var(--panel);color:var(--text);font-size:var(--t-sm);}
-.section-load-error button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;}
+.section-load-error button{background:var(--accent);color:var(--on-accent);border:none;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;}
 /* A stock opened in place (Analysis, Strategies, Industry): the page's own content is hidden, not removed, so it is exactly as it was on Back. */
 
 .inline-detail-host{margin-top:6px;}

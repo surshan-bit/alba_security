@@ -100,6 +100,8 @@ for(const f of require('fs').readdirSync('styles').filter(x => x.endsWith('.css'
     idSelectors: css.reduce((n, c) => n + c.s.replace(/\{[^{}]*\}/g, '{}').split('{').reduce((m, sel) => m + (sel.match(/(^|[\s,>+~(])#[a-zA-Z][\w-]*/g) || []).length, 0), 0),
     literalFontSizes: count(/font-size:\s*[\d.]+(rem|px|em)/g, f => f !== 'white-type.css' && f !== 'tokens.css'),
     important: count(/!important/g),
+    // a colour written as a hex value or as rgb()/rgba() of plain numbers, anywhere but tokens.css (data: images are not counted)
+    hardCodedColours: css.reduce((n, c) => n + (c.f === 'tokens.css' ? 0 : (c.s.replace(/url\((?:[^()]|\([^)]*\))*\)/g, '').match(/#[0-9a-fA-F]{3,8}\b|rgba?\(\s*\d/g) || []).length), 0),
     tripleRoot: count(/:root:root:root/g)
   };
   let saved = null;

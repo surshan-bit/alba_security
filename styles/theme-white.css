@@ -5,19 +5,19 @@
 /* Type: one sans-serif font everywhere (code and formulas keep their monospace). */
 :root[data-theme="white"] body,:root[data-theme="white"] :is(h1,h2,h3,h4,h5,h6,button,input,select,textarea,table,th,td,.topbar *,.sidebar *,.analysis-panel,.help-panel,.settings-panel,.upload-panel,.filters,.sub,footer){font-family:var(--ff-white);}
 /* Top bar: white, no shadow. Brand on the left, menu links, search and bell on the right. */
-:root[data-theme="white"] .topbar{background:#fff;border-bottom:1px solid #e6e9f2;box-shadow:none;height:var(--tb-h);padding:0 24px;margin-bottom:20px;gap:18px;}
-:root[data-theme="white"] .topbar :is(.topbar-brand,.topbar-title){color:#1b1f2a;}
+:root[data-theme="white"] .topbar{background:var(--panel);border-bottom:1px solid var(--c-e6e9f2);box-shadow:none;height:var(--tb-h);padding:0 24px;margin-bottom:20px;gap:18px;}
+:root[data-theme="white"] .topbar :is(.topbar-brand,.topbar-title){color:var(--text);}
 :root[data-theme="white"] .topbar-brand{font-size:var(--t-lg);font-weight:500;letter-spacing:-.5px;}
 :root[data-theme="white"] .topbar :is(.topbar-sep,.topbar-section){display:none;}
 :root[data-theme="white"] .topbar .topbar-search{position:relative;left:auto;top:auto;transform:none;margin:0 0 0 auto;width:260px;max-width:none;flex:0 1 260px;}
 @media (min-width:1400px){:root[data-theme="white"] .topbar .topbar-search{position:absolute;right:179px;top:50%;transform:translateY(-50%);margin:0;width:240px;}}
-:root[data-theme="white"] .topbar .topbar-search-input{border-radius:8px;border:1px solid #c9cfdf;background:#fff;height:42px;}
+:root[data-theme="white"] .topbar .topbar-search-input{border-radius:8px;border:1px solid var(--c-c9cfdf);background:var(--panel);height:42px;}
 :root[data-theme="white"] .topbar .topbar-search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent);}
-:root[data-theme="white"] .topbar .activity-bell{color:#4a5163;}
-:root[data-theme="white"] .topbar .activity-bell:hover,:root[data-theme="white"] .topbar .activity-bell[aria-expanded="true"]{color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,#fff);}
-:root[data-theme="white"] .topbar :is(.activity-badge,.activity-run){box-shadow:0 0 0 2px #fff;}
-:root[data-theme="white"] .topbar .live-toggle{background:#fff;border-color:#c9cfdf;color:#4a5163;}
-:root[data-theme="white"] .topbar .live-toggle:hover{border-color:var(--accent);background:#fff;}
+:root[data-theme="white"] .topbar .activity-bell{color:var(--muted);}
+:root[data-theme="white"] .topbar .activity-bell:hover,:root[data-theme="white"] .topbar .activity-bell[aria-expanded="true"]{color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--panel));}
+:root[data-theme="white"] .topbar :is(.activity-badge,.activity-run){box-shadow:0 0 0 2px var(--panel);}
+:root[data-theme="white"] .topbar .live-toggle{background:var(--panel);border-color:var(--c-c9cfdf);color:var(--muted);}
+:root[data-theme="white"] .topbar .live-toggle:hover{border-color:var(--accent);background:var(--panel);}
 :root[data-theme="white"] .topbar .live-toggle.live,:root[data-theme="white"] .topbar .live-px{color:var(--accent);border-color:var(--accent);}
 /* Menu as text links in the top bar (wide screens). The sidebar element is reused: it is laid over the top bar as a row. */
 @media (min-width:1400px){
@@ -25,18 +25,18 @@
   :root[data-theme="white"] .sidebar{transform:none;position:fixed;top:0;left:330px;right:auto;bottom:auto;width:auto;max-width:none;height:var(--tb-h);padding:0;gap:0;background:transparent;border:0;box-shadow:none;flex-direction:row;align-items:center;overflow:visible;z-index:21;pointer-events:none;}
   :root[data-theme="white"] .sidebar-brand,:root[data-theme="white"] .nav-section-label,:root[data-theme="white"] .sidebar-overlay,:root[data-theme="white"] .nav-icon,:root[data-theme="white"] .pro-pill,:root[data-theme="white"] .sidebar :is(.brand-version,.sidebar-foot){display:none;}
   :root[data-theme="white"] .sidebar-nav{display:flex;flex-direction:row;align-items:center;gap:2px;padding:0;pointer-events:auto;}
-  :root[data-theme="white"] .nav-item{background:transparent;border:0;border-radius:6px;padding:10px 16px;font-size:var(--t-md);font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#3b4156;white-space:nowrap;box-shadow:none;width:auto;}
+  :root[data-theme="white"] .nav-item{background:transparent;border:0;border-radius:6px;padding:10px 16px;font-size:var(--t-md);font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--c-3b4156);white-space:nowrap;box-shadow:none;width:auto;}
   :root[data-theme="white"] .nav-item:hover{background:transparent;color:var(--accent);}
   :root[data-theme="white"] .nav-item.active{background:transparent;color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent);border-radius:0;}
 }
 /* Cards: big rounded white panels, softer border. */
-:root[data-theme="white"] :is(.analysis-panel,.upload-panel,.help-panel,.settings-row,.refreshlog-run,.activity-panel,.alba-confirm-card){border-radius:16px;border-color:#e6e9f2;}
+:root[data-theme="white"] :is(.analysis-panel,.upload-panel,.help-panel,.settings-row,.refreshlog-run,.activity-panel,.alba-confirm-card){border-radius:16px;border-color:var(--c-e6e9f2);}
 /* Table: indigo header labels, no uppercase, hairline rows. */
-:root[data-theme="white"] table thead th{color:var(--accent);font-weight:500;text-transform:none;letter-spacing:0;background:#fff;border-bottom:1px solid #e6e9f2;}
-:root[data-theme="white"] .analysis-leaderboard.lb-full .strat-table thead th{background:#fff;}
-:root[data-theme="white"] table tbody td{border-color:#eef0f6;}
+:root[data-theme="white"] table thead th{color:var(--accent);font-weight:500;text-transform:none;letter-spacing:0;background:var(--panel);border-bottom:1px solid var(--c-e6e9f2);}
+:root[data-theme="white"] .analysis-leaderboard.lb-full .strat-table thead th{background:var(--panel);}
+:root[data-theme="white"] table tbody td{border-color:var(--c-eef0f6);}
 /* Buttons: outlined, uppercase, letter-spaced, as on the Screener. */
-@media (min-width:901px){:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main){text-transform:uppercase;letter-spacing:.1em;font-size:var(--t-sm);font-weight:600;border-radius:6px;color:#3b4156;}}
+@media (min-width:901px){:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main){text-transform:uppercase;letter-spacing:.1em;font-size:var(--t-sm);font-weight:600;border-radius:6px;color:var(--c-3b4156);}}
 :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main):hover{color:var(--accent);border-color:var(--accent);}
 @media (min-width:901px){:root[data-theme="white"] :is(.browse-btn,.tl-btn-primary,.alba-confirm-ok){text-transform:uppercase;letter-spacing:.1em;font-size:var(--t-sm);font-weight:600;border-radius:6px;}}
 :root[data-theme="white"] .filters{border-radius:16px;}
@@ -48,14 +48,14 @@
 /* Tools drop-down (wide screens): Data Refresh, Help, Knowledge Base and Settings. */
 @media (min-width:1400px){
   :root[data-theme="white"] .nav-tools-group{display:block;position:relative;}
-  :root[data-theme="white"] .nav-tools-toggle{display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;border-radius:0;padding:10px 16px;font:inherit;font-size:var(--t-md);font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#3b4156;cursor:pointer;white-space:nowrap;}
+  :root[data-theme="white"] .nav-tools-toggle{display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;border-radius:0;padding:10px 16px;font:inherit;font-size:var(--t-md);font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--c-3b4156);cursor:pointer;white-space:nowrap;}
   :root[data-theme="white"] .nav-tools-toggle:hover,:root[data-theme="white"] .nav-tools-group.open .nav-tools-toggle,:root[data-theme="white"] .nav-tools-group:has(.nav-item.active) .nav-tools-toggle{color:var(--accent);}
   :root[data-theme="white"] .nav-tools-group:has(.nav-item.active) .nav-tools-toggle{box-shadow:inset 0 -2px 0 var(--accent);}
-  :root[data-theme="white"] .nav-tools-menu{display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:300px;background:#fff;border:1px solid #e6e9f2;border-radius:12px;box-shadow:0 12px 32px rgba(27,31,42,.16);padding:8px;flex-direction:column;z-index:40;}
+  :root[data-theme="white"] .nav-tools-menu{display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:300px;background:var(--panel);border:1px solid var(--c-e6e9f2);border-radius:12px;box-shadow:0 12px 32px color-mix(in srgb, var(--text) 16%, transparent);padding:8px;flex-direction:column;z-index:40;}
   :root[data-theme="white"] .nav-tools-group.open .nav-tools-menu{display:flex;}
-  :root[data-theme="white"] .nav-tools-menu .nav-item{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:12px 14px;border-radius:8px;font-size:var(--t-md);letter-spacing:0;text-transform:none;font-weight:500;color:#1b1f2a;box-shadow:none;}
-  :root[data-theme="white"] .nav-tools-menu .nav-item .nav-icon{display:inline-flex;width:40px;height:40px;align-items:center;justify-content:center;border-radius:10px;background:#f3f5fb;color:var(--accent);}
-  :root[data-theme="white"] .nav-tools-menu .nav-item:hover,:root[data-theme="white"] .nav-tools-menu .nav-item.active{background:#f3f5fb;color:var(--accent);}
+  :root[data-theme="white"] .nav-tools-menu .nav-item{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:12px 14px;border-radius:8px;font-size:var(--t-md);letter-spacing:0;text-transform:none;font-weight:500;color:var(--text);box-shadow:none;}
+  :root[data-theme="white"] .nav-tools-menu .nav-item .nav-icon{display:inline-flex;width:40px;height:40px;align-items:center;justify-content:center;border-radius:10px;background:var(--panel2);color:var(--accent);}
+  :root[data-theme="white"] .nav-tools-menu .nav-item:hover,:root[data-theme="white"] .nav-tools-menu .nav-item.active{background:var(--panel2);color:var(--accent);}
 }
 /* Larger type, closer to the Screener sample. */
 :root[data-theme="white"] .topbar .topbar-search-input{font-size:var(--t-md);height:46px;}
@@ -76,7 +76,7 @@
   :root[data-theme="white"] .card-narrow > *{max-width:960px;margin-left:0;margin-right:auto;}
   :root[data-theme="white"] .card-narrow :is(.refreshlog-panel,.settings-panel){max-width:960px;}
   :root[data-theme="white"] .card-narrow :is(.refreshlog-freshness,.upload-panel,.refreshlog-run,.settings-row,.refreshlog-job,.live-refresh){background:transparent;border:0;border-radius:0;box-shadow:none;}
-  :root[data-theme="white"] .card-narrow :is(.upload-panel,.settings-row,.refreshlog-freshness,.refreshlog-job){border-bottom:1px solid #eef0f6;padding-left:0;padding-right:0;margin-bottom:0;}
+  :root[data-theme="white"] .card-narrow :is(.upload-panel,.settings-row,.refreshlog-freshness,.refreshlog-job){border-bottom:1px solid var(--c-eef0f6);padding-left:0;padding-right:0;margin-bottom:0;}
   
   
   :root[data-theme="white"] .card-narrow .sub{max-width:none;}
@@ -84,9 +84,9 @@
 /* Wide screens: the search box grows into the free space between the menu and the Live / bell buttons. */
 @media (min-width:1600px){:root[data-theme="white"] .topbar .topbar-search{width:calc(100vw - 1110px - 179px);max-width:600px;}}
 /* Score and rating badges: black text for clarity (the tinted background still shows the verdict). */
-:root[data-theme="white"] .badge:is(.b-buy,.b-mbuy,.b-hold,.b-avoid){color:#000;font-weight:600;}
+:root[data-theme="white"] .badge:is(.b-buy,.b-mbuy,.b-hold,.b-avoid){color:var(--c-000000);font-weight:600;}
 /* Primary headings (Data Refresh jobs, Settings, Help and Knowledge Base sections): a topic icon before the title, a larger heavier face and a short accent bar. */
-  :root[data-theme="white"] :is(h2[data-icon]){display:flex;align-items:center;gap:12px;font-size:var(--t-lg);font-weight:700;letter-spacing:-.02em;color:#1b1f2a;line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;}
+  :root[data-theme="white"] :is(h2[data-icon]){display:flex;align-items:center;gap:12px;font-size:var(--t-lg);font-weight:700;letter-spacing:-.02em;color:var(--text);line-height:1.2;margin:0 0 14px;position:relative;padding-bottom:12px;}
   :root[data-theme="white"] :is(h2[data-icon])::before{content:"";width:28px;height:28px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;}
   :root[data-theme="white"] :is(h2[data-icon])::after{content:"";position:absolute;left:0;bottom:0;width:56px;height:3px;border-radius:2px;background:var(--accent);}
   :root[data-theme="white"] h2[data-icon="bar"]{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='6' y1='20' x2='6' y2='11'/%3E%3Cline x1='12' y1='20' x2='12' y2='4'/%3E%3Cline x1='18' y1='20' x2='18' y2='14'/%3E%3C/svg%3E");}
@@ -158,8 +158,8 @@
 /* Phones: a visible menu button, no logo and no Live pill in the top bar, so the search box gets the room. */
 @media (max-width:900px){
   :root[data-theme="white"] .topbar{height:auto;min-height:56px;padding:6px 10px;gap:8px;margin-bottom:10px;}
-  :root[data-theme="white"] .topbar .menu-toggle{color:#1b1f2a;margin:0;}
-  :root[data-theme="white"] .topbar .menu-toggle:hover{background:#eef0f6;}
+  :root[data-theme="white"] .topbar .menu-toggle{color:var(--text);margin:0;}
+  :root[data-theme="white"] .topbar .menu-toggle:hover{background:var(--c-eef0f6);}
   :root[data-theme="white"] .topbar .topbar-title{display:none;}
   :root[data-theme="white"] .topbar .live-toggle,:root[data-theme="white"] .topbar .live-px{display:none;}
   :root[data-theme="white"] .topbar .topbar-search{margin:0;flex:1 1 auto;min-width:0;width:auto;max-width:none;}
@@ -184,31 +184,31 @@
    Help, Knowledge Base, Trade Log positions (table view) and Buy / Sell ideas. Explorer's own industry table keeps its own look. */
 @media (min-width:901px){
   :root[data-theme="white"] .help-table{font-size:var(--t-md);border-collapse:separate;border-spacing:0;}
-  :root[data-theme="white"] .help-table th{color:#1b1f2a;font-size:var(--t-md);font-weight:500;text-transform:none;letter-spacing:0;padding:12px 14px;border-bottom:1px solid #e6e9f2;background:transparent;}
+  :root[data-theme="white"] .help-table th{color:var(--text);font-size:var(--t-md);font-weight:500;text-transform:none;letter-spacing:0;padding:12px 14px;border-bottom:1px solid var(--c-e6e9f2);background:transparent;}
   :root[data-theme="white"] .help-table td{font-size:var(--t-md);line-height:1.45;padding:14px;border-bottom:0;}
-  :root[data-theme="white"] .help-table tbody tr:nth-child(odd) td{background:#f4f6fc;}
+  :root[data-theme="white"] .help-table tbody tr:nth-child(odd) td{background:var(--c-f4f6fc);}
   :root[data-theme="white"] .help-table tbody tr:nth-child(odd) td:first-child{border-radius:8px 0 0 8px;}
   :root[data-theme="white"] .help-table tbody tr:nth-child(odd) td:last-child{border-radius:0 8px 8px 0;}
   
 }
 /* Strategies: fewer boxes, more free flow. Fields become underlined, the setup bar and secondary buttons lose their frames, and the list actions are plain links. */
-  :root[data-theme="white"] .strat-layout .strat-main :is(input:not([type=checkbox]):not([type=radio]),select,textarea){border:0;border-bottom:1px solid #c9cfdf;border-radius:0;background-color:transparent;box-shadow:none;padding-left:2px;padding-right:6px;}
+  :root[data-theme="white"] .strat-layout .strat-main :is(input:not([type=checkbox]):not([type=radio]),select,textarea){border:0;border-bottom:1px solid var(--c-c9cfdf);border-radius:0;background-color:transparent;box-shadow:none;padding-left:2px;padding-right:6px;}
   :root[data-theme="white"] .strat-layout .strat-main :is(input,select,textarea):focus{border-bottom:2px solid var(--accent);box-shadow:none;outline:none;}
   /* v1.282: a rule row already sits between two lines, so its fields carry no underline of their own; one appears on hover and focus. */
   :root[data-theme="white"] .strat-layout .strat-main.strat-main .sr-row :is(input,select){border-bottom-color:transparent;}
-  :root[data-theme="white"] .strat-layout .strat-main.strat-main .sr-row :is(input,select):hover:not(:disabled){border-bottom-color:#c9cfdf;}
+  :root[data-theme="white"] .strat-layout .strat-main.strat-main .sr-row :is(input,select):hover:not(:disabled){border-bottom-color:var(--c-c9cfdf);}
   :root[data-theme="white"] .strat-layout .strat-main.strat-main .sr-row :is(input,select):focus{border-bottom-color:var(--accent);}
-  :root[data-theme="white"] .strat-layout .strat-main .strat-fold > summary{border:0;border-bottom:1px solid #e6e9f2;border-radius:0;background:transparent;padding:12px 0;}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-fold > summary{border:0;border-bottom:1px solid var(--c-e6e9f2);border-radius:0;background:transparent;padding:12px 0;}
   :root[data-theme="white"] .strat-layout .strat-main .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;box-shadow:none;}
-  :root[data-theme="white"] .strat-layout .strat-main .strat-btn:not(.on):hover{background:color-mix(in srgb,var(--accent) 8%,#fff);}
+  :root[data-theme="white"] .strat-layout .strat-main .strat-btn:not(.on):hover{background:color-mix(in srgb,var(--accent) 8%,var(--panel));}
 /* Buttons: one primary and one secondary style everywhere (wide screens).
    Primary = filled indigo; secondary = white with a thin edge. Both: 40px tall, small spaced capitals, 6px corners. */
 @media (min-width:901px){
   :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,.biz-toolbar .biz-expand,.biz-toolbar .rk-btn,.biz-toolbar .rk-main,.alba-confirm-cancel){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 20px;font-size:var(--t-sm);font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2;}
-  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,.biz-toolbar .biz-expand,.biz-toolbar .rk-btn,.biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
+  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,.biz-toolbar .biz-expand,.biz-toolbar .rk-btn,.biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:var(--text);background:var(--panel);border:1px solid var(--c-c9cfdf);}
   :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.detail-back,.rk-main,.biz-toolbar .biz-expand,.biz-toolbar .rk-btn,.biz-toolbar .rk-main,.alba-confirm-cancel):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary):hover:not(:disabled){color:var(--accent);border-color:var(--accent);}
-  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn:not(.fi-btn-primary),.rk-main):disabled{color:#8a90a0;background:#f6f7fb;border-color:#e0e4ee;}
-  :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary):disabled{color:#fff;background:color-mix(in srgb,var(--accent) 45%,#fff);border-color:transparent;cursor:not-allowed;}
+  :root[data-theme="white"] :is(.browse-btn,.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn:not(.fi-btn-primary),.rk-main):disabled{color:var(--c-8a90a0);background:var(--c-f6f7fb);border-color:var(--c-e0e4ee);}
+  :root[data-theme="white"] :is(.select-mode-btn.fi-btn-primary,.tl-btn-primary):disabled{color:var(--on-accent);background:color-mix(in srgb,var(--accent) 45%,var(--panel));border-color:transparent;cursor:not-allowed;}
   
   
   /* Strategies keeps its free-flow Duplicate / Delete / Suggested Rules as plain text buttons */
@@ -217,11 +217,11 @@
 /* Watchlist sync picker: rows like Settings > Claude controls (bold name, short description, tick box at the right, hairline between rows). */
   
   :root[data-theme="white"] .wl-picker{gap:0;margin-bottom:18px;width:100%;}
-  :root[data-theme="white"] .wl-pick{justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid #eef0f6;}
+  :root[data-theme="white"] .wl-pick{justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--c-eef0f6);}
   :root[data-theme="white"] .wl-pick input[type=checkbox]{order:2;flex:none;width:20px;height:20px;margin:0;accent-color:var(--accent);cursor:pointer;}
   :root[data-theme="white"] .wl-pick input[type=checkbox]:disabled{cursor:not-allowed;opacity:.5;}
   :root[data-theme="white"] .wl-pick-text{display:flex;flex-direction:column;gap:2px;min-width:0;}
-  :root[data-theme="white"] .wl-pick-name{font-size:var(--t-md);font-weight:700;color:#1b1f2a;}
+  :root[data-theme="white"] .wl-pick-name{font-size:var(--t-md);font-weight:700;color:var(--text);}
   
   
 /* Strategies: a single line under the closed setup bar, and the "+ Add a rule" box lined up with the rule fields above it. */
@@ -245,7 +245,7 @@
 /* Phones: the laptop card layout, scaled down. White cards on the lavender page for the detail pages and the Tools screens, topic icons and accent bars on
    the main headings, flat rows inside the cards, readable dark heading colours. */
 @media (max-width:900px){
-  :root[data-theme="white"]{--card-shadow:0 1px 2px rgba(27,31,42,.05),0 6px 20px rgba(27,31,42,.06);}
+  :root[data-theme="white"]{--card-shadow:0 1px 2px color-mix(in srgb, var(--text) 5%, transparent),0 6px 20px color-mix(in srgb, var(--text) 6%, transparent);}
   /* Stock and industry pages */
   
   
@@ -324,7 +324,7 @@
   
   
   :root[data-theme="white"] .strat-layout .strat-main .strat-btn:not(.pub):not(.on){border-color:transparent;background:transparent;}
-  :root[data-theme="white"] .sort-select{min-height:40px;font-size:var(--t-md);border:1px solid #c9cfdf;background-color:#fff;color:#1b1f2a;}
+  :root[data-theme="white"] .sort-select{min-height:40px;font-size:var(--t-md);border:1px solid var(--c-c9cfdf);background-color:var(--panel);color:var(--text);}
   :root[data-theme="white"] .strat-layout .strat-main .strat-fold > summary{padding-right:22px;}
   /* Track these picks is a button like Refresh: outlined, same height */
   
@@ -332,7 +332,7 @@
   :root[data-theme="white"] .strat-layout .strat-main .strat-group > summary.analysis-panel-title:before{right:0;}
 }
 /* The sort box above a results grid looks the same in Analysis and Strategies (boxed), not underlined like the form fields. */
-:root[data-theme="white"] .strat-layout .strat-main .sort-select{border:1px solid #c9cfdf;border-radius:8px;background-color:#fff;padding-left:10px;}
+:root[data-theme="white"] .strat-layout .strat-main .sort-select{border:1px solid var(--c-c9cfdf);border-radius:8px;background-color:var(--panel);padding-left:10px;}
 
 /* Score and rating pills in the grids (Fund, Tech, Tech 2, W / M Tech Rating, ...): black, regular weight; the pill colour carries the meaning. */
 
@@ -346,6 +346,6 @@
 /* Strategies, all screen sizes: the Sort by box is boxed like the one in Analysis, and Track these picks is an outlined button like Refresh. */
 
 /* The Delete button stays a visible red outlined button (it was a plain text button and hard to spot). */
-:root[data-theme="white"] .strat-layout .strat-main .strat-btn.strat-btn-danger:not(.pub):not(.on){color:#a83f38;border:1px solid #a83f38;background:#fff;}
-:root[data-theme="white"] .strat-layout .strat-main .strat-btn.strat-btn-danger:not(.pub):not(.on):hover{color:#fff;background:#a83f38;border-color:#a83f38;}
+:root[data-theme="white"] .strat-layout .strat-main .strat-btn.strat-btn-danger:not(.pub):not(.on){color:var(--avoid);border:1px solid var(--avoid);background:var(--panel);}
+:root[data-theme="white"] .strat-layout .strat-main .strat-btn.strat-btn-danger:not(.pub):not(.on):hover{color:var(--on-accent);background:var(--avoid);border-color:var(--avoid);}
 

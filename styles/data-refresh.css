@@ -13,7 +13,7 @@ footer{margin-top:26px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",s
 .upload-text{flex:1;min-width:220px;}
 .upload-title{font-size:var(--t-md);font-weight:700;color:var(--text);margin-bottom:2px;}
 .browse-wrap{position:relative;display:inline-flex;flex-shrink:0;}
-.browse-btn{font-size:var(--t-sm);display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:#0f1720;font-weight:700;padding:9px 18px;border-radius:8px;cursor:pointer;transition:opacity .15s;white-space:nowrap;border:none;font-family:inherit;pointer-events:none;}
+.browse-btn{font-size:var(--t-sm);display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:var(--c-0f1720);font-weight:700;padding:9px 18px;border-radius:8px;cursor:pointer;transition:opacity .15s;white-space:nowrap;border:none;font-family:inherit;pointer-events:none;}
 .browse-wrap:active .browse-btn{opacity:.8;}
 .csv-file-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;-webkit-appearance:none;}
 .upload-result{margin-top:14px;}
@@ -42,10 +42,10 @@ footer{margin-top:26px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",s
 .refreshlog-run-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
 .refreshlog-run-time{font-size:var(--t-sm);font-weight:700;color:var(--text);}
 .refreshlog-run-status{font-size:var(--t-sm);font-weight:700;padding:2px 10px;border-radius:20px;}
-.refreshlog-run-status-buy{background:rgba(47,158,110,.14);color:var(--buy);}
-.refreshlog-run-status-hold{background:rgba(201,162,39,.16);color:var(--hold);}
+.refreshlog-run-status-buy{background:rgb(var(--rgb-47-158-110) / .14);color:var(--buy);}
+.refreshlog-run-status-hold{background:rgb(var(--rgb-201-162-39) / .16);color:var(--hold);}
 .refreshlog-run-status-muted{background:var(--panel2);color:var(--muted);}
-.refreshlog-run-status-avoid{background:rgba(193,82,74,.16);color:var(--avoid);}
+.refreshlog-run-status-avoid{background:rgb(var(--rgb-193-82-74) / .16);color:var(--avoid);}
 .refreshlog-run-stats{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:var(--t-sm);color:var(--muted);}
 .refreshlog-run-stats--muted{color:var(--muted);}
 .refreshlog-run-stats--bad{color:var(--avoid);}
@@ -58,10 +58,10 @@ footer{margin-top:26px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",s
 .refreshlog-freshness-bars{display:flex;flex-direction:column;gap:6px;}
 .refreshlog-freshness-row{display:flex;align-items:center;gap:8px;}
 .refreshlog-freshness-label{flex:0 0 92px;color:var(--muted);}
-.refreshlog-freshness-track{flex:1;height:8px;border-radius:5px;background:var(--panel3, rgba(127,127,127,.15));overflow:hidden;}
+.refreshlog-freshness-track{flex:1;height:8px;border-radius:5px;background:var(--panel3, rgb(var(--rgb-127-127-127) / .15));overflow:hidden;}
 .refreshlog-freshness-fill{height:100%;width:var(--w,0%);border-radius:5px;background:var(--accent);}
 .refreshlog-freshness-count{flex:0 0 auto;min-width:64px;text-align:right;color:var(--text);font-weight:600;}
-.data-integrity-banner{background:rgba(193,82,74,.14);color:var(--avoid);border-bottom:1px solid rgba(193,82,74,.35);font-size:var(--t-sm);line-height:1.5;padding:8px 16px;}
+.data-integrity-banner{background:rgb(var(--rgb-193-82-74) / .14);color:var(--avoid);border-bottom:1px solid rgb(var(--rgb-193-82-74) / .35);font-size:var(--t-sm);line-height:1.5;padding:8px 16px;}
 .data-chip.chip-na{border-style:solid;}
 
 /* Factor cards: metric rows flow into as many columns as fit (label left, value right) instead of one long column; research bullets (neutral / positive / negative) sit side by side. */
@@ -82,7 +82,7 @@ footer{margin-top:26px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",s
 /* Source tags and numbered links in the Fundamental Score cards (v1.299, rows and bullets re-laid in v1.301). */
 .srctag{display:inline-block;font-size:var(--t-xs);font-weight:600;line-height:1.5;padding:0 7px;border-radius:10px;margin-left:6px;white-space:nowrap;vertical-align:1px;border:1px solid transparent;}
 .st-tv{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);}
-.st-claude{background:color-mix(in srgb,#8b7fe8 18%,transparent);color:#8b7fe8;}
+.st-claude{background:color-mix(in srgb,var(--c-8b7fe8) 18%,transparent);color:var(--c-8b7fe8);}
 .st-warn{background:color-mix(in srgb,var(--hold) 18%,transparent);color:var(--hold);}
 /* Metric rows: [number slot] [dot] label + source tag ... value. The value column is right-aligned, so every number lines up at the right edge. */
 .fund-cell .data-chip{display:grid;grid-template-columns:10px minmax(0,1fr) auto;column-gap:8px;align-items:baseline;}

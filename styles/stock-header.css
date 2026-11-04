@@ -23,10 +23,10 @@
 .detail-ticker{margin-left:8px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--muted);font-size:var(--t-sm);}
 .badge{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-sm);font-weight:600;padding:4px 11px;border-radius:20px;letter-spacing:.2px;}
 .badge--tight{padding:var(--pad-tight);}
-.b-buy{background:rgba(47,158,110,.18);color:var(--buy);}
-.b-mbuy{background:rgba(123,171,62,.18);color:var(--mbuy);}
-.b-hold{background:rgba(201,162,39,.18);color:var(--hold);}
-.b-avoid{background:rgba(193,82,74,.18);color:var(--avoid);}
+.b-buy{background:rgb(var(--rgb-47-158-110) / .18);color:var(--buy);}
+.b-mbuy{background:rgb(var(--rgb-123-171-62) / .18);color:var(--mbuy);}
+.b-hold{background:rgb(var(--rgb-201-162-39) / .18);color:var(--hold);}
+.b-avoid{background:rgb(var(--rgb-193-82-74) / .18);color:var(--avoid);}
 /* Data-completeness ("confidence") badge (added 2026-09-30) — a small pill next to the
      Fundamental Score and Technical Score panel titles showing how many of the 9 fundamental
      factors / 5 technical signals actually had usable underlying data, so a stock scored on a
@@ -36,8 +36,8 @@
      and technical.states, never stored, so it can never go stale relative to the data it
      describes. See fundamentalCompleteness()/technicalCompleteness() further down. */
 .completeness-badge{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-xs);font-weight:600;padding:2px 9px;border-radius:20px;letter-spacing:.2px;white-space:nowrap;display:inline-flex;align-items:center;}
-.completeness-badge.complete{background:rgba(47,158,110,.14);color:var(--buy);}
-.completeness-badge.incomplete{background:rgba(201,162,39,.18);color:var(--hold);}
+.completeness-badge.complete{background:rgb(var(--rgb-47-158-110) / .14);color:var(--buy);}
+.completeness-badge.incomplete{background:rgb(var(--rgb-201-162-39) / .18);color:var(--hold);}
 /* The Back button stays in view under the top bar while the stock page scrolls; the Jump-to bar and the jump targets sit below it. */
 .detail-back-bar ~ .detail-jump .detail-jump-who{padding-right:230px;box-sizing:border-box;min-height:34px;}
 

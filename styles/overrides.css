@@ -21,7 +21,7 @@
 .biz-news-head{margin-top:16px;}
 .biz-detail-box .biz-news-bar h3.biz-news-head{margin:0;}
 .biz-detail-box .biz-news-bar .biz-newsbtn{background:transparent;border:1px solid var(--line);color:var(--accent);}
-.biz-detail-box .biz-news-bar .biz-newsbtn:hover:not(:disabled){border-color:var(--accent);background:rgba(255,255,255,.04);}
+.biz-detail-box .biz-news-bar .biz-newsbtn:hover:not(:disabled){border-color:var(--accent);background:color-mix(in srgb, var(--on-accent) 4%, transparent);}
 .biz-dname{text-transform:none;letter-spacing:0;color:var(--text);}
 .biz-detail-box .biz-ft{color:var(--muted);}
 
@@ -41,17 +41,17 @@
 :root[data-theme="white"] :is(.strat-table,.biz-table) td .badge{font-size:var(--t-sm);}
 :root[data-theme="white"] .analysis-leaderboard-head{justify-content:flex-start;margin:5px 0 10px;}
 }
-:root[data-theme="white"] :is(.strat-table,.biz-table,.peers-table) td .badge{color:#000;font-weight:var(--w-reg);}
-:root[data-theme="white"] :is(.strat-table,.biz-table) thead th{color:#000;font-weight:var(--w-reg);}
+:root[data-theme="white"] :is(.strat-table,.biz-table,.peers-table) td .badge{color:var(--c-000000);font-weight:var(--w-reg);}
+:root[data-theme="white"] :is(.strat-table,.biz-table) thead th{color:var(--c-000000);font-weight:var(--w-reg);}
 :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{font-weight:500;color:inherit;}
-:root[data-theme="white"] .biz-table > thead > tr > th:first-child::before{font-weight:var(--w-reg);color:#000;}
+:root[data-theme="white"] .biz-table > thead > tr > th:first-child::before{font-weight:var(--w-reg);color:var(--c-000000);}
 :root[data-theme="white"] :is(.analysis-lb-rank,.strat-table td.analysis-lb-rank){font-weight:var(--w-reg);}
 :root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{font-weight:var(--w-reg);}
 
 /* from refresh-kit.css */
 .strat-table th.strat-selcell,.strat-table td.strat-selcell,.strat-table th.rk-cell,.strat-table td.rk-cell{text-align:left;}
 .biz-detail-box .rk-main{background:transparent;border:1px solid var(--line);color:var(--accent);}
-.biz-detail-box .rk-main:hover:not(:disabled){border-color:var(--accent);background:rgba(255,255,255,.04);}
+.biz-detail-box .rk-main:hover:not(:disabled){border-color:var(--accent);background:color-mix(in srgb, var(--on-accent) 4%, transparent);}
 .strat-group > summary.analysis-panel-title::before{content:"";transform:none;}
 @media (max-width:640px){
 .analysis-leaderboard-head > div:last-child{gap:8px;}
