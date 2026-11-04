@@ -11,7 +11,7 @@ const { TV_HEADER, FUND_HEADER, tvCsv, fundCsv, fundRow, rv } = D;
 const rd = f => fs.readFileSync(path.join(root, f), 'utf8');
 
 const { load, loadWithStubs } = require('./lib/load.js');
-const F = load('src/import/fund-engine.js', 'export { FundEngine };');
+const F = load('src/import/fund-engine.js', 'export { FundEngine, interpolateCurve };');
 const P = load('src/import/csvparse.js');
 const Fe = F.FundEngine;
 
@@ -23,6 +23,11 @@ function test(name, fn){
 }
 const near = (a, b, d = 1e-9) => assert.ok(Math.abs(a - b) <= d, `${a} is not within ${d} of ${b}`);
 const throwsMsg = (fn, re) => assert.throws(fn, e => re.test(e.message));
+test('fund engine: a score curve is read by straight lines between its points, flat before the first and after the last', () => {
+  const curve = [[0, 0], [10, 5], [20, 5]];
+  assert.strictEqual(F.interpolateCurve(curve, -3), 0); assert.strictEqual(F.interpolateCurve(curve, 5), 2.5);
+  assert.strictEqual(F.interpolateCurve(curve, 15), 5); assert.strictEqual(F.interpolateCurve(curve, 99), 5, 'past the last point it stays at the last value');
+});
 
 // =========================================================== CSV parsing: the shared parser and the fundamental engine's own copy must agree
 const PARSER_CASES = [
@@ -897,11 +902,12 @@ test('rocky page: picks, rejected picks, open and closed positions are tables, a
   const html = await rockyPage({ state: { curve: [], open: [{ k: HOSTILE, d: 'd1', q: 10, entry: 100, last: 110, stop: 90, target: 130 }, { k: 'NOPRICE', d: 'd1', q: 1 }],
       closed: Array.from({ length: 30 }, (_, i) => ({ k: 'C' + i, d: 'a', xd: 'b', why: HOSTILE, ret: i - 10, pnl: i })) },
     picks: { asof: 'd3', dataAsof: null, universe: 5, blocked: 1, picks: [{ k: HOSTILE, n: HOSTILE, g: HOSTILE, close: 50, score: 7.5, mos: 20, rsiW: 55, stop: 45, target: 65 }, { k: 'NOSTOP', score: 'x' }],
-      gated: [{ k: 'G', score: 6, close: 10, stop: 9, target: 11, why: HOSTILE }] },
+      gated: [{ k: 'G', score: 6, close: 10, stop: 9, target: 11, why: HOSTILE }, { k: 'G2', close: 10, stop: 9, target: 11, why: 'no score' }] },
     weights: null, learn: { d: '2026-10-01', note: HOSTILE } });
   assert.ok(!html.includes('<img'), 'no markup from saved data');
   assert.ok(/data as of \?/.test(html), 'a missing data date is shown as ?');
   assert.ok(/Passed the checks, failed the 1:3 gate/.test(html) && /Why rejected/.test(html));
+  assert.ok(/<b>G2<\/b>(?:(?!<\/tr>).)*<td class="num">–<\/td>/.test(html), 'a rejected pick with no score shows a dash');
   assert.ok(/rky-up">\+10\.00%/.test(html), 'open position P&L');
   assert.ok(html.includes('C29') && !html.includes('C4<') && /C5</.test(html), 'only the latest 25 closed trades, newest first');
   assert.ok(/Last review 2026-10-01: &lt;img/.test(html), 'the learning note is escaped');
@@ -915,43 +921,42 @@ test('rocky page: the learning line reads the review figures when there is no wr
 
 // ---- the Rocky page: best swing trades of the day (src/rocky/swing.js), the risk-tier columns and the store that reads the swing document
 const EMPTY_ST = { curve: [], closed: [], open: [] };
-const IDEA = (o) => Object.assign({ k: 'AAA', n: 'Aaa Ltd', g: 'Textiles', close: 100, mrsi: 71, thin: false, tier: 'high', risk: 0.005, action: 'Buy zone', m3h: { since: 3, h: 1.5 },
-  entry: [100, 101], stop: 92.5, stopPct: 7.5, t1: 110, t2: 120, rr: 2.7, qty: { '500000': 47, '1000000': 94 }, why: ['Monthly RSI 71, inside 66-76', '3-hour MACD above its signal line and above zero'], warn: [] }, o);
-const SWING = (o) => Object.assign({ asof: '2026-11-03', dataAsof: '2026-11-03', band: [66, 76], pool: 124, shortlisted: 12, checked: 12, ideas: [IDEA()], capitals: [500000, 1000000] }, o);
-test('rocky page: best swing trades say so when the document is missing or no stock meets both rules', async () => {
+const IDEA = (o) => Object.assign({ k: 'AAA', n: 'Aaa Ltd', g: 'Textiles', close: 100, mrsi: 71, thin: false, tier: 'high', risk: 0.005, action: 'Buy zone', m2h: { since: 3, h: 1.5 }, m3h: { since: 5, h: 0.8 }, wrsi: 58,
+  entry: [100, 101], stop: 92.5, stopPct: 7.5, t1: 110, t2: 120, rr: 2.7, qty: { '500000': 47, '1000000': 94 }, warn: [] }, o);
+const SWING = (o) => Object.assign({ asof: '2026-11-03', dataAsof: '2026-11-03', band: [66, 76], pool: 124, checked: 12, ideas: [IDEA()], capitals: [500000, 1000000] }, o);
+test('rocky page: best swing trades say so when the document is missing or no stock meets the rules', async () => {
   const none = await rockyPage({ state: EMPTY_ST });
   assert.ok(/Best swing trades for the day/.test(none) && /appear after the next daily run/.test(none));
-  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [] }) }), /No Positive MoS stock meets both rules today: monthly RSI 66-76, and a 3-hour MACD above its signal line and above zero/);
-  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: undefined }) }), /No Positive MoS stock meets both rules today/);
+  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [] }) }), /No Positive MoS stock meets the rules today: weekly MACD above its signal line, monthly RSI 66-76, and a 2-hour MACD \(30, 60, 5\) above its signal line/);
+  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: undefined }) }), /No Positive MoS stock meets the rules today/);
 });
-test('rocky page: a swing idea shows rank, action, cross age, tier, the levels in rupees, shares for both capitals, the two rules and the caveat', async () => {
+test('rocky page: the swing grid leads with weekly RSI, monthly RSI and the 2-hour cross age, then tier, levels in rupees, shares for both capitals and notes', async () => {
   const html = await rockyPage({ state: EMPTY_ST, swing: SWING() });
-  assert.ok(html.includes('rky-idea rky-idea-top') && html.includes('<span class="rky-rank">1</span><b>AAA</b>') && html.includes('Aaa Ltd · Textiles'));
-  assert.ok(html.includes('rky-act rky-act-buy">Buy zone') && html.includes('3-hour cross 3 bars ago') && html.includes('High risk tier'));
-  assert.ok(html.includes('₹100.00 – 101.00') && html.includes('₹92.50 (−7.5%)') && html.includes('₹110.00') && html.includes('₹120.00') && html.includes('2.7 : 1'));
-  assert.ok(html.includes('Shares at ₹5L / ₹10L</b><span>47 / 94</span>'), 'shares for both capitals');
-  assert.ok(html.includes('<li>Monthly RSI 71, inside 66-76</li>') && !/Score/.test(html.split('Equity curve')[0]), 'no score: only the two rules select');
-  assert.ok(/124 stocks qualify your Positive MoS strategy and have a monthly RSI of 66-76\. 12 passed a first pass on the 2-hour and 4-hour MACD and 12 got the exact 3-hour check; 1 meet both rules, freshest 3-hour cross first\. Data as of 2026-11-03\./.test(html));
-  assert.ok(/not a prediction/.test(html) && /Only the two rules above select a stock/.test(html) && !/style=/.test(html));
+  const head = ['#', 'Stock', 'W RSI', 'M RSI', '2-hr cross (bars ago)', '3-hr cross (bars ago)', 'Tier', 'Entry', 'Stop', 'T1 +10%', 'T2 +20%', 'Shares at ₹5L / ₹10L', 'Notes'];
+  assert.ok(head.every((h, i) => i === 0 || html.indexOf('>' + h + '</th>') > html.indexOf('>' + head[i - 1] + '</th>') || i === 1), 'columns in order');
+  assert.ok(html.includes('<td>1</td><td><b>AAA</b><br><span class="rky-sub">Aaa Ltd</span></td><td class="num">58</td><td class="num">71</td><td class="num">3</td><td class="num">5</td><td>High</td>'));
+  assert.ok(html.includes('₹100.00') && html.includes('₹92.50 (−7.5%)') && html.includes('₹110.00') && html.includes('₹120.00') && html.includes('<td class="num">47 / 94</td><td>–</td>'));
+  assert.ok(!/Score/.test(html.split('Equity curve')[0]) && !html.includes('rky-idea'), 'a grid, not cards; no score: only the two rules select');
+  assert.ok(/124 stocks qualify your Positive MoS strategy and have a monthly RSI of 66-76 with the weekly MACD above its signal line\. 12 got the 2-hour MACD check; 1 meet all the rules, freshest 2-hour cross first\. Data as of 2026-11-03\./.test(html));
+  assert.ok(/not a prediction/.test(html) && /Only the rules above select a stock/.test(html) && !/style=/.test(html));
 });
-test('rocky page: only the first idea is the top one; thin ideas, unknown tiers and an unknown cross age carry what the data says', async () => {
-  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA(), IDEA({ k: 'BBB', thin: true, tier: 'medium', m3h: { since: null }, warn: ['Thinly traded', 'Stop is an estimate'] }), IDEA({ k: 'CCC', tier: 'odd', m3h: undefined, action: 'Wait' }), IDEA({ k: 'DDD', m3h: { since: 1 } })] }) });
-  assert.ok(html.includes('3-hour cross 1 bar ago') && !html.includes('1 bars ago') && html.includes('3-hour cross 3 bars ago'), 'singular and plural');
-  assert.strictEqual((html.match(/rky-idea-top/g) || []).length, 1);
-  assert.ok(html.includes('Medium risk tier') && html.includes('<span class="rky-chip">Thin</span>') && html.includes('3-hour cross a while ago'));
-  assert.ok(html.includes('<div class="rky-warn">Thinly traded</div><div class="rky-warn">Stop is an estimate</div>'));
-  assert.ok(html.includes('rky-act ">Wait') && html.includes('Unrated risk tier') && (html.match(/3-hour cross a while ago/g) || []).length === 2, 'a non-buy action gets no colour; a missing state reads as a while ago');
-  assert.ok((html.match(/<span class="rky-chip">Thin<\/span>/g) || []).length === 1, 'only the thin idea is flagged');
+test('rocky page: the grid keeps the rank order, and warnings, unknown tiers and unknown cross ages carry what the data says', async () => {
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA(), IDEA({ k: 'BBB', tier: 'medium', m2h: { since: null }, warn: ['Thinly traded', 'Stop is an estimate'] }), IDEA({ k: 'CCC', tier: 'odd', m2h: undefined, wrsi: null }), IDEA({ k: 'DDD', m2h: { since: 1 } })] }) });
+  assert.ok(html.indexOf('<b>AAA</b>') < html.indexOf('<b>BBB</b>') && html.indexOf('<b>BBB</b>') < html.indexOf('<b>CCC</b>') && html.includes('<td>4</td><td><b>DDD</b>'));
+  assert.ok(html.includes('<td>Medium</td>') && html.includes('Thinly traded; Stop is an estimate') && html.includes('<td>Unrated</td>'));
+  assert.ok((html.match(/<td class="num">–<\/td>/g) || []).length >= 3, 'an unknown cross age and weekly RSI read as a dash');
+  const below = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ m3h: { since: 2, h: -0.4 } }), IDEA({ k: 'EEE', m3h: null })] }) });
+  assert.ok(below.includes('<td class="num">below</td>') && !below.includes('<td class="num">2</td><td>High</td>'), 'a 3-hour MACD under its signal line says so');
 });
 test('rocky page: missing figures in an idea show a dash, and a missing data date is said plainly', async () => {
-  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ dataAsof: null, band: undefined, capitals: undefined, ideas: [IDEA({ entry: undefined, stop: null, qty: undefined, why: undefined, warn: undefined })] }) });
-  assert.ok(/Entry zone<\/b><span>– – –/.test(html) && /Stop<\/b><span>– \(−7\.5%\)/.test(html) && /Shares at <\/b><span><\/span>/.test(html));
-  assert.ok(/Data as of \?\./.test(html) && /monthly RSI of -\./.test(html));
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ dataAsof: null, band: undefined, capitals: undefined, ideas: [IDEA({ entry: undefined, stop: null, qty: undefined, warn: undefined })] }) });
+  assert.ok(/<td class="num">–<\/td><td class="num">– \(−7\.5%\)<\/td>/.test(html));
+  assert.ok(/Data as of \?\./.test(html) && /monthly RSI of - with the weekly MACD/.test(html));
   const noQty = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ qty: undefined })] }) });
-  assert.ok(/Shares at ₹5L \/ ₹10L<\/b><span>– \/ –/.test(noQty));
+  assert.ok(/Shares at ₹5L \/ ₹10L<\/th>/.test(noQty) && noQty.includes('<td class="num">– / –</td>'));
 });
 test('rocky page: saved text in the swing section stays text', async () => {
-  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ k: HOSTILE, n: HOSTILE, g: HOSTILE, action: HOSTILE, why: [HOSTILE], warn: [HOSTILE] })], pool: HOSTILE, shortlisted: HOSTILE, checked: HOSTILE, dataAsof: HOSTILE }) });
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ k: HOSTILE, n: HOSTILE, g: HOSTILE, tier: HOSTILE, warn: [HOSTILE] })], pool: HOSTILE, checked: HOSTILE, dataAsof: HOSTILE }) });
   assert.ok(!html.includes('<img'), 'no markup from saved data');
   assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'));
 });

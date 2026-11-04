@@ -4,8 +4,8 @@ Modes (all file based; WORK dir holds the JSON docs):
   build   WORK  ALBADATA   -> writes WORK/compact.json (static fundamentals + bar stats for the Positive MoS universe)
   daily   WORK  [--nifty X] -> reads WORK/live/*.json (liveSnapshot docs), compact, state, weights -> updates state.json, picks.json, log.json
   weekly  WORK             -> recalibrates weights.json from closed paper trades, writes learn.json
-  prox    WORK             -> reads WORK/agent/macdprox.json ({key: [2h MACD, 2h signal, 4h MACD, 4h signal]}), writes prox.json and refreshes swing.json
-  m3h     WORK             -> reads WORK/agent/bars3h.json ({key: [3-hour closes]}), writes m3h.json and refreshes swing.json (best swing trades of the day)
+  m2h     WORK             -> reads WORK/agent/bars2h.json ({key: [2-hour closes]}), writes m2h.json and refreshes swing.json (best swing trades of the day)
+  m3h     WORK             -> reads WORK/agent/bars3h.json ({key: [3-hour closes]}), writes m3h.json: the 3-hour cross age shown beside each idea (information only, it selects nothing)
 """
 import json,glob,sys,os,math,datetime as dt
 CAP=1_000_000; RISK=0.01; MAXPOS=8; POSCAP=0.125; COST=0.005  # round-trip costs+slippage
@@ -15,7 +15,7 @@ TIER_RISK={'low':0.01,'medium':0.0075,'high':0.005}; MRSI_HIGH=70; MRSI_MEDIUM=6
 RR_MIN=3.0; GATE_DAYS=70       # 1:3 gate: target = RR_MIN x stop distance; new positions may run 70 days (10 weeks, as tested)
 SPIKE_PG=300   # informational: trailing profit growth above 300% is flagged on a swing idea (it does not change the selection)
 LIQ_PART=0.10   # a position may be at most 10% of the stock's average daily volume, so it can be sold without moving the price
-SWING_MRSI=(66,76); MOS_MIN_SCORE=2; MOS_MIN_PCT=-25; MOS_MIN_FII=0.1; MOS_MIN_VOL=20000; LIQ_LAKH=50; T1_PCT=10.0; T2_PCT=20.0; CAPITALS=(500000,1000000); MAX_3H=12   # swing ideas: monthly-RSI band, liquid = turnover of at least Rs 50 lakh a day, targets, capitals shown, exact 3-hour checks per day
+SWING_MRSI=(66,76); MOS_MIN_SCORE=2; MOS_MIN_PCT=-25; MOS_MIN_FII=0.1; MOS_MIN_VOL=20000; LIQ_LAKH=50; T1_PCT=10.0; T2_PCT=20.0; CAPITALS=(500000,1000000); MAX_BARS=40; MACD_FAST=30; MACD_SLOW=60; MACD_SIG=5; MIN_BARS=2*MACD_SLOW   # swing ideas: monthly-RSI band, liquid = turnover of at least Rs 50 lakh a day, targets, capitals shown, 2-hour checks per day
 REGIME_MIN=0.6   # market filter: new entries only while at least this share of the universe has a positive 1-month change
 FEATS=['fund','mos','trend','rsi','mom','near']
 W0={'fund':1.0,'mos':1.0,'trend':1.5,'rsi':0.7,'mom':0.8,'near':0.8}
@@ -56,19 +56,20 @@ def build_watch(work,D):
             if isinstance(iv,(int,float)) and iv>0: pg=v.get('profitGrowth'); w[s['ticker'].split(' ·')[0].strip()]=[(s.get('name') or '')[:24],s.get('industryGroup'),iv,s.get('score'),s.get('verdict'),round(pg) if isinstance(pg,(int,float)) else None,v.get('fiiHolding')]
     S(work+'/agent/watch.json',{'built':today(),'w':w}); print('watch',len(w))
 
-# ---- 3-hour MACD (12, 26, 9) ----
+# ---- 2-hour MACD (30, 60, 5; EMA), the user's own chart setting ----
 def _ema(v,n):
     k=2/(n+1); o=[v[0]]
     for x in v[1:]: o.append(x*k+o[-1]*(1-k))
     return o
 def _macd(c):
-    m=[a-b for a,b in zip(_ema(c,12),_ema(c,26))]; sg=_ema(m,9)
+    m=[a-b for a,b in zip(_ema(c,MACD_FAST),_ema(c,MACD_SLOW))]; sg=_ema(m,MACD_SIG)
     return m,[a-b for a,b in zip(m,sg)]
 def macd_state(c):
-    """State of the 3-hour MACD from a list of closes (oldest first, at least 60 bars). None when there are too few.
+    """State of the 2-hour MACD from a list of closes (oldest first, at least MIN_BARS bars so the slow average has warmed up). None when there are too few.
     kind: fresh_up (crossed up within 6 bars), rising (histogram above zero and rising), fading (above zero, not rising), down (histogram at or below zero).
-    flip: the next close at which the histogram changes sign (below it for fresh_up/rising/fading; above it for down)."""
-    if not c or len(c)<60: return None
+    since: bars since the last cross (None when none in the last 80 bars). flip: the next close at which the histogram changes sign.
+    zero: whether the MACD line itself is above zero."""
+    if not c or len(c)<MIN_BARS: return None
     m,h=_macd(c); n=len(c); cross=None
     for i in range(n-1,max(n-80,1),-1):
         if (h[i]>0)!=(h[i-1]>0): cross=(i,'up' if h[i]>0 else 'down'); break
@@ -84,12 +85,8 @@ def macd_state(c):
     return {'kind':kind,'h':round(h[-1],2),'hp':round(max(h[-12:]),2),'since':since,'dir':cross[1] if cross else None,'flip':round(flip,2),'zero':m[-1]>0,'last':c[-1]}
 
 def qualifies(st):
-    """Rule 2 of the swing selection: the 3-hour MACD is above its signal line and above zero."""
-    return bool(st) and st['h']>0 and st['zero']
-
-def prox_ok(p):
-    """First pass only (TradingView has no 3-hour MACD column): the 2-hour and 4-hour MACD are both above their signal line and above zero."""
-    return isinstance(p,(list,tuple)) and len(p)>=4 and p[0]>p[1] and p[0]>0 and p[2]>p[3] and p[2]>0
+    """Rule 2 of the swing selection: the 2-hour MACD (30, 60, 5) is above its signal line."""
+    return bool(st) and st['h']>0
 
 def positive_mos(info,c):
     """The saved dashboard strategy "Positive MoS" (its month-RSI 30-80 and any-MACD rules are implied by rule 1): fundamental score >= 2,
@@ -101,15 +98,13 @@ def positive_mos(info,c):
     if not all(isinstance(x,(int,float)) and not isinstance(x,bool) for x in nums) or iv<=0: return False
     return score>=MOS_MIN_SCORE and (iv-close)/iv*100>=MOS_MIN_PCT and fii>=MOS_MIN_FII and mcap>0 and vol>=MOS_MIN_VOL
 
-def swing_pool(live,sym,wl=None):
-    """The candidates: stocks that qualify the Positive MoS strategy (when the watch list is given) and have a monthly RSI between 66 and 76."""
-    return [{'k':k,'y':sym.get(k),'close':c[0],'mrsi':c[6]} for k,c in live.items() if c[0] and c[6] is not None and SWING_MRSI[0]<=c[6]<=SWING_MRSI[1] and (wl is None or positive_mos(wl.get(k),c))]
+def weekly_ok(c):
+    """The weekly MACD (from the live snapshot, the dashboard's own columns: MACD in 1, signal in 2) is above its signal line."""
+    return all(isinstance(x,(int,float)) and not isinstance(x,bool) for x in (c[1],c[2])) and c[1]>c[2]
 
-def shortlist(pool,prox):
-    """The pool stocks whose 2-hour and 4-hour MACD agree, freshest first (smallest 4-hour gap as a share of price), at most MAX_3H: those get the exact 3-hour check."""
-    ok=[p for p in pool if prox_ok(prox.get(p['k']))]
-    ok.sort(key=lambda p:(prox[p['k']][2]-prox[p['k']][3])/p['close'])
-    return ok[:MAX_3H]
+def swing_pool(live,sym,wl=None):
+    """The candidates: stocks that qualify the Positive MoS strategy (when the watch list is given), have a monthly RSI between 66 and 76 and a weekly MACD above its signal line."""
+    return [{'k':k,'y':sym.get(k),'close':c[0],'mrsi':c[6]} for k,c in live.items() if c[0] and c[6] is not None and SWING_MRSI[0]<=c[6]<=SWING_MRSI[1] and weekly_ok(c) and (wl is None or positive_mos(wl.get(k),c))]
 
 def swing_card(p,st,c,info,held):
     """One idea: the two rules it met, the levels from Rocky's volatility stop, the sizes by risk tier, and warnings. The dashboard fields only inform; they never select."""
@@ -122,7 +117,7 @@ def swing_card(p,st,c,info,held):
         q=int(min(cap*rk/(entry-stop),cap*POSCAP*(rk/RISK)/entry))
         if maxq is not None and q>maxq: q=maxq; limited=True
         qty[str(cap)]=q
-    why=['Monthly RSI %d, inside %d-%d'%(round(p['mrsi']),*SWING_MRSI),'3-hour MACD above its signal line and above zero (crossed up %s, histogram %s)'%('a while ago' if st['since'] is None else '%d bar%s ago'%(st['since'],'' if st['since']==1 else 's'),st['h'])]
+    why=['Monthly RSI %d, inside %d-%d'%(round(p['mrsi']),*SWING_MRSI),'2-hour MACD (30, 60, 5) above its signal line (crossed up %s, histogram %s)'%('a while ago' if st['since'] is None else '%d bar%s ago'%(st['since'],'' if st['since']==1 else 's'),st['h'])]
     if vd: why.append('For reference: dashboard verdict %s (score %s)%s'%(vd,sc,'' if mos is None else ', margin of safety %d%%'%round(mos)))
     w=[]
     if thin: w.append('Thinly traded (about Rs %d lakh a day): exits may be hard, use limit orders'%round(turn))
@@ -130,22 +125,24 @@ def swing_card(p,st,c,info,held):
     if vd=='avoid': w.append('The dashboard has an Avoid verdict on this stock')
     if mos is not None and mos<=0: w.append('Price is above the dashboard\'s intrinsic value (negative margin of safety)')
     if isinstance(pg,(int,float)) and pg>SPIKE_PG: w.append('Earnings spike: trailing profit growth %s%%. Check what the revenue is made of before buying'%format(pg,',.0f'))
+    if not st['zero']: w.append('The 2-hour MACD line is still below zero')
     if not p.get('atr'): w.append('Stop is an estimate (8%): no volatility data')
     if p['k'] in held: w.append('Already held in Rocky\'s paper ledger')
-    return {'k':p['k'],'y':p['y'],'n':n,'g':g,'close':round(close,2),'mrsi':round(p['mrsi'],1),'tier':tier,'risk':rk,'thin':thin,'m3h':st,'action':'Buy zone','entry':[round(entry,2),round(entry*1.01,2)],'stop':round(stop,2),'stopPct':round(sp,1),
+    return {'k':p['k'],'y':p['y'],'n':n,'g':g,'close':round(close,2),'mrsi':round(p['mrsi'],1),'wrsi':None if c[5] is None else round(c[5],1),'tier':tier,'risk':rk,'thin':thin,'m2h':st,'action':'Buy zone','entry':[round(entry,2),round(entry*1.01,2)],'stop':round(stop,2),'stopPct':round(sp,1),
             't1':round(entry*(1+T1_PCT/100),2),'t2':round(entry*(1+T2_PCT/100),2),'rr':round(T2_PCT/sp,1),'qty':qty,'liqLimited':limited,'ref':{'vd':vd,'sc':sc,'mos':None if mos is None else round(mos),'pg':pg},'why':why,'warn':w}
 
-def swing_ideas(live,wl,m3h=None,prox=None,held=(),sym=None,comp=None):
-    """The best swing trades: (1) monthly RSI 66-76 and (2) the 3-hour MACD above its signal line and above zero. Nothing else selects or ranks:
-    freshest 3-hour cross-up first. Because TradingView has no 3-hour MACD column, the 2-hour and 4-hour MACD shortlist at most MAX_3H stocks,
-    and only those get the exact 3-hour check; the result says how many were checked. A ranking of candidates, not a prediction."""
-    m3h=m3h or {}; prox=prox or {}; sym=sym or {}; comp=comp or {}; wl=wl or {}
-    pool=swing_pool(live,sym,wl); short=shortlist(pool,prox) if prox else []
+def swing_ideas(live,wl,m2h=None,held=(),sym=None,comp=None,m3h=None):
+    """The best swing trades: stocks that qualify Positive MoS with a weekly MACD above its signal line, then (1) monthly RSI 66-76 and (2) the 2-hour MACD (30, 60, 5) above its signal line.
+    Nothing else selects or ranks: the freshest 2-hour cross-up comes first. At most MAX_BARS pool stocks are checked per run. A ranking of candidates, not a prediction."""
+    m2h=m2h or {}; m3h=m3h or {}; sym=sym or {}; comp=comp or {}; wl=wl or {}
+    pool=swing_pool(live,sym,wl); checked=pool[:MAX_BARS]
     for p in pool: p['atr']=(comp.get(p['k']) or {}).get('atr')
-    ideas=[swing_card(p,m3h[p['k']],live[p['k']],wl.get(p['k']),held) for p in short if qualifies(m3h.get(p['k']))]
-    ideas.sort(key=lambda i:(i['m3h']['since'] if i['m3h']['since'] is not None else 999,-i['m3h']['h']/i['close']))
-    return {'band':list(SWING_MRSI),'pool':len(pool),'shortlisted':len(short),'checked':sum(1 for p in short if p['k'] in m3h),'ideas':ideas[:8],
-            'needProx':[{'k':p['k'],'y':p['y']} for p in pool] if not prox else [],'need3h':[{'k':p['k'],'y':p['y']} for p in short if p['k'] not in m3h],'capitals':list(CAPITALS)}
+    ideas=[swing_card(p,m2h[p['k']],live[p['k']],wl.get(p['k']),held) for p in checked if qualifies(m2h.get(p['k']))]
+    ideas.sort(key=lambda i:(i['m2h']['since'] if i['m2h']['since'] is not None else 999,-i['m2h']['h']/i['close']))
+    ideas=ideas[:8]
+    for i in ideas: i['m3h']=m3h.get(i['k'])
+    return {'band':list(SWING_MRSI),'pool':len(pool),'checked':sum(1 for p in checked if p['k'] in m2h),'ideas':ideas,
+            'need2h':[{'k':p['k'],'y':p['y']} for p in checked if p['k'] not in m2h],'need3h':[{'k':i['k'],'y':i['y']} for i in ideas if i['k'] not in m3h],'capitals':list(CAPITALS)}
 
 def swing_run(work):
     live={};sym={};asof=None
@@ -154,22 +151,21 @@ def swing_run(work):
         for r in d['rows']: live[r['k']]=(r['c']+[None]*12)[:12]; sym[r['k']]=r.get('y')
     if not live: return None
     fresh=lambda name:(lambda m:m.get('s',{}) if m.get('d')==today() else {})(J(work+'/agent/%s.json'%name,{}) or {})
-    m3h=fresh('m3h'); prox=fresh('prox'); wl=(J(work+'/agent/watch.json') or {}).get('w',{}); comp=(J(work+'/agent/compact.json') or {}).get('stocks',{})
+    m2h=fresh('m2h'); m3h=fresh('m3h')
+    wl=(J(work+'/agent/watch.json') or {}).get('w',{}); comp=(J(work+'/agent/compact.json') or {}).get('stocks',{})
     held={o['k'] for o in (J(work+'/agent/state.json',{}) or {}).get('open',[])}
-    out=swing_ideas(live,wl,m3h,prox,held,sym,comp); out.update({'asof':today(),'dataAsof':asof,'proxAsof':today() if prox else None,'m3hAsof':today() if m3h else None})
-    S(work+'/agent/swing.json',out); print('swing pool',out['pool'],'shortlisted',out['shortlisted'],'checked',out['checked'],'ideas',[i['k'] for i in out['ideas']],'needProx',len(out['needProx']),'need3h',[x['k'] for x in out['need3h']]); return out
+    out=swing_ideas(live,wl,m2h,held,sym,comp,m3h); out.update({'asof':today(),'dataAsof':asof,'m2hAsof':today() if m2h else None})
+    S(work+'/agent/swing.json',out); print('swing pool',out['pool'],'checked',out['checked'],'ideas',[i['k'] for i in out['ideas']],'need2h',[x['k'] for x in out['need2h']],'need3h',[x['k'] for x in out['need3h']]); return out
 
-def prox_run(work):
-    raw=J(work+'/agent/macdprox.json',{}) or {}
-    res={k:[float(x) for x in v[:4]] for k,v in raw.items() if isinstance(v,(list,tuple)) and len(v)>=4 and all(isinstance(x,(int,float)) for x in v[:4])}
-    S(work+'/agent/prox.json',{'d':today(),'s':res}); print('2h/4h MACD for',len(res),'stocks'); return swing_run(work)
-
-def m3h_run(work):
-    bars=J(work+'/agent/bars3h.json',{}) or {}; res={}
+def _bars_run(work,name):
+    bars=J(work+'/agent/bars%s.json'%name,{}) or {}; res={}
     for k,c in bars.items():
         st=macd_state(c)
         if st: res[k]=st
-    S(work+'/agent/m3h.json',{'d':today(),'s':res}); print('m3h states',{k:v['kind'] for k,v in res.items()}); return swing_run(work)   # keys are the dashboard tickers
+    S(work+'/agent/m%s.json'%name,{'d':today(),'s':res}); print('m%s states'%name,{k:v['kind'] for k,v in res.items()}); return swing_run(work)   # keys are the dashboard tickers
+
+def m2h_run(work): return _bars_run(work,'2h')
+def m3h_run(work): return _bars_run(work,'3h')
 
 def build(work,D):
     uni=set(J('%s/universe.json'%work)) if os.path.exists('%s/universe.json'%work) else None
@@ -359,5 +355,5 @@ if __name__=='__main__':
         n=float(sys.argv[sys.argv.index('--nifty')+1]) if '--nifty' in sys.argv else None
         daily(w,n)
     elif m=='weekly': weekly(w)
+    elif m=='m2h': m2h_run(w)
     elif m=='m3h': m3h_run(w)
-    elif m=='prox': prox_run(w)

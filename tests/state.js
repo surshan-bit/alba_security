@@ -418,8 +418,8 @@ async function rockyScenarios(){
   const pk = { asof: '2026-11-04', dataAsof: '2026-11-03', universe: 474, blocked: 328, regime: { on: true, breadth: 0.7, min: 0.6 },
     picks: [{ k: 'AAAA', n: 'Aaaa Ltd', g: 'Gas', close: 100, score: 6.5, mos: 30, rsiW: 58, stop: 95, target: 115 }],
     gated: [{ k: 'PASUPTAC', n: 'Pasupati Acrylon', g: 'Chemicals', close: 72.2, score: 6.37, stop: 65.9, target: 91.9, why: '40-week high 86 is below the 92 target' }] };
-  const swing = { asof: '2026-11-03', dataAsof: '2026-11-03', band: [66, 76], pool: 124, shortlisted: 12, checked: 12, capitals: [500000, 1000000],
-    ideas: [{ k: 'SERA', n: 'Sera Investments', g: 'Finance', close: 59.52, mrsi: 66.1, tier: 'medium', risk: 0.0075, thin: false, action: 'Buy zone', m3h: { since: 3, h: 0.39 }, entry: [59.52, 60.12], stop: 54.42, stopPct: 8.6, t1: 65.47, t2: 71.42, rr: 2.3, qty: { '500000': 734, '1000000': 1469 }, why: ['Monthly RSI 66, inside 66-76', '3-hour MACD above its signal line and above zero'], warn: ['Stop is an estimate'] }] };
+  const swing = { asof: '2026-11-03', dataAsof: '2026-11-03', band: [66, 76], pool: 124, checked: 12, capitals: [500000, 1000000],
+    ideas: [{ k: 'SERA', n: 'Sera Investments', g: 'Finance', close: 59.52, mrsi: 66.1, tier: 'medium', risk: 0.0075, thin: false, action: 'Buy zone', m2h: { since: 3, h: 0.39 }, entry: [59.52, 60.12], stop: 54.42, stopPct: 8.6, t1: 65.47, t2: 71.42, rr: 2.3, qty: { '500000': 734, '1000000': 1469 }, why: ['Monthly RSI 66, inside 66-76', '2-hour MACD (30, 60, 5) above its signal line'], warn: ['Stop is an estimate'] }] };
   const docs = { 'rocky/swing': swing, 'rocky/state': st, 'rocky/picks': pk, 'rocky/weights': { v: 0, w: { fund: 1, mos: 1, trend: 1.5, rsi: 0.7, mom: 0.8, near: 0.8 }, hist: [] }, 'rocky/learn': { d: '2026-11-03', note: 'Fewer than 20 closed paper trades; weights unchanged.' } };
   await scenario('rocky: shows the ledger, picks, the 1:3 gate list and the regime', { section: 'rocky' }, docs, async page => {
     await goto(page, 'rocky');
@@ -433,8 +433,8 @@ async function rockyScenarios(){
     ok(/TANLA/.test(t) && /\+12\.50%/.test(t), 'a closed trade shows its return');
     ok(await page.evaluate(() => document.querySelectorAll('#rockyBody svg.rky-curve path').length === 2), 'the curve draws Rocky and the Nifty line');
     ok(/Learning starts after 20|Fewer than 20/.test(t), 'the learning note is shown');
-    ok(/Best swing trades for the day/i.test(t) && /SERA/.test(t) && /Buy zone/.test(t) && /54\.42/.test(t) && /734 \/ 1,469/.test(t), 'the best swing trades section shows the idea with its action, stop and shares');
-    ok(await page.evaluate(() => document.querySelectorAll('#rockyBody .rky-idea').length === 1 && document.querySelectorAll('#rockyBody .rky-idea-top').length === 1), 'one idea card, marked as the top one');
+    ok(/Best swing trades for the day/i.test(t) && /SERA/.test(t) && /2-hr cross/.test(t) && /54\.42/.test(t) && /734 \/ 1,469/.test(t), 'the best swing trades section shows the idea with its action, stop and shares');
+    ok(await page.evaluate(() => document.querySelectorAll('#rockyBody .rky-table tbody tr').length >= 1 && /Sera/.test(document.getElementById('rockyBody').textContent)), 'the swing grid lists the idea');
   });
   await scenario('rocky: before the first run the page says so', { section: 'rocky' }, null, async page => {
     await goto(page, 'rocky');
