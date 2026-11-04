@@ -72,8 +72,8 @@
 .scope-section-trackrecord[data-tl-tab="ideas"] .scope-trade-add-btn,.scope-section-trackrecord:has(.tl-form) .scope-trade-add-btn{display:none;}
 .scope-section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-head{display:block;height:0;overflow:visible;margin:0;padding:0;}
 .scope-section-trackrecord .analysis-panel:not(.tl-ideas) .analysis-panel-head .analysis-panel-title{display:none;}
-.scope-trade-form-host:has(.tl-form)::before{content:"";position:fixed;inset:0;background:rgba(20,25,50,.4);z-index:60;}
-.scope-trade-form-host .tl-form{position:fixed;left:0;right:0;bottom:0;z-index:61;box-sizing:border-box;width:100%;max-width:100vw;margin:0;border-radius:20px 20px 0 0;border-width:1px 0 0;max-height:88vh;overflow:auto;background:var(--panel);box-shadow:0 -8px 30px rgba(20,25,50,.25);}
+.scope-trade-form-host:has(.tl-form)::before{content:"";position:fixed;inset:0;background:rgb(var(--rgb-20-25-50) / .4);z-index:60;}
+.scope-trade-form-host .tl-form{position:fixed;left:0;right:0;bottom:0;z-index:61;box-sizing:border-box;width:100%;max-width:100vw;margin:0;border-radius:20px 20px 0 0;border-width:1px 0 0;max-height:88vh;overflow:auto;background:var(--panel);box-shadow:0 -8px 30px rgb(var(--rgb-20-25-50) / .25);}
 .scope-trade-form-host .tl-grid > *{min-width:0;}
 .scope-trade-form-host .tl-grid input,.scope-trade-form-host .tl-grid .search-box{width:100%;box-sizing:border-box;}
 .scope-trade-form-host .tl-form-actions .tl-btn-primary{flex:1;}

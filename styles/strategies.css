@@ -12,7 +12,7 @@
 .strat-btn{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 12px;font-size:var(--t-sm);cursor:pointer;}
 .strat-btn:hover{background:var(--panel2);}
 .strat-btn-danger{color:var(--avoid);border-color:var(--avoid);font-weight:600;}
-.strat-btn-danger:hover{background:var(--avoid);color:#fff;}
+.strat-btn-danger:hover{background:var(--avoid);color:var(--on-accent);}
 .strat-sub{margin-bottom:8px;}
 .sr-rules{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
 /* Strategies rules: the rows have no outline any more, so they take no side padding and line up with the heading and the + Add a rule box. */
@@ -44,7 +44,7 @@
 .sr-count{margin-left:auto;font-size:var(--t-sm);color:var(--muted);font-variant-numeric:tabular-nums;}
 .sr-incomplete{font-style:italic;}
 .sr-del{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;box-sizing:border-box;background:transparent;border:1px solid color-mix(in srgb,var(--avoid) 45%,transparent);border-radius:6px;color:var(--avoid);cursor:pointer;}
-.sr-del:hover,.sr-del:focus-visible{background:var(--avoid);border-color:var(--avoid);color:#fff;}
+.sr-del:hover,.sr-del:focus-visible{background:var(--avoid);border-color:var(--avoid);color:var(--on-accent);}
 .sr-head{display:none;padding:0 0 6px;border-bottom:1px solid var(--line);font-size:var(--t-sm);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
 .sr-head span:nth-child(4){text-align:right;}
 .sr-head span:nth-child(5){text-align:center;}
@@ -144,12 +144,12 @@
 .trk-split{display:flex;gap:14px;flex-wrap:wrap;font-size:var(--t-sm);margin-top:4px;color:var(--muted);}
 /* ---- Strategies: data refresh ---- */
 /* In-page confirmation box (see src/ui/confirm.js) */
-.alba-confirm{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px;}
-.alba-confirm-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;max-width:420px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+.alba-confirm{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgb(var(--rgb-0-0-0) / .55);padding:16px;}
+.alba-confirm-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;max-width:420px;width:100%;box-shadow:0 10px 40px rgb(var(--rgb-0-0-0) / .5);}
 
 .alba-confirm-msg{font-size:var(--t-md);line-height:1.5;margin-bottom:16px;}
 .alba-confirm-btns{display:flex;justify-content:flex-end;gap:10px;}
-.alba-confirm-ok{background:var(--accent);color:#fff;border-color:var(--accent);}
+.alba-confirm-ok{background:var(--accent);color:var(--on-accent);border-color:var(--accent);}
 .strat-save-note{margin-left:10px;font-size:var(--t-sm);font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted);}
 .strat-save-ok{color:var(--buy);}
 .strat-save-warn{color:var(--hold);}
@@ -159,7 +159,7 @@
 .learn-modal-head .analysis-panel-title{margin:0;}
 .lm-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
 .lm-tab{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:var(--t-sm);cursor:pointer;}
-.lm-tab.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}
+.lm-tab.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700;}
 .lm-pane .pr-name{font-weight:700;font-size:var(--t-md);}
 .lm-pane .pr-why{margin:2px 0 6px;}
 .lm-pane .pr-ask{margin-top:8px;}
@@ -246,4 +246,4 @@
 .strat-side .dm-strat .strat-pick-n{border:1px solid var(--line);border-radius:999px;padding:0 7px;font-size:var(--t-sm);font-variant-numeric:tabular-nums;}
 .strat-side .dm-pop{min-width:360px;max-height:60vh;overflow:auto;}
 
-:root[data-theme="white"] .strat-side.strat-side .dm-btn{height:36px;border:1px solid #c9cfdf;background:#fff;border-radius:6px;}
+:root[data-theme="white"] .strat-side.strat-side .dm-btn{height:36px;border:1px solid var(--c-c9cfdf);background:var(--panel);border-radius:6px;}

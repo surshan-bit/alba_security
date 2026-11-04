@@ -30,8 +30,8 @@
 }
 .fund-pc-dot.fs-hold{background:var(--hold);}
 .fund-research-list.pts li::marker{color:var(--muted);}
-.global-events{margin-top:14px;padding-top:12px;border-top:1px solid var(--border,rgba(128,128,128,.25));}
-.global-event{border-left:3px solid var(--hold,#c9a227);padding-left:10px;}
+.global-events{margin-top:14px;padding-top:12px;border-top:1px solid var(--border,rgb(var(--rgb-128-128-128) / .25));}
+.global-event{border-left:3px solid var(--hold,var(--c-c9a227));padding-left:10px;}
 .global-event .ev-tag{font-size:var(--t-sm);font-weight:700;opacity:.8;margin-left:6px;}
 .analysis-toggles{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end;}
 

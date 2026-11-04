@@ -147,8 +147,8 @@ html{font-size:112.5%;}
   /* the row that opens the sheet: a sliders icon, "Filters", and what is selected */
   .biz-filters-toggle .ft-label::before,.analysis-filters-panel .filters-toggle .ft-label::before{content:"";display:inline-block;width:18px;height:18px;margin-right:8px;vertical-align:-3px;background:currentColor;-webkit-mask:var(--ico-sliders) center/contain no-repeat;mask:var(--ico-sliders) center/contain no-repeat;}
   .biz-side.filters-collapsed .sheet-panel,.analysis-filters-panel.filters-collapsed .sheet-panel,.strat-filters-panel.filters-collapsed .sheet-panel{display:none;}
-  .biz-side:not(.filters-collapsed) .sheet-backdrop,.analysis-filters-panel:not(.filters-collapsed) .sheet-backdrop,.strat-filters-panel:not(.filters-collapsed) .sheet-backdrop{display:block;position:fixed;inset:0;z-index:69;background:rgba(10,14,22,.5);}
-  .biz-side:not(.filters-collapsed) .sheet-panel,.analysis-filters-panel:not(.filters-collapsed) .sheet-panel,.strat-filters-panel:not(.filters-collapsed) .sheet-panel{display:flex;flex-direction:column;position:fixed;left:0;right:0;bottom:0;z-index:70;max-height:86vh;overflow-y:auto;overscroll-behavior:contain;padding:0 18px;background:var(--panel);color:var(--text);border-radius:20px 20px 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.35);}
+  .biz-side:not(.filters-collapsed) .sheet-backdrop,.analysis-filters-panel:not(.filters-collapsed) .sheet-backdrop,.strat-filters-panel:not(.filters-collapsed) .sheet-backdrop{display:block;position:fixed;inset:0;z-index:69;background:rgb(var(--rgb-10-14-22) / .5);}
+  .biz-side:not(.filters-collapsed) .sheet-panel,.analysis-filters-panel:not(.filters-collapsed) .sheet-panel,.strat-filters-panel:not(.filters-collapsed) .sheet-panel{display:flex;flex-direction:column;position:fixed;left:0;right:0;bottom:0;z-index:70;max-height:86vh;overflow-y:auto;overscroll-behavior:contain;padding:0 18px;background:var(--panel);color:var(--text);border-radius:20px 20px 0 0;box-shadow:0 -12px 40px rgb(var(--rgb-0-0-0) / .35);}
   body:has(.biz-side:not(.filters-collapsed) .sheet-panel),body:has(.analysis-filters-panel:not(.filters-collapsed) .sheet-panel),body:has(.strat-filters-panel:not(.filters-collapsed) .sheet-panel){overflow:hidden;}
   .sheet-head{display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;padding:24px 0 12px;background:var(--panel);}
   .sheet-head::before{content:"";position:absolute;top:9px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--line);}
@@ -185,7 +185,7 @@ html{font-size:112.5%;}
   .strat-result-head > .biz-filters-toggle{flex:1 1 100%;}
   
   .sheet-foot{display:flex;position:sticky;bottom:0;margin-top:auto;padding:12px 0 calc(14px + env(safe-area-inset-bottom,0px));background:var(--panel);}
-  .sheet-done{flex:1;height:46px;border:0;border-radius:8px;background:var(--accent);color:#0f1720;font:inherit;font-weight:700;cursor:pointer;}
+  .sheet-done{flex:1;height:46px;border:0;border-radius:8px;background:var(--accent);color:var(--c-0f1720);font:inherit;font-weight:700;cursor:pointer;}
 }
 
 /* v1.324 Phones: the stock grids use the screen better, and all of them follow one pattern. Every grid row is 37px tall with the same slim padding and no stock code (the name is enough);

@@ -85,7 +85,7 @@ a.news-stock:hover{color:var(--accent);}
 .news-why ul{margin:0;padding-left:18px;}.news-why li{margin:4px 0;}
 .news-why small{font-style:italic;margin-top:6px;}
 .news-ch{font-weight:700;}
-.news-own{display:inline-block;font:700 .6rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;background:#fdf1c8;color:#7a5a00;}
+.news-own{display:inline-block;font:700 .6rem -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle;background:var(--c-fdf1c8);color:var(--c-7a5a00);}
 .news-types{margin-top:2px;}
 :root .news-types{margin-bottom:4px;}
 .day-head + .row-line{border-top:0;}
@@ -95,7 +95,7 @@ a.news-stock:hover{color:var(--accent);}
 .row-line .row-cc{flex:none;min-width:3.1em;font-weight:700;font-size:var(--t-sm);color:var(--text);}
 .news-flag{margin-right:4px;}
 /* Importance as a small circle: red up arrow = high, amber bar = medium, grey down arrow = low */
-.news-lvl{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:var(--t-xs);line-height:1;color:#fff;}
+.news-lvl{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:var(--t-xs);line-height:1;color:var(--on-accent);}
 .news-lvl-hi{background:var(--avoid);}
 .news-lvl-md{background:var(--hold);}
 .news-lvl-lo{background:var(--muted);}
