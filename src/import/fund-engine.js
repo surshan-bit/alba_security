@@ -85,6 +85,7 @@ function toNum(v) {
   return Number.isFinite(n) ? n : null;
 }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function sum(list) { return list.reduce((a, b) => a + b, 0); }
 
 /** Graceful partial-data weighted average (skill section 5): renormalize over whichever parts are present; null only when none are. */
 function weightedPartial(weight, parts) {
@@ -244,7 +245,7 @@ function scoreCsv(csvText, opts) {
   const moatInputs = new Map();
   for (const r of records) {
     const parts = [pct.roceRaw.get(r), pct.roeRaw.get(r), pct.opm.get(r)].filter(v => v != null);
-    if (parts.length) moatInputs.set(r, parts.reduce((a, b) => a + b, 0) / parts.length);
+    if (parts.length) moatInputs.set(r, sum(parts) / parts.length);
   }
   const moatPct = relativePercentiles(records, r => (moatInputs.has(r) ? moatInputs.get(r) : null), groupKey, moatBasis);
 
@@ -260,95 +261,136 @@ function scoreCsv(csvText, opts) {
   return { records, columnMap: colMap, duplicates };
 }
 
-function scoreOne(r, pct, moatPct) {
-  const factors = [];
-  // A bank or insurer has no applicable figure here: the factor is left out (na) and its weight shared by the others below.
-  const finNa = finFactorNotApplicable(r.finKind);
-  const finScore = finNa ? null : weightedPartial(1.8, [
+// ---- One stock's score: nine factors (weights add up to 10), each built by its own function, then added up ----
+
+// A bank or insurer has no applicable figure here: the factor is left out (na) and its weight shared by the others (see totalScore).
+function finFactor(r, pct) {
+  const na = finFactorNotApplicable(r.finKind);
+  const score = na ? null : weightedPartial(1.8, [
     { coef: 0.35, pct: pct.deInv.get(r) }, { coef: 0.55, pct: pct.intCov.get(r) }, { coef: 0.35, pct: pct.quick.get(r) },
     { coef: 0.35, pct: pct.altmanZ.get(r) }, { coef: 0.20, pct: pct.currentRatio.get(r) }, { coef: 0.20, pct: pct.debtorDaysInv.get(r) },
   ]);
-  factors.push({ key: 'fin', label: 'Financial Health & Balance Sheet', weight: 1.8, score: finScore, na: finNa ? KIND_WORD[r.finKind] : undefined });
+  return { key: 'fin', label: 'Financial Health & Balance Sheet', weight: 1.8, score, na: na ? KIND_WORD[r.finKind] : undefined };
+}
 
+// A recent profit spike far above the multi-year trend is discounted (in Growth, and left out of Predictability so it is not punished twice).
+function earningsQuality(r) {
   const trend = [r.profitGrowth3, r.profitGrowth5].filter(v => v != null);
-  const trendAvg = trend.length ? trend.reduce((a, b) => a + b, 0) / trend.length : null;
-  let eqDiscount = 1.0, eqNote = '';
-  if (trendAvg != null && trendAvg > 0 && r.profitGrowthTTM != null) {
-    const ratio = r.profitGrowthTTM / trendAvg;
-    if (ratio >= 3.5) { eqDiscount = 0.55; eqNote = ' (0.55x earnings-quality discount — TTM far above multi-year trend)'; }
-    else if (ratio >= 2.0) { eqDiscount = 0.8; eqNote = ' (0.8x earnings-quality discount — TTM notably ahead of trend)'; }
-  }
+  const trendAvg = trend.length ? sum(trend) / trend.length : null;
+  if (trendAvg == null || trendAvg <= 0 || r.profitGrowthTTM == null) return { discount: 1.0, note: '' };
+  const ratio = r.profitGrowthTTM / trendAvg;
+  if (ratio >= 3.5) return { discount: 0.55, note: ' (0.55x earnings-quality discount — TTM far above multi-year trend)' };
+  if (ratio >= 2.0) return { discount: 0.8, note: ' (0.8x earnings-quality discount — TTM notably ahead of trend)' };
+  return { discount: 1.0, note: '' };
+}
 
-  let profScore = weightedPartial(1.8, [
+function profFactor(r, pct) {
+  const score = weightedPartial(1.8, [
     { coef: 0.654, pct: pct.roceEff.get(r) }, { coef: 0.514, pct: pct.roeEff.get(r) }, { coef: 0.631, pct: pct.opm.get(r) },
   ]);
-  factors.push({ key: 'prof', label: 'Profitability & Capital Efficiency', weight: 1.8, score: profScore });
+  return { key: 'prof', label: 'Profitability & Capital Efficiency', weight: 1.8, score };
+}
 
-  let growthScore = weightedPartial(1.125, [
+// Growth is worth less when it is not backed by cash: both cash figures present and not both positive x0.75; only one present and not positive x0.85.
+function cashFlowAdjustment(r) {
+  const fcf = r.fcf3 != null ? r.fcf3 : r.fcf5;
+  const ocf = r.ocf3 != null ? r.ocf3 : r.ocf5;
+  const fcfPresent = fcf != null, ocfPresent = ocf != null;
+  if (fcfPresent && ocfPresent) {
+    const mult = (fcf > 0 && ocf > 0) ? 1.0 : 0.75;
+    return { mult, note: mult < 1 ? ' (0.75x — growth not cash-backed)' : '' };
+  }
+  if (fcfPresent !== ocfPresent) {
+    const mult = (fcfPresent ? fcf : ocf) <= 0 ? 0.85 : 1.0;
+    return { mult, note: mult < 1 ? ' (0.85x — partial cash-flow evidence only)' : '' };
+  }
+  return { mult: 1.0, note: '' };
+}
+
+function growthFactor(r, pct, quality) {
+  let score = weightedPartial(1.125, [
     { coef: 0.3977, pct: pct.sales3.get(r) }, { coef: 0.3200, pct: pct.profit3.get(r) }, { coef: 0.6896, pct: pct.profitTTM.get(r) },
   ]);
-  let cfNote = '';
-  if (growthScore != null) {
-    growthScore *= eqDiscount;
-    const fcf = r.fcf3 != null ? r.fcf3 : r.fcf5;
-    const ocf = r.ocf3 != null ? r.ocf3 : r.ocf5;
-    const fcfPresent = fcf != null, ocfPresent = ocf != null;
-    let cfMult = 1.0;
-    if (fcfPresent && ocfPresent) { cfMult = (fcf > 0 && ocf > 0) ? 1.0 : 0.75; if (cfMult < 1) cfNote = ' (0.75x — growth not cash-backed)'; }
-    else if (fcfPresent !== ocfPresent) { const only = fcfPresent ? fcf : ocf; cfMult = only <= 0 ? 0.85 : 1.0; if (cfMult < 1) cfNote = ' (0.85x — partial cash-flow evidence only)'; }
-    growthScore *= cfMult;
+  let cashNote = '';
+  if (score != null) {
+    const cash = cashFlowAdjustment(r);
+    score = score * quality.discount * cash.mult;
+    cashNote = cash.note;
   }
-  factors.push({ key: 'growth', label: 'Growth & Cash Flow Generation', weight: 1.125, score: growthScore, note: (eqNote || cfNote) ? `${eqNote}${cfNote}`.trim() : undefined });
+  const note = `${quality.note}${cashNote}`.trim();
+  return { key: 'growth', label: 'Growth & Cash Flow Generation', weight: 1.125, score, note: (quality.note || cashNote) ? note : undefined };
+}
 
+function valFactor(r, pct) {
   const pegPct = (r.peg != null && r.peg > 0) ? pct.pegInv.get(r) : (r.peg == null || r.peg <= 0 ? 50 : null);
-  const valScore = weightedPartial(1.125, [
+  const score = weightedPartial(1.125, [
     { coef: 0.764, pct: pct.relPe.get(r) }, { coef: 0.511, pct: pegPct }, { coef: 0.35, pct: pct.ownHist.get(r) },
   ]);
-  factors.push({ key: 'val', label: 'Valuation Metrics vs. Industry', weight: 1.125, score: valScore });
+  return { key: 'val', label: 'Valuation Metrics vs. Industry', weight: 1.125, score };
+}
 
-  const moatP = moatPct.get(r);
-  factors.push({ key: 'moat', label: 'Moat & Competitive Advantage', weight: 0.9, score: moatP != null ? 0.9 * moatP / 100 : null });
+// A factor that is a straight share of its weight: weight x percentile / 100, or none when there is no percentile.
+function shareFactor(key, label, weight, percentile) {
+  return { key, label, weight, score: percentile != null ? weight * percentile / 100 : null };
+}
 
+// Governance: the Piotroski percentile, less a penalty for pledged shares and a falling promoter holding, adjusted a little by what funds did.
+function govFactor(r, pct) {
   const piotPct = pct.piotroski.get(r);
-  let govScore = null;
+  let score = null;
   if (piotPct != null) {
     const base = 0.9 * piotPct / 100;
     const penalty = 0.00214 * (r.pledgePct || 0) + 0.00424 * Math.max(0, -(r.promoterHoldingChange || 0));
     const fiiDiiParts = [r.fiiChange3, r.diiChange3].filter(v => v != null);
-    const fiiDii = fiiDiiParts.length ? fiiDiiParts.reduce((a, b) => a + b, 0) : 0;
-    const convictionAdj = clamp(fiiDii * 0.003, -0.05, 0.05);
-    govScore = clamp(base - penalty + convictionAdj, 0, 0.9);
+    const fiiDii = fiiDiiParts.length ? sum(fiiDiiParts) : 0;
+    score = clamp(base - penalty + clamp(fiiDii * 0.003, -0.05, 0.05), 0, 0.9);
   }
-  factors.push({ key: 'gov', label: 'Management & Governance', weight: 0.9, score: govScore });
+  return { key: 'gov', label: 'Management & Governance', weight: 0.9, score };
+}
 
-  // A TTM spike is already discounted in Growth; it is left out here so it is not punished a second time.
-  const growthPts = [eqDiscount < 1 ? null : r.profitGrowthTTM, r.profitGrowth3, r.profitGrowth5].filter(v => v != null);
-  let predictScore = null, predictNote;
-  if (growthPts.length >= 2) {
-    const dispersion = Math.max(...growthPts) - Math.min(...growthPts);
+// Predictability: the steadier the profit growth across the windows, the higher the score (a curve over the spread between the best and worst window).
+function predictFactor(r, quality) {
+  const points = [quality.discount < 1 ? null : r.profitGrowthTTM, r.profitGrowth3, r.profitGrowth5].filter(v => v != null);
+  let score = null, note;
+  if (points.length >= 2) {
+    const dispersion = Math.max(...points) - Math.min(...points);
     let raw = interpolateCurve([[2,0.68],[11,0.5],[18,0.55],[25,0.5],[34,0.4],[43,0.38],[56,0.34],[74,0.29],[108,0.2],[180,0.12],[2818,0.03]], dispersion);
-    if (growthPts.length === 2) { raw *= 0.9; predictNote = '0.9x haircut — only 2 of 3 growth windows available'; }
-    predictScore = clamp(raw, 0, 0.675);
+    if (points.length === 2) { raw *= 0.9; note = '0.9x haircut — only 2 of 3 growth windows available'; }
+    score = clamp(raw, 0, 0.675);
   }
-  factors.push({ key: 'predict', label: 'Earnings Predictability', weight: 0.675, score: predictScore, note: predictNote });
+  return { key: 'predict', label: 'Earnings Predictability', weight: 0.675, score, note };
+}
 
-  const reinvestP = pct.reinvest.get(r);
-  factors.push({ key: 'reinvest', label: 'Capital Reinvestment Efficiency', weight: 0.675, score: reinvestP != null ? 0.675 * reinvestP / 100 : null });
+// The ten factors add up to 10; factors that do not apply (na) are not counted as zero: the weights that do apply are scaled up to make 10 again.
+function totalScore(factors) {
+  const present = factors.filter(f => f.score != null).map(f => f.score);
+  const naWeight = sum(factors.filter(f => f.na).map(f => f.weight));
+  return present.length ? Math.round(sum(present) * (10 / (10 - naWeight)) * 100) / 100 : null;
+}
 
-  const mosP = pct.mos.get(r);
-  factors.push({ key: 'dcf', label: 'Valuation & Margin of Safety', weight: 1.0, score: mosP != null ? 1.0 * mosP / 100 : null });
-
-  const presentScores = factors.filter(f => f.score != null).map(f => f.score);
-  // Factors that do not apply (na) are not counted as zero: the weights that do apply are scaled up to make 10 again.
-  const naWeight = factors.filter(f => f.na).reduce((a, f) => a + f.weight, 0);
-  const score = presentScores.length ? Math.round(/** @type {number[]} */ (presentScores).reduce((a, b) => a + b, 0) * (10 / (10 - naWeight)) * 100) / 100 : null;
-  const verdict = scoreToVerdict(score);
+// The three sub-scores on the stock page: Traditional (fin, prof, growth, val), Buffett-style (moat, gov, predict, reinvest) and Valuation (dcf).
+function subScores(factors, score) {
+  if (score == null) return { traditionalSubscore: null, buffettSubscore: null, valuationSubscore: null };
   const by = k => (factors.find(f => f.key === k).score || 0);
-  const tradWeight = 5.85 - factors.filter(f => f.na && ['fin', 'prof', 'growth', 'val'].includes(f.key)).reduce((a, f) => a + f.weight, 0);
-  const traditionalSubscore = score != null ? Math.round(((by('fin') + by('prof') + by('growth') + by('val')) / tradWeight) * 10 * 100) / 100 : null;
-  const buffettSubscore = score != null ? Math.round(((by('moat') + by('gov') + by('predict') + by('reinvest')) / 3.15) * 10 * 100) / 100 : null;
-  const valuationSubscore = score != null ? Math.round((by('dcf') / 1.0) * 10 * 100) / 100 : null;
-  return { factors, score, verdict, traditionalSubscore, buffettSubscore, valuationSubscore, mosPct: marginOfSafetyPct(r) };
+  const tradWeight = 5.85 - sum(factors.filter(f => f.na && ['fin', 'prof', 'growth', 'val'].includes(f.key)).map(f => f.weight));
+  return {
+    traditionalSubscore: Math.round(((by('fin') + by('prof') + by('growth') + by('val')) / tradWeight) * 10 * 100) / 100,
+    buffettSubscore: Math.round(((by('moat') + by('gov') + by('predict') + by('reinvest')) / 3.15) * 10 * 100) / 100,
+    valuationSubscore: Math.round((by('dcf') / 1.0) * 10 * 100) / 100,
+  };
+}
+
+function scoreOne(r, pct, moatPct) {
+  const quality = earningsQuality(r);
+  const factors = [
+    finFactor(r, pct), profFactor(r, pct), growthFactor(r, pct, quality), valFactor(r, pct),
+    shareFactor('moat', 'Moat & Competitive Advantage', 0.9, moatPct.get(r)),
+    govFactor(r, pct), predictFactor(r, quality),
+    shareFactor('reinvest', 'Capital Reinvestment Efficiency', 0.675, pct.reinvest.get(r)),
+    shareFactor('dcf', 'Valuation & Margin of Safety', 1.0, pct.mos.get(r)),
+  ];
+  const score = totalScore(factors);
+  return { factors, score, verdict: scoreToVerdict(score), ...subScores(factors, score), mosPct: marginOfSafetyPct(r) };
 }
 const FundEngine = { normSym, scoreCsv, scoreToVerdict };
 
