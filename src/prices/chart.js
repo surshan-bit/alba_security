@@ -48,8 +48,7 @@ const panelOf = (ctx, k) => /** @type {Element} */ (ctx.panels.querySelector('[d
 /** Time span [start, end) of bar i of timeframe k. */
 function barSpan(ctx, k, i){ const b = ctx.bars[k]; return [b[i][0], i + 1 < b.length ? b[i + 1][0] : b[i][0] + PERIOD_SECS[k]]; }
 
-/** Shade, on each chart, the bars that overlap the bar hovered on the other chart. */
-function drawBands(ctx){
+function drawBands(ctx){   // shade, on each chart, the bars that overlap the bar hovered on the other chart
   ORDER.forEach((k) => {
     const g = panelOf(ctx, k).querySelector('.pc-band'), G = ctx.geo[k];
     if(!g || !G) return;
