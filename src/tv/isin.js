@@ -51,6 +51,27 @@ async function resolveIsinSymbols(list, workers = 4){
   return list.filter(s => !isinSymbols[isinOf(s)]);
 }
 
+// Stocks TradingView gave no price for although they have a saved symbol: the company may have been renamed or moved to the other exchange, so the saved
+// symbol is dead (an ISIN stays the same). Each one is searched by its ISIN again and, where the search confirms a different symbol, the map is corrected.
+// Returns [{ stock, from, to }]. A failed search leaves the saved symbol as it is; no connection or no quota stops the whole lookup.
+async function correctIsinSymbols(list, workers = 4){
+  await loadIsinSymbols();
+  const todo = list.filter(s => ISIN_RE.test(isinOf(s)) && isinSymbols[isinOf(s)]);
+  const fixed = [], added = {};
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(workers, todo.length) }, async () => {
+    while(i < todo.length){
+      const s = todo[i++], isin = isinOf(s);
+      try {
+        const sym = await searchIsin(isin);
+        if(sym && sym !== isinSymbols[isin]){ fixed.push({ stock: s, from: isinSymbols[isin], to: sym }); isinSymbols[isin] = sym; added[isin] = sym; }
+      } catch(e){ if(e && (e.code === 'no_mcp' || e.code === 'quota')) throw e; /* one failed search only leaves that symbol as it is */ }
+    }
+  }));
+  if(fixed.length) await saveIsinSymbols(added);
+  return fixed;
+}
+
 // A bulk run does not search TradingView: it pairs each stock's saved ISIN with the TradingView symbol its last run stored (`savedOf(stock)`),
 // and keeps the pairs in the same map. Stocks with no saved symbol are returned; they are found by their own Refresh. One save for the whole list.
 async function useSavedSymbols(list, savedOf){
@@ -66,4 +87,4 @@ async function useSavedSymbols(list, savedOf){
   return list.filter(s => !isinSymbols[isinOf(s)]);
 }
 
-export { isinOf, isinSymbolCached, resolveIsinSymbols, useSavedSymbols };
+export { correctIsinSymbols, isinOf, isinSymbolCached, resolveIsinSymbols, useSavedSymbols };

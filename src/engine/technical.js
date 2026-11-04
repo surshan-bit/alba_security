@@ -25,6 +25,15 @@ function techMacdCrossState(c, cfg = MACD_CROSS_WEEKLY){
   for(let i = n - cfg.within; i < n; i++) if(atOrBelow(i - 1)) return 'cross_up';
   return 'above';
 }
+// The same MACD for daily bars (the 1D import for a strategy). Today's bar is the newest bar, so `within: 1` means "crossed up today".
+const MACD_CROSS_DAILY = { fast: 30, slow: 60, signal: 5, within: 1 };
+const techDailyCrossState = (closes) => techMacdCrossState(closes, MACD_CROSS_DAILY);
+// The daily reading (state and the day of its newest bar) of a saved block is carried into a block calculated afresh from weekly and monthly bars, which know nothing of it.
+function techCarryDaily(prev, next){
+  const state = prev && prev.states && prev.states.dayMacd3060;
+  if(!state) return next;
+  return Object.assign({}, next, { states: Object.assign({}, next.states, { dayMacd3060: state }), raw: Object.assign({}, next.raw, { dayMacdAsof: prev.raw && prev.raw.dayMacdAsof }) });
+}
 function techMacd(c){
   const r = techMacdSeries(c);
   return r ? { level: r.macd[r.macd.length - 1], signal: r.signal[r.signal.length - 1] } : null;
@@ -161,4 +170,4 @@ function techKeepsBarsBlock(t, today, days = 3){
   return techDayNo(today) - techDayNo(t.asof) <= days;
 }
 
-export { MACD_CROSS_WEEKLY, computeTechnical, snapshotTechnical, techCompleted, techEma, techKeepsBarsBlock, techLiveCrossState, techMacdSeries, techRsi, techScore3 };
+export { MACD_CROSS_DAILY, MACD_CROSS_WEEKLY, computeTechnical, snapshotTechnical, techCompleted, techEma, techCarryDaily, techDailyCrossState, techKeepsBarsBlock, techLiveCrossState, techMacdSeries, techRsi, techScore3 };

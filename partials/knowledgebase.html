@@ -134,6 +134,14 @@
             <li>The lengths live in <code>MACD_CROSS_WEEKLY</code> in <code>src/engine/technical.js</code>, so other timeframes can reuse the same maths later.</li>
           </ul>
         </li>
+        <li><b>D MACD 30/60/5 vs signal (Strategies filter, daily):</b> the same MACD (30-day fast and 60-day slow EMA of the close, 5-day EMA signal line) on daily bars, with the same three choices: <b>Above signal</b>, <b>Below signal</b> and <b>Just crossed up (latest day)</b>, which means the newest daily bar, today's included, has just moved above the signal line.
+          <ul>
+            <li>Daily bars are saved only for the stocks of one strategy. In Data Refresh, tick <b>Also import daily (1D) data for one strategy</b> next to Refresh all stocks and pick a strategy: the run then works on the stocks that pass that strategy's rules other than the daily one, at most 600 a run. The first time a stock is imported its last 500 daily bars (about 2 years) are fetched from TradingView and saved, one record per stock in the collection <code>priceHistory1D</code> (laid out like the weekly and monthly records in <code>priceHistory</code>: bars as [time, open, high, low, close, volume], newest last). Later runs fetch only the days since the newest saved bar, merge them in and save; if TradingView has adjusted old prices (a split) the whole 500 bars are fetched again. The choice is remembered in the browser.</li>
+            <li>The reading is calculated from the saved bars and kept with each stock's technical block (<code>technical.states.dayMacd3060</code> and the day of its newest bar in <code>technical.raw.dayMacdAsof</code>). The daily records are not read by the rest of the app (they are not part of the page's price history), so they add no load to the other screens. Remember to include <code>priceHistory1D</code> in the database backup.</li>
+            <li>The strategy needs at least one other rule, so the stocks to read can be chosen. A stock that was not read has no reading (use "None (no rating)" to let it through), and so does a reading more than 4 days old, so a rule never rests on stale days. It needs at least 65 daily bars.</li>
+            <li>The numbers live in <code>MACD_CROSS_DAILY</code> in <code>src/engine/technical.js</code>; the reading is worked out by <code>src/refresh/dailymacd.js</code>.</li>
+          </ul>
+        </li>
         <li><b>Tech 2 and Tech 3:</b> two extra scores, hidden from every screen since v1.261 but still worked out.
           <ul>
             <li>Tech 3 is the Tech score without the valuation points, rescaled to 0&ndash;10 (<code>techScore3</code> in <code>src/engine/technical.js</code>).</li>
@@ -258,6 +266,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.355 &middot; 2026-11-04</h3>
+            <ul>
+              <li><strong>Strategies: new daily filter &ldquo;D MACD 30/60/5 vs signal&rdquo;:</strong> Above signal, Below signal or Just crossed up (latest day) for the MACD 30/60/5 on daily bars, today's bar included. To keep TradingView use low, daily bars are imported only for the stocks of one strategy: in Data Refresh tick &ldquo;Also import daily (1D) data for one strategy&rdquo; next to Refresh all stocks, pick the strategy, and the run imports just the stocks that pass its other rules, at most 600 a run. Each stock's last 500 daily bars (about 2 years) are saved, one record per stock in the new collection priceHistory1D, and later runs fetch only the new days. The result lists how many were read and how many records were saved. A stock that was not read, or whose reading is more than 4 days old, shows as &ldquo;None (no rating)&rdquo;. Scores and the weekly filter are unchanged.</li>
+              <li><strong>TradingView Watchlist Sync no longer stops on new BSE stocks:</strong> when an import added BSE-only stocks, the sync looked up their TradingView symbols and then stopped with &ldquo;Cannot add property &hellip; object is not extensible&rdquo;. The looked-up symbols are now added to a copy of the saved list, so the sync goes through.</li>
+              <li><strong>Renamed companies fix themselves in Refresh all stocks:</strong> a company that is renamed or moves exchange keeps its ISIN but gets a new TradingView symbol, so the saved symbol stopped returning prices and the stock quietly kept old figures. A stock TradingView still gives no price for after the retry is now searched by its ISIN again (up to 20 a run), the corrected symbol is saved, and the Result lists the stocks that were corrected. They are priced from the next run.</li>
+            </ul>
             <h3>v1.354 &middot; 2026-11-04</h3>
             <ul>
               <li><strong>Strategies: &ldquo;W MACD 30/60/5 vs signal&rdquo; now covers every stock:</strong> in v1.353 only the few stocks whose bars changed that day had a reading, so the filter showed far too few stocks (for example Shyam Metalics, which is above its signal line, was missing). Refresh all stocks now works the reading out for every stock on every run from its saved weekly bars and today&rsquo;s price, so Above signal, Below signal and Just crossed up are right on any weekday. Stocks show it after their next Refresh all stocks. Scores and ratings are unchanged.</li>

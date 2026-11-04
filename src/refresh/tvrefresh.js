@@ -15,8 +15,12 @@ import { COLS } from '../overlays/livesnapshot.js';
 import { priceHistoryByTicker, pcTickerKey, ensureAllPriceBars } from '../prices/store.js';
 import { refreshOneNow, priceJobs, saveFullBars } from '../prices/refresh.js';
 import { COMPACT_LAG, lagOf } from '../prices/recent.js';
-import { saveCrossStates, saveRecentBars, saveTechBlocks, sameValue } from './barchunks.js';
-import { isinOf, isinSymbolCached, resolveIsinSymbols, useSavedSymbols } from '../tv/isin.js';
+import { saveCrossStates, saveDailyStates, saveRecentBars, saveTechBlocks, sameValue } from './barchunks.js';
+import { dailyChoice, wireDailyPicker } from './dailypick.js';
+import { dailyReportLine, dailyStocksOf, readDailyStates } from './dailymacd.js';
+import { loadDailyBars, saveDailyBars } from './dailystore.js';
+import { strategies } from '../strategies/state.js';
+import { correctIsinSymbols, isinOf, isinSymbolCached, resolveIsinSymbols, useSavedSymbols } from '../tv/isin.js';
 import { tvCall, tvErrorText, tvIsQuota, tvIstDate, tvMcp } from '../tv/connector.js';
 import { loadRuns } from '../strategies/tracking.js';
 import { priorityOrder } from './freshness.js';
@@ -43,6 +47,7 @@ const STEPS = [{ key: 'prepare', label: 'Prepare the stock list', w: 5 }, { key:
 
 // The TradingView symbol for a stock: its ISIN is in the database, and the symbol is the one the last run saved for it (see tv/isin.js). No TradingView search is made. null when it has none.
 const snapshotSymbol = isinSymbolCached;
+const SYMBOL_FIXES_PER_RUN = 20;     // stocks per run whose saved symbol is searched by ISIN again after TradingView gave no price for them
 const SYMBOL_LOOKUPS_PER_RUN = 25;   // new stocks searched by ISIN in one bulk run (a search is 1 to 3 TradingView calls)
 let stopAsked = false;
 let busy = false;
@@ -254,6 +259,15 @@ async function rsSnapshot(run){
   fiSet('run', 'done', num(run.updated) + ' saved' + (run.unchanged ? ', ' + num(run.unchanged) + ' unchanged' : ''));
 }
 
+// A stock TradingView still gave no price for today (after the retry) may have been renamed or moved to the other exchange, which leaves its saved symbol dead.
+// Those stocks are searched by their ISIN again and a corrected symbol is saved for the next run. A failure here never stops the run.
+async function rsFixSymbols(run){
+  const silent = run.todo.map(x => x.s).filter(s => !run.livePx.has(sanitizeDocId(tickerSymbol(s)))).slice(0, SYMBOL_FIXES_PER_RUN);
+  if(!silent.length || stopAsked || run.stopped) return;
+  try { run.symbolFixes = (await correctIsinSymbols(silent)).map(x => tickerSymbol(x.stock) + ' ' + x.from + ' → ' + x.to); }
+  catch(e){ console.error('Could not search the TradingView symbols again', e); }
+}
+
 // 3. New weekly and monthly bars for stocks whose bars are out of date, then their technical scores: the long part (one call per bar type per stock), so it is last.
 // It can run out of the daily quota; the stocks not reached stay out of date and the next run carries on with them.
 
@@ -335,6 +349,24 @@ async function rsCross(run){
   } catch(e){ console.error('The weekly MACD 30/60/5 could not be read', e); run.crossFailed = -1; }
 }
 
+// The daily (1D) MACD 30/60/5 of the stocks of the strategy chosen in the panel, if one was: read from TradingView for those stocks only and saved with their technical blocks.
+async function rsDaily(run){
+  if(!run.dailyPick || run.stopped) return;
+  const strategy = strategies.find(st => st.id === run.dailyPick.strategyId);
+  if(!strategy){ run.dailyResult = { problem: 'the chosen strategy no longer exists' }; return; }
+  const { list, total, needsOtherRule } = dailyStocksOf(stocks, strategy);
+  if(needsOtherRule){ run.dailyResult = { name: strategy.name, problem: 'the strategy needs a rule besides the daily MACD, to choose the stocks to read' }; return; }
+  fiSet('verify', 'running', 'Daily MACD 30/60/5: reading ' + num(list.length) + ' stocks…', 0.2);
+  const progress = (d, n) => fiSet('verify', 'running', 'Daily MACD 30/60/5: ' + num(d) + ' of ' + num(n) + ' stocks', 0.2 + 0.2 * d / n);
+  try {
+    const io = { symbolOf: snapshotSymbol, keyOf: s => sanitizeDocId(tickerSymbol(s)), stop: () => stopAsked, today: tvIstDate, loadBars: (s, sym) => loadDailyBars(run.db, sym),
+      saveBars: (s, sym, bars, isNew) => saveDailyBars(run.db, { sym, key: pcTickerKey(s), name: s.name }, bars, isNew) };
+    const r = await readDailyStates(list, io, progress);
+    const saved = await saveDailyStates(run.db, r.results, run.today, () => {});
+    run.dailyResult = { name: strategy.name, stocks: list.length, total, read: r.results.length, changed: saved.changed, failed: r.failures.length, stored: r.stored, storeFailed: r.storeFailed, notSaved: saved.failed, abort: r.abort };
+  } catch(e){ console.error('The daily MACD could not be read', e); run.dailyResult = { name: strategy.name, problem: 'it could not be read' }; }
+}
+
 // Technical Score 2, from the saved weekly bars (a few records).
 async function rsTech2(run){
   // ---- Technical Score 2: from the saved weekly bars, a few records ----
@@ -377,6 +409,8 @@ function rsReport(run){
   }
   if(run.noSymbol.length) B(num(run.noSymbol.length) + ' stocks without a TradingView symbol: ' + run.noSymbol.slice(0, 3).join(', ') + (run.noSymbol.length > 3 ? ' …' : ''));
   if(run.carried) B(num(run.carried) + ' stocks had no price today and kept an earlier one');
+  if(run.dailyResult){ const d = dailyReportLine(run.dailyResult); B(d.text, d.problem); }
+  if(run.symbolFixes.length) B(num(run.symbolFixes.length) + ' saved TradingView symbol' + (run.symbolFixes.length === 1 ? ' was' : 's were') + ' out of date and corrected (priced from the next run): ' + run.symbolFixes.slice(0, 4).join('; ') + (run.symbolFixes.length > 4 ? ' …' : ''));
   if(run.skipped.length){
     const why = new Map(); run.skipped.forEach(x => { const r = String(x.reason).replace(/\([A-Z]+:[^)]*\)/g, '').replace(/from \d{4}-\d\d-\d\d/, '').trim(); why.set(r, (why.get(r) || 0) + 1); });
     const top = [...why.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -392,14 +426,16 @@ async function runSnapshot(){
   // Everything the steps count and report. The steps below fill it in; `run.lines` is the result shown at the end.
   const run = { db, today: tvIstDate(), lines: [], skipped: [], updated: 0, kept: 0, scored: 0, unchanged: 0, stopped: false,
     t0: Date.now(), startedAt: new Date().toISOString(), batchSecs: [], tvWaitMs: 0, saveMs: 0, planned: 0, chunksSaved: 0, runError: '',
-    retried: 0, answeredAgain: 0, carried: 0, noSymbol: [], tech2Saved: 0, tech2Failed: 0, livePx: new Map(), crossRead: 0, crossChanged: 0, crossFailed: 0,
+    retried: 0, answeredAgain: 0, carried: 0, noSymbol: [], tech2Saved: 0, tech2Failed: 0, livePx: new Map(), crossRead: 0, crossChanged: 0, crossFailed: 0, symbolFixes: [], dailyPick: dailyChoice(), dailyResult: null,
     batchSaved: 0, chunkWrites: 0, compacted: 0, techBlocksSaved: 0, filled: 0, barsUpdated: 0, histFailed: 0, noneBefore: 0, staleBefore: 0, noHistoryLeft: 0, histRan: false };
   try {
     await rsPrepare(run);
     await rsFillHistory(run);
     await rsSnapshot(run);
+    await rsFixSymbols(run);
     await rsBars(run);
     await rsCross(run);
+    await rsDaily(run);
     await rsTech2(run);
     rsReport(run);
   } catch(e){
@@ -422,6 +458,7 @@ async function paintHint(){
   } catch(e){ el.textContent = ''; }
 }
 function init_refresh_tvrefresh(){
+  wireDailyPicker();
   const on = (id, fn) => { const b = document.getElementById(id); if(b) b.addEventListener('click', fn); };
   on('tvSnapshotBtn', () => runSnapshot().then(paintHint));
   on('tvStopBtn', () => { stopAsked = true; const b = /** @type {HTMLButtonElement|null} */ (document.getElementById('tvStopBtn')); if(b){ b.disabled = true; b.textContent = 'Stopping…'; } });
