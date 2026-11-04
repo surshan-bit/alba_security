@@ -2340,6 +2340,68 @@ test('csv: a row with no group or name, and a figure that is not a number, is re
   assert.ok(rec.scored.score != null, 'the other figures still score it');
 });
 
+test('subscriptions: every listener is started, restarted after an error up to its limit, and redraws only on real change', () => alone(async () => {
+  const log = [], G = globalThis, saved = { document: G.document, setTimeout: G.setTimeout, S: G.__S };
+  const S = G.__S = { log, identity: true, inFlight: false, replaceResult: true, db: {} };
+  const stubs = {
+    'core/store.js': `const L = globalThis.__S.log; export const dbCapabilityPromise = Promise.resolve(globalThis.__S.db);
+      export const attachDb = () => L.push('attachDb'); export const attachTradeDb = () => L.push('attachTradeDb');
+      export const replacePinnedTickers = (a) => { L.push('replacePins:' + a.join()); return globalThis.__S.replaceResult; };
+      export const replaceTradeLog = (m) => L.push('tradeLog:' + m.size);
+      export const watchlistSyncLog = { put: (i) => L.push('wl:' + i) }; export const fundamentalCsvUploadLog = { put: (i) => L.push('fund:' + i) };`,
+    'analysis/section.js': 'export const refreshAnalysisSoon = () => globalThis.__S.log.push("analysis");',
+    'research/status.js': 'export const setResearchTriggers = (m) => globalThis.__S.log.push("triggers:" + m.size); export const setResearchTriggerKinds = (m) => globalThis.__S.log.push("kinds:" + m.size);',
+    'detail/render.js': 'export const rerenderDetail = () => globalThis.__S.log.push("rerender");',
+    'overlays/research.js': 'export const applyResearchOverlay = (d) => globalThis.__S.log.push("research:" + d.length);',
+    'overlays/updates.js': 'const L = globalThis.__S.log; export const applyRecentBarsOverlay = () => L.push("bars"); export const applySnapshotOverlay = () => { throw new Error("bad"); }; export const applyTechBlocksOverlay = () => L.push("blocks"); export const applyUpdatesOverlay = () => L.push("updates");',
+    'overlays/techscore2.js': 'export const applyTech2Overlay = () => globalThis.__S.log.push("tech2");',
+    'identity/session.js': 'export const pinsRef = (db) => db.pins || null; export const tradeCol = (db) => globalThis.__S.identity ? db.trades : null;',
+    'core/pins.js': 'export const pinWritesInFlight = () => globalThis.__S.inFlight;',
+    'core/lazy.js': 'export const renderLoadedPart = (p) => globalThis.__S.log.push("part:" + p);',
+    'news/store.js': 'export const setNewsChangeHook = (f) => { globalThis.__S.hook = f; }; export const startNewsSync = () => globalThis.__S.log.push("news");',
+  };
+  const timers = []; G.setTimeout = (f, ms) => { timers.push({ f, ms }); return 0; };
+  const open = new Set(['section-analysis', 'section-strategies']);
+  G.document = { getElementById: (id) => open.has(id) ? { classList: { contains: () => true } } : null };
+  const listeners = {}, fail = {};
+  const reg = (name) => (ok, err) => { (listeners[name] = listeners[name] || []).push({ ok, err }); if(fail[name]) throw new Error('no listener'); };
+  const snapOf = (docs) => ({ docs: docs.map((d) => ({ id: d.id, exists: d.exists !== false, data: () => d })) });
+  const freshDb = () => ({ collection: (name) => ({ onSnapshot: reg(name) }),
+    pins: { onSnapshot: reg('pins'), get: () => Promise.resolve({ exists: true, data: () => ({ tickers: ['AAA'] }) }) },
+    trades: { onSnapshot: reg('trades') } });
+  const tick = () => new Promise((r) => setImmediate(r));
+  try {
+    S.db = freshDb();
+    const M = await loadWithStubs('src/sync/subscriptions.js', '', stubs);
+    M.init_sync_subscriptions(); await tick(); await tick();
+    assert.ok(log.includes('attachDb') && log.includes('news') && log.includes('attachTradeDb'));
+    S.hook(); assert.ok(log.includes('rerender') && log.includes('part:strategies'));
+    log.length = 0; const pin = listeners.pins[0];
+    S.inFlight = true; pin.ok({ data: () => ({ tickers: ['Z'] }) }); assert.ok(!log.some((x) => x.startsWith('replacePins')));
+    S.inFlight = false; pin.ok({ data: () => null }); assert.ok(log.includes('replacePins:') && log.includes('rerender') && log.includes('analysis'));
+    log.length = 0; S.replaceResult = false; pin.ok({ data: () => ({ tickers: ['A', 'B'] }) }); assert.deepStrictEqual(log, ['replacePins:A,B']); S.replaceResult = true;
+    for(let i = 0; i < 6; i++){ const t = timers.length; listeners.pins[listeners.pins.length - 1].err(new Error('x')); if(i < 5){ assert.strictEqual(timers.length, t + 1); assert.strictEqual(timers[t].ms, 3000 * (i + 1)); timers[t].f(); } else assert.strictEqual(timers.length, t); }
+    const ov = listeners.stockResearch[0]; ov.ok(snapOf([{ id: 'a' }, { id: 'b', exists: false }])); assert.ok(log.includes('research:1'));
+    listeners.liveSnapshot[0].ok(snapOf([{ id: 'a' }]));   // its apply throws; contained
+    assert.ok(!listeners.barsRecent); timers.find((t) => t.ms === 3000).f(); assert.ok(listeners.barsRecent);
+    ov.err(new Error('x')); const last = timers[timers.length - 1]; assert.strictEqual(last.ms, 3000); last.f(); assert.strictEqual(listeners.stockResearch.length, 2);
+    log.length = 0; const trig = listeners.researchTriggers[0];
+    const tsnap = snapOf([{ id: '1', ticker: 'AAA', triggeredAt: 5, kind: 'news' }, { id: '2', ticker: 'BBB', triggeredAt: 6 }, { id: '3' }, { id: '4', exists: false, ticker: 'C', triggeredAt: 1 }]);
+    trig.ok(tsnap); assert.ok(log.includes('triggers:2') && log.includes('kinds:1') && log.includes('analysis'));
+    log.length = 0; trig.ok(tsnap); assert.deepStrictEqual(log, []);
+    trig.err(new Error('x'));
+    log.length = 0; listeners.watchlistSyncLog[0].ok(snapOf([{ id: 'w1' }])); listeners.fundamentalCsvUploadLog[0].ok(snapOf([{ id: 'f1' }]));
+    assert.deepStrictEqual(log, ['wl:w1', 'part:refreshlog', 'fund:f1', 'part:refreshlog']);
+    log.length = 0; listeners.trades[0].ok(snapOf([{ id: 't1' }, { id: 't2', exists: false }])); assert.deepStrictEqual(log, ['tradeLog:1', 'part:trackrecord']);
+    for(let i = 0; i < 5; i++){ const t = timers.length; listeners.trades[listeners.trades.length - 1].err(new Error('x')); if(i < 4){ assert.strictEqual(timers[t].ms, 2000 * (i + 1)); timers[t].f(); } else assert.strictEqual(timers.length, t); }
+    // registration failures are contained; no identity means no trade log; no capability means nothing starts
+    ['pins', 'stockResearch', 'researchTriggers'].forEach((n) => { fail[n] = true; });
+    S.identity = false; log.length = 0; M.init_sync_subscriptions(); await tick(); await tick(); assert.ok(log.includes('attachDb') && !log.includes('attachTradeDb'));
+    S.db = null; log.length = 0; const none = await loadWithStubs('src/sync/subscriptions.js', '', stubs);
+    none.init_sync_subscriptions(); await tick(); assert.deepStrictEqual(log, []);
+  } finally { if(saved.document === undefined) delete G.document; else G.document = saved.document; G.setTimeout = saved.setTimeout; if(saved.S === undefined) delete G.__S; else G.__S = saved.S; }
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
