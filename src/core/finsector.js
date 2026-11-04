@@ -25,6 +25,8 @@ const FIN_NOT_APPLICABLE = {
 const KIND_WORD = { bank: 'banks', insurer: 'insurers', lender: 'lenders' };
 /** True when the whole Financial Health factor is left out for this kind (nothing in it applies). */
 const finFactorNotApplicable = kind => !!kind && kind !== 'lender';
+// Whether one figure (de, interestCoverage, quickRatio, altmanZ, ...) describes this kind of company at all.
+const finApplies = (r, field) => !(FIN_NOT_APPLICABLE[r.finKind] || []).includes(field);
 /** One line for the research prompts, so Claude does not write about figures that do not apply. */
 function sectorPromptNote(kind){
   if(kind === 'bank') return 'SECTOR NOTE: this is a bank. Debt, interest cover, liquidity ratios, Altman Z and debtor days do not apply to a bank and are not scored. Do not write about them.\n';
@@ -32,4 +34,4 @@ function sectorPromptNote(kind){
   if(kind === 'lender') return 'SECTOR NOTE: this is a lender. High debt is normal for a lender and only matters against other lenders. Liquidity ratios, Altman Z and debtor days do not apply and are not scored. Do not write about them.\n';
   return '';
 }
-export { financialKind, FIN_NOT_APPLICABLE, KIND_WORD, finFactorNotApplicable, sectorPromptNote };
+export { financialKind, KIND_WORD, finApplies, finFactorNotApplicable, sectorPromptNote };

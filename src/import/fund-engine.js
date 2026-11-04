@@ -1,7 +1,8 @@
 // Fundamental Score engine: turns a screener.in CSV row into factor scores.
 import { parseCSV } from './csvparse.js';
 import { marginOfSafety } from '../core/mos.js';
-import { financialKind, FIN_NOT_APPLICABLE, KIND_WORD, finFactorNotApplicable } from '../core/finsector.js';
+import { financialKind, KIND_WORD, finApplies, finFactorNotApplicable } from '../core/finsector.js';
+import { buildFundamentals, pillarsFor, valuationBlock } from './fund-text.js';
 
 // ---- Fundamental Score engine v3 ----
 // ---- Generic O(n log n) percentile-rank engine ----
@@ -192,7 +193,6 @@ function reinvestMetric(r) { return useCroic(r) ? r.croic : r.roic != null ? r.r
 function marginOfSafetyPct(r) { return marginOfSafety(r.intrinsicValue, r.currentPrice); }
 const groupKey = r => r.industryGroup;
 // False when a Financial Health figure does not describe this kind of company (a bank's current ratio, a lender's Altman Z...).
-const finApplies = (r, field) => !(FIN_NOT_APPLICABLE[r.finKind] || []).includes(field);
 
 // ---- Verdict thresholds (section 6) ----
 function scoreToVerdict(score) {
@@ -322,7 +322,7 @@ function growthFactor(r, pct, quality) {
 }
 
 function valFactor(r, pct) {
-  const pegPct = (r.peg != null && r.peg > 0) ? pct.pegInv.get(r) : (r.peg == null || r.peg <= 0 ? 50 : null);
+  const pegPct = (r.peg != null && r.peg > 0) ? pct.pegInv.get(r) : 50;   // a missing or non-positive PEG counts as the middle
   const score = weightedPartial(1.125, [
     { coef: 0.764, pct: pct.relPe.get(r) }, { coef: 0.511, pct: pegPct }, { coef: 0.35, pct: pct.ownHist.get(r) },
   ]);
@@ -397,138 +397,61 @@ const FundEngine = { normSym, scoreCsv, scoreToVerdict };
 // ---- Applying the engine to the stock list ----
 // Mutates `stocks` in place (new tickers are appended). Returns what happened. New tickers get safe defaults:
 // no screenerConsolidated flag (the page then links to the consolidated Screener.in page) and no BSE chart mapping.
-function applyFundamental(csvText, stocks, asof){
-  const E = FundEngine;
-const n = v => v != null && Number.isFinite(v);
-const f = (v, d) => n(v) ? v.toFixed(d) : 'n/a';
-const xx = (v, d = 2) => n(v) ? v.toFixed(d) + 'x' : 'n/a';
-const pc = (v, d = 1) => n(v) ? v.toFixed(d) + '%' : 'n/a';
-const cr = v => n(v) ? '₹' + v.toFixed(1) + ' Cr' : 'n/a';
-const px = v => !n(v) ? 'n/a' : v.toFixed(1);
-const px0 = v => !n(v) ? 'n/a' : v.toFixed(0);
-const ordN = p => p == null ? 'n/a' : ord(p);
-function ord(p) { const k = Math.round(p), m = k % 100, s = (m >= 11 && m <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[k % 10] || 'th'); return k + s; }
-
-const NAMES = {
-  fin: ['Traditional', 'Financial Health &amp; Balance Sheet'], prof: ['Traditional', 'Profitability &amp; Capital Efficiency'],
-  growth: ['Traditional', 'Growth &amp; Cash Flow Generation'], val: ['Traditional', 'Valuation Metrics (vs. industry)'],
-  moat: ['Buffett', 'Moat &amp; Competitive Advantage'], gov: ['Buffett', 'Management &amp; Governance'],
-  predict: ['Buffett', 'Earnings Predictability'], reinvest: ['Buffett', 'Capital Reinvestment Efficiency'],
-  dcf: ['Valuation', 'Valuation &amp; Margin of Safety (Screener.in Intrinsic Value)'],
-};
-
-function peerText(basis, industry, group) {
-  if (basis == null) basis = 'industry';
-  // returns {chip, moatWhere, govWhere}
-  if (basis === 'industry') return { chip: industry, moatWhere: `the same industry (${industry})`, govWhere: industry };
-  if (basis === 'group') return { chip: `${group} group`, moatWhere: `the same industry group (${group}), since ${industry} has fewer than 10 peers`, govWhere: `the ${group} group (${industry} has fewer than 10 peers)` };
-  return { chip: 'all stocks', moatWhere: null, govWhere: null };
-}
-
-function buildFactor(key, r, sc, industry, group, scored) {
-  const fa = scored.factors.find(x => x.key === key);
-  let metrics, note;
-  if (key === 'fin') {
-    const all = [['D/E', xx(r.de), 'de'], ['Interest coverage', xx(r.interestCoverage), 'interestCoverage'], ['Quick ratio', xx(r.quickRatio), 'quickRatio'], ['Altman Z', f(r.altmanZ, 2), 'altmanZ'],
-      ['Current ratio', xx(r.currentRatio), 'currentRatio'], ['Avg debtor days 3yr', f(r.avgDebtorDays3, 1), 'avgDebtorDays3']];
-    metrics = all.filter(m => finApplies(r, m[2])).map(m => [m[0], m[1]]).concat([['Contingent liabilities', cr(r.contingentLiabilities)]]);
-    const flag = n(r.contingentLiabilities) && r.contingentLiabilities > 0 ? ` Contingent liabilities of ${cr(r.contingentLiabilities)} noted as a risk flag (not scored).` : '';
-    if (fa.na) note = `Left out of the score: debt, liquidity, distress-model and debtor figures do not describe ${r.finKind === 'insurer' ? 'an insurer' : 'a bank'}.` + flag;
-    else if (r.finKind === 'lender') note = `Scored against other lenders on debt compared with the owners' money (${xx(r.de)}) and interest cover (${xx(r.interestCoverage)}); liquidity, distress-model and debtor figures are left out.` + flag;
-    else note = `Mechanically scored from screener.in data: balance-sheet profile (D/E ${xx(r.de)}, interest coverage ${xx(r.interestCoverage)}, Altman Z ${f(r.altmanZ, 2)}, current ratio ${xx(r.currentRatio)}).` + flag;
-  } else if (key === 'prof') {
-    metrics = [['ROCE', pc(r.roce)], ['ROE', pc(r.roe)], ['OPM', pc(r.opm)], ['Median ROCE 10yr', pc(r.medianRoce10)], ['Avg ROE 7yr', pc(r.avgRoe7)]];
-    note = `Mechanically scored: capital efficiency blending current-year and multi-year-average ROCE/ROE with OPM (ROCE ${pc(r.roce)}, ROE ${pc(r.roe)}, OPM ${pc(r.opm)}).` + eqText(fa.note);
-  } else if (key === 'growth') {
-    metrics = [['Sales growth 3yr', pc(r.salesGrowth3)], ['Profit growth 3yr', pc(r.profitGrowth3)], ['Profit growth TTM', pc(r.profitGrowthTTM)], ['FCF 3yr', cr(r.fcf3)], ['OCF 3yr', cr(r.ocf3)]];
-    note = `Mechanically scored: top-line/bottom-line growth trend (3yr sales ${pc(r.salesGrowth3)}, 3yr profit ${pc(r.profitGrowth3)}).` + eqText(fa.note) + cfText(fa.note);
-  } else if (key === 'val') {
-    metrics = [['P/E', xx(r.pe)], ['Industry P/E', xx(r.industryPe)], ['PEG', f(r.peg, 2)], ['Historical PE 5yr', xx(r.histPe5)]];
-    note = `Mechanically scored vs industry: P/E ${xx(r.pe)} vs industry ${xx(r.industryPe)}, PEG ${f(r.peg, 2)}, and own 5yr-historical-PE comparison.`;
-  } else if (key === 'moat') {
-    const pct = scored.moatPct, p = peerText(pct == null ? null : scored.moatBasis, industry, group);
-    metrics = [['Industry-relative capital efficiency percentile', `${ordN(pct)} (${p.chip})`]];
-    note = 'Data-driven mechanical proxy (pending individual research): scored from this company\'s own ROCE/ROE/OPM ranked against ' +
-      (p.moatWhere ? `peers in ${p.moatWhere}` : `all stocks, since ${industry} and its industry group have fewer than 10 peers`) + ` — ${ordN(pct)} percentile. Not a substitute for researched moat analysis.`;
-  } else if (key === 'gov') {
-    const pct = scored.piotroskiPct, p = peerText(pct == null ? null : scored.govBasis, industry, group);
-    metrics = [['Piotroski F-Score percentile', `${ordN(pct)} (${p.chip})`], ['Promoter pledge', pc(r.pledgePct)], ['Promoter holding', pc(r.promoterHolding, 2)], ['Promoter holding change', pc(r.promoterHoldingChange)],
-      ['FII holding', pc(r.fiiHolding, 2)], ['FII change last quarter', pc(r.fiiChange, 2)], ['FII change 3yr', pc(r.fiiChange3, 2)], ['DII change 3yr', pc(r.diiChange3, 2)]];
-    note = 'Data-driven mechanical proxy (pending individual research): based on Piotroski F-Score ranked against ' +
-      (p.govWhere ? `peers in ${p.govWhere}` : `all stocks (${industry} and its group have fewer than 10 peers)`) +
-      ` (${ordN(pct)} percentile), adjusted for promoter pledge (${pc(r.pledgePct)}), promoter-holding change, and institutional (FII/DII) conviction where available.`;
-  } else if (key === 'predict') {
-    metrics = [['Profit growth TTM', pc(r.profitGrowthTTM)], ['3yr avg', pc(r.profitGrowth3)], ['5yr avg', pc(r.profitGrowth5)]];
-    note = 'Mechanically scored on consistency of profit growth across TTM/3yr/5yr windows.';
-  } else if (key === 'reinvest') {
-    const croic = scored.reinvestCroic;
-    metrics = [[croic ? 'CROIC' : 'ROIC', pc(croic ? r.croic : r.roic)]];
-    note = croic ? `Mechanically scored from CROIC (Cash Return on Invested Capital) as a proxy for reinvestment efficiency — ${pc(r.croic)}.`
-      : `Mechanically scored from Return on Invested Capital (ROIC) as a proxy for reinvestment efficiency — ${pc(r.roic)}; CROIC is unavailable or held down by capex while operating cash flow is positive.`;
-  } else if (key === 'dcf') {
-    const mos = scored.mosPct;
-    metrics = [['Intrinsic Value (Screener.in)', px0(r.intrinsicValue)], ['Current price', px(r.currentPrice)], ['Margin of safety', n(mos) ? mos.toFixed(1) + '%' : 'n/a'], ['Graham Number', px0(r.graham)], ['NCAVPS', px(r.ncavps)]];
-    note = `Mechanically scored: Screener.in's own Intrinsic Value estimate ₹${px0(r.intrinsicValue)} vs current price ₹${px(r.currentPrice)} (${n(mos) ? mos.toFixed(1) + '%' : 'n/a'} margin of safety, ranked against the current dataset).` +
-      (n(r.graham) ? ` Cross-check: Graham Number ₹${px0(r.graham)}` + (n(r.intrinsicValue) && r.intrinsicValue > 0 && Math.abs(r.graham - r.intrinsicValue) / r.intrinsicValue > 0.3 ? ' (diverges notably from Intrinsic Value — informational only, not scored).' : '.') : '');
-  }
-  const kindFields = key === 'fin' && r.finKind ? { sector: r.finKind, ...(fa.na ? { na: fa.na } : {}) } : {};
-  return { category: NAMES[key][0], key, metrics, name: NAMES[key][1], note, score: fa.score == null ? 0 : fa.score, weight: fa.weight, ...kindFields };
-}
-// discount sentences derived from the engine's own notes
-function eqText(en) { if (!en) return ''; if (en.includes('0.55x')) return ' (TTM growth far above multi-year trend — cyclical-spike discount applied)'; if (en.includes('0.8x')) return ' (TTM growth notably ahead of multi-year trend — mild discount applied)'; return ''; }
-function cfText(en) { if (!en) return ''; if (en.includes('0.75x') || en.includes('0.85x')) return ' (growth not cash-backed — FCF/OCF discount applied)'; return ''; }
-
-function buildFundamentals(r, industry, group) {
-  const sc = r.scored;
-  const factors = ['fin', 'prof', 'growth', 'val', 'moat', 'gov', 'predict', 'reinvest', 'dcf'].map(k => buildFactor(k, r, sc, industry, group, sc));
-  return { factors, scoringBreakdown: { buffettSubscore: sc.buffettSubscore, overallComposite: sc.score, traditionalSubscore: sc.traditionalSubscore, valuationSubscore: sc.valuationSubscore }, total: 10 };
-}
-// Technical composite's valuation pillar = the valuation factor score x10, kept in step with every fundamental import.
-function pillarVal(r) { const sc = r.scored.factors.find(x => x.key === 'dcf').score; return sc == null ? null : Math.round(sc * 10 * 10) / 10; }
-function pillarsFor(r) { const v = pillarVal(r); return v == null ? null : { val: v }; }
-function valuationBlock(r, old) {
-  const v = { asof, currentPrice: r.currentPrice, grahamNumber: r.graham, intrinsicValue: r.intrinsicValue,
-    intrinsicValueSource: 'Screener.in Intrinsic Value estimate (from uploaded fundamentals CSV) — the single source of truth for intrinsic value across this app.', ncavps: r.ncavps };
-  // Holding and return figures from the CSV; kept as they were when this file does not have the column.
-  const extra = { profitGrowth: r.profitGrowthTTM, promoterHolding: r.promoterHolding, fiiHolding: r.fiiHolding, fiiChange: r.fiiChange, fiiChange3: r.fiiChange3, diiChange3: r.diiChange3, ret1y: r.ret1, ret3y: r.ret3, ret5y: r.ret5 };
-  Object.keys(extra).forEach(k => { if(extra[k] != null) v[k] = extra[k]; });
-  return v;
-}
-
-const symOf = s => E.normSym(s.ticker.split('·')[0].trim());
+const symOf = s => normSym(s.ticker.split('·')[0].trim());
 const indOf = s => (s.ticker.split('·')[1] || '').trim();
-const exact = new Map(stocks.map(s => [symOf(s), indOf(s)]));
-const { records, duplicates } = E.scoreCsv(csvText, { exactIndustryBySym: exact });
-const byNse = new Map(), byBse = new Map();
-for (const r of records) { if (r.nseCode) byNse.set(E.normSym(r.nseCode), r); if (r.bseCode) byBse.set(E.normSym(r.bseCode), r); }
-const used = new Set(); let rescored = 0; const dropped = [], inactive = [];
-for (const s of stocks) {
-  const sym = symOf(s); const r = byNse.get(sym) || byBse.get(sym);
-  // In the file = active. A stock missing from the file is marked inactive (kept in the data, hidden and not refreshed); one in the file but unscored stays as it was.
-  if (r) delete s.active; else { s.active = false; inactive.push(s.ticker); }
-  if (!r || r.scored.score == null) { dropped.push(s.ticker); continue; }
-  used.add(r);
-  s.score = r.scored.score; s.verdict = r.scored.verdict; if (r.industryGroup !== '(unclassified)') s.industryGroup = r.industryGroup;
-  s.fundamentals = buildFundamentals(r, indOf(s) || r.industry, r.industryGroup);
-  s.valuation = { ...(s.valuation || {}), ...valuationBlock(r) };
-  { const pv = pillarsFor(r); if (pv) s.pillars = { ...(s.pillars || {}), ...pv }; }
-  if (r.isin) s.isin = r.isin;
-  s.asof = asof; rescored++;
+
+// Each stock is rescored from its record in the file. In the file = active. A stock missing from the file is marked inactive (kept in the data, hidden and not refreshed); one in the file but unscored stays as it was.
+function rescoreKnown(stocks, records, asof) {
+  const byNse = new Map(), byBse = new Map();
+  for (const r of records) { if (r.nseCode) byNse.set(normSym(r.nseCode), r); if (r.bseCode) byBse.set(normSym(r.bseCode), r); }
+  const used = new Set(), dropped = [], inactive = [];
+  let rescored = 0;
+  for (const s of stocks) {
+    const sym = symOf(s);
+    const r = byNse.get(sym) || byBse.get(sym);
+    if (r) delete s.active; else { s.active = false; inactive.push(s.ticker); }
+    if (!r || r.scored.score == null) { dropped.push(s.ticker); continue; }
+    used.add(r);
+    s.score = r.scored.score; s.verdict = r.scored.verdict; if (r.industryGroup !== '(unclassified)') s.industryGroup = r.industryGroup;
+    s.fundamentals = buildFundamentals(r, indOf(s) || r.industry, r.industryGroup);
+    s.valuation = { ...(s.valuation || {}), ...valuationBlock(r, asof) };
+    const pillars = pillarsFor(r);
+    if (pillars) s.pillars = { ...(s.pillars || {}), ...pillars };
+    if (r.isin) s.isin = r.isin;
+    s.asof = asof; rescored++;
+  }
+  return { used, rescored, dropped, inactive };
 }
-const onboarded = [], needScreenerCheck = [], bseOnly = [];
-for (const r of records) {
-  if (used.has(r)) continue;
-  const code = r.nseCode || r.bseCode; if (!code || r.scored.score == null) continue;
-  const industry = r.industry || r.industryGroup;
-    stocks.push({
+
+// A ticker in the file that is not in the stock list yet: new tickers get safe defaults (no Technical Signal history, no sector notes).
+function newStock(r, code, industry, asof) {
+  return {
     asof, name: r.name, isin: r.isin || undefined, ticker: `${code} · ${industry}`, industryGroup: r.industryGroup, score: r.scored.score, verdict: r.scored.verdict,
     pillars: pillarsFor(r) || {},
     technical: { reason: 'Newly imported in the fresh full-universe data load; no Technical Signal history yet. Will be computed from the next Growth List CSV / TradingView refresh.', asof },
     globalFactors: { scope: 'sector', sectorLabel: industry, asof, positive: [], negative: [] },
-    fundamentals: buildFundamentals(r, industry, r.industryGroup), valuation: valuationBlock(r),
-  });
-  onboarded.push(code); needScreenerCheck.push(code); if (/^\d+$/.test(code)) bseOnly.push(code);
+    fundamentals: buildFundamentals(r, industry, r.industryGroup), valuation: valuationBlock(r, asof),
+  };
 }
+
+function onboardNew(stocks, records, used, asof) {
+  const onboarded = [], bseOnly = [];
+  for (const r of records) {
+    if (used.has(r)) continue;
+    const code = r.nseCode || r.bseCode;
+    if (!code || r.scored.score == null) continue;
+    stocks.push(newStock(r, code, r.industry || r.industryGroup, asof));
+    onboarded.push(code);
+    if (/^\d+$/.test(code)) bseOnly.push(code);
+  }
+  return { onboarded, bseOnly };
+}
+
+function applyFundamental(csvText, stocks, asof){
+  const exact = new Map(stocks.map(s => [symOf(s), indOf(s)]));
+  const { records, duplicates } = FundEngine.scoreCsv(csvText, { exactIndustryBySym: exact });
+  const { used, rescored, dropped, inactive } = rescoreKnown(stocks, records, asof);
+  const { onboarded, bseOnly } = onboardNew(stocks, records, used, asof);
   const verdictMix = {}; for(const s of stocks) verdictMix[s.verdict] = (verdictMix[s.verdict] || 0) + 1;
   return { csvRows: records.length, duplicates, rescored, onboarded, bseOnly, dropped, inactive, verdictMix };
 }
