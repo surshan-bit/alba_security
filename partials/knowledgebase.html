@@ -251,6 +251,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.351 &middot; 2026-11-04</h3>
+            <ul>
+              <li><strong>One consistent look (a few labels a touch smaller on phones):</strong> every text size, colour and spacing in the app now comes from one shared set of values instead of being repeated by hand. The result looks the same on a laptop, except that some small chart labels on the Analysis screen are one point larger. On a phone, a few labels follow the phone text size: the trade-log rows, the Analysis chart labels and some Refresh menu text are a point or two smaller.</li>
+              <li><strong>Safer web page (nothing changes in claude.ai):</strong> the copy of Alba that runs on its own website now tells the browser to refuse any script or style that does not come from Alba itself, and to talk only to Alba and its database. Even a missed mistake in how a page is drawn can no longer run unexpected code there.</li>
+              <li><strong>Cleaner inside (nothing looks different):</strong> the last pieces of hand-set styling were removed from the code (progress bars, hover cards, the update banner and the sign-in page now use shared styles), dozens of overlapping style rules were removed, and the checks that guard the code now also cover type mistakes and how long a single function may be.</li>
+            </ul>
             <h3>v1.350 &middot; 2026-11-03</h3>
             <ul>
               <li><strong>Stricter limits on the test website (nothing changes in claude.ai):</strong> the copy of Alba that runs outside claude.ai now refuses a single saved document over 1 MB, more than 10,000 saved documents per person, and uploaded files that are not CSV or are over 10 MB. Asking Claude from that website is limited to 1,000 calls an hour, and a deleted trade or other private document is no longer announced to other signed-in users.</li>
