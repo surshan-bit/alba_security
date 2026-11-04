@@ -45,25 +45,6 @@ const RESIZE_PAUSE_MS = 80, DEFAULT_WIDTH_PX = 320;
 
 const panelOf = (ctx, k) => /** @type {Element} */ (ctx.panels.querySelector('[data-k="' + k + '"]'));
 
-/** The saved bars, with this week's and this month's bar following the current price as W % chg / M % chg do. */
-function barsFor(s){
-  const saved = priceHistoryByTicker[pcTickerKey(s)], px = s.valuation && s.valuation.currentPrice, now = Date.now();
-  return Object.assign({}, saved, { '1W': followPrice(saved['1W'], px, periodStartSec('W', now), FOLLOW_SECS['1W']), '1M': followPrice(saved['1M'], px, periodStartSec('M', now), FOLLOW_SECS['1M']) });
-}
-// The events under each timeframe's bars, for the kinds of event currently shown.
-const rebuildEvents = (ctx) => {
-  ORDER.forEach((k) => { ctx.byBar[k] = eventsByBar(ctx.events, ctx.bars[k], PERIOD_SECS[k], ctx.shown); });
-};
-// Reads the saved bars and events of one stock into the state the two charts share.
-function createChart(root, s){
-  const bars = barsFor(s), macd = {}, events = stockChartEvents(s), groups = EVENT_GROUPS.filter((g) => events.some((e) => e.group === g.id));
-  // MACD (12, 26, 9) of every bar, from all the bars so it does not change with the range chosen; null for a stock with too little history (no panel).
-  ORDER.forEach((k) => { macd[k] = techMacdSeries(bars[k].map((r) => r[4])); });
-  const ctx = { root, panels: /** @type {Element} */ (root.querySelector('.pc-panels')), bars, macd, groups, shown: new Set(groups.map((g) => g.id)), byBar: {}, events, state: {}, hover: {}, geo: {} };
-  rebuildEvents(ctx);
-  return ctx;
-}
-
 /** Time span [start, end) of bar i of timeframe k. */
 function barSpan(ctx, k, i){ const b = ctx.bars[k]; return [b[i][0], i + 1 < b.length ? b[i + 1][0] : b[i][0] + PERIOD_SECS[k]]; }
 
@@ -161,6 +142,27 @@ function watchResize(ctx){
   let timer;
   pcObserver = new ResizeObserver(() => { clearTimeout(timer); timer = setTimeout(() => { if(ctx.root.isConnected) drawAll(ctx); }, RESIZE_PAUSE_MS); });
   pcObserver.observe(ctx.root);
+}
+
+/** The saved bars, with this week's and this month's bar following the current price as W % chg / M % chg do. */
+function barsFor(s){
+  const saved = priceHistoryByTicker[pcTickerKey(s)], px = s.valuation && s.valuation.currentPrice, now = Date.now();
+  return Object.assign({}, saved, { '1W': followPrice(saved['1W'], px, periodStartSec('W', now), FOLLOW_SECS['1W']), '1M': followPrice(saved['1M'], px, periodStartSec('M', now), FOLLOW_SECS['1M']) });
+}
+
+/** Hide or show kinds of event: the events under each timeframe's bars, for the kinds currently shown. */
+function rebuildEvents(ctx){
+  ORDER.forEach((k) => { ctx.byBar[k] = eventsByBar(ctx.events, ctx.bars[k], PERIOD_SECS[k], ctx.shown); });
+}
+
+/** Reads the saved bars and events of one stock into the state the two charts share. */
+function createChart(root, s){
+  const bars = barsFor(s), macd = {}, events = stockChartEvents(s), groups = EVENT_GROUPS.filter((g) => events.some((e) => e.group === g.id));
+  // MACD (12, 26, 9) of every bar, from all the bars so it does not change with the range chosen; null for a stock with too little history (no panel).
+  ORDER.forEach((k) => { macd[k] = techMacdSeries(bars[k].map((r) => r[4])); });
+  const ctx = { root, panels: /** @type {Element} */ (root.querySelector('.pc-panels')), bars, macd, groups, shown: new Set(groups.map((g) => g.id)), byBar: {}, events, state: {}, hover: {}, geo: {} };
+  rebuildEvents(ctx);
+  return ctx;
 }
 
 function initPriceChart(s){
