@@ -2290,6 +2290,56 @@ test('factors: the total scales the weights that apply back up to 10, and the su
   assert.strictEqual(FX.subScores(na, 5).traditionalSubscore, Math.round((1.5 / (5.85 - 1.8)) * 1000) / 100, 'the Traditional weight drops by the not-applicable factor');
 });
 
+// ---- the apply step's edges: tickers without an industry, merged pillars, records that cannot be scored or have no code
+test('apply: a listed stock whose ticker names no industry, with no old valuation or pillars, is rescored with the file\'s industry', () => {
+  const bare = { asof: '2026-01-01', name: 'Bare', ticker: 'WID0', industryGroup: 'OldGroup', score: 1, verdict: 'avoid' };
+  const stocks = [bare], res = F.applyFundamental(fundCsv(universe.slice(0, 12)), stocks, '2026-10-10');
+  assert.strictEqual(res.rescored, 1); assert.strictEqual(stocks[0], bare, 'updated in place');
+  assert.ok(bare.fundamentals.factors.length === 9 && bare.valuation.asof === '2026-10-10');
+  assert.deepStrictEqual(Object.keys(bare.pillars), ['val'], 'a stock with no pillars gets the valuation pillar');
+  assert.strictEqual(res.verdictMix[bare.verdict] >= 1, true);
+});
+test('apply: other pillars are kept when the valuation pillar is refreshed, and left alone when there is no valuation to give one', () => {
+  const kept = mkStock('WID1', 'Widgets', { pillars: { val: 3, tech: 7 } });
+  F.applyFundamental(fundCsv(universe.slice(0, 12)), [kept], '2026-10-10');
+  assert.strictEqual(kept.pillars.tech, 7); assert.notStrictEqual(kept.pillars.val, 3);
+  const noIv = fundRow('NOIV', 'Alpha', 'Widgets', { 'Intrinsic Value': '', Graham: '' });
+  const listed = mkStock('NOIV', 'Widgets', { pillars: { val: 3, tech: 7 } });
+  F.applyFundamental(fundCsv([noIv, ...universe.slice(0, 11)]), [listed], '2026-10-10');
+  assert.deepStrictEqual(listed.pillars, { val: 3, tech: 7 }, 'no intrinsic value: the pillars stay as they were');
+});
+const FY = load('src/import/fund-engine.js', 'export { rescoreKnown, onboardNew };');
+test('apply: a record with no NSE or BSE code, or without a score, is not added, and a listed stock without a score is left as it was', () => {
+  const unscored = { nseCode: 'AAA1', bseCode: '', scored: { score: null }, industry: 'Widgets', industryGroup: 'Alpha' };
+  const noCode = { nseCode: '', bseCode: '', scored: { score: 5 }, industry: 'Widgets', industryGroup: 'Alpha' };
+  const stocks = [];
+  assert.deepStrictEqual(FY.onboardNew(stocks, [unscored, noCode], new Set(), '2026-10-10'), { onboarded: [], bseOnly: [] });
+  assert.strictEqual(stocks.length, 0);
+  const listed = mkStock('AAA1', 'Widgets'), before = JSON.stringify(listed);
+  const out = FY.rescoreKnown([listed], [unscored], '2026-10-10');
+  assert.deepStrictEqual([out.rescored, out.dropped, out.inactive, out.used.size], [0, ['AAA1 · Widgets'], [], 0]);
+  assert.strictEqual(JSON.stringify(listed), before, 'in the file but unscored: nothing changes');
+  const gone = mkStock('ZZZ9', 'Widgets'), res = FY.rescoreKnown([gone], [unscored], '2026-10-10');
+  assert.deepStrictEqual([gone.active, res.inactive], [false, ['ZZZ9 · Widgets']], 'missing from the file: marked inactive');
+  const back = mkStock('AAA1', 'Widgets', { active: false }); FY.rescoreKnown([back], [unscored], '2026-10-10');
+  assert.strictEqual('active' in back, false, 'back in the file: the inactive mark is removed');
+});
+test('apply: a new ticker with no industry in the file is added under its industry group, and a BSE-only code is reported', () => {
+  const noInd = fundRow('NOIND', 'Alpha', ''), bseOnly = Object.assign(fundRow('X', 'Alpha', 'Widgets'), { 'NSE Code': '', 'BSE Code': '543210' });
+  const stocks = [], res = F.applyFundamental(fundCsv([noInd, bseOnly, ...universe.slice(0, 11)]), stocks, '2026-10-10');
+  assert.ok(stocks.some(x => x.ticker === 'NOIND · Alpha'), 'the group stands in for the missing industry');
+  assert.ok(res.bseOnly.includes('543210') && res.onboarded.includes('543210'));
+});
+
+test('csv: a row with no group or name, and a figure that is not a number, is read as unclassified, nameless and missing', () => {
+  const odd = fundRow('ODD1', '', 'Widgets', { 'Name': '', 'Price to Earning': 'n/a', 'Debt to equity': 'abc' });
+  const rec = Fe.scoreCsv(fundCsv([odd, ...universe.slice(0, 11)]), {}).records.find(r => r.sym === 'ODD1');
+  assert.strictEqual(rec.industryGroup, '(unclassified)');
+  assert.strictEqual(rec.name, '');
+  assert.deepStrictEqual([rec.pe, rec.de], [null, null], 'text that is not a number is missing, never NaN');
+  assert.ok(rec.scored.score != null, 'the other figures still score it');
+});
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
