@@ -4,6 +4,7 @@
 //  3. no module-level declaration or export is unused                                    (catches dead code)
 //  4. no exported let/var and no set_x exports: shared state goes through accessors / named actions (catches the old pattern)
 //  5. no empty catch block without a comment saying why the error can be ignored                (catches silently swallowed errors)
+//  7. the size of functions (tools/complexity.js): lines, parameters and nesting may only go down (tools/quality-ratchet.json)
 //  6. the stylesheet moves toward one central design system (styles/css-ratchet.json): the number of rules tied to one screen (an element id in the selector),
 //     of font sizes written as a literal instead of a --t-* size, and of !important / :root:root:root overrides may only go down. Fewer than the
 //     recorded number: lower it (node tools/lint.js --ratchet). More: the check fails.
@@ -131,17 +132,22 @@ for(const f of require('fs').readdirSync('styles').filter(x => x.endsWith('.css'
   const markup = [path.join(root, 'index.html')].concat(fs.readdirSync(path.join(root, 'partials')).map(f => path.join(root, 'partials', f)));
   const srcText = files.map(f => fs.readFileSync(f, 'utf8'));
   const count = (re, texts) => texts.reduce((n, t) => n + (t.match(re) || []).length, 0);
+  const sizes = [...mods.values()].reduce((t, m) => { const r = require('./complexity.js').measure(m.ast); for(const k of Object.keys(t)) t[k] += r[k]; return t; }, { functions: 0, tooLong: 0, tooManyParams: 0, tooDeep: 0 });
   const now = {
     innerHTMLAssignments: count(/\.(innerHTML|outerHTML)\s*\+?=/g, srcText),
     evalLike: count(/\beval\(|new Function\(|document\.write\(|insertAdjacentHTML\(/g, srcText),
     inlineStyleAttrs: count(/\sstyle=/g, srcText.concat(markup.map(read))),
-    inlineStyleScriptWrites: count(/\.style\.(?!setProperty|removeProperty)[a-zA-Z]+\s*=[^=]/g, srcText)
+    inlineStyleScriptWrites: count(/\.style\.(?!setProperty|removeProperty)[a-zA-Z]+\s*=[^=]/g, srcText),
+    // CLAUDE.md section 1: functions of at most 40 lines, 4 parameters and 3 levels of nesting (tools/complexity.js)
+    functionsOver40Lines: sizes.tooLong,
+    functionsOver4Params: sizes.tooManyParams,
+    functionsNestedOver3: sizes.tooDeep
   };
   let saved = null;
   try { saved = JSON.parse(read(file)); } catch(e){ /* first run: nothing recorded yet */ }
   if(process.argv.includes('--ratchet') || !saved){ fs.writeFileSync(file, JSON.stringify(now, null, 2) + '\n'); console.log('quality ratchet written: ' + JSON.stringify(now)); }
   else for(const k of Object.keys(now)){
-    if(now[k] > (saved[k] ?? 0)) err('quality: ' + k + ' went up (' + (saved[k] ?? 0) + ' -> ' + now[k] + '). See CLAUDE.md: use safe DOM APIs and shared CSS classes.');
+    if(now[k] > (saved[k] ?? 0)) err('quality: ' + k + ' went up (' + (saved[k] ?? 0) + ' -> ' + now[k] + '). ' + (k.startsWith('functions') ? 'See CLAUDE.md section 1: keep functions short (40 lines), at most 4 parameters (else an options object) and 3 levels of nesting (early returns).' : 'See CLAUDE.md: use safe DOM APIs and shared CSS classes.'));
     else if(now[k] < (saved[k] ?? 0)) warn('quality: ' + k + ' is down to ' + now[k] + ' (was ' + saved[k] + '): run node tools/lint.js --ratchet to lock it in');
   }
 }

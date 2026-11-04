@@ -2160,6 +2160,30 @@ test('refresh menu: it opens under its button (or above it, or in the middle wit
   } finally { win.Element.prototype.getBoundingClientRect = protoRect; if(saved) Object.defineProperty(globalThis, 'window', saved); else delete globalThis.window; }
 }));
 
+// ---- the size limits of CLAUDE.md section 1 (tools/complexity.js): lines, parameters and nesting of a function
+test('complexity: the limits are 40 lines, 4 parameters and 3 levels of nesting', () => {
+  const C = require('../tools/complexity.js');
+  assert.deepStrictEqual([C.MAX_LINES, C.MAX_PARAMS, C.MAX_NESTING], [40, 4, 3]);
+});
+test('complexity: a function over the limits is counted once per limit, a nested function on its own', () => {
+  const { measure, nestingDepth } = require('../tools/complexity.js'), espree = require('espree');
+  const parse = code => espree.parse(code, { ecmaVersion: 'latest', sourceType: 'module', loc: true });
+  assert.deepStrictEqual(measure(parse('')), { functions: 0, tooLong: 0, tooManyParams: 0, tooDeep: 0 });
+  assert.deepStrictEqual(measure(parse('function ok(a, b, c, d){ if(a) return b; return c + d; }')), { functions: 1, tooLong: 0, tooManyParams: 0, tooDeep: 0 }, 'exactly at the limits is fine');
+  const five = measure(parse('const f = (a, b, c, d, e) => a;'));
+  assert.deepStrictEqual([five.tooManyParams, five.tooLong, five.tooDeep], [1, 0, 0]);
+  const long = measure(parse('function big(){\n' + 'x();\n'.repeat(39) + '}'));
+  assert.strictEqual(long.tooLong, 1, '41 lines is over');
+  assert.strictEqual(measure(parse('function edge(){\n' + 'x();\n'.repeat(38) + '}')).tooLong, 0, '40 lines is allowed');
+  const deep = 'function d(a){ if(a){ for(const x of a){ while(x){ try { x(); } catch(e){ /* ignored */ } } } } }';
+  assert.strictEqual(measure(parse(deep)).tooDeep, 1, 'if > for > while > try is four levels');
+  assert.strictEqual(measure(parse('function d(a){ if(a){ for(const x of a){ while(x){ x(); } } } }')).tooDeep, 0, 'three levels is allowed');
+  const inner = measure(parse('function outer(a){ if(a){ if(a){ if(a){ return () => { if(a){ if(a){ if(a){ return 1; } } } }; } } } }'));
+  assert.deepStrictEqual([inner.functions, inner.tooDeep], [2, 0], 'a nested function is measured on its own, not added to its parent');
+  assert.strictEqual(nestingDepth(parse('switch(1){ case 1: if(1){} }').body), 2);
+  assert.strictEqual(nestingDepth(null), 0);
+});
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
