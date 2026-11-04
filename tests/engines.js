@@ -2402,6 +2402,168 @@ test('subscriptions: every listener is started, restarted after an error up to i
   } finally { if(saved.document === undefined) delete G.document; else G.document = saved.document; G.setTimeout = saved.setTimeout; if(saved.S === undefined) delete G.__S; else G.__S = saved.S; }
 }));
 
+// ---- price chart: tooltip text and SVG drawing are pure; the page wiring is driven in jsdom
+const CHART_BARS = (n, step, t0) => Array.from({ length: n }, (_, i) => { const c = 100 + Math.sin(i / 5) * 20 + i * .3; return [t0 + i * step, c - 1.5, c + 4, c - 4, c + (i % 3 ? 1 : -1), 1000 + i * 37]; });
+const CHART_MS = (n, from) => ({ from, macd: Array.from({ length: n }, (_, i) => Math.sin(i / 4)), signal: Array.from({ length: n }, (_, i) => Math.sin(i / 4 - .5)), hist: Array.from({ length: n }, (_, i) => Math.sin(i / 4) - Math.sin(i / 4 - .5) - (i % 2 ? .6 : 0)) });
+const CHART_CFG = { title: 'Weekly', ranges: [], def: 0, lbl: { day: 'numeric', month: 'short' }, every: 0 };
+
+test('price chart tooltip: prices, change and volume read in Indian units, and the heading names the week or month', () => {
+  const T = load('src/prices/charttip.js');
+  const bar = [1.65e9, 100, 110, 90, 105, 2.5e7];
+  assert.strictEqual(T.tipLabel('1W', bar), 'Week of 15 Apr 2022');
+  assert.strictEqual(T.tipLabel('1M', bar), 'April 2022');
+  const html = T.tooltipHtml('H', bar, 5, 'X');
+  assert.ok(html.startsWith('<b>H</b>') && html.endsWith('X') && html.includes('₹100.00') && html.includes('+5.0%') && html.includes('2.50 Cr'));
+  assert.ok(T.tooltipHtml('H', [0, 1, 1, 1, 1, 150000], -2.04, '').includes('-2.0%') && T.tooltipHtml('H', [0, 1, 1, 1, 1, 150000], 0, '').includes('1.50 L'));
+  assert.ok(T.tooltipHtml('H', [0, 1, 1, 1, 1, 1500], 0, '').includes('1.5K') && T.tooltipHtml('H', [0, 1, 1, 1, 1, 999], 0, '').includes('<span>999</span>'));
+  assert.ok(Math.abs(T.changePct([0, 100, 0, 0, 110, 0], [0, 0, 0, 0, 100, 0]) - 10) < 1e-9);
+  assert.ok(Math.abs(T.changePct([0, 100, 0, 0, 110, 0], undefined) - 10) < 1e-9);   // the first bar compares with its own open
+  assert.ok(Math.abs(T.changePct([0, 100, 0, 0, 110, 0], [0, 0, 0, 0, 0, 0]) - 10) < 1e-9);   // a previous close of zero is no base
+});
+
+test('price chart tooltip: MACD rows, and the tooltip stays inside the chart', () => {
+  const T = load('src/prices/charttip.js');
+  assert.strictEqual(T.macdTipHtml(null, 3), '');
+  const ms = { macd: [1.234], signal: [2], hist: [-.5], from: 0 };
+  assert.ok(T.macdTipHtml(ms, 0).includes('1.23') && T.macdTipHtml(ms, 0).includes('-0.50') && !T.macdTipHtml(ms, 0).includes('warming'));
+  assert.ok(T.macdTipHtml(Object.assign({}, ms, { from: 5 }), 0).includes('MACD still warming up'));
+  assert.strictEqual(T.tipLeft(500, 100, 50), 64);        // beside the pointer
+  assert.strictEqual(T.tipLeft(500, 100, 450), 336);      // flipped to the pointer's left
+  assert.strictEqual(T.tipLeft(500, 100, 20), 34);
+  assert.strictEqual(T.tipLeft(100, 200, 10), 0);         // wider than the chart: pinned to the left edge
+});
+
+test('price chart tooltip: events are listed newest first, escaped, capped at five, with the price reaction after news', () => {
+  const T = load('src/prices/charttip.js');
+  const groups = [{ id: 'earn', glyph: 'E' }, { id: 'trade', glyph: 'T' }];
+  assert.strictEqual(T.eventTipHtml(undefined, null, 'week', groups), '');
+  assert.strictEqual(T.eventTipHtml([], null, 'week', groups), '');
+  const ev = (o) => Object.assign({ t: 1, d: '2023-01-01', k: 'news', group: 'news', glyph: '', text: 't', src: '', s: '' }, o);
+  const html = T.eventTipHtml([ev({ text: '<img onerror=alert(1)>', src: 'S&P', s: 'pos', t: 9 }), ev({ k: 'earn', group: 'earn', text: 'R', t: 5 }), ev({ k: 'sell', group: 'trade', glyph: 'S', text: 'Sold', t: 4 }), ev({ k: 'x', group: 'trade', text: 'T', t: 3 })], { same: 2, next: null }, 'week', groups);
+  assert.ok(!html.includes('<img') && html.includes('&lt;img') && html.includes('S&amp;P'));
+  assert.ok(html.indexOf('&lt;img') < html.indexOf('>R<') && html.includes('pc-evk-news s-pos') && html.includes('⚡') && html.includes('pc-evk-trade sell'));
+  assert.ok(html.includes('>E<') && html.includes('>T<') && html.includes('Price: week +2.0%, next week n/a'));
+  const many = T.eventTipHtml(Array.from({ length: 7 }, (_, i) => ev({ t: i })), null, 'month', groups);
+  assert.ok(many.includes('+2 more') && !many.includes('evmove'));
+  assert.ok(!T.eventTipHtml([ev({ k: 'earn', group: 'earn' })], { same: 1, next: 1 }, 'week', groups).includes('evmove'));   // reaction only for news
+});
+
+test('price chart drawing: candles, volume, dates and the MACD band are drawn for the bars in view, and warm-up bars are marked', () => {
+  const S = load('src/prices/chartsvg.js');
+  const view = CHART_BARS(60, 7 * 86400, 1.65e9), base = { view, off: 40, cfg: CHART_CFG, ms: null, lanes: [], byBar: new Map(), W: 900 };
+  const plain = S.buildChartSvg(base);
+  assert.ok(plain.html.includes('class="pc-volbar"') && plain.html.includes('var(--buy)') && plain.html.includes('class="pc-xh"') && !plain.html.includes('MACD'));
+  assert.strictEqual(plain.geo.H, 250); assert.strictEqual(plain.geo.n, 60); assert.strictEqual(plain.geo.off, 40);
+  const withMacd = S.buildChartSvg(Object.assign({}, base, { ms: CHART_MS(100, 50) }));
+  assert.ok(withMacd.html.includes('MACD (12, 26, 9)') && withMacd.html.includes('pc-mwarm') && withMacd.html.includes('warm-up: less reliable') && withMacd.html.includes('pc-mline') && withMacd.html.includes('pc-early'));
+  assert.strictEqual(withMacd.geo.H, 250 + 92);
+  const reliable = S.buildChartSvg(Object.assign({}, base, { ms: CHART_MS(100, 0) }));
+  assert.ok(!reliable.html.includes('pc-mwarm'));
+  const flat = { from: 0, macd: Array(100).fill(0), signal: Array(100).fill(0), hist: Array(100).fill(0) };
+  assert.ok(S.buildChartSvg(Object.assign({}, base, { ms: flat })).html.includes('pc-mzero'));
+  const tiny = { from: 0, macd: Array(100).fill(.004), signal: Array(100).fill(.001), hist: Array(100).fill(.003) };
+  assert.ok(/>0\.00\d</.test(S.buildChartSvg(Object.assign({}, base, { ms: tiny })).html));   // small values keep decimals on the axis
+  const short = S.buildChartSvg(Object.assign({}, base, { ms: CHART_MS(100, 42) }));
+  assert.ok(!short.html.includes('warm-up: less reliable'));   // too narrow a block for the note
+});
+
+test('price chart drawing: candle bodies change with the room, narrow charts get fewer date labels, and the monthly labels follow their step', () => {
+  const S = load('src/prices/chartsvg.js');
+  const cfg = { title: 'Monthly', ranges: [], def: 0, lbl: { month: 'short', year: '2-digit' }, every: 3 };
+  const draw = (n, W, c) => S.buildChartSvg({ view: CHART_BARS(n, 30 * 86400, 1.55e9), off: 0, cfg: c || CHART_CFG, ms: null, lanes: [], byBar: new Map(), W }).html;
+  assert.ok(draw(20, 900).includes('<rect') && !draw(20, 900).includes('class="pc-xh" y1="8" y2="228" opacity="0"/><rect'));   // wide bars are rects
+  assert.ok(draw(120, 900).includes('M') && !/<rect x="[^"]+" y="[^"]+" width="[^"]+" height="[^"]+" fill/.test(draw(300, 900)));   // thin bars are paths
+  assert.ok(!/<path d="[^"]*" fill="var\(--buy\)"/.test(draw(900, 400)));   // too thin to draw a body: wicks only
+  const labels = (html) => (html.match(/text-anchor="(start|middle|end)"/g) || []).length;
+  assert.ok(labels(draw(80, 400)) < labels(draw(80, 900)));
+  assert.ok(labels(draw(60, 900, cfg)) > 0);
+  const edge = draw(40, 300);   // the first label hugs the left edge, a late one the right
+  assert.ok(edge.includes('text-anchor="start"'));
+});
+
+test('price chart drawing: event tags sit in one lane per kind, with the right glyph and colour class', () => {
+  const S = load('src/prices/chartsvg.js');
+  const ev = (o) => Object.assign({ group: 'news', k: 'news', s: '' }, o);
+  const lanes = [{ id: 'news', glyph: '⚡' }, { id: 'trade', glyph: 'T' }, { id: 'earn', glyph: 'E' }];
+  const byBar = new Map([[41, [ev({ s: 'pos' }), ev({ s: 'neg' })]], [42, [ev({ s: 'pos' })]], [43, [ev({ s: 'neg' })]], [44, [ev({ s: 'neu' })]], [45, [ev({})]], [46, [ev({ group: 'trade', k: 'sell' })]], [47, [ev({ group: 'trade', k: 'buy' }), ev({ group: 'trade', k: 'sell' })]], [48, [ev({ group: 'earn', k: 'earn' })]], [5, [ev({})]]]);
+  const html = S.buildChartSvg({ view: CHART_BARS(60, 7 * 86400, 1.65e9), off: 40, cfg: CHART_CFG, ms: null, lanes, byBar, W: 900 }).html;
+  ['s-mix', 's-pos', 's-neg', 's-neu'].forEach((c) => assert.ok(html.includes('pc-ev pc-evk-news ' + c), c));
+  assert.ok(html.includes('pc-ev pc-evk-news"') || html.includes('pc-ev pc-evk-news s-"'));   // unlabelled news
+  assert.ok(html.includes('pc-evk-trade sell') && html.includes('pc-evk-trade buy') && html.includes('pc-evk-earn') && html.includes('<circle'));
+  assert.strictEqual((html.match(/class="pc-ev /g) || []).length, 9 - 1);   // the bar before the view is skipped
+  assert.ok(S.buildChartSvg({ view: CHART_BARS(60, 7 * 86400, 1.65e9), off: 40, cfg: CHART_CFG, ms: null, lanes, byBar: new Map(), W: 900 }).geo.H > 250);
+});
+
+test('price chart drawing: the band over a chart covers the bars that overlap the other chart\'s hovered bar', () => {
+  const S = load('src/prices/chartsvg.js');
+  const G = { b: [0, 1, 2, 3, 4], off: 10, X: (i) => 10 * i, step: 8, H: 100 };
+  const spanAt = (j) => [(j - 10) * 10, (j - 10) * 10 + 10];
+  assert.strictEqual(S.bandRects(G, [], spanAt), '');
+  assert.strictEqual(S.bandRects(G, [[100, 110]], spanAt), '');   // nothing overlaps
+  const one = S.bandRects(G, [[12, 28]], spanAt);   // overlaps bars 1 and 2
+  assert.ok(one.includes('x="6"') && one.includes('width="16"') && one.includes('height="70"') && one.includes('pc-bandrect'));
+  assert.strictEqual((S.bandRects(G, [[12, 28], [0, 5]], spanAt).match(/<rect/g) || []).length, 2);
+});
+
+test('price chart: both charts are drawn, the pointer shows a tooltip and links the two charts, ranges and event kinds can be switched, and a resize redraws', () => alone(async () => {
+  const { JSDOM } = require('jsdom');
+  const win = new JSDOM('<!doctype html><body></body>').window, G = globalThis, saved = ['document', 'ResizeObserver', 'requestAnimationFrame', '__H'].map((k) => [k, G[k]]), realNow = Date.now;
+  let resize; G.document = win.document; G.ResizeObserver = class { constructor(cb){ resize = cb; } observe(){} disconnect(){ this.gone = true; } }; G.requestAnimationFrame = (cb) => { cb(); return 0; }; Date.now = () => Date.UTC(2026, 10, 4);
+  G.__H = { T: { '1W': CHART_BARS(120, 7 * 86400, 1.65e9), '1M': CHART_BARS(70, 30 * 86400, 1.55e9) }, NONE: {} };
+  Object.defineProperty(win.HTMLElement.prototype, 'clientWidth', { configurable: true, get(){ return 900; } });
+  Object.defineProperty(win.HTMLElement.prototype, 'offsetWidth', { configurable: true, get(){ return 100; } });
+  win.Element.prototype.getBoundingClientRect = () => ({ left: 10, width: 900, top: 0, height: 100 });
+  const t0 = 1.65e9, ev = (o) => Object.assign({ d: '2022-07-01', k: 'news', group: 'news', glyph: '', text: 'n', src: '', url: '', s: 'pos' }, o);
+  const stubs = {
+    './store.js': 'export const pcTickerKey = (s) => s.t; export const priceHistoryByTicker = globalThis.__H; export const priceLoaded = () => true; export const ensureAllPriceBars = () => {}; export const ensurePriceBars = () => {}; export const loadPriceBarsFor = () => {}; export const loadRecentBars = () => {}; export const priceApply = () => {}; export const priceSymbolByTicker = {};',
+    './events.js': `export const EVENT_GROUPS = [{id:'news',label:'News',glyph:'⚡'},{id:'trade',label:'Your trades',glyph:'T'}]; export const eventTime = () => null; export const stockChartEvents = (s) => s.ev || [];
+      export const eventsByBar = (events, bars, span, shown) => { const m = new Map(); bars.forEach((b, i) => { const l = events.filter(e => shown.has(e.group) && e.t >= b[0] && e.t < (i + 1 < bars.length ? bars[i + 1][0] : b[0] + span)); if(l.length) m.set(i, l); }); return m; };
+      export const barReaction = (bars, i) => ({ same: 1.5, next: null });`,
+  };
+  try {
+    const C = await loadWithStubs('src/prices/chart.js', '', stubs), host = win.document.createElement('div'); win.document.body.appendChild(host);
+    const stock = { t: 'T', ev: [ev({ t: t0 + 7 * 86400 * 10 + 5 }), ev({ t: t0 + 7 * 86400 * 30, k: 'sell', group: 'trade', s: '' })] };
+    assert.strictEqual(C.renderPriceChartMount({ t: 'NONE' }, {}), '');
+    host.innerHTML = C.renderPriceChartMount(stock, { '1W': '<b>w</b>' });
+    assert.ok(host.querySelector('.pc-sums [data-k="1M"]').innerHTML === '');   // a missing summary is empty
+    C.initPriceChart({ t: 'NONE' });   // no data: nothing drawn
+    C.initPriceChart(stock);
+    const panel = (k) => host.querySelector('.pc-panel[data-k="' + k + '"]');
+    assert.strictEqual(host.querySelectorAll('.pc-panel').length, 2);
+    assert.ok(panel('1W').querySelector('svg').innerHTML.includes('pc-volbar') && panel('1W').querySelector('.pc-psum b').textContent === 'w');
+    const move = (k, x) => panel(k).querySelector('.pc-chart').dispatchEvent(Object.assign(new win.Event('pointermove'), { clientX: x }));
+    move('1W', 86);
+    const tip = panel('1W').querySelector('.pc-tip');
+    assert.ok(tip.classList.contains('is-shown') && tip.textContent.includes('Week of') && tip.textContent.includes('Price: week +1.5%, next week n/a') && tip.style.getPropertyValue('--x') !== '');
+    assert.strictEqual(panel('1W').querySelector('.pc-xh').getAttribute('opacity'), '1');
+    assert.ok(panel('1M').querySelector('.pc-bandrect'));   // the other chart shades the same weeks
+    move('1W', 5000);
+    assert.ok(panel('1W').querySelector('.pc-tip').textContent.includes('Week of'));   // clamped to the last bar
+    panel('1W').querySelector('.pc-chart').dispatchEvent(new win.Event('pointerleave'));
+    assert.ok(!tip.classList.contains('is-shown') && !panel('1M').querySelector('.pc-bandrect') && panel('1W').querySelector('.pc-xh').getAttribute('opacity') === '0');
+    const pills = panel('1W').querySelectorAll('.pc-pill'); pills[0].click();
+    assert.strictEqual(pills[0].getAttribute('aria-pressed'), 'true'); assert.strictEqual(pills[2].getAttribute('aria-pressed'), 'false');
+    assert.ok(panel('1W').querySelector('svg').innerHTML.length < 20000); pills[2].click();   // 6M shows fewer bars; back to all of them
+    const lanes = () => (panel('1W').querySelector('svg').innerHTML.match(/class="pc-ev /g) || []).length;
+    const before = lanes(); assert.ok(before > 0);
+    host.querySelector('.pc-evtoggle').click();   // hides the news lane
+    assert.ok(lanes() < before && host.querySelector('.pc-evtoggle').getAttribute('aria-pressed') === 'false');
+    host.querySelector('.pc-evtoggle').click(); assert.strictEqual(lanes(), before);
+    const key = host.querySelector('#pcKeyToggle'); key.click();
+    assert.ok(host.querySelector('#priceChartBlock').classList.contains('show-key') && key.textContent === 'Hide legend' && key.getAttribute('aria-expanded') === 'true');
+    key.click(); assert.strictEqual(key.textContent, 'Legend');
+    const html = panel('1M').querySelector('svg').innerHTML;
+    panel('1M').querySelector('svg').innerHTML = ''; resize(); resize();
+    await new Promise((r) => setTimeout(r, 150));
+    assert.strictEqual(panel('1M').querySelector('svg').innerHTML, html);   // a resize redraws once it pauses
+    const old = host.querySelector('#priceChartBlock'); host.innerHTML = ''; resize();
+    await new Promise((r) => setTimeout(r, 150));   // a chart no longer on the page is left alone
+    assert.ok(!old.isConnected);
+    host.innerHTML = C.renderPriceChartMount(stock, {}); C.initPriceChart(stock);   // starting again drops the earlier observer
+    assert.strictEqual(host.querySelectorAll('.pc-panel').length, 2);
+  } finally { saved.forEach(([k, v]) => { if(v === undefined) delete G[k]; else G[k] = v; }); Date.now = realNow; }
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
