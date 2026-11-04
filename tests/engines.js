@@ -2634,18 +2634,22 @@ test('refresh snapshot: bars carried by the snapshot call are placed when they l
 });
 
 // ---- Refresh all stocks (src/refresh/tvrefresh.js): the snapshot and bar steps, driven with a made-up TradingView and database
-const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG']);
+const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG', 'fundamentalCsvUploadLog', 'tabId']);
 const TV_DEFAULTS = { tickerSymbol: (s) => s.ticker, sanitizeDocId: (x) => x, sleep: () => Promise.resolve(), sameValue: (a, b) => JSON.stringify(a) === JSON.stringify(b) };   // what the real helpers do, without their imports and waits
 // A stand-in for an imported function: it calls whatever the running test put in globalThis.__T (looked up at call time) or a default. Made here, not in the stub's text, so it is not counted as source code.
 globalThis.__TVFN = (n) => (...a) => (globalThis.__T[n] ? globalThis.__T[n](...a) : (TV_DEFAULTS[n] || (() => undefined))(...a));
-async function loadTvRefresh(){
-  const fs = require('fs'), src = fs.readFileSync(path.join(root, 'src/refresh/tvrefresh.js'), 'utf8'), keep = new Set(['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js']), stubs = {};
+// Loads a src module with every import replaced by a stand-in, except the modules named in `keep` (which load for real). A stand-in function calls whatever the
+// running test put in globalThis.__T (or a default); the stand-ins for values are read from globalThis.__T when the module loads.
+async function loadAllStubbed(file, extra, keep){
+  const src = fs.readFileSync(path.join(root, file), 'utf8'), stubs = {};
   for(const m of src.matchAll(/^import \{([^}]*)\} from '([^']+)';/gm)){
-    if(keep.has(m[2])) continue;
-    stubs[m[2]] = m[1].split(',').map((n) => n.trim()).concat(m[2] === '../tv/connector.js' ? ['tvIsFatal'] : []).map((n) => TV_VALUES.has(n) ? `export const ${n} = globalThis.__T.${n};` : `export const ${n} = globalThis.__TVFN('${n}');`).join('\n');
+    if(keep.includes(m[2])) continue;
+    stubs[m[2]] = m[1].split(',').map((n) => n.trim().split(' as ')[0]).concat(m[2] === '../tv/connector.js' ? ['tvIsFatal'] : []).map((n) => TV_VALUES.has(n) ? `export const ${n} = globalThis.__T.${n};` : `export const ${n} = globalThis.__TVFN('${n}');`).join('\n');
   }
-  return loadWithStubs('src/refresh/tvrefresh.js', 'export { paintHint, rsBars, rsReport, rsSnapshot, rsTech2, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };', stubs);
+  return loadWithStubs(file, extra, stubs);
 }
+const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { paintHint, rsBars, rsReport, rsSnapshot, rsTech2, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
+  ['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js']);
 const tvStock = (name) => ({ name, ticker: name, pillars: { val: 0.5 } });
 const tvRun = (db, names, over) => Object.assign({ db, today: '2026-11-04', stored: new Map(), prevRows: new Map(), todo: names.map((n) => ({ s: tvStock(n), sym: 'N:' + n })), ctx: null, batchLeft: {}, updated: 0, unchanged: 0, scored: 0, kept: 0, chunksSaved: 0,
   retried: 0, answeredAgain: 0, carried: 0, skipped: [], batchSecs: [], tvWaitMs: 0, saveMs: 0, stopped: false, barsUpdated: 0, batchSaved: 0, chunkWrites: 0, techBlocksSaved: 0, compacted: 0, staleBefore: 0, noneBefore: 0, filled: 0, histFailed: 0, noHistoryLeft: 0 }, over);
@@ -2846,6 +2850,133 @@ test('refresh all stocks, bars step: placed stocks are saved in batches and scor
   await M.rsBars(run2); M.__stop(false);
   assert.deepStrictEqual([run2.compacted, onebyone.length, run2.stopped], [1, 0, true]);
 }));
+
+// ---- Fundamental import (src/import/fund-import.js, fundreport.js)
+test('fundamental import report: the column check, thin-file warning, job note and result lines say what happened', () => {
+  const R = load('src/import/fundreport.js');
+  const cols = /const FI_COLUMNS = \[(.*?)\];/.exec(fs.readFileSync(path.join(root, 'src/import/fundreport.js'), 'utf8'))[1].split(',').map((c) => c.trim().replace(/^'|'$/g, ''));
+  assert.strictEqual(cols.length, 44);
+  assert.strictEqual(R.fundColumnsError(cols.join(',') + '\n1,2'), null);
+  assert.strictEqual(R.fundColumnsError(cols.map((c) => '"' + c.toUpperCase() + '"').join(',') + '\r\n'), null);   // quoted, any case
+  assert.ok(R.fundColumnsError(cols.slice(0, 40).join(',')).endsWith('Missing: ' + cols.slice(40, 44).join(', ') + '.'));
+  const many = R.fundColumnsError('Name'); assert.ok(many.includes('… +37.') && many.includes('Missing: BSE Code'));
+  assert.strictEqual(R.fundColumnsError(''), many.replace('Missing: BSE Code', 'Missing: Name').replace(/Missing: .*… \+37\./, 'Missing: ' + cols.slice(0, 6).join(', ') + ' … +38.'));
+  assert.strictEqual(R.thinFileWarning(1500, 2100), null);
+  assert.ok(R.thinFileWarning(900, 2100).startsWith('Only 900 of the 2,100 dashboard stocks are in this file'));
+  const res = { rescored: 2000, onboarded: ['N1', 'N2'], dropped: ['D'], inactive: ['I1', 'I2', 'I3'], verdictMix: { buy: 3, hold: 5 }, duplicates: [], bseOnly: [] };
+  assert.strictEqual(R.importNote(res, { buy: 1, mbuy: 2 }, res.verdictMix), 'Imported in the page: 2000 rescored, 2 new, 1 left unchanged, 3 marked inactive (not in the file). Strong 1→3, Good 2→0, Hold 0→5, Avoid 0→0.');
+  const stocks = [{ t: 'N1', pillars: { val: 1 } }, { t: 'N2', pillars: {} }, { t: 'OLD' }, { t: 'N3' }];
+  assert.deepStrictEqual(R.newWithoutValue(stocks, ['N1', 'N2', 'N3'], (s) => s.t), ['N2', 'N3']);
+  const chk = { moved: 4, maxMove: 2.345 }, lines = R.importResultLines({ res, before: { buy: 1 }, chk, nothing: false, noVal: [], logErr: '' });
+  assert.deepStrictEqual(lines.map((l) => l.text), ['Import complete.', '2,000 stocks rescored · 2 new · 3 not in the file (marked inactive: hidden and no longer refreshed).', 'Strong 1 → 3 · Good 0 → 0 · Hold 0 → 5 · Avoid 0 → 0.', '4 stocks moved by 1.0 point or more (largest move 2.35).', lines[4].text]);
+  assert.ok(lines[4].text.startsWith('New: N1, N2. They use the default Screener.in link and need no chart mapping.') && lines[4].cls.includes('muted'));
+  const big = { rescored: 1, onboarded: Array.from({ length: 17 }, (_, i) => 'N' + i), bseOnly: Array.from({ length: 12 }, (_, i) => 'B' + i), duplicates: Array.from({ length: 12 }, (_, i) => 'D' + i), inactive: [], dropped: [], verdictMix: {} };
+  const all = R.importResultLines({ res: big, before: {}, chk, nothing: true, noVal: ['X'], logErr: 'db down' }).map((l) => l.text);
+  assert.ok(all[0].startsWith('Import complete: the file produced no changes') && all[4].includes('D0, D1') && all[4].includes('… +2 on more than one row'));
+  assert.ok(all[5].includes('… +2. They use the default Screener.in link and have no TradingView chart mapping yet (BSE-only: B0') && all[5].includes('B9 …).'));
+  assert.ok(all[6].startsWith('1 new stock has no Intrinsic Value') && R.importResultLines({ res: big, before: {}, chk, nothing: false, noVal: ['X', 'Y'], logErr: '' })[6].text.startsWith('2 new stocks have no'));
+  assert.ok(all[7].includes('could not be marked as imported (db down)'));
+});
+
+const fiFakeDb = (docs, hooks) => {
+  const h = hooks || {};
+  return { docs, doc: (p) => ({ get: async () => { if(h.get) h.get(p); return { exists: p in docs, data: () => docs[p] }; },
+    set: async (d) => { if(h.set) h.set(p, d); docs[p] = JSON.parse(JSON.stringify(d)); }, delete: async () => { if(h.del) h.del(p); delete docs[p]; } }) };
+};
+const fiStock = (t, extra) => Object.assign({ ticker: t, verdict: 'hold' }, extra);
+const fiRaw = (stocks, version) => {
+  const doc = { chunk: 1, count: stocks.length, stocks }, canon = (o) => Array.isArray(o) ? '[' + o.map(canon).join(',') + ']' : o && typeof o === 'object' ? '{' + Object.keys(o).sort().filter((k) => o[k] !== undefined).map((k) => JSON.stringify(k) + ':' + canon(o[k])).join(',') + '}' : JSON.stringify(o);
+  return { meta: { version, count: stocks.length, chunks: ['c001'], index: Object.fromEntries(stocks.map((x) => [x.ticker, 'c001'])) }, docs: { c001: doc }, oldCanon: { c001: canon(doc) }, stocks };
+};
+const fiSetup = () => {
+  const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), fiSym: (s) => s.ticker, fundamentalCsvUploadLog: new Map(), tabId: 'tab', primeStockCache: async () => {}, lockBusy: () => false, startBeat: () => () => {} };
+  return T;
+};
+const fiLoad = () => loadAllStubbed('src/import/fund-import.js', 'export { fiPersist, fiRollback, fiRunImport }; export const __own = (db, assets) => { fiDb = db; fiAssets = assets; fiOwner = !!db; };', ['./fundreport.js']);
+
+test('fundamental import, writing: only changed chunks are written, the index goes last, and the result is read back', () => alone(async () => {
+  const T = fiSetup(), M = await fiLoad(), old = [fiStock('A'), fiStock('B')], raw = fiRaw(old, 4), writes = [];
+  const db = fiFakeDb({ 'stockMeta/main': raw.meta, 'stockData/c001': raw.docs.c001 }, { set: (p) => writes.push(p) });
+  const same = await M.fiPersist(db, raw, JSON.parse(JSON.stringify(old)), 'import');
+  assert.deepStrictEqual([same.nothing, same.wrote, writes], [true, 0, []]);   // nothing changed: nothing written
+  const out = await M.fiPersist(db, raw, [fiStock('A', { verdict: 'buy' }), fiStock('B')], 'import');
+  assert.deepStrictEqual([out.nothing, out.wrote, writes], [false, 1, ['stockData/c001', 'stockMeta/main']]);
+  assert.strictEqual(db.docs['stockMeta/main'].version, 5); assert.ok(T.log.includes('write|done|1 parts written') && T.log.some((l) => l.startsWith('verify|running|Reading it back')));
+}));
+
+test('fundamental import, writing: a failed chunk write or index publish puts the old data back, and a failed read-back says the data is live', () => alone(async () => {
+  const T = fiSetup(), M = await fiLoad(), old = [fiStock('A'), fiStock('B')], changed = [fiStock('A', { verdict: 'buy' }), fiStock('B')];
+  const fresh = () => { const raw = fiRaw(old, 4); return { raw, docs: { 'stockMeta/main': JSON.parse(JSON.stringify(raw.meta)), 'stockData/c001': JSON.parse(JSON.stringify(raw.docs.c001)) } }; };
+  const denied = Object.assign(new Error('no write access'), { code: 'not_granted' });
+  let f = fresh(); let db = fiFakeDb(f.docs, { set: (p) => { if(p === 'stockData/c001' && !f.docs.__failed){ f.docs.__failed = 1; throw denied; } } });
+  delete f.docs.__failed;
+  await assert.rejects(M.fiPersist(db, f.raw, changed, 'import'), (e) => e.rolledBack === true && /Could not save the stock data \(not_granted: no write access\)\. Your previous data was put back\./.test(e.message));
+  assert.strictEqual(f.docs['stockData/c001'].stocks[0].verdict, 'hold'); assert.ok(T.log.some((l) => l.includes('putting the old data back')));
+  f = fresh(); db = fiFakeDb(f.docs, { get: (p) => { if(p === 'stockMeta/main') f.docs['stockMeta/main'].version = 9; } });   // someone else published meanwhile
+  await assert.rejects(M.fiPersist(db, f.raw, changed, 'import'), (e) => e.rolledBack && /Could not publish the new data \(the stock data was changed by someone else while this import was running \(version 4 → 9\)\)/.test(e.message));
+  assert.strictEqual(f.docs['stockData/c001'].stocks[0].verdict, 'hold');
+  f = fresh(); const rollbackErrors = []; const realError = console.error; console.error = (...a) => rollbackErrors.push(a[0]);
+  let first = true; db = fiFakeDb(f.docs, { get: (p) => { if(p === 'stockMeta/main' && f.docs['stockMeta/main'].version === 5 && first){ first = false; f.docs['stockMeta/main'].version = 5; } }, set: (p) => { if(p === 'stockData/c001' && f.docs.__rb) throw denied; } });
+  f.docs.__rb = 1; try { await assert.rejects(M.fiPersist(db, f.raw, changed, 'import')); } finally { console.error = realError; }   // even the rollback cannot write: it is logged and the error still comes out
+  assert.ok(rollbackErrors.includes('Rollback failed for c001'));
+  f = fresh(); db = fiFakeDb(f.docs, { get: (p) => { if(p === 'stockMeta/main' && f.docs['stockMeta/main'].version === 5) f.docs['stockMeta/main'] = Object.assign({}, f.docs['stockMeta/main'], { version: 6 }); } });
+  await assert.rejects(M.fiPersist(db, f.raw, changed, 'import'), (e) => e.published === true && /read-back check failed: the index shows version 6/.test(e.message));
+  f = fresh(); db = fiFakeDb(f.docs, { set: (p, d) => { if(p === 'stockData/c001') d.stocks = []; } });
+  await assert.rejects(M.fiPersist(db, f.raw, changed, 'import'), (e) => e.published === true && /read-back check failed for c001/.test(e.message));
+}));
+
+const fiCsv = () => { const cols = /const FI_COLUMNS = \[(.*?)\];/.exec(fs.readFileSync(path.join(root, 'src/import/fundreport.js'), 'utf8'))[1].split(',').map((c) => c.trim().replace(/^'|'$/g, '')); return cols.join(',') + '\nrow'; };
+test('fundamental import, writing: rolling back restores a chunk that existed and deletes one that was new', () => alone(async () => {
+  fiSetup(); const M = await fiLoad(), gone = [];
+  const db = fiFakeDb({ 'stockData/c001': { stocks: ['changed'] }, 'stockData/c002': { stocks: ['new'] } }, { del: (p) => gone.push(p) });
+  await M.fiRollback(db, { oldCanon: { c001: '{"stocks":["old"]}' } }, new Set(['c001', 'c002']));
+  assert.deepStrictEqual(gone, ['stockData/c002']); assert.deepStrictEqual(db.docs['stockData/c001'], { stocks: ['old'] });
+}));
+
+const fiImportSetup = (over) => {
+  const T = fiSetup(), old = [fiStock('A'), fiStock('B')], raw = fiRaw(old, 4), jobs = [], saved = [];
+  const docs = { 'stockMeta/main': raw.meta, 'stockData/c001': raw.docs.c001 };
+  const db = fiFakeDb(docs, { set: (p, d) => { if(p.startsWith('importJobs')) jobs.push(d); } });
+  T.uploadsSettled = async () => {};
+  T.fundamentalCsvUploadLog.set('u1', { status: 'uploaded', uploadedAt: '2026-11-03T10:00:00Z', assetId: 'a1', filename: 'screen.csv' });
+  T.applyFundamental = (csv, stocks) => { stocks[0].verdict = 'buy'; return { rescored: 1600, onboarded: [], dropped: [], inactive: [], bseOnly: [], duplicates: [], verdictMix: { buy: 1, hold: 1 } }; };
+  T.fiCheck = () => ({ soft: [], hard: [], moved: 0, maxMove: 0 }); T.fiPrevInfo = () => ({}); T.recordScoreHistory = async () => {};
+  T.saveRecord = async (kind, id, rec) => { saved.push([kind, id, rec.status]); return ''; }; T.recordAttempt = (...a) => { T.attempt = a; };
+  T.fiAsk = async () => true; T.getFiState = () => ({ status: {} }); T.fiShowResult = (kind, lines) => { T.result = [kind, lines.map((l) => l.text)]; };
+  Object.assign(T, over || {});
+  return { T, db, jobs, saved, docs, assets: { read: async () => ({ ok: true, text: async () => fiCsv() }) } };
+};
+
+test('fundamental import: a good file is read, scored, checked, written and reported, and the job and upload record are closed', () => withPage('<button id="importFundamentalDataBtn"></button><button id="refreshWatchlistBtn"></button>', async () => {
+  const x = fiImportSetup(), M = await fiLoad();
+  M.__own(x.db, x.assets);
+  await M.fiRunImport();
+  assert.strictEqual(x.T.result[0], 'ok'); assert.strictEqual(x.T.result[1][0], 'Import complete.');
+  assert.deepStrictEqual(x.saved, [['fund', 'u1', 'processed']]);
+  assert.deepStrictEqual(x.jobs.map((j) => j.status), ['running', 'done']);
+  assert.strictEqual(x.docs['stockData/c001'].stocks[0].verdict, 'buy');
+  assert.ok(x.T.log.includes('read|done|screen.csv') && x.T.log.includes('load|done|2 stocks (data v4)') && x.T.log.includes('score|done|1,600 rescored, 0 new') && x.T.log.includes('check|done|passed') && x.T.log.includes('verify|done|data v5'));
+  assert.ok(!x.T.attempt);
+}));
+
+test('fundamental import: a missing file, wrong columns, a busy lock, a refused warning or failed checks stop the import with the right message and free the lock', () => withPage('<button id="importFundamentalDataBtn"></button><button id="refreshWatchlistBtn"></button>', async () => {
+  const realError = console.error; console.error = () => {};
+  try {
+    const run = async (over, mutate) => { const x = fiImportSetup(over); if(mutate) mutate(x); const M = await fiLoad(); M.__own(x.db, x.assets); await M.fiRunImport(); return x; };
+    let x = await run({}, (y) => y.T.fundamentalCsvUploadLog.clear());
+    assert.strictEqual(x.T.result[0], 'err'); assert.ok(x.T.result[1][0].startsWith('Import stopped: there is no uploaded file waiting.')); assert.strictEqual(x.jobs[x.jobs.length - 1].status, 'failed'); assert.ok(x.T.attempt);
+    x = await run({}, (y) => { y.assets.read = async () => ({ ok: true, text: async () => 'Name\nrow' }); });
+    assert.ok(x.T.result[1][0].includes('does not match the expected 44-column'));
+    x = await run({}, (y) => { y.assets.read = async () => ({ ok: false, status: 404 }); }); assert.ok(x.T.result[1][0].includes('could not read the stored file "screen.csv" (404)'));
+    x = await run({ lockBusy: () => true, lockText: () => 'since 10:00' }); assert.ok(x.T.result[1][0].includes('another import is already running (since 10:00)')); assert.strictEqual(x.jobs.length, 0);
+    x = await run({ fiCheck: () => ({ soft: [], hard: ['bad score'], moved: 0, maxMove: 0 }) }); assert.ok(x.T.result[1][0].includes('integrity check failed, nothing was written:'));
+    x = await run({ fiCheck: () => ({ soft: ['Looks odd.'], hard: [], moved: 0, maxMove: 0 }), fiAsk: async () => false });
+    assert.strictEqual(x.T.result[0], 'warn'); assert.ok(x.T.result[1][0].startsWith('Import cancelled before anything was written.')); assert.strictEqual(x.docs['stockData/c001'].stocks[0].verdict, 'hold');
+    x = await run({ applyFundamental: (csv, stocks) => { stocks[0].verdict = 'buy'; return { rescored: 900, onboarded: ['N'], dropped: [], inactive: [], bseOnly: [], duplicates: [], verdictMix: {} }; }, fiAsk: async (text) => { fiAskedText = text; return true; } });
+    assert.ok(fiAskedText.startsWith('Only 900 of the 2 dashboard stocks are in this file')); assert.strictEqual(x.T.result[0], 'ok');
+  } finally { console.error = realError; }
+}));
+let fiAskedText = '';
 
 (async () => {
 await Promise.all(pending);
