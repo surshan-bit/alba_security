@@ -614,6 +614,22 @@ test('strategy fields: every field reads an empty stock as missing and a full on
   assert.strictEqual(F.FIELD_BY_ID.get('pinned').get(full), 'no'); assert.strictEqual(F.FIELD_BY_ID.get('industry').get(full), 'Chemicals'); assert.strictEqual(F.FIELD_BY_ID.get('industry').get({ ticker: 'ABC' }), null);
   assert.ok(F.FIELD_BY_ID.get('techScore2') && !F.FIELDS.includes(F.FIELD_BY_ID.get('techScore2')), 'hidden fields stay readable but are not offered');
 });
+test('weekly MACD 30/60/5 live: today\'s price replaces this week\'s bar or is added as it, and an unusable price leaves the saved bars as they are', () => {
+  const TECH = load('src/engine/technical.js'), fall = Array.from({ length: 70 }, (_, i) => 200 - i), today = '2026-11-04';   // a Wednesday
+  const lastWeek = barsAt(mondays('2026-10-26', 70), fall), thisWeek = barsAt(mondays('2026-11-02', 70), fall);
+  assert.strictEqual(TECH.techLiveCrossState(lastWeek, undefined, today), 'below');
+  assert.strictEqual(TECH.techLiveCrossState(lastWeek, 400, today), 'cross_up');   // no bar for this week yet: the price is added as it
+  assert.strictEqual(TECH.techLiveCrossState(thisWeek, 400, today), 'cross_up');   // this week's bar is there: the price replaces its close
+  assert.strictEqual(lastWeek.length, 70); assert.strictEqual(thisWeek[69][4], 131);   // the saved bars are not changed
+  [NaN, Infinity, 0, -5, '400', null].forEach(px => assert.strictEqual(TECH.techLiveCrossState(lastWeek, px, today), 'below', String(px)));
+  assert.strictEqual(TECH.techLiveCrossState(lastWeek, 400, ''), 'below');   // no date: the saved bars as they are
+  assert.strictEqual(TECH.techLiveCrossState(null, 400, today), null); assert.strictEqual(TECH.techLiveCrossState([], 400, today), null);
+  const fast = { fast: 3, slow: 5, signal: 2, within: 1 };   // other lengths (a later timeframe) use the same maths
+  assert.strictEqual(TECH.techLiveCrossState(lastWeek, undefined, today, fast), 'below'); assert.strictEqual(TECH.techLiveCrossState(lastWeek, 400, today, fast), 'cross_up');
+  const short = barsAt(mondays('2026-10-26', 64), fall.slice(0, 64));
+  assert.strictEqual(TECH.techLiveCrossState(short, undefined, today), null);   // 64 bars are too few
+  assert.notStrictEqual(TECH.techLiveCrossState(short, 100, today), null);   // the price is the 65th
+});
 // ---- v1.182: refresh from TradingView (snapshot readings, no bars) ----
 test('v1.182: a TradingView snapshot is scored by the engine rules and is marked as a snapshot', () => {
   const TECH = load('src/engine/technical.js');
@@ -1495,6 +1511,16 @@ test('trade call: history keeps one point a day and lists when the call changed'
     assert.strictEqual(d.liquidity.avgVolume, 50000);
     assert.strictEqual(d.technical.src, 'snapshot');
     assert.strictEqual(d.snapAsof, '2026-10-14', 'the day TradingView confirmed the stock, for the Technical data age');
+  });
+  test('live snapshot: a snapshot block that replaces an older saved block keeps its weekly MACD 30/60/5 state', () => {
+    const saved = (states) => ({ technical: { asof: '2026-10-01', score: 5, states } });   // older than the snapshot and more than 3 days old: the snapshot block wins
+    const d = L.mergedDoc(stock, saved({ weekMacd: 'bull_above', weekMacd3060: 'cross_up' }), snap());
+    assert.strictEqual(d.technical.src, 'snapshot'); assert.strictEqual(d.technical.states.weekMacd3060, 'cross_up');
+    assert.strictEqual(d.technical.states.weekMacd, L.mergedDoc(stock, undefined, snap()).technical.states.weekMacd, 'the snapshot keeps its own ratings');
+    assert.ok(!('weekMacd3060' in L.mergedDoc(stock, saved({ weekMacd: 'bull_above' }), snap()).technical.states));   // nothing saved: nothing added
+    assert.ok(!('weekMacd3060' in L.mergedDoc(stock, { technical: { asof: '2026-10-01' } }, snap()).technical.states));   // a block with no states
+    const fresh = { technical: { asof: '2026-10-14', basis: { week: '2026-10-05' }, states: { weekMacd3060: 'above' } } };
+    assert.strictEqual(L.mergedDoc(stock, fresh, snap()).technical, fresh.technical);   // a recent bars block still wins as it was
   });
   test('live snapshot: market cap comes back in rupees crore, next to the volume (v1.286)', () => {
     const withCap = Object.assign({}, tv, { market_cap_basic: 15000000000 });
@@ -2706,6 +2732,48 @@ test('refresh snapshot: bars carried by the snapshot call are placed when they l
   R.collectBatchBars([batch[1]], {}, ctx, left); assert.strictEqual(left.noAnswer, 2);
 });
 
+// ---- the technical records of Refresh all stocks (src/refresh/barchunks.js)
+const BARCHUNK_STUBS = {
+  'core/stocks.js': 'export const stocks = [];', 'core/util.js': 'export const sanitizeDocId = (x) => x; export const sleep = () => Promise.resolve(); export const tickerSymbol = (s) => s.ticker.split("·")[0].trim();',
+  'prices/store.js': 'export const priceApply = () => {}; export const pcTickerKey = (s) => s.ticker; export const priceHistoryByTicker = {}; export const priceSymbolByTicker = {};',
+  'prices/recent.js': 'export const noteRecentSaved = () => {}; export const recentRow = () => ({});'
+};
+const memoryDb = (docs, failSave) => { const saved = []; return { saved, collection: () => ({ get: async () => { if(docs === null) throw new Error('read failed'); return { docs: Object.entries(docs).map(([id, d]) => ({ id, exists: true, data: () => d })).concat([{ id: 'gone', exists: false, data: () => null }]) }; } }),
+  doc: (p) => ({ set: async (d) => { if(failSave) throw new Error('save failed'); saved.push([p, d]); } }) }; };
+test('technical records: scores are saved 50 stocks to a record and only the records that changed are written again', async () => {
+  const B = await loadWithStubs('src/refresh/barchunks.js', '', BARCHUNK_STUBS), errors = [], keep = console.error; console.error = (m) => errors.push(m);
+  try {
+    const bars = barsAt(mondays('2026-10-26', 40), Array.from({ length: 40 }, (_, i) => 100 + i)), stock = (n, val) => ({ ticker: n + ' · Chemicals', pillars: { val: val === undefined ? 5 : val } });
+    const db = memoryDb({ c001: { rows: [{ k: 'OLD', t: { asof: '2026-10-01' } }, { k: null, t: {} }, { k: 'NOBLOCK' }, null, 'junk'] }, c002: null, c003: { rows: 'not a list' } });
+    const r = await B.saveTechBlocks(db, [{ s: stock('NEW'), W: bars, M: [] }, { s: stock('NOVAL', null), W: bars, M: [] }, { s: { ticker: 'NOPILLARS' }, W: bars, M: [] }, { s: stock('BROKEN'), W: 'x', M: [] }, { s: stock('SECOND'), W: bars, M: [] }], '2026-11-04', () => {});
+    assert.deepStrictEqual([r.computed, r.records, r.chunksWritten, r.failed], [2, 1, 1, 0]);   // no valuation reading or no pillars: skipped; BROKEN throws and is skipped; OLD is kept
+    assert.deepStrictEqual(db.saved[0][1].rows.map((x) => x.k), ['NEW', 'OLD', 'SECOND']);
+    assert.ok(errors.some((m) => /Technical score failed for BROKEN/.test(m)));
+    const same = memoryDb({ c001: db.saved[0][1] }), again = await B.saveTechBlocks(same, [], '2026-11-05', () => {});
+    assert.deepStrictEqual([again.computed, again.chunksWritten, same.saved.length], [0, 0, 0]);   // nothing changed: nothing saved
+    const down = await B.saveTechBlocks(memoryDb({}, true), [{ s: stock('NEW'), W: bars, M: [] }], '2026-11-04', () => {});
+    assert.deepStrictEqual([down.chunksWritten, down.failed], [0, 1]);
+    const unreadable = await B.saveTechBlocks(memoryDb(null), [], '2026-11-04', () => {});
+    assert.strictEqual(unreadable.records, 0); assert.ok(errors.includes('Could not read techBlocks'));
+  } finally { console.error = keep; }
+});
+test('weekly MACD 30/60/5 for every stock: only that reading of a saved block changes, and an unchanged or unreadable stock is left alone', async () => {
+  const B = await loadWithStubs('src/refresh/barchunks.js', '', BARCHUNK_STUBS), TECH = load('src/engine/technical.js'), today = '2026-11-04';
+  const fall = Array.from({ length: 70 }, (_, i) => 200 - i), W = barsAt(mondays('2026-10-26', 70), fall);   // below the signal line; a price of 400 crosses it
+  const block = (cross) => ({ asof: '2026-11-02', score: 6.1, reason: 'kept', raw: { weekRsi: 50 }, states: Object.assign({ weekMacd: 'bull_above' }, cross ? { weekMacd3060: cross } : {}) });
+  const db = memoryDb({ c001: { rows: [{ k: 'CROSS', t: block() }, { k: 'SAME', t: block('below') }, { k: 'SHORT', t: block() }, { k: 'NOSTATES', t: { asof: '2026-11-02' } }] } });
+  const items = [{ key: 'CROSS', W, px: 400 }, { key: 'SAME', W, px: undefined }, { key: 'SHORT', W: W.slice(0, 20), px: 100 }, { key: 'NOSTATES', W, px: 400 }, { key: 'NOBLOCK', W, px: 400 }];
+  const r = await B.saveCrossStates(db, items, today, () => {});
+  assert.deepStrictEqual([r.read, r.changed, r.records, r.chunksWritten, r.failed], [3, 2, 1, 1, 0]);   // CROSS and NOSTATES change; SAME is unchanged; SHORT has too few bars; NOBLOCK has no block
+  const rows = Object.fromEntries(db.saved[0][1].rows.map((x) => [x.k, x.t]));
+  assert.deepStrictEqual(rows.CROSS, Object.assign(block(), { states: { weekMacd: 'bull_above', weekMacd3060: 'cross_up' } }));   // the score, date and other states are untouched
+  assert.strictEqual(rows.NOSTATES.states.weekMacd3060, 'cross_up'); assert.strictEqual(rows.SAME.states.weekMacd3060, 'below'); assert.strictEqual(rows.SHORT.states.weekMacd3060, undefined);
+  assert.ok(!('NOBLOCK' in rows));
+  const again = await B.saveCrossStates(memoryDb({ c001: db.saved[0][1] }), items, today, () => {});
+  assert.deepStrictEqual([again.changed, again.chunksWritten], [0, 0]);   // the same prices on the same day: nothing saved
+  const down = await B.saveCrossStates(memoryDb({ c001: { rows: [{ k: 'CROSS', t: block() }] } }, true), [items[0]], today, () => {});
+  assert.deepStrictEqual([down.changed, down.chunksWritten, down.failed], [1, 0, 1]);
+});
 // ---- Refresh all stocks (src/refresh/tvrefresh.js): the snapshot and bar steps, driven with a made-up TradingView and database
 const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG', 'fundamentalCsvUploadLog', 'tabId']);
 const TV_DEFAULTS = { tickerSymbol: (s) => s.ticker, sanitizeDocId: (x) => x, sleep: () => Promise.resolve(), sameValue: (a, b) => JSON.stringify(a) === JSON.stringify(b) };   // what the real helpers do, without their imports and waits
@@ -2721,11 +2789,11 @@ async function loadAllStubbed(file, extra, keep){
   }
   return loadWithStubs(file, extra, stubs);
 }
-const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { paintHint, rsBars, rsReport, rsSnapshot, rsTech2, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
+const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { noteLivePrices, paintHint, rsBars, rsCross, rsReport, rsSnapshot, rsTech2, runSnapshot, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
   ['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js']);
 const tvStock = (name) => ({ name, ticker: name, pillars: { val: 0.5 } });
 const tvRun = (db, names, over) => Object.assign({ db, today: '2026-11-04', stored: new Map(), prevRows: new Map(), todo: names.map((n) => ({ s: tvStock(n), sym: 'N:' + n })), ctx: null, batchLeft: {}, updated: 0, unchanged: 0, scored: 0, kept: 0, chunksSaved: 0,
-  retried: 0, answeredAgain: 0, carried: 0, skipped: [], batchSecs: [], tvWaitMs: 0, saveMs: 0, stopped: false, barsUpdated: 0, batchSaved: 0, chunkWrites: 0, techBlocksSaved: 0, compacted: 0, staleBefore: 0, noneBefore: 0, filled: 0, histFailed: 0, noHistoryLeft: 0 }, over);
+  retried: 0, answeredAgain: 0, carried: 0, skipped: [], batchSecs: [], tvWaitMs: 0, saveMs: 0, stopped: false, livePx: new Map(), crossRead: 0, crossChanged: 0, crossFailed: 0, barsUpdated: 0, batchSaved: 0, chunkWrites: 0, techBlocksSaved: 0, compacted: 0, staleBefore: 0, noneBefore: 0, filled: 0, histFailed: 0, noHistoryLeft: 0 }, over);
 const tvDb = (fail) => { const saved = []; return { saved, doc: (p) => ({ set: async (d) => { if(fail && fail(p, saved.length)) throw new Error('database down'); saved.push([p, d]); } }) }; };
 const tvAnswer = (symbols, lacking) => ({ data: Object.fromEntries(symbols.filter((x) => !(lacking || []).includes(x)).map((x) => [x, { close: 10, 'RSI|1M': 60 }])) });
 
@@ -2738,6 +2806,7 @@ test('refresh all stocks, snapshot step: batches of 50 are saved one record each
   assert.deepStrictEqual(T.calls, [50, 2, 1]);   // two batches (the next one is already asked while the first is saved), then S3 alone
   assert.deepStrictEqual(db.saved.map((x) => x[0]), ['liveSnapshot/c001', 'liveSnapshot/c002']);
   assert.deepStrictEqual([run.updated, run.unchanged, run.chunksSaved, run.retried, run.answeredAgain], [51, 0, 2, 1, 0]);
+  assert.strictEqual(run.livePx.size, 51); assert.strictEqual(run.livePx.get('S0'), 10); assert.ok(!run.livePx.has('S3'));   // today's price of every stock that was priced
   assert.deepStrictEqual(run.skipped.map((x) => x.sym), ['S3']);
   assert.ok(T.log.some((l) => l.startsWith('run|done|51 saved')));
   T.calls.length = 0; db.saved.length = 0; run.skipped.length = 0;
@@ -2851,9 +2920,12 @@ test('refresh all stocks, result: the heading and bullets tell what was done, wi
   assert.ok(text.startsWith('Stopped after ') && text.includes('Stopped because: quota used up') && text.includes('Prices and snapshot: 1 of 0 stocks'));
   assert.ok(text.includes('Full history: 1 of 2 stocks (50%)') && text.includes('Weekly and monthly bars: 4 of 5 stocks (80%) (1 one by one)') && text.includes('Technical scores (completed weeks): 4 calculated'));
   assert.ok(!text.includes('Technical Score 2:'));   // not reported for a stopped run
+  assert.ok(text.includes('Weekly MACD 30/60/5: 0 stocks read, 0 changed'));
   assert.ok(text.includes('4 stocks without a TradingView symbol: A, B, C …') && text.includes('2 stocks had no price today') && text.includes('3 stocks skipped, mostly: no price : kept its figures (list below)'));
   M.rsReport(run({ updated: 1, histRan: true, tech2Saved: 2, tech2Failed: 1 })); assert.ok(shown[3][1].join('\n').includes('Technical Score 2: 2 of 2 stocks (100%), 1 not saved'));
-  M.rsReport(run({ updated: 1, histRan: true, tech2Failed: -1 })); assert.ok(shown[4][1].join('\n').includes('Technical Score 2 could not be calculated'));
+  M.rsReport(run({ updated: 1, histRan: true, crossRead: 2000, crossChanged: 40, crossFailed: 2 })); assert.ok(shown[shown.length - 1][1].join('\n').includes('Weekly MACD 30/60/5: 2,000 stocks read, 40 changed, 2 batches not saved'));
+  M.rsReport(run({ updated: 1, histRan: true, crossFailed: -1 })); assert.ok(shown[shown.length - 1][1].join('\n').includes('The weekly MACD 30/60/5 could not be read'));
+  M.rsReport(run({ updated: 1, histRan: true, tech2Failed: -1 })); assert.ok(shown[shown.length - 1][1].join('\n').includes('Technical Score 2 could not be calculated'));
 }));
 
 
@@ -2901,6 +2973,91 @@ test('refresh all stocks, bars step: without a plan or with nothing stale the st
   T.log.length = 0; M.__stop(true);
   await M.rsBars(tvRun(db, [], { ctx: tvBarsCtx({ plan: { stale: [1] } }) }));   // Stop pressed before the step
   assert.ok(T.log.includes('tech|done|skipped')); M.__stop(false);
+}));
+
+test('refresh all stocks, weekly MACD 30/60/5 step: every stock priced today is read with its saved bars, and a failure never stops the run', () => alone(async () => {
+  const [A, B, C] = ['A', 'B', 'C'].map(tvStock), keep = console.error, errors = [];
+  const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks: [A, B, C], priceHistoryByTicker: { A: { '1W': ['a-bars'] }, B: {} }, pcTickerKey: (s) => s.name, COMPACT_LAG: 1 };
+  const M = await loadTvRefresh(), db = tvDb(), calls = [];
+  T.saveCrossStates = async (d, items, today, progress) => { calls.push([d === db, items, today]); progress(1, 2); return { read: 2, changed: 1, chunksWritten: 3, failed: 0 }; };
+  const run = tvRun(db, [], { histRan: true, chunkWrites: 1 }); run.livePx.set('A', 10); run.livePx.set('B', 20);   // C was not priced today
+  await M.rsCross(run);
+  assert.deepStrictEqual(calls, [[true, [{ key: 'A', W: ['a-bars'], px: 10 }, { key: 'B', W: undefined, px: 20 }], '2026-11-04']]);
+  assert.deepStrictEqual([run.crossRead, run.crossChanged, run.crossFailed, run.chunkWrites], [2, 1, 0, 4]);
+  assert.ok(T.log.some((l) => l.startsWith('verify|running|Reading the weekly MACD 30/60/5…')) && T.log.some((l) => l.startsWith('verify|running|Weekly MACD 30/60/5: 1 of 2 batches')));
+  calls.length = 0; await M.rsCross(tvRun(db, [], { histRan: false })); await M.rsCross(tvRun(db, [], { histRan: true, stopped: true }));
+  assert.strictEqual(calls.length, 0);   // the history stages did not run, or Stop was pressed
+  console.error = (m) => errors.push(m);
+  try { T.saveCrossStates = async () => { throw new Error('boom'); }; const broken = tvRun(db, [], { histRan: true }); await M.rsCross(broken); assert.strictEqual(broken.crossFailed, -1); } finally { console.error = keep; }
+  assert.deepStrictEqual(errors, ['The weekly MACD 30/60/5 could not be read']);
+}));
+
+test('refresh all stocks: a whole run goes through its steps in order, the weekly MACD 30/60/5 step reads the prices the snapshot step kept, and the result reports it', () => alone(async () => {
+  const stocks = [tvStock('A')], steps = [], shown = [], keep = globalThis.document, bars = [[Math.floor(Date.now() / 1000), 1, 1, 1, 1, 1]];   // current bars: no stock needs new ones
+  globalThis.document = { getElementById: () => null };
+  try {
+    const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks, priceHistoryByTicker: { A: { '1W': bars, '1M': bars } }, pcTickerKey: (s) => s.name, COMPACT_LAG: 1, pillars: 1, getFiRunning: () => false, getFiOwner: () => true, getFiDb: () => db,
+      tvMcp: async () => true, tvIstDate: () => '2026-11-04', debugHandle: () => ({}), loadRuns: async () => [], priorityOrder: (k, l) => l, isinSymbolCached: (s) => 'N:' + s.name, isinOf: () => 'INE1', buildTech2Chunks: () => [], fiShowResult: (...a) => shown.push(a),
+      tvCall: async (tool, args) => (args.symbols ? tvAnswer(args.symbols) : { data: {} }), ensureAllPriceBars: async () => { steps.push('bars loaded'); }, saveRunLog: async (d, kind, at, t0, rec) => { steps.push('log ' + rec.saved); },
+      saveCrossStates: async (d, items) => { steps.push('cross ' + JSON.stringify(items)); return { read: 1, changed: 1, chunksWritten: 0, failed: 0 }; } };
+    const db = { collection: () => ({ get: async () => ({ docs: [] }) }), doc: () => ({ get: async () => ({ exists: false }), set: async () => {} }) };
+    const M = await loadTvRefresh();
+    await M.runSnapshot();
+    assert.strictEqual(steps.join(' | '), 'bars loaded | cross ' + JSON.stringify([{ key: 'A', W: bars, px: 10 }]) + ' | log 1');   // the price the snapshot step kept is read with the saved bars, then the run is logged
+    assert.strictEqual(shown.length, 1); assert.ok(shown[0][1].map((l) => l.text).join('\n').includes('Weekly MACD 30/60/5: 1 stocks read, 1 changed'));
+    assert.ok(T.log.includes('verify|done|'));
+    await M.runSnapshot();   // a second run can start: the "a job is running" flag was released
+    assert.strictEqual(shown.length, 2);
+  } finally { globalThis.document = keep; }
+}));
+
+test('refresh all stocks: only today\'s price of a stock is remembered for the weekly MACD 30/60/5 step, not a row kept from an earlier day or a row without a price', () => alone(async () => {
+  globalThis.__T = { log: [], fiSet: () => {}, stocks: [], priceHistoryByTicker: {}, COMPACT_LAG: 1 };
+  const M = await loadTvRefresh(), run = { livePx: new Map() };
+  M.noteLivePrices(run, [{ k: 'TODAY', c: [12.5, 1] }, { k: 'KEPT', c: [9], d: '2026-11-02' }, { k: 'NOPRICE', c: [null, 1] }, { k: 'NOTARRAY', c: 'x' }, { k: 'TEXT', c: ['12'] }]);
+  assert.deepStrictEqual([...run.livePx], [['TODAY', 12.5]]);
+}));
+test('refresh all stocks: a run copes with a quota refusal, unreadable saved records and stocks that have no TradingView symbol, and lists those stocks', () => alone(async () => {
+  const stocks = ['A', 'B', 'C', 'D'].map(tvStock), shown = [], errors = [], keepDoc = globalThis.document, keepErr = console.error, bars = [[Math.floor(Date.now() / 1000), 1, 1, 1, 1, 1]], looked = [];
+  globalThis.document = { getElementById: () => null }; console.error = (m) => errors.push(String(m));
+  try {
+    const db = { collection: () => ({ get: async () => { throw new Error('unreadable'); } }), doc: () => ({ get: async () => { throw new Error('unreadable'); }, set: async () => {} }) };
+    let tries = 0;
+    const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks, priceHistoryByTicker: Object.fromEntries(stocks.map((x) => [x.name, { '1W': bars, '1M': bars }])), pcTickerKey: (s) => s.name, COMPACT_LAG: 1, pillars: 1,
+      getFiRunning: () => false, getFiOwner: () => true, getFiDb: () => db, tvMcp: async () => true, tvIstDate: () => '2026-11-04', debugHandle: () => ({}), loadRuns: async () => { throw new Error('no runs'); }, priorityOrder: (k, l) => l, ensureAllPriceBars: async () => {},
+      isinSymbolCached: (s) => s.name === 'A' ? 'N:A' : null, isinOf: (s) => s.name === 'B' ? null : 'INE' + s.name, resolveIsinSymbols: async (list) => { looked.push(list.map((x) => x.name)); throw new Error('search refused'); },
+      tvIsQuota: (e) => /quota/.test(e.message), tvErrorText: (e) => e.message, buildTech2Chunks: () => [], fiShowResult: (...a) => shown.push(a), saveRunLog: async () => {}, saveCrossStates: async () => ({ read: 0, changed: 0, chunksWritten: 0, failed: 0 }),
+      tvCall: async (tool, args) => { if(!args.symbols){ if(++tries === 1) throw new Error('quota used up'); return { data: {} }; } return tvAnswer(args.symbols); } };
+    const M = await loadTvRefresh();
+    await M.runSnapshot();
+    assert.strictEqual(tries, 2); assert.ok(T.log.some((l) => l.startsWith('prepare|running|TradingView refused the call; trying once more in 8 seconds')));   // the quota refusal is tried once more
+    assert.deepStrictEqual(looked, [['C', 'D']]); assert.ok(T.log.some((l) => l.startsWith('prepare|running|Looking up TradingView symbols for 2 new stocks')));
+    const text = shown[0][1].map((l) => l.text).join('\n');
+    assert.ok(text.includes('3 stocks without a TradingView symbol: B B, C C, D D') && T.log.includes('prepare|done|1 stocks, 3 without a symbol'));
+    assert.ok(['Could not read the saved snapshot', 'Could not look up the TradingView symbols', 'Could not read tracked picks'].every((m) => errors.includes(m)), errors.join(' / '));
+  } finally { globalThis.document = keepDoc; console.error = keepErr; }
+}));
+
+test('refresh all stocks: a run that cannot start says why, a run that fails part-way reports it, and the next run can start', () => alone(async () => {
+  const shown = [], errors = [], keepDoc = globalThis.document, keepErr = console.error, db = { collection: () => ({ get: async () => ({ docs: [] }) }), doc: () => ({ get: async () => ({ exists: false }), set: async () => {} }) };
+  globalThis.document = { getElementById: () => null }; console.error = (m) => errors.push(String(m));
+  try {
+    const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks: [tvStock('A')], priceHistoryByTicker: {}, COMPACT_LAG: 1, getFiRunning: () => false, getFiOwner: () => true, getFiDb: () => db, tvMcp: async () => true,
+      tvIstDate: () => '2026-11-04', fiShowResult: (...a) => shown.push(a), tvErrorText: (e) => e.message, saveRunLog: async () => {}, ensureAllPriceBars: async () => {} };
+    const M = await loadTvRefresh(), texts = (i) => shown[i][1].map((l) => l.text).join('\n');
+    T.getFiRunning = () => true; await M.runSnapshot(); assert.strictEqual(shown.length, 0);   // another job is running: nothing happens
+    T.getFiRunning = () => false; T.getFiOwner = () => false; await M.runSnapshot();
+    assert.ok(texts(0).startsWith('Only the owner can run this'));
+    T.getFiOwner = () => true; T.getFiDb = () => null; await M.runSnapshot(); assert.ok(texts(1).startsWith('Only the owner can run this'));   // no database in this view
+    T.getFiDb = () => db; T.tvMcp = async () => false; await M.runSnapshot(); assert.ok(texts(2).startsWith('The TradingView connector is not available'));
+    T.tvMcp = async () => { throw new Error('no connector'); }; await M.runSnapshot(); assert.ok(texts(3).startsWith('The TradingView connector is not available')); assert.ok(errors.includes('TradingView connector check failed'));
+    T.tvMcp = async () => true; T.tvCall = async () => { throw new Error('TradingView is down'); };   // the first call of the run fails for a reason that is not the quota
+    await M.runSnapshot();
+    assert.strictEqual(shown.length, 5); assert.strictEqual(shown[4][0], 'err'); assert.ok(texts(4).startsWith('Stopped: TradingView is down') && texts(4).includes('0 stocks were saved before this.'));
+    T.tvCall = async (tool, args) => (args.symbols ? tvAnswer(args.symbols) : { data: {} }); T.isinSymbolCached = (s) => 'N:' + s.name; T.isinOf = () => 'INE1'; T.priorityOrder = (k, l) => l; T.loadRuns = async () => []; T.debugHandle = () => ({ skipHistoryStage: true });
+    await M.runSnapshot();   // the flag was released after the failed run, and with the history steps switched off the run still ends with its result
+    assert.strictEqual(shown.length, 6); assert.strictEqual(shown[5][0], 'ok'); assert.ok(!texts(5).includes('Weekly MACD'));   // the history steps did not run, so there is no reading to report
+  } finally { globalThis.document = keepDoc; console.error = keepErr; }
 }));
 
 test('refresh all stocks, bars step: placed stocks are saved in batches and scored, long-behind stocks are rewritten, and the rest go one by one', () => alone(async () => {

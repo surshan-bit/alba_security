@@ -15,7 +15,7 @@ import { COLS } from '../overlays/livesnapshot.js';
 import { priceHistoryByTicker, pcTickerKey, ensureAllPriceBars } from '../prices/store.js';
 import { refreshOneNow, priceJobs, saveFullBars } from '../prices/refresh.js';
 import { COMPACT_LAG, lagOf } from '../prices/recent.js';
-import { saveRecentBars, saveTechBlocks, sameValue } from './barchunks.js';
+import { saveCrossStates, saveRecentBars, saveTechBlocks, sameValue } from './barchunks.js';
 import { isinOf, isinSymbolCached, resolveIsinSymbols, useSavedSymbols } from '../tv/isin.js';
 import { tvCall, tvErrorText, tvIsQuota, tvIstDate, tvMcp } from '../tv/connector.js';
 import { loadRuns } from '../strategies/tracking.js';
@@ -216,12 +216,18 @@ async function saveSnapshotChunk(run, id, batch, built){
   run.skipped.push(...skippedForFailure(batch.filter(x => rows.some(r => r.k === sanitizeDocId(tickerSymbol(x.s)))), why));
 }
 
+// Today's price of each stock this batch priced (a row kept from an earlier day is not today's price), by stock key, for the weekly MACD 30/60/5 step.
+function noteLivePrices(run, rows){
+  rows.forEach(r => { if(r.d === undefined && Array.isArray(r.c) && typeof r.c[0] === 'number') run.livePx.set(r.k, r.c[0]); });
+}
+
 // One batch's answer (job = { batch, payload, bi }): ask again for what is missing, save the rows, and take the bars it carried.
 async function applyBatch(run, fetcher, job){
   const { batch, payload, bi } = job, data = Object.assign({}, payload.data || {});
   await askAgain(run, fetcher, batch, data);
   const built = snapshotRows(batch, data, run.prevRows, run.today);
   run.carried += built.carried; run.skipped.push(...built.skipped);
+  noteLivePrices(run, built.rows);
   if(run.ctx) collectBatchBars(batch, data, run.ctx, run.batchLeft);
   const s0 = Date.now();
   await saveSnapshotChunk(run, 'c' + String(bi + 1).padStart(3, '0'), batch, built);
@@ -313,6 +319,22 @@ async function rsBars(run){
   ctx.failedBars.forEach(x => run.skipped.push(x));
 }
 
+// The weekly MACD 30/60/5 of every stock, from its saved weekly bars and today's price (the week in progress). It is read again every run for every stock,
+// not only the ones whose bars changed, so the Strategies filter of that name is current on any weekday. A failure here never stops the run.
+async function rsCross(run){
+  if(!run.histRan || run.stopped) return;
+  fiSet('verify', 'running', 'Reading the weekly MACD 30/60/5…', 0.2);
+  try {
+    const items = [];
+    for(const s of stocks){
+      const key = sanitizeDocId(tickerSymbol(s));
+      if(run.livePx.has(key)) items.push({ key, W: (priceHistoryByTicker[pcTickerKey(s)] || {})['1W'], px: run.livePx.get(key) });
+    }
+    const r = await saveCrossStates(run.db, items, run.today, (d, n) => fiSet('verify', 'running', 'Weekly MACD 30/60/5: ' + num(d) + ' of ' + num(n) + ' batches', 0.2 + 0.3 * d / n));
+    Object.assign(run, { crossRead: r.read, crossChanged: r.changed, crossFailed: r.failed }); run.chunkWrites += r.chunksWritten;
+  } catch(e){ console.error('The weekly MACD 30/60/5 could not be read', e); run.crossFailed = -1; }
+}
+
 // Technical Score 2, from the saved weekly bars (a few records).
 async function rsTech2(run){
   // ---- Technical Score 2: from the saved weekly bars, a few records ----
@@ -348,6 +370,8 @@ function rsReport(run){
     if(run.noneBefore) B('Full history: ' + num(run.filled) + ' of ' + num(run.noneBefore) + ' stocks' + pct(run.filled, run.noneBefore));
     B('Weekly and monthly bars: ' + num(run.barsUpdated) + ' of ' + num(run.staleBefore) + ' stocks' + pct(run.barsUpdated, run.staleBefore) + (run.barsUpdated > run.batchSaved ? ' (' + num(run.barsUpdated - run.batchSaved) + ' one by one)' : ''));
     B('Technical scores (completed weeks): ' + num(run.techBlocksSaved + Math.max(0, run.barsUpdated - run.batchSaved)) + ' calculated');
+    if(run.crossFailed === -1) B('The weekly MACD 30/60/5 could not be read', true);
+    else B('Weekly MACD 30/60/5: ' + num(run.crossRead) + ' stocks read, ' + num(run.crossChanged) + ' changed' + (run.crossFailed ? ', ' + num(run.crossFailed) + ' batches not saved' : ''));
     if(run.tech2Failed !== -1 && !run.stopped) B('Technical Score 2: ' + num(run.tech2Saved) + ' of ' + num(stocks.length) + ' stocks' + pct(run.tech2Saved, stocks.length) + (run.tech2Failed ? ', ' + num(run.tech2Failed) + ' not saved' : ''));
     if(run.tech2Failed === -1) B('Technical Score 2 could not be calculated', true);
   }
@@ -368,13 +392,14 @@ async function runSnapshot(){
   // Everything the steps count and report. The steps below fill it in; `run.lines` is the result shown at the end.
   const run = { db, today: tvIstDate(), lines: [], skipped: [], updated: 0, kept: 0, scored: 0, unchanged: 0, stopped: false,
     t0: Date.now(), startedAt: new Date().toISOString(), batchSecs: [], tvWaitMs: 0, saveMs: 0, planned: 0, chunksSaved: 0, runError: '',
-    retried: 0, answeredAgain: 0, carried: 0, noSymbol: [], tech2Saved: 0, tech2Failed: 0,
+    retried: 0, answeredAgain: 0, carried: 0, noSymbol: [], tech2Saved: 0, tech2Failed: 0, livePx: new Map(), crossRead: 0, crossChanged: 0, crossFailed: 0,
     batchSaved: 0, chunkWrites: 0, compacted: 0, techBlocksSaved: 0, filled: 0, barsUpdated: 0, histFailed: 0, noneBefore: 0, staleBefore: 0, noHistoryLeft: 0, histRan: false };
   try {
     await rsPrepare(run);
     await rsFillHistory(run);
     await rsSnapshot(run);
     await rsBars(run);
+    await rsCross(run);
     await rsTech2(run);
     rsReport(run);
   } catch(e){

@@ -77,6 +77,16 @@ function techBarForming(bar, kind, today){
   return techWeekStart(open) >= techWeekStart(today);
 }
 function techCompleted(bars, kind, today){ return bars.length && techBarForming(bars[bars.length - 1], kind, today) ? bars.slice(0, -1) : bars; }
+// The MACD 30/60/5 state with the week in progress read from today's price: the newest saved weekly bar is replaced by `price` when it belongs to this
+// week, otherwise `price` is added as this week's bar. Without a usable price the saved bars are read as they are. Null without enough bars.
+function techLiveCrossState(weekBars, price, today, cfg = MACD_CROSS_WEEKLY){
+  const bars = weekBars || [], closes = bars.map(b => b[4]);
+  if(typeof price === 'number' && isFinite(price) && price > 0 && today){
+    const last = bars[bars.length - 1];
+    if(last && techWeekStart(techIstDate(last[0])) === techWeekStart(today)) closes[closes.length - 1] = price; else closes.push(price);
+  }
+  return techMacdCrossState(closes, cfg);
+}
 // States, raw figures and score from two close series; null without any usable component.
 function techReading(wc, mc, pillarsVal){
   const wm = techMacd(wc), mm = techMacd(mc), wr = techRsi(wc), mr = techRsi(mc);
@@ -151,4 +161,4 @@ function techKeepsBarsBlock(t, today, days = 3){
   return techDayNo(today) - techDayNo(t.asof) <= days;
 }
 
-export { MACD_CROSS_WEEKLY, computeTechnical, snapshotTechnical, techCompleted, techEma, techKeepsBarsBlock, techMacdSeries, techRsi, techScore3 };
+export { MACD_CROSS_WEEKLY, computeTechnical, snapshotTechnical, techCompleted, techEma, techKeepsBarsBlock, techLiveCrossState, techMacdSeries, techRsi, techScore3 };
