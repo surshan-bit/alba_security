@@ -11,7 +11,7 @@
 //     stocks not reached stay out of date and the next run carries on with them.
 import { stocks, stockByTickerSymbol } from '../core/stocks.js';
 import { sanitizeDocId, sleep, tickerSymbol } from '../core/util.js';
-import { COLS, packValues, snapshotUpdate } from '../overlays/livesnapshot.js';
+import { COLS } from '../overlays/livesnapshot.js';
 import { priceHistoryByTicker, pcTickerKey, ensureAllPriceBars } from '../prices/store.js';
 import { refreshOneNow, priceJobs, saveFullBars } from '../prices/refresh.js';
 import { COMPACT_LAG, lagOf } from '../prices/recent.js';
@@ -20,7 +20,8 @@ import { isinOf, isinSymbolCached, resolveIsinSymbols, useSavedSymbols } from '.
 import { tvCall, tvErrorText, tvIsFatal, tvIsQuota, tvIstDate, tvMcp } from '../tv/connector.js';
 import { loadRuns } from '../strategies/tracking.js';
 import { priorityOrder } from './freshness.js';
-import { planHistory, alignBars, batchBars, weekStartS, monthStartS, BAR_COLUMNS, TOLERANCE } from './historyplan.js';
+import { planHistory, weekStartS, monthStartS, BAR_COLUMNS, TOLERANCE } from './historyplan.js';
+import { collectBatchBars, isPriced, skippedForFailure, snapshotRows } from './snapshotrows.js';
 import { buildTech2Chunks } from '../engine/techscore2.js';
 import { debugHandle } from '../boot/handoff.js';
 import { getFiDb, getFiOwner, getFiRunning, setFiRunning } from '../import/fund-import.js';
@@ -28,6 +29,7 @@ import { fiEl, fiReset, fiSet, fiShowResult, setFiPfx } from '../import/panel.js
 import { registerBusy } from '../core/busy.js';
 import { duration, paintLastRuns, saveRunLog } from './runlog.js';
 
+const FETCH_GAP_MS = 300, ERROR_BACKOFF_MS = 1500, RETRY_PAUSE_MS = 1000, SAVE_RETRY_PAUSE_MS = 1500, MAX_FAILED_BATCHES = 3;   // pacing of the snapshot calls, in ms
 const BATCH = 50;                 // symbols per TradingView call (the tool's limit)
 const SKIP_RETRY_DAYS = 14;       // a stock whose history download failed is not tried again for this long
 const FULL_WORKERS = 2;           // stocks whose full history is downloaded at the same time (a big download each)
@@ -190,135 +192,165 @@ async function rsFillHistory(run){
 }
 
 // 2. Snapshot of every stock, 50 per call (about 44 calls); it is what the screens show every day, so it goes before the long bar update.
+// The next batch is requested while the current one is being saved. TradingView answers "Too Many Requests" when called back to back, so a request
+// waits until 300 ms after the previous one started (longer after a failed call).
+function snapshotFetcher(columns){
+  const pace = { lastStart: 0, backoff: 0 };
+  const call = (symbols) => tvCall('mcp-tv-get-symbol-data-batch', { symbols, columns });
+  return {
+    call,
+    slowDown(){ pace.backoff = ERROR_BACKOFF_MS; },
+    touch(){ pace.lastStart = Date.now(); },
+    /** @returns {Promise<{ payload?: any, error?: any }>} */
+    async fetch(batch){
+      const wait = Math.max(FETCH_GAP_MS, pace.backoff) - (Date.now() - pace.lastStart);
+      pace.backoff = 0;
+      if(wait > 0) await sleep(wait);
+      pace.lastStart = Date.now();
+      try { return { payload: await call(batch.map(x => x.sym)) }; }
+      catch(e){ return { error: e }; }
+    },
+  };
+}
+
+// A stock TradingView leaves out of an answer is usually a one-off miss: ask again for just those symbols before giving up.
+async function askAgain(run, fetcher, batch, data){
+  const lacking = batch.filter(x => !isPriced(data, x));
+  if(!lacking.length || stopAsked) return;
+  await sleep(RETRY_PAUSE_MS);
+  try {
+    const again = await fetcher.call(lacking.map(x => x.sym));
+    Object.assign(data, (again && again.data) || {});
+    run.retried += lacking.length; run.answeredAgain += lacking.filter(x => isPriced(data, x)).length;
+  } catch(e){ console.error('Retry of the missing stocks failed', e); }
+  fetcher.touch();
+}
+
+// Saves a record, trying twice. Returns the last error, or null when it was saved.
+async function setWithRetry(db, path, doc){
+  let err = null;
+  for(let attempt = 0; attempt < 2; attempt++){
+    try { await db.doc(path).set(doc); return null; } catch(e){ err = e; if(attempt === 0) await sleep(SAVE_RETRY_PAUSE_MS); }
+  }
+  return err;
+}
+
+// Saves one batch's rows as record liveSnapshot/<id> unless it already holds exactly these rows today.
+async function saveSnapshotChunk(run, id, batch, built){
+  const { rows } = built, old = run.stored.get(id);
+  if(!rows.length) return;
+  if(old && old.asof === run.today && sameValue(old.rows, rows)){ run.unchanged += rows.length; return; }
+  const doc = { v: 1, asof: run.today, at: new Date().toISOString(), rows };
+  const err = await setWithRetry(run.db, 'liveSnapshot/' + id, doc);
+  if(!err){ run.stored.set(id, doc); run.updated += rows.length; run.scored += built.scored; run.kept += built.kept; run.chunksSaved++; return; }
+  const why = 'could not be saved: ' + String((err && err.message) || err).slice(0, 80);
+  run.skipped.push(...skippedForFailure(batch.filter(x => rows.some(r => r.k === sanitizeDocId(tickerSymbol(x.s)))), why));
+}
+
+// Records a failed batch (stopping the run when it was fatal or the third in a row). Returns the answer's payload, or null when this batch failed.
+function settleBatch(run, state, batch, res){
+  if(!res.error){ state.failed = 0; return res.payload || {}; }
+  if(tvIsFatal(res.error)) throw res.error;
+  if(++state.failed >= MAX_FAILED_BATCHES) throw new Error(tvErrorText(res.error) + ' Three batches in a row failed, so the run stopped.');
+  run.skipped.push(...skippedForFailure(batch, tvErrorText(res.error)));
+  return null;
+}
+
+// One batch's answer (job = { batch, payload, bi }): ask again for what is missing, save the rows, and take the bars it carried.
+async function applyBatch(run, fetcher, job){
+  const { batch, payload, bi } = job, data = Object.assign({}, payload.data || {});
+  await askAgain(run, fetcher, batch, data);
+  const built = snapshotRows(batch, data, run.prevRows, run.today);
+  run.carried += built.carried; run.skipped.push(...built.skipped);
+  if(run.ctx) collectBatchBars(batch, data, run.ctx, run.batchLeft);
+  const s0 = Date.now();
+  await saveSnapshotChunk(run, 'c' + String(bi + 1).padStart(3, '0'), batch, built);
+  run.saveMs += Date.now() - s0;
+}
+
 async function rsSnapshot(run){
-  const { stored, prevRows, todo, ctx, batchLeft } = run;
-  // ---- 2. snapshot of every stock, 50 per call (about 44 calls, and it is what the screens show every day, so it goes before the long bar update) ----
-  const snapCols = ctx ? COLS.concat(BAR_COLUMNS) : COLS;   // with the bars of the stocks that need them, in the same call
+  const { todo, ctx } = run, fetcher = snapshotFetcher(ctx ? COLS.concat(BAR_COLUMNS) : COLS), state = { failed: 0 };   // with the bars of the stocks that need them, in the same call
   const batches = [];
   for(let i = 0; i < todo.length; i += BATCH) batches.push(todo.slice(i, i + BATCH));
-  // The next batch is requested while the current one is being saved. TradingView answers "Too Many Requests" when called back
-  // to back, so a request waits until 300 ms after the previous one started (longer after a failed call).
-  let lastStart = 0, backoff = 0, failedBatches = 0;
-  const fetchBatch = async (batch) => {
-    const wait = Math.max(300, backoff) - (Date.now() - lastStart);
-    backoff = 0;
-    if(wait > 0) await sleep(wait);
-    lastStart = Date.now();
-    try { return { payload: await tvCall('mcp-tv-get-symbol-data-batch', { symbols: batch.map(x => x.sym), columns: snapCols }) }; }
-    catch(e){ return { error: e }; }
-  };
-  let pending = batches.length && !stopAsked ? fetchBatch(batches[0]) : null;
+  const next = (bi) => bi < batches.length && !stopAsked ? fetcher.fetch(batches[bi]) : null;
+  let pending = next(0);
   for(let bi = 0; bi < batches.length; bi++){
     if(stopAsked){ run.stopped = true; break; }
     const batch = batches[bi], b0 = Date.now();
     fiSet('run', 'running', 'Batch ' + (bi + 1) + ' of ' + batches.length + ' · ' + num(run.updated + run.unchanged) + ' done', bi / batches.length);
-    const w0 = Date.now();
-    const res = await pending;
+    const w0 = Date.now(), res = await pending;
     run.tvWaitMs += Date.now() - w0;
-    pending = bi + 1 < batches.length && !stopAsked ? fetchBatch(batches[bi + 1]) : null;
-    if(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error && tvIsFatal(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error)) throw /** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error;
-    if(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error && ++failedBatches >= 3){ const e = new Error(tvErrorText(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error) + ' Three batches in a row failed, so the run stopped.'); throw e; }
-    if(!/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error) failedBatches = 0;
-    if(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error){ batch.forEach(x => run.skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: tvErrorText(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error) })); backoff = 1500; run.batchSecs.push(Math.round((Date.now() - b0) / 100) / 10); continue; }
-    const payload = /** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).payload;
-    const data = Object.assign({}, (payload && payload.data) || {});
-    // A stock TradingView leaves out of an answer is usually a one-off miss: ask again for just those symbols before giving up.
-    const priced = x => data[x.sym] && typeof data[x.sym].close === 'number' && data[x.sym].close > 0;
-    const lacking = batch.filter(x => !priced(x));
-    if(lacking.length && !stopAsked){
-      await sleep(1000);
-      try { const again = await tvCall('mcp-tv-get-symbol-data-batch', { symbols: lacking.map(x => x.sym), columns: snapCols }); Object.assign(data, (again && again.data) || {}); run.retried += lacking.length; run.answeredAgain += lacking.filter(priced).length; } catch(e){ console.error('Retry of the missing stocks failed', e); }
-      lastStart = Date.now();
-    }
-    const rows = [];
-    let rowScored = 0, rowKept = 0;
-    for(const { s, sym } of batch){
-      const k = sanitizeDocId(tickerSymbol(s));
-      const u = snapshotUpdate(s, data[sym], run.today, sym, s.technical);
-      if(u.reason){
-        const prev = prevRows.get(k);
-        if(prev){ rows.push({ k, y: prev.y, c: prev.c, d: prev.d, t: prev.t }); run.carried++; run.skipped.push({ sym: tickerSymbol(s), name: s.name, reason: u.reason + ' (' + sym + '): kept its figures from ' + prev.d }); }
-        else run.skipped.push({ sym: tickerSymbol(s), name: s.name, reason: u.reason + ' (' + sym + ')' });
-        continue;
-      }
-      rows.push({ k, y: sym, c: packValues(data[sym]) });
-      if(u.technical) rowScored++; if(u.kept) rowKept++;
-    }
-    if(ctx) for(const { s, sym } of batch){
-      const j = ctx.jobs.get(s); if(!j) continue;
-      const row = data[sym];
-      const bw = j.needW ? batchBars(row, 'W') : null, bm = j.needM ? batchBars(row, 'M') : null;
-      const W = j.needW ? alignBars(j.h['1W'], bw, 'W', ctx.nowS) : j.h['1W'];
-      const M = j.needM ? alignBars(j.h['1M'], bm, 'M', ctx.nowS) : j.h['1M'];
-      if(W && M) ctx.ready.set(s, { s, W, M, w: j.needW, m: j.needM });
-      else { const k = !row ? 'noAnswer' : ((j.needW && !bw) || (j.needM && !bm)) ? 'missing' : 'unclear'; batchLeft[k] = (batchLeft[k] || 0) + 1; }
-    }
-    const s0 = Date.now();
-    if(rows.length){
-      const id = 'c' + String(bi + 1).padStart(3, '0');
-      const old = stored.get(id);
-      if(old && old.asof === run.today && sameValue(old.rows, rows)){ run.unchanged += rows.length; }
-      else {
-        const doc = { v: 1, asof: run.today, at: new Date().toISOString(), rows };
-        let saved = false, err = null;
-        for(let attempt = 0; attempt < 2 && !saved; attempt++){
-          try { await run.db.doc('liveSnapshot/' + id).set(doc); saved = true; } catch(e){ err = e; if(attempt === 0) await sleep(1500); }
-        }
-        if(saved){ stored.set(id, doc); run.updated += rows.length; run.scored += rowScored; run.kept += rowKept; run.chunksSaved++; }
-        else { const why = 'could not be saved: ' + String((err && err.message) || err).slice(0, 80); batch.forEach(x => { if(rows.some(r => r.k === sanitizeDocId(tickerSymbol(x.s)))) run.skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: why }); }); }
-      }
-    }
-    run.saveMs += Date.now() - s0;
+    pending = next(bi + 1);
+    const payload = settleBatch(run, state, batch, res);
+    if(payload) await applyBatch(run, fetcher, { batch, payload, bi }); else fetcher.slowDown();
     run.batchSecs.push(Math.round((Date.now() - b0) / 100) / 10);
   }
   fiSet('run', 'done', num(run.updated) + ' saved' + (run.unchanged ? ', ' + num(run.unchanged) + ' unchanged' : ''));
 }
 
-// 3. New weekly and monthly bars for stocks whose bars are out of date, then their technical scores.
+// 3. New weekly and monthly bars for stocks whose bars are out of date, then their technical scores: the long part (one call per bar type per stock), so it is last.
+// It can run out of the daily quota; the stocks not reached stay out of date and the next run carries on with them.
+
+// Stocks the snapshot call should have answered for but that it neither placed nor gave a reason for (the call did not happen, or failed).
+function countUnseen(batchLeft, ctx, left){
+  const explained = Object.keys(batchLeft).filter(k => k !== 'noSymbol' && k !== 'callFailed').reduce((n, k) => n + batchLeft[k], 0);
+  const unseen = left.filter(s => ctx.jobs.has(s)).length - explained;
+  if(unseen > 0) batchLeft.callFailed = (batchLeft.callFailed || 0) + unseen;
+}
+
+// A few stocks per run get their own price documents rewritten in full, so the records never have to reach back further than they keep (see prices/recent.js).
+async function compactLagging(run){
+  const { ctx } = run;
+  const lagging = stocks.map(s => ({ s, lag: lagOf(pcTickerKey(s), (priceHistoryByTicker[pcTickerKey(s)] || {})['1W']) })).filter(x => x.lag >= COMPACT_LAG).sort((a, b) => b.lag - a.lag).slice(0, COMPACT_MAX);
+  if(!lagging.length || stopAsked) return;
+  fiSet('update', 'running', 'Rewriting ' + num(lagging.length) + ' stocks in full…', 0.9);
+  for(const { s } of lagging){
+    if(stopAsked || ctx.abort) break;
+    const h = priceHistoryByTicker[pcTickerKey(s)];
+    if(await saveFullBars(s, h['1W'], h['1M'])) run.compacted++;
+  }
+}
+
+// The technical scores of the stocks whose bars were just saved, 50 stocks to a record.
+async function scoreSavedBars(run, savedList){
+  fiSet('tech', 'running', 'Calculating…', 0.05);
+  const tb = await saveTechBlocks(run.db, savedList, tvIstDate(), (d, n) => fiSet('tech', 'running', num(d) + ' of ' + num(n) + ' batches', d / n));
+  run.techBlocksSaved = tb.computed; run.chunkWrites += tb.chunksWritten;
+  fiSet('tech', 'done', num(tb.computed) + ' scores in ' + num(tb.records) + ' batches' + (tb.failed ? ', ' + tb.failed + ' could not be saved' : ''));
+}
+
+// The new bars of every stock the snapshot could place (50 stocks to a record), their scores, and then the rest one by one, as before.
+async function saveFreshBars(run){
+  const { ctx, batchLeft } = run, ordered = ctx.byImportance(ctx.plan.stale);
+  const readyList = ordered.filter(s => ctx.ready.has(s)).map(s => ctx.ready.get(s));
+  let left = ordered.filter(s => !ctx.ready.has(s));
+  countUnseen(batchLeft, ctx, left);
+  fiSet('update', 'running', 'Saving the bars in batches…', 0.05);
+  const rb = await saveRecentBars(run.db, readyList, (d, n) => fiSet('update', 'running', num(d) + ' of ' + num(n) + ' batches', d / n));
+  const savedList = readyList.filter(r => rb.saved.has(pcTickerKey(r.s)));
+  run.batchSaved = savedList.length; run.barsUpdated = run.batchSaved; run.chunkWrites += rb.chunksWritten;
+  left = left.concat(readyList.filter(r => rb.failed.has(pcTickerKey(r.s))).map(r => r.s));
+  await compactLagging(run);
+  fiSet('update', 'done', num(run.batchSaved) + ' stocks in ' + num(rb.records) + ' batches' + (rb.chunksWritten < rb.records ? ' (' + num(rb.records - rb.chunksWritten) + ' unchanged)' : ''));
+  await scoreSavedBars(run, savedList);
+  if(stopAsked || ctx.abort || !left.length) return;
+  fiSet('update', 'running', 'The rest one by one…', 0.95);
+  run.barsUpdated += await ctx.bars(left, 'update', false, BAR_WORKERS, true, { done: 0, total: left.length });
+  fiSet('update', 'done', num(run.batchSaved) + ' in batches, ' + num(left.length) + ' one by one');
+}
+
 async function rsBars(run){
-  const { ctx, batchLeft } = run;
-  // ---- 3. new weekly / monthly bars for stocks whose bars are out of date: the long part (one call per bar type per stock), so it is last. It can run out of
-  // the daily quota; the stocks not reached stay out of date and the next run carries on with them. ----
-  if(ctx){
-    if(stopAsked) run.stopped = true;
-    if(!run.stopped && ctx.plan.stale.length){
-      const ordered = ctx.byImportance(ctx.plan.stale);
-      const readyList = ordered.filter(s => ctx.ready.has(s)).map(s => ctx.ready.get(s));
-      let left = ordered.filter(s => !ctx.ready.has(s));
-      const unseen = left.filter(s => ctx.jobs.has(s)).length - Object.keys(batchLeft).filter(k => k !== 'noSymbol' && k !== 'callFailed').reduce((n, k) => n + batchLeft[k], 0);
-      if(unseen > 0) batchLeft.callFailed = (batchLeft.callFailed || 0) + unseen;   // the snapshot call for them did not happen or failed
-      // Step 2: the new bars of every stock, 50 stocks to a record
-      fiSet('update', 'running', 'Saving the bars in batches…', 0.05);
-      const rb = await saveRecentBars(run.db, readyList, (d, n) => fiSet('update', 'running', num(d) + ' of ' + num(n) + ' batches', d / n));
-      const savedList = readyList.filter(r => rb.saved.has(pcTickerKey(r.s)));
-      run.batchSaved = savedList.length; run.barsUpdated = run.batchSaved; run.chunkWrites += rb.chunksWritten;
-      left = left.concat(readyList.filter(r => rb.failed.has(pcTickerKey(r.s))).map(r => r.s));
-      // A few stocks per run get their own price documents rewritten in full, so the records never have to reach back further than they keep (see prices/recent.js).
-      const lagging = stocks.map(s => ({ s, lag: lagOf(pcTickerKey(s), (priceHistoryByTicker[pcTickerKey(s)] || {})['1W']) })).filter(x => x.lag >= COMPACT_LAG).sort((a, b) => b.lag - a.lag).slice(0, COMPACT_MAX);
-      if(lagging.length && !stopAsked){
-        fiSet('update', 'running', 'Rewriting ' + num(lagging.length) + ' stocks in full…', 0.9);
-        for(const { s } of lagging){ if(stopAsked || ctx.abort) break; const h = priceHistoryByTicker[pcTickerKey(s)]; if(await saveFullBars(s, h['1W'], h['1M'])) run.compacted++; }
-      }
-      // Step 3: the technical scores of those stocks, 50 stocks to a record
-      fiSet('update', 'done', num(run.batchSaved) + ' stocks in ' + num(rb.records) + ' batches' + (rb.chunksWritten < rb.records ? ' (' + num(rb.records - rb.chunksWritten) + ' unchanged)' : ''));
-      fiSet('tech', 'running', 'Calculating…', 0.05);
-      const tb = await saveTechBlocks(run.db, savedList, tvIstDate(), (d, n) => fiSet('tech', 'running', num(d) + ' of ' + num(n) + ' batches', d / n));
-      run.techBlocksSaved = tb.computed; run.chunkWrites += tb.chunksWritten;
-      fiSet('tech', 'done', num(tb.computed) + ' scores in ' + num(tb.records) + ' batches' + (tb.failed ? ', ' + tb.failed + ' could not be saved' : ''));
-      // The stocks the snapshot could not place with certainty are fetched one by one, as before.
-      if(!stopAsked && !ctx.abort && left.length){
-        fiSet('update', 'running', 'The rest one by one…', 0.95);
-        run.barsUpdated += await ctx.bars(left, 'update', false, BAR_WORKERS, true, { done: 0, total: left.length });
-        fiSet('update', 'done', num(run.batchSaved) + ' in batches, ' + num(left.length) + ' one by one');
-      }
-    } else { fiSet('tech', 'done', run.stopped ? 'skipped' : 'none needed'); }
-    if(stopAsked) run.stopped = true;
-    if(!ctx.plan.stale.length || run.stopped) fiSet('update', 'done', run.staleBefore ? num(run.barsUpdated) + ' of ' + num(run.staleBefore) + ' updated' : 'all up to date');
-    if(ctx.abort){ run.stopped = true; run.runError = ctx.abort; }
-    run.histFailed = ctx.failedBars.length;
-    run.noHistoryLeft = run.noneBefore - run.filled;
-    ctx.failedBars.forEach(x => run.skipped.push(x));
-  } else { fiSet('update', 'done', 'skipped'); fiSet('tech', 'done', 'skipped'); }
+  const { ctx } = run;
+  if(!ctx){ fiSet('update', 'done', 'skipped'); fiSet('tech', 'done', 'skipped'); return; }
+  if(stopAsked) run.stopped = true;
+  if(!run.stopped && ctx.plan.stale.length) await saveFreshBars(run);
+  else fiSet('tech', 'done', run.stopped ? 'skipped' : 'none needed');
+  if(stopAsked) run.stopped = true;
+  if(!ctx.plan.stale.length || run.stopped) fiSet('update', 'done', run.staleBefore ? num(run.barsUpdated) + ' of ' + num(run.staleBefore) + ' updated' : 'all up to date');
+  if(ctx.abort){ run.stopped = true; run.runError = ctx.abort; }
+  run.histFailed = ctx.failedBars.length;
+  run.noHistoryLeft = run.noneBefore - run.filled;
+  ctx.failedBars.forEach(x => run.skipped.push(x));
 }
 
 // Technical Score 2, from the saved weekly bars (a few records).
