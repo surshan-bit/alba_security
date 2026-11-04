@@ -127,6 +127,13 @@
             <li><code>technical.reason</code> names what was missing.</li>
           </ul>
         </li>
+        <li><b>W MACD 30/60/5 vs signal (Strategies filter):</b> weekly MACD with a 30-week fast and 60-week slow EMA of the close and a 5-week EMA signal line, saved as <code>technical.states.weekMacd3060</code> by Refresh all stocks.
+          <ul>
+            <li>Three choices: <b>Above signal</b>, <b>Below signal</b> and <b>Just crossed up (this week)</b>, which means the latest weekly bar, including the week in progress, has moved above the signal line from at or below it. The three never overlap; pick two to combine them.</li>
+            <li>Unlike the Tech Rating, it reads every weekly bar including the week in progress, so it can be used on any weekday. It needs at least 65 weekly bars; with fewer the stock has no reading (use "None (no rating)" to let it through).</li>
+            <li>The lengths live in <code>MACD_CROSS_WEEKLY</code> in <code>src/engine/technical.js</code>, so other timeframes can reuse the same maths later.</li>
+          </ul>
+        </li>
         <li><b>Tech 2 and Tech 3:</b> two extra scores, hidden from every screen since v1.261 but still worked out.
           <ul>
             <li>Tech 3 is the Tech score without the valuation points, rescaled to 0&ndash;10 (<code>techScore3</code> in <code>src/engine/technical.js</code>).</li>

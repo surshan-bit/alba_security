@@ -541,6 +541,79 @@ test('the RSI shown includes the week and month in progress (as TradingView); th
   assert.strictEqual(t.raw.weekRsi, TECH.techRsi(W.map(b => b[4]))); assert.strictEqual(t.raw.monthRsi, TECH.techRsi(M.map(b => b[4])));
   assert.ok(t.raw.weekRsi < 100 && t.states.weekRsi === 'overbought');   // completed bars only rise: still overbought for the score
 });
+// ---- Weekly MACD 30/60/5 against its signal line (above / below / just crossed up) ----
+// A long fall followed by a rise of k bars: k = 0 is below the signal line, then the MACD line crosses up and stays above.
+const FIELD_STUBS = {
+  'core/stocks.js': 'export const verdictLabel = { buy: "Buy", mbuy: "Mild buy", hold: "Hold", avoid: "Avoid" };',
+  'core/pins.js': 'export const isPinned = () => false;',
+  'list/metrics.js': 'export const mosPct = () => NaN; export const mosRatingAny = () => null;',
+  'research/status.js': 'export const stockResearchAgeDays = () => null;',
+  'strategies/news.js': 'export const NEWS_DAYS = 30; export const daysSinceEvent = () => null; export const newsCounts = () => null;'
+};
+const crossStateAfterRise =(TECH, k) => {
+  const closes = [...Array.from({ length: 70 }, (_, i) => 200 - i), ...Array.from({ length: k }, (_, i) => 130 + 4 * (i + 1))];
+  const bars = barsAt(mondays('2026-10-12', closes.length), closes);
+  const t = TECH.computeTechnical(bars, [], 5, '2026-11-02');
+  return t.states.weekMacd3060;
+};
+test('weekly MACD 30/60/5: below the signal, then just crossed up on the one bar that crosses, then above', () => {
+  const TECH = load('src/engine/technical.js');
+  const states = Array.from({ length: 25 }, (_, k) => crossStateAfterRise(TECH, k));
+  assert.strictEqual(states[0], 'below');
+  const first = states.indexOf('cross_up');
+  assert.ok(first > 0, 'a rise crosses the signal line');
+  assert.strictEqual(TECH.MACD_CROSS_WEEKLY.within, 1, 'just crossed up is the latest weekly bar');
+  assert.strictEqual(states[first - 1], 'below'); assert.strictEqual(states[first + 1], 'above');
+  assert.strictEqual(states[24], 'above');
+  assert.strictEqual(states.filter(s => s === 'cross_up').length, 1, 'cross_up lasts one bar only');
+});
+test('weekly MACD 30/60/5: a steady fall is below and a steady rise is above (not just crossed)', () => {
+  const TECH = load('src/engine/technical.js'), at = f => TECH.computeTechnical(barsAt(mondays('2026-10-12', 80), Array.from({ length: 80 }, (_, i) => f(i))), [], 5, '2026-11-02').states.weekMacd3060;
+  assert.strictEqual(at(i => 300 - i), 'below'); assert.strictEqual(at(i => 100 + i), 'above');
+});
+test('weekly MACD 30/60/5: with fewer than 65 weekly bars there is no state, and the standard 12/26/9 reading is unchanged', () => {
+  const TECH = load('src/engine/technical.js'), closes = n => Array.from({ length: n }, (_, i) => 100 + i);
+  const short = TECH.computeTechnical(barsAt(mondays('2026-10-12', 64), closes(64)), [], 5, '2026-11-02');
+  assert.strictEqual(short.states.weekMacd3060, null); assert.strictEqual(short.states.weekMacd, 'bull_above');   // 12/26/9 still reads
+  assert.strictEqual(TECH.computeTechnical(barsAt(mondays('2026-10-12', 65), closes(65)), [], 5, '2026-11-02').states.weekMacd3060, 'above');
+  assert.strictEqual(TECH.techMacdSeries(closes(34)), null); assert.strictEqual(TECH.techMacdSeries(closes(35)).from, 33);
+  assert.strictEqual(TECH.techMacdSeries(closes(64), 30, 60, 5), null); assert.strictEqual(TECH.techMacdSeries(closes(65), 30, 60, 5).from, 63);
+});
+test('weekly MACD 30/60/5: the week in progress counts, so the state is the same on a Wednesday and after the week closes', () => {
+  const TECH = load('src/engine/technical.js');
+  const closes = [...Array.from({ length: 70 }, (_, i) => 200 - i), 400];   // a spike in the week still open
+  const bars = barsAt(mondays('2026-10-12', closes.length), closes);
+  assert.strictEqual(TECH.computeTechnical(bars, [], 5, '2026-10-14').states.weekMacd3060, 'cross_up');   // Wednesday: the open week's bar crosses
+  assert.strictEqual(TECH.computeTechnical(bars, [], 5, '2026-10-17').states.weekMacd3060, 'cross_up');   // Saturday: the week is finished
+  assert.strictEqual(TECH.computeTechnical(bars, [], 5, '2026-10-14').states.weekMacd, 'bear_below', 'the standard weekly rating still uses completed weeks');
+});
+test('weekly MACD 30/60/5 strategy filter: reads the saved state, offers the three choices, a stock without one is missing', async () => {
+  const F = await loadWithStubs('src/strategies/fields.js', '', FIELD_STUBS);
+  const f = F.FIELD_BY_ID.get('weekMacd3060');
+  assert.strictEqual(f.label, 'W MACD 30/60/5 vs signal'); assert.strictEqual(f.type, 'enum');
+  assert.deepStrictEqual(f.options.map(o => o[0]), ['cross_up', 'above', 'below']);
+  assert.ok(f.options[0][1].includes('this week'));
+  ['cross_up', 'above', 'below'].forEach(v => assert.strictEqual(f.get({ technical: { states: { weekMacd3060: v } } }), v));
+  [{}, { technical: {} }, { technical: { states: {} } }, { technical: { states: { weekMacd3060: '' } } }].forEach(s => assert.strictEqual(f.get(s), null));
+  assert.ok(F.FIELDS.includes(f), 'it is offered in the rule picker');
+});
+test('strategy fields: every field reads an empty stock as missing and a full one as the right type', async () => {
+  const F = await loadWithStubs('src/strategies/fields.js', '', FIELD_STUBS);
+  const full = { ticker: 'ABC · Chemicals', score: 7.5, verdict: 'buy', technical: { score: 6, raw: { weekRsi: 55, monthRsi: 60, weekPctChange: 2, monthPctChange: 5 }, states: {} },
+    fundamentals: { factors: [{ key: 'fin', score: 4, weight: 5 }] },
+    valuation: { promoterHolding: 50, fiiHolding: 10, fiiChange: 1, fiiChange3: 2, diiChange3: 3, ret1y: 10, ret3y: 20, ret5y: 30, currentPrice: 100 },
+    liquidity: { avgVolume: 200000, marketCap: 30000, nextResults: '2999-01-01' } };
+  for(const f of F.FIELD_BY_ID.values()){
+    const empty = f.get({ ticker: 'ABC' }), got = f.get(full);
+    assert.ok(empty === null || f.id === 'pinned' || f.id === 'newsPos' || f.id === 'capClass' || typeof empty === 'number' || typeof empty === 'string', f.id + ' on an empty stock');
+    if(f.type === 'num' && got !== null) assert.strictEqual(typeof got, 'number', f.id);
+  }
+  assert.strictEqual(F.FIELD_BY_ID.get('score').get(full), 7.5); assert.strictEqual(F.FIELD_BY_ID.get('fin').get(full), 8);
+  assert.strictEqual(F.FIELD_BY_ID.get('avgTraded').get(full), 200); assert.strictEqual(F.FIELD_BY_ID.get('capClass').get(full), 'small');
+  assert.strictEqual(F.FIELD_BY_ID.get('weekRsi').get(full), 55); assert.strictEqual(F.FIELD_BY_ID.get('techScore').get(full), 6);
+  assert.strictEqual(F.FIELD_BY_ID.get('pinned').get(full), 'no'); assert.strictEqual(F.FIELD_BY_ID.get('industry').get(full), 'Chemicals'); assert.strictEqual(F.FIELD_BY_ID.get('industry').get({ ticker: 'ABC' }), null);
+  assert.ok(F.FIELD_BY_ID.get('techScore2') && !F.FIELDS.includes(F.FIELD_BY_ID.get('techScore2')), 'hidden fields stay readable but are not offered');
+});
 // ---- v1.182: refresh from TradingView (snapshot readings, no bars) ----
 test('v1.182: a TradingView snapshot is scored by the engine rules and is marked as a snapshot', () => {
   const TECH = load('src/engine/technical.js');

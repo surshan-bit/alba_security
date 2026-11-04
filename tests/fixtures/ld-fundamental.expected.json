@@ -968,7 +968,8 @@
      "weekMacd": "bear_above",
      "monthRsi": "strong",
      "weekRsi": "strong",
-     "valuation": "attractively valued"
+     "valuation": "attractively valued",
+     "weekMacd3060": "below"
     },
     "raw": {
      "monthMacdLevel": 3.4717337453135855,

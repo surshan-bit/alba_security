@@ -6,10 +6,24 @@
 function techEma(x, n){ const k = 2 / (n + 1); const e = [x[0]]; for(let i = 1; i < x.length; i++) e.push(x[i] * k + e[i - 1] * (1 - k)); return e; }
 // MACD for every bar: { macd, signal, hist } as long as the closes, and `from`, the first bar index where the signal line has had its 9
 // values after the 26 the slow average needs (earlier values are still warming up and are not drawn). Null with fewer than 35 bars.
-function techMacdSeries(c){
-  if(!c || c.length < 35) return null;   // 26 bars to seed the slow EMA plus 9 for the signal line
-  const a = techEma(c, 12), b = techEma(c, 26), m = a.map((v, i) => v - b[i]), s = techEma(m, 9);
-  return { macd: m, signal: s, hist: m.map((v, i) => v - s[i]), from: 33 };
+// The lengths default to the standard 12/26/9; other lengths need `slow + signal` bars.
+function techMacdSeries(c, fast = 12, slow = 26, signal = 9){
+  if(!c || c.length < slow + signal) return null;   // bars to seed the slow EMA plus the signal line
+  const a = techEma(c, fast), b = techEma(c, slow), m = a.map((v, i) => v - b[i]), s = techEma(m, signal);
+  return { macd: m, signal: s, hist: m.map((v, i) => v - s[i]), from: slow + signal - 2 };
+}
+// Weekly MACD 30/60/5 (close, EMA) used by the "W MACD 30/60/5" strategy filter. `within` is how many of the latest bars a
+// crossing above the signal line still counts as "just crossed up"; 1 means the latest bar itself, the week in progress.
+// Other timeframes (1 day, 3 hour) add their own entry here.
+const MACD_CROSS_WEEKLY = { fast: 30, slow: 60, signal: 5, within: 1 };
+// 'cross_up' (above the signal line and was at or below it within the last `within` bars), 'above', 'below'; null without enough bars.
+function techMacdCrossState(c, cfg = MACD_CROSS_WEEKLY){
+  const r = techMacdSeries(c, cfg.fast, cfg.slow, cfg.signal);
+  if(!r) return null;
+  const n = r.macd.length, atOrBelow = i => r.macd[i] <= r.signal[i];
+  if(atOrBelow(n - 1)) return 'below';
+  for(let i = n - cfg.within; i < n; i++) if(atOrBelow(i - 1)) return 'cross_up';
+  return 'above';
 }
 function techMacd(c){
   const r = techMacdSeries(c);
@@ -107,7 +121,8 @@ function computeTechnical(weekBars, monthBars, pillarsVal, today){
   const raw = { monthMacdLevel: r.monthMacdLevel, monthMacdSignal: r.monthMacdSignal, weekMacdLevel: r.weekMacdLevel, weekMacdSignal: r.weekMacdSignal,
     weekPctChange: pct(wp), monthPctChange: pct(mp), monthRsi, weekRsi, valuationScore: pillarsVal == null ? null : pillarsVal };
   const reason = techReason({ ...states, monthRsi: techRsiState(monthRsi), weekRsi: techRsiState(weekRsi) }, raw, pillarsVal);
-  const out = { score: techComposite(states, pillarsVal), reason, states, raw, asof: today };
+  // The MACD 30/60/5 state reads every bar, the week in progress included, so the filter works on any weekday.
+  const out = { score: techComposite(states, pillarsVal), reason, states: { ...states, weekMacd3060: techMacdCrossState(wp) }, raw, asof: today };
   // Which bars the score rests on, and the in-progress reading when a week or month is not finished yet.
   out.basis = { week: wDone.length ? techIstDate(wDone[wDone.length - 1][0]) : null, month: mDone.length ? techIstDate(mDone[mDone.length - 1][0]) : null };
   if(wDone.length !== wAll.length || mDone.length !== mAll.length){
@@ -136,4 +151,4 @@ function techKeepsBarsBlock(t, today, days = 3){
   return techDayNo(today) - techDayNo(t.asof) <= days;
 }
 
-export { computeTechnical, snapshotTechnical, techCompleted, techEma, techKeepsBarsBlock, techMacdSeries, techRsi, techScore3 };
+export { MACD_CROSS_WEEKLY, computeTechnical, snapshotTechnical, techCompleted, techEma, techKeepsBarsBlock, techMacdSeries, techRsi, techScore3 };
