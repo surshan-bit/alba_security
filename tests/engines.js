@@ -3111,13 +3111,13 @@ test('refresh all stocks, daily MACD step: the stocks of the chosen strategy are
   const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks, strategies: [{ id: 's1', name: 'Value', rules: [] }], priceHistoryByTicker: {}, COMPACT_LAG: 1, isinSymbolCached: (s) => 'N:' + s.name,
     dailyStocksOf: (u) => ({ list: u, total: 5, needsOtherRule: false }),
     pcTickerKey: (s) => s.name, tvIstDate: () => '2026-11-04', loadDailyBars: async (d, sym) => ['saved ' + sym], saveDailyBars: async (d, who, bars, isNew) => { stored.push([d === db, who, bars, isNew]); },
-    readDailyStates: async (list, io, progress) => { calls.push([list.length, io.symbolOf(list[0]), io.keyOf(list[0]), io.stop(), io.today(), await io.loadBars(list[0], 'N:A')]); await io.saveBars(list[1], 'N:B', ['bar'], true); progress(1, 2); return { results: [{ key: 'A', state: 'above', asof: '2026-11-04' }], failures: [{}], abort: '', stored: 3, storeFailed: 1 }; },
+    readDailyStates: async (list, io, progress) => { calls.push([list.length, io.symbolOf(list[0]), io.keyOf(list[0]), io.stop(), io.today(), await io.loadBars(list[0], 'N:A')]); await io.saveBars(list[1], 'N:B', ['bar'], true); await io.pause(1); progress(1, 2); return { results: [{ key: 'A', state: 'above', asof: '2026-11-04' }], failures: [{}], abort: '', stored: 3, storeFailed: 1, pauses: 2 }; },
     saveDailyStates: async (d, results, today) => { saved.push([d === db, results, today]); return { changed: 1, failed: 0 }; } };
   const M = await loadTvRefresh(), pick = { strategyId: 's1' }, run = tvRun(db, [], { dailyPick: pick });
   await M.rsDaily(run);
   assert.strictEqual(JSON.stringify(calls), JSON.stringify([[2, 'N:A', 'A', false, '2026-11-04', ['saved N:A']]])); assert.strictEqual(JSON.stringify(stored), JSON.stringify([[true, { sym: 'N:B', key: 'B', name: 'B' }, ['bar'], true]]));   // the saved bars are read and saved through the run's database
   assert.deepStrictEqual(saved, [[true, [{ key: 'A', state: 'above', asof: '2026-11-04' }], '2026-11-04']]);
-  assert.deepStrictEqual(run.dailyResult, { name: 'Value', stocks: 2, total: 5, read: 1, changed: 1, failed: 1, stored: 3, storeFailed: 1, notSaved: 0, abort: '' });
+  assert.deepStrictEqual(run.dailyResult, { name: 'Value', stocks: 2, total: 5, read: 1, changed: 1, failed: 1, stored: 3, storeFailed: 1, pauses: 2, notSaved: 0, abort: '' });
   assert.ok(T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: reading 2 stocks')) && T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: 1 of 2 stocks')));
   M.__stop(true); calls.length = 0; await M.rsDaily(tvRun(db, [], { dailyPick: pick })); M.__stop(false); assert.strictEqual(calls[0][3], true);   // the read is told when Stop is pressed
   const idle = tvRun(db, [], {}); await M.rsDaily(idle); const stopped = tvRun(db, [], { dailyPick: pick, stopped: true }); await M.rsDaily(stopped);
@@ -3289,7 +3289,7 @@ test('daily MACD import: the stocks of a strategy besides its daily rule are cho
   assert.deepStrictEqual(D.dailyStocksOf(stocks, { rules: [{ field: 'dayMacd3060' }] }), none); assert.deepStrictEqual(D.dailyStocksOf(stocks, {}), none); assert.deepStrictEqual(D.dailyStocksOf(stocks, undefined), none);
   // What is saved for each stock: B is two days short, C is up to date, D has prices that were adjusted since, E's record cannot be read, F cannot be saved, G has too few bars
   const have = { B: all['N:B'].slice(0, 68), C: all['N:C'], D: dailyRows(fall.map((c) => c * 2)), F: undefined }, kept = [];
-  const io = { symbolOf: (s) => s.sym, keyOf: (s) => s.key, stop: () => false, today: () => '2026-03-17',
+  const pauses = [], io = { symbolOf: (s) => s.sym, keyOf: (s) => s.key, stop: () => false, today: () => '2026-03-17', pause: async (ms) => { pauses.push(ms); },
     loadBars: async (s) => { if(s.key === 'E') throw new Error('unreadable'); return have[s.key] || null; }, saveBars: async (s, sym, bars, isNew) => { if(s.key === 'F') throw new Error('database down'); kept.push([s.key, bars.length, isNew]); } };
   const progress = [], mk = (key, sym) => ({ key, sym });
   const out = await D.readDailyStates(['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((k) => mk(k, 'N:' + k)).concat([mk('BAD', 'N:BAD'), mk('NOSYM', null), mk('EMPTY', 'N:EMPTY')]), io, (d, n) => progress.push([d, n]));
@@ -3305,11 +3305,19 @@ test('daily MACD import: the stocks of a strategy besides its daily rule are cho
   calls.length = 0; await D.readDailyStates([mk('C', 'N:C')], Object.assign({}, io, { today: () => '2026-04-14' }), () => {}); await D.readDailyStates([mk('C', 'N:C')], Object.assign({}, io, { today: () => '2028-06-01' }), () => {});
   assert.deepStrictEqual(calls.map((c) => c[1]), [33, 500]);   // the days since the newest saved bar and three more; never more than 500
   const quota = await D.readDailyStates([mk('Q1', 'N:QUOTA'), mk('A', 'N:A'), mk('B', 'N:B'), mk('C', 'N:C'), mk('D', 'N:A'), mk('E', 'N:A')], Object.assign({}, io), () => {});
-  assert.strictEqual(quota.abort, 'quota used up'); assert.ok(quota.results.length < 5);   // a quota refusal stops the rest
+  assert.strictEqual(quota.abort, 'quota used up');   // a quota that does not clear stops the read after six waits
+  assert.deepStrictEqual([quota.pauses, pauses.length, pauses[0]], [6, 6, 65000]);
+  // a quota refusal that clears after a wait: all the stocks are read, the refused one again
+  const real = globalThis.__DM.tvCall; let refuse = 2; pauses.length = 0;
+  globalThis.__DM.tvCall = async (tool, args) => { if(refuse > 0 && args.symbol === 'N:A'){ refuse--; throw new Error('quota used up'); } return real(tool, args); };
+  const waited = await D.readDailyStates([mk('A', 'N:A'), mk('C2', 'N:C'), mk('D2', 'N:D')], io, () => {});
+  assert.deepStrictEqual([waited.abort, waited.results.length, waited.pauses, pauses.length], ['', 3, 2, 2]);   // refused twice in a row: two waits, then the stock is read
+  const pressed = await D.readDailyStates([mk('Q1', 'N:QUOTA')], Object.assign({}, io, { stop: () => true }), () => {}); assert.strictEqual(pressed.pauses, 0);   // Stop pressed: no wait
+  globalThis.__DM.tvCall = real;
   globalThis.__DM.tvCall = async () => { throw Object.assign(new Error('no connector'), { code: 'no_mcp' }); };
   assert.strictEqual((await D.readDailyStates([mk('A', 'N:A')], io, () => {})).abort, 'no connector');
   const stopped = await D.readDailyStates([mk('A', 'N:A')], Object.assign({}, io, { stop: () => true }), () => {}); assert.deepStrictEqual([stopped.results.length, stopped.failures.length], [0, 0]);   // Stop was pressed
-  assert.deepStrictEqual(await D.readDailyStates([], io, () => {}), { results: [], failures: [], abort: '', stored: 0, storeFailed: 0 });
+  assert.deepStrictEqual(await D.readDailyStates([], io, () => {}), { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0 });
   globalThis.__DM.tvCall = async () => { throw 'plain text'; };   // a failure that is not an Error
   assert.strictEqual((await D.readDailyStates([mk('A', 'N:A')], io, () => {})).failures[0].reason, 'plain text');
 }));
@@ -3332,6 +3340,8 @@ test('daily MACD import, result line: what was read, and the problems there are'
   assert.deepStrictEqual(line({ name: 'W MACD', stocks: 328, total: 328, read: 325, changed: 40, stored: 12 }), { text: 'Daily MACD 30/60/5 (W MACD): 325 of 328 stocks read, 40 changed, 12 daily records saved', problem: false });
   assert.deepStrictEqual(line({ name: 'S', stocks: 3, total: 3, read: 3, changed: 0, storeFailed: 2 }), { text: 'Daily MACD 30/60/5 (S): 3 of 3 stocks read, 0 changed, 2 daily records could not be saved', problem: true });
   assert.deepStrictEqual(line({ name: 'Big', stocks: 600, total: 1200, read: 600, changed: 0, failed: 2, notSaved: 1 }), { text: 'Daily MACD 30/60/5 (Big): 600 of 600 stocks read, 0 changed, only the first 600 of 1,200 this run, 2 failed, 1 batches not saved', problem: true });
+  assert.deepStrictEqual(line({ name: 'P', stocks: 5, total: 5, read: 5, changed: 0, pauses: 1 }).text, 'Daily MACD 30/60/5 (P): 5 of 5 stocks read, 0 changed, waited 1 time for the TradingView call limit');
+  assert.ok(line({ name: 'P', stocks: 5, total: 5, read: 5, changed: 0, pauses: 3 }).text.includes('waited 3 times'));
   assert.deepStrictEqual(line({ name: 'Q', stocks: 5, total: 5, read: 2, changed: 2, abort: 'quota used up' }), { text: 'Daily MACD 30/60/5 (Q): 2 of 5 stocks read, 2 changed. Stopped: quota used up', problem: true });
   assert.deepStrictEqual(line({ problem: 'the chosen strategy no longer exists' }), { text: 'Daily MACD 30/60/5: the chosen strategy no longer exists', problem: true });
 }));

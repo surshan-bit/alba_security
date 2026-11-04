@@ -8,7 +8,9 @@ import { tvCall, tvIsQuota, tvIstDate, tvMergeDelta, tvToRows, tvValidate } from
 const DAILY_FIELD = 'dayMacd3060';   // the strategy rule this import serves (src/strategies/fields.js)
 const DAILY_KEEP = 500;              // daily bars saved per stock: about 2 years
 const DAILY_EXTRA = 3;               // bars asked on top of the days since the newest saved bar, so the newest saved bars are fetched again and checked
-const DAILY_WORKERS = 4;             // stocks fetched at the same time
+const DAILY_WORKERS = 2;             // stocks fetched at the same time (few, so TradingView does not see a burst of calls)
+const DAILY_PAUSE_MS = 65000;        // wait after TradingView suspends the connector (it says "for one minute")
+const DAILY_PAUSES = 6;              // waits allowed in one run before the read stops
 const DAILY_MAX = 600;               // stocks per run, so one run cannot use up the TradingView quota
 const IST_SECONDS = 19800;
 const dayBucket = t => Math.floor((t + IST_SECONDS) / 86400);   // the Indian day a bar belongs to
@@ -52,30 +54,38 @@ const sameDailyBars = (a, b) => !!a && a.length === b.length && JSON.stringify(a
 
 /**
  * The daily MACD reading of each stock in `list`, DAILY_WORKERS at a time, and their bars saved. `io` = { symbolOf(stock), keyOf(stock), stop(), today(), loadBars(stock, sym),
- * saveBars(stock, sym, bars, isNew) }; progress(done, total) after each stock. A stock that fails is listed with its reason and the rest go on; no connection or no quota
- * stops the whole read (`abort` says why). A bar document that cannot be read is fetched in full; one that cannot be saved is counted (`storeFailed`), its reading still counts.
- * @returns {Promise<{ results: { key: string, state: string, asof: string }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number }>}
+ * saveBars(stock, sym, bars, isNew), pause(ms) }; progress(done, total) after each stock. A stock that fails is listed with its reason and the rest go on; no connection stops
+ * the whole read (`abort` says why). When TradingView refuses a call for its quota, all workers wait io.pause(DAILY_PAUSE_MS) and the stock is tried again, up to DAILY_PAUSES
+ * waits (`pauses` counts them); after that the read stops with the quota message. A bar document that cannot be read is fetched in full; one that cannot be saved is counted (`storeFailed`), its reading still counts.
+ * @returns {Promise<{ results: { key: string, state: string, asof: string }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number }>}
  */
 async function readDailyStates(list, io, progress){
-  /** @type {{ results: { key: string, state: string, asof: string }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number }} */
-  const out = { results: [], failures: [], abort: '', stored: 0, storeFailed: 0 };
+  /** @type {{ results: { key: string, state: string, asof: string }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number }} */
+  const out = { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0 };
+  let resting = null;
+  const rest = () => { if(!resting){ out.pauses++; resting = Promise.resolve(io.pause(DAILY_PAUSE_MS)).finally(() => { resting = null; }); } return resting; };
   let next = 0, done = 0;
   const have = async (s, sym) => { try { return await io.loadBars(s, sym); } catch(e){ return null; } };   // unreadable: the whole history is fetched again
   const keep = async (s, sym, old, bars) => {
     if(sameDailyBars(old, bars)) return;
     try { await io.saveBars(s, sym, bars, !old); out.stored++; } catch(e){ out.storeFailed++; }
   };
+  const readOne = async (s, sym) => {
+    const old = await have(s, sym), bars = await dailyBarsFor(sym, old, io.today());
+    const state = techDailyCrossState(bars.map(r => r[4]));
+    if(state) out.results.push({ key: io.keyOf(s), state, asof: tvIstDate(bars[bars.length - 1][0]) }); else out.failures.push({ stock: s, reason: 'fewer than 65 daily bars' });
+    await keep(s, sym, old, bars);
+  };
   const one = async s => {
     const sym = io.symbolOf(s);
     if(!sym){ out.failures.push({ stock: s, reason: 'no TradingView symbol' }); return; }
-    try {
-      const old = await have(s, sym), bars = await dailyBarsFor(sym, old, io.today());
-      const state = techDailyCrossState(bars.map(r => r[4]));
-      if(state) out.results.push({ key: io.keyOf(s), state, asof: tvIstDate(bars[bars.length - 1][0]) }); else out.failures.push({ stock: s, reason: 'fewer than 65 daily bars' });
-      await keep(s, sym, old, bars);
-    } catch(e){
-      if(tvIsQuota(e) || (e && e.code === 'no_mcp')) out.abort = e.message;
-      else out.failures.push({ stock: s, reason: String((e && e.message) || e).slice(0, 80) });
+    for(;;){
+      try { await readOne(s, sym); return; } catch(e){
+        if(tvIsQuota(e) && (resting || out.pauses < DAILY_PAUSES) && !io.stop()){ await rest(); continue; }   // wait for TradingView, then this stock again
+        if(tvIsQuota(e) || (e && e.code === 'no_mcp')) out.abort = e.message;
+        else out.failures.push({ stock: s, reason: String((e && e.message) || e).slice(0, 80) });
+        return;
+      }
     }
   };
   const worker = async () => { while(next < list.length && !io.stop() && !out.abort){ await one(list[next++]); progress(++done, list.length); } };
@@ -84,7 +94,7 @@ async function readDailyStates(list, io, progress){
 }
 
 const num = x => x.toLocaleString('en-IN');
-// The line of the Refresh all stocks result about the daily import: `d` = the run's daily result, { name, stocks, total, read, changed, failed, stored, storeFailed, notSaved, abort }
+// The line of the Refresh all stocks result about the daily import: `d` = the run's daily result, { name, stocks, total, read, changed, failed, pauses, stored, storeFailed, notSaved, abort }
 // or { name?, problem }. Returns { text, problem } (a problem is shown in bold).
 function dailyReportLine(d){
   const head = 'Daily MACD 30/60/5' + (d.name ? ' (' + d.name + ')' : '') + ': ';
@@ -92,6 +102,7 @@ function dailyReportLine(d){
   const parts = [num(d.read) + ' of ' + num(d.stocks) + ' stocks read', num(d.changed) + ' changed'];
   if(d.total > d.stocks) parts.push('only the first ' + num(d.stocks) + ' of ' + num(d.total) + ' this run');
   if(d.stored) parts.push(num(d.stored) + ' daily records saved');
+  if(d.pauses) parts.push('waited ' + num(d.pauses) + ' time' + (d.pauses > 1 ? 's' : '') + ' for the TradingView call limit');
   if(d.failed) parts.push(num(d.failed) + ' failed');
   if(d.storeFailed) parts.push(num(d.storeFailed) + ' daily records could not be saved');
   if(d.notSaved) parts.push(num(d.notSaved) + ' batches not saved');
