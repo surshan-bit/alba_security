@@ -1,6 +1,6 @@
 /* Rules written for one screen or one element (a hook class such as scope-trade-log-panel-body stands for what used to be an element id). They sit in their own layer above the screen files, which is what an id used to do: they win over any rule that is not scoped to an element. */
 .scope-section-help .sub,.scope-section-knowledgebase .sub{max-width:none;}
-.scope-analysis-strategy-filter .filter-btn,#strategyFilterRow .filter-btn{white-space:nowrap;}
+.scope-analysis-strategy-filter .filter-btn{white-space:nowrap;}
 .scope-jump-val{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
 .scope-jump-fund{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
 .scope-jump-global{scroll-margin-top:calc(var(--jump-top,64px) + 70px);}
@@ -15,7 +15,6 @@
 .scope-trade-log-panel-body .chg-up{color:var(--buy);font-weight:700;}
 .scope-trade-log-panel-body .chg-down{color:var(--avoid);font-weight:700;}
 .scope-trade-ideas-run:disabled{opacity:.55;cursor:not-allowed;}
-#glossary-data-proxy{grid-column:1/-1;}
 .scope-section-refreshlog :is(.upload-title,.refreshlog-runs-title,.refreshlog-freshness-title,.refreshlog-run-time){font-size:var(--t-md);}
 .scope-section-refreshlog :is(.fi-detail,.fi-line-muted,.data-chip,.data-chip b,.refreshlog-run-status){font-size:var(--t-sm);}
 .scope-section-refreshlog :is(.refreshlog-freshness-summary,.refreshlog-freshness-row,.refreshlog-run-stats,.upload-hint,.fi-step,.fi-result,.fi-prompt-msg,.fi-pct,.live-status,.help-tab-link){font-size:var(--t-md);}
@@ -28,7 +27,7 @@
 .scope-news-body :is(.news-text,.news-card,.news-why,.news-hint,.news-status,.news-empty,.news-watch,.news-link){overflow-wrap:anywhere;min-width:0;}
 .scope-events-panel .news-row{padding:6px 0;}
 @media (max-width:900px){
-.sheet-slot :is(#analysisFullscreenBtn,[data-biz-full]){display:none !important;}
+.sheet-slot :is([data-analysis-full],[data-biz-full]){display:none !important;}
 }
 :root[data-theme="white"] .scope-section-settings .settings-row{padding-top:18px;padding-bottom:18px;}
 :root[data-theme="white"] .scope-section-settings .settings-subhead{margin-top:28px;}
@@ -114,7 +113,6 @@
 :root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,.biz-expand,.scope-section-business .rk-btn):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:#1b1f2a;background:#fff;border:1px solid #c9cfdf;}
 :root[data-theme="white"] .strat-layout .strat-main .strat-total .scope-strat-track-btn{border:1px solid #c9cfdf;background:#fff;color:#1b1f2a;min-height:40px;border-radius:6px;}
 }
-:root[data-theme="white"] .strat-layout .strat-main .strat-total #stratSort{border:1px solid #c9cfdf;border-radius:6px;background-color:#fff;padding:0 30px 0 10px;height:40px;min-height:40px;}
 :root[data-theme="white"] .strat-layout .strat-main .strat-total .scope-strat-track-btn{border:1px solid #c9cfdf;background:#fff;color:#1b1f2a;min-height:40px;border-radius:6px;}
 :root[data-theme="white"] .strat-layout .strat-main .strat-total .scope-strat-track-btn:disabled{opacity:.5;}
 :root[data-theme="white"] .strat-layout .strat-main .scope-strat-dup.strat-btn:not(.pub):not(.on){color:#1b1f2a;border:1px solid #c9cfdf;background:#fff;}
