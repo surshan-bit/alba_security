@@ -2874,7 +2874,7 @@ test('fundamental import report: the column check, thin-file warning, job note a
   const all = R.importResultLines({ res: big, before: {}, chk, nothing: true, noVal: ['X'], logErr: 'db down' }).map((l) => l.text);
   assert.ok(all[0].startsWith('Import complete: the file produced no changes') && all[4].includes('D0, D1') && all[4].includes('… +2 on more than one row'));
   assert.ok(all[5].includes('… +2. They use the default Screener.in link and have no TradingView chart mapping yet (BSE-only: B0') && all[5].includes('B9 …).'));
-  assert.ok(all[6].startsWith('1 new stock has no Intrinsic Value') && R.importResultLines({ res: big, before: {}, chk, nothing: false, noVal: ['X', 'Y'], logErr: '' })[6].startsWith('2 new stocks have no'));
+  assert.ok(all[6].startsWith('1 new stock has no Intrinsic Value') && R.importResultLines({ res: big, before: {}, chk, nothing: false, noVal: ['X', 'Y'], logErr: '' })[6].text.startsWith('2 new stocks have no'));
   assert.ok(all[7].includes('could not be marked as imported (db down)'));
 });
 
@@ -2930,7 +2930,7 @@ const fiImportSetup = (over) => {
   const T = fiSetup(), old = [fiStock('A'), fiStock('B')], raw = fiRaw(old, 4), jobs = [], saved = [];
   const docs = { 'stockMeta/main': raw.meta, 'stockData/c001': raw.docs.c001 };
   const db = fiFakeDb(docs, { set: (p, d) => { if(p.startsWith('importJobs')) jobs.push(d); } });
-  T.uploadsSettled = async () => {}; T.fiTakeLockBusy = null;
+  T.uploadsSettled = async () => {};
   T.fundamentalCsvUploadLog.set('u1', { status: 'uploaded', uploadedAt: '2026-11-03T10:00:00Z', assetId: 'a1', filename: 'screen.csv' });
   T.applyFundamental = (csv, stocks) => { stocks[0].verdict = 'buy'; return { rescored: 1600, onboarded: [], dropped: [], inactive: [], bseOnly: [], duplicates: [], verdictMix: { buy: 1, hold: 1 } }; };
   T.fiCheck = () => ({ soft: [], hard: [], moved: 0, maxMove: 0 }); T.fiPrevInfo = () => ({}); T.recordScoreHistory = async () => {};
@@ -2940,7 +2940,7 @@ const fiImportSetup = (over) => {
   return { T, db, jobs, saved, docs, assets: { read: async () => ({ ok: true, text: async () => fiCsv() }) } };
 };
 
-test('fundamental import: a good file is read, scored, checked, written and reported, and the job and upload record are closed', () => alone(async () => {
+test('fundamental import: a good file is read, scored, checked, written and reported, and the job and upload record are closed', () => withPage('<button id="importFundamentalDataBtn"></button><button id="refreshWatchlistBtn"></button>', async () => {
   const x = fiImportSetup(), M = await fiLoad();
   M.__own(x.db, x.assets);
   await M.fiRunImport();
@@ -2950,17 +2950,12 @@ test('fundamental import: a good file is read, scored, checked, written and repo
   assert.strictEqual(x.docs['stockData/c001'].stocks[0].verdict, 'buy');
   assert.ok(x.T.log.includes('read|done|screen.csv') && x.T.log.includes('load|done|2 stocks (data v4)') && x.T.log.includes('score|done|1,600 rescored, 0 new') && x.T.log.includes('check|done|passed') && x.T.log.includes('verify|done|data v5'));
   assert.ok(!x.T.attempt);
-  // nothing to change: the stored data stays as it is
-  x.T.applyFundamental = () => ({ rescored: 1600, onboarded: [], dropped: [], inactive: [], bseOnly: [], duplicates: [], verdictMix: {} });
-  x.T.fundamentalCsvUploadLog.set('u1', { status: 'uploaded', uploadedAt: '2026-11-04T10:00:00Z', assetId: 'a1', filename: 'screen.csv' });
-  x.docs['stockData/c001'].stocks[0].verdict = 'hold';
-  await M.fiRunImport(); x.T.log.length = 0;
 }));
 
-test('fundamental import: a missing file, wrong columns, a busy lock, a refused warning or failed checks stop the import with the right message and free the lock', () => alone(async () => {
+test('fundamental import: a missing file, wrong columns, a busy lock, a refused warning or failed checks stop the import with the right message and free the lock', () => withPage('<button id="importFundamentalDataBtn"></button><button id="refreshWatchlistBtn"></button>', async () => {
   const realError = console.error; console.error = () => {};
   try {
-    const M = await fiLoad(), run = async (over, mutate) => { const x = fiImportSetup(over); if(mutate) mutate(x); M.__own(x.db, x.assets); await M.fiRunImport(); return x; };
+    const run = async (over, mutate) => { const x = fiImportSetup(over); if(mutate) mutate(x); const M = await fiLoad(); M.__own(x.db, x.assets); await M.fiRunImport(); return x; };
     let x = await run({}, (y) => y.T.fundamentalCsvUploadLog.clear());
     assert.strictEqual(x.T.result[0], 'err'); assert.ok(x.T.result[1][0].startsWith('Import stopped: there is no uploaded file waiting.')); assert.strictEqual(x.jobs[x.jobs.length - 1].status, 'failed'); assert.ok(x.T.attempt);
     x = await run({}, (y) => { y.assets.read = async () => ({ ok: true, text: async () => 'Name\nrow' }); });
@@ -2972,7 +2967,6 @@ test('fundamental import: a missing file, wrong columns, a busy lock, a refused 
     assert.strictEqual(x.T.result[0], 'warn'); assert.ok(x.T.result[1][0].startsWith('Import cancelled before anything was written.')); assert.strictEqual(x.docs['stockData/c001'].stocks[0].verdict, 'hold');
     x = await run({ applyFundamental: (csv, stocks) => { stocks[0].verdict = 'buy'; return { rescored: 900, onboarded: ['N'], dropped: [], inactive: [], bseOnly: [], duplicates: [], verdictMix: {} }; }, fiAsk: async (text) => { fiAskedText = text; return true; } });
     assert.ok(fiAskedText.startsWith('Only 900 of the 2 dashboard stocks are in this file')); assert.strictEqual(x.T.result[0], 'ok');
-    const closed = await run({}, (y) => { y.assets = null; }); assert.ok(closed.T.log.length >= 0);
   } finally { console.error = realError; }
 }));
 let fiAskedText = '';
