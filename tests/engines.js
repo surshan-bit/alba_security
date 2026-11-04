@@ -2838,9 +2838,9 @@ async function loadAllStubbed(file, extra, keep){
   return loadWithStubs(file, extra, stubs);
 }
 const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { noteLivePrices, paintHint, rsBars, rsCross, rsDaily, rsFixSymbols, rsReport, rsSnapshot, rsTech2, runSnapshot, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
-  ['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js']);
+  ['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js', './finalchunk.js']);
 const tvStock = (name) => ({ name, ticker: name, pillars: { val: 0.5 } });
-const tvRun = (db, names, over) => Object.assign({ db, today: '2026-11-04', stored: new Map(), prevRows: new Map(), todo: names.map((n) => ({ s: tvStock(n), sym: 'N:' + n })), ctx: null, batchLeft: {}, updated: 0, unchanged: 0, scored: 0, kept: 0, chunksSaved: 0,
+const tvRun = (db, names, over) => Object.assign({ db, today: '2026-11-04', stored: new Map(), prevRows: new Map(), todo: names.map((n) => ({ s: tvStock(n), sym: 'N:' + n })), ctx: null, batchLeft: {}, updated: 0, unchanged: 0, reusedFinal: 0, scored: 0, kept: 0, chunksSaved: 0,
   retried: 0, answeredAgain: 0, carried: 0, skipped: [], batchSecs: [], tvWaitMs: 0, saveMs: 0, stopped: false, livePx: new Map(), symbolFixes: [], dailyPick: null, dailyResult: null, crossRead: 0, crossChanged: 0, crossFailed: 0, barsUpdated: 0, batchSaved: 0, chunkWrites: 0, techBlocksSaved: 0, compacted: 0, staleBefore: 0, noneBefore: 0, filled: 0, histFailed: 0, noHistoryLeft: 0 }, over);
 const tvDb = (fail) => { const saved = []; return { saved, doc: (p) => ({ set: async (d) => { if(fail && fail(p, saved.length)) throw new Error('database down'); saved.push([p, d]); } }) }; };
 const tvAnswer = (symbols, lacking) => ({ data: Object.fromEntries(symbols.filter((x) => !(lacking || []).includes(x)).map((x) => [x, { close: 10, 'RSI|1M': 60 }])) });
@@ -3009,6 +3009,45 @@ test('refresh all stocks, page: the buttons follow the run, the hint counts save
 
 const tvBarsCtx = (over) => Object.assign({ plan: { stale: [] }, jobs: new Map(), ready: new Map(), failedBars: [], abort: '', byImportance: (l) => l, bars: async (left) => left.length }, over);
 
+test('final snapshot chunks: a chunk saved after the close stands until the next session opens, and only then', async () => {
+  const F = await loadWithStubs('src/refresh/finalchunk.js', '', {});
+  const ist = (d, h, m) => Date.parse(d + 'T00:00:00Z') + ((h * 60 + m) * 60000) - 19800000, keys = ['A', 'B'];
+  const chunk = (at, over) => Object.assign({ at: new Date(at).toISOString(), rows: [{ k: 'A', c: [1] }, { k: 'B', c: [2] }] }, over);
+  const fin = (savedAt, now, over) => F.chunkIsFinal(chunk(savedAt, over), keys, now);
+  assert.strictEqual(fin(ist('2026-11-02', 15, 45), ist('2026-11-02', 16, 0)), true);   // Monday, saved after the close, asked again the same afternoon
+  assert.strictEqual(fin(ist('2026-11-02', 15, 29), ist('2026-11-02', 16, 0)), false);   // saved a minute before the close: the last prices are not in it
+  assert.strictEqual(fin(ist('2026-11-02', 15, 45), ist('2026-11-03', 8, 0)), true);   // still final the next morning before the market opens
+  assert.strictEqual(fin(ist('2026-11-02', 15, 45), ist('2026-11-03', 9, 15)), false);   // the next session has opened
+  assert.strictEqual(fin(ist('2026-10-30', 16, 0), ist('2026-11-02', 10, 0)), false);   // Friday's close is old news on Monday during the session
+  assert.strictEqual(fin(ist('2026-10-30', 16, 0), ist('2026-11-02', 8, 0)), true);   // ... but fine over the weekend and early Monday
+  assert.strictEqual(fin(ist('2026-11-06', 16, 0), ist('2026-11-07', 12, 0)), true);   // Saturday
+  assert.strictEqual(fin(ist('2026-11-06', 16, 0), ist('2026-11-08', 22, 0)), true);   // Sunday night
+  assert.strictEqual(fin(ist('2026-11-02', 16, 0), ist('2026-11-02', 15, 0)), false);   // saved "in the future" (a wrong clock)
+  assert.strictEqual(fin(ist('2026-10-30', 16, 0), ist('2026-11-02', 16, 0)), false);   // Friday's save when Monday has also closed
+  assert.strictEqual(F.chunkIsFinal(Object.assign(chunk(ist('2026-11-02', 16, 0)), { at: 'not a time' }), keys, ist('2026-11-02', 17, 0)), false);
+  assert.strictEqual(F.chunkIsFinal(undefined, keys, 1), false); assert.strictEqual(F.chunkIsFinal({ at: '2026-11-02T10:30:00Z', rows: 'x' }, keys, 1), false);
+  const now = ist('2026-11-02', 17, 0), at = ist('2026-11-02', 16, 0);
+  assert.strictEqual(fin(at, now, { rows: [{ k: 'A', c: [1] }, { k: 'B', c: [2], d: '2026-10-30' }] }), false);   // a row kept from an earlier day was not priced
+  assert.strictEqual(fin(at, now, { rows: [{ k: 'A', c: [1] }, { k: 'C', c: [2] }] }), false);   // another stock in the chunk
+  assert.strictEqual(fin(at, now, { rows: [{ k: 'A', c: [1] }] }), false);   // a stock is missing
+  assert.strictEqual(fin(at, now, { rows: [{ k: 'A', c: [1] }, { k: 'A', c: [1] }] }), false);   // the same stock twice
+});
+test('refresh all stocks, snapshot step: a chunk saved after the close is not asked for again, and its prices still reach the weekly step', () => alone(async () => {
+  const T = globalThis.__T = { log: [], calls: [], fiSet: (...a) => T.log.push(a.join('|')), tvErrorText: (e) => e.message, tvIsFatal: () => false, stocks: [], priceHistoryByTicker: {}, COMPACT_LAG: 1 };
+  T.tvCall = async (tool, args) => { T.calls.push(args.symbols.slice()); return tvAnswer(args.symbols); };
+  const names = Array.from({ length: 102 }, (_, i) => 'S' + i), M = await loadTvRefresh(), db = tvDb(), realNow = Date.now;
+  const finalChunk = { asof: '2026-11-04', at: '2026-11-04T10:15:00Z', rows: names.slice(0, 50).map((n) => ({ k: n, y: 'N:' + n, c: [10] })) };   // 15:45 Indian time
+  const stored = () => new Map([['c001', finalChunk], ['c002', Object.assign({}, finalChunk, { at: '2026-11-04T08:00:00Z', rows: names.slice(50, 100).map((n) => ({ k: n, c: [10] })) })]]);   // c002 was saved at noon
+  Date.now = () => Date.parse('2026-11-04T11:00:00Z');   // 16:30 Indian time
+  try {
+    const run = tvRun(db, names, { stored: stored() }); await M.rsSnapshot(run);
+    assert.deepStrictEqual(T.calls.map((c) => c.length), [50, 2]);   // c001 is final: not asked for; c002 and the last two stocks are
+    assert.deepStrictEqual([run.reusedFinal, run.unchanged, run.updated, run.livePx.size, run.livePx.get('S0')], [50, 50, 52, 102, 10]);
+    assert.ok(T.log.some((l) => l.startsWith('run|done|52 saved, 50 unchanged')));
+    T.calls.length = 0; const asked = tvRun(db, names, { stored: stored() }); asked.ctx = tvBarsCtx({ plan: { stale: [asked.todo[3].s] } }); await M.rsSnapshot(asked);
+    assert.strictEqual(asked.reusedFinal, 0);   // S3 needs new bars: its chunk is asked for after all
+  } finally { Date.now = realNow; }
+}));
 test('refresh all stocks, bars step: without a plan or with nothing stale the step is skipped or reported as none needed', () => alone(async () => {
   const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks: [], priceHistoryByTicker: {}, COMPACT_LAG: 1 };
   const M = await loadTvRefresh(), db = tvDb();

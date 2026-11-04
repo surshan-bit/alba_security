@@ -266,6 +266,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.357 &middot; 2026-11-05</h3>
+            <ul>
+              <li><strong>Refresh all stocks skips prices that can no longer change:</strong> a batch of 50 stocks that was saved after the market closed (15:30 Indian time) holds the final prices of that day, so it is not asked for from TradingView again until the next session opens, including over a weekend. A stock that needs new weekly or monthly bars is still asked for. The result line says how many stocks were skipped this way. A market holiday is not known, so on the day after one the prices are asked for as usual.</li>
+              <li><strong>The daily (1D) import stops at once on a long TradingView suspension:</strong> in v1.356 the import waited and tried again six times after TradingView suspended the connector, and TradingView then extended the suspension to the end of the day. Now it waits only when TradingView says the suspension is for one minute, at most twice; any longer suspension stops the import without further calls.</li>
+              <li><strong>The first daily import is spread over several runs:</strong> at most 100 stocks with no saved daily bars are fetched one by one per run; the rest wait for the next run and the result line says how many. Stocks that already have daily bars are still brought up to date in batches.</li>
+            </ul>
             <h3>v1.356 &middot; 2026-11-04</h3>
             <ul>
               <li><strong>Daily (1D) import: far fewer TradingView calls:</strong> a stock that already has saved daily bars is now brought up to date from TradingView's batch call (50 stocks per call), the way the weekly and monthly bars are. Only a stock with no saved daily bars, or one whose saved bars no longer line up (it was missed for several days, or its prices were adjusted by a split), is fetched on its own. The first import of a strategy still reads each stock once; after that a daily run needs only a handful of calls.</li>
