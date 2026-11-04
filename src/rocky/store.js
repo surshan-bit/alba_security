@@ -11,8 +11,8 @@ let started = false, heard = false, tries = 0;
 let unsub = null;
 
 // Starts listening once; `again` (the page opening) listens afresh, so a listener that never delivered cannot leave the page empty.
-/** @param {boolean} [again] */
-async function startRockySync(again){
+/** @param {boolean} [again] @param {(fn: () => void, ms: number) => any} [schedule] the timer; tests pass a fake one */
+async function startRockySync(again, schedule = setTimeout){
   if(started && !again) return;
   started = true;
   let db = null;
@@ -21,7 +21,7 @@ async function startRockySync(again){
   if(!db){ rocky.noDb = true; done(); return; }
   if(unsub){ try { unsub(); } catch(e){ /* the old listener is already gone */ } unsub = null; }
   heard = false;
-  const retry = () => { if(tries++ < 5) setTimeout(() => startRockySync(true), 3000 * tries); };
+  const retry = () => { if(tries++ < 5) schedule(() => startRockySync(true, schedule), 3000 * tries); };
   try {
     unsub = db.collection('rocky').onSnapshot(
       (snap) => {
@@ -33,7 +33,7 @@ async function startRockySync(again){
       },
       (err) => { console.error('Rocky sync error', err); done(); retry(); }
     );
-    setTimeout(() => { if(!heard) retry(); }, 8000);
+    schedule(() => { if(!heard) retry(); }, 8000);
   } catch(e){ console.error('Rocky unavailable', e); done(); }
 }
 

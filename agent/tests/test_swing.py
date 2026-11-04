@@ -25,137 +25,115 @@ class Macd(unittest.TestCase):
         c = [100.0] * 80 + [100 + 0.5 * i * i for i in range(1, 12)]; self.assertIn(A.macd_state(c)['kind'], ('rising', 'fresh_up'))
 
 # a live row: [close, wMACD, wSig, mMACD, mSig, rsiW, rsiM, ch1w, ch1m, volume, mcap, earn]
-def row(close=100, rsiw=58, rsim=70, ch1m=5, vol=200000): return [close, 2, 1, 2, 1, rsiw, rsim, 1, ch1m, vol, 1e4, None]
-def wl(**kw): d = {'A': ['Aaa', 'G', 200, 8.0, 'buy']}; d.update(kw); return d
-def comp(k='A', atr=5.0, hi=110, ma10=95, ma10p=94): return {k: {'n': k, 'g': 'G', 'sc': 8, 'vd': 'buy', 'iv': 200, 'atr': atr, 'hi': hi, 'ma10': ma10, 'ma10p': ma10p}}
+def row(close=100, rsim=70, vol=200000): return [close, 2, 1, 2, 1, 58, rsim, 1, 5, vol, 1e4, None]
+def st3(kind='fresh_up', h=1.5, since=3, zero=True): return {'kind': kind, 'h': h, 'hp': h, 'since': since, 'dir': 'up', 'flip': 90, 'zero': zero, 'last': 100}
+GOOD = [2.0, 1.0, 3.0, 1.0]      # 2-hour MACD, signal, 4-hour MACD, signal: both above their signal line and above zero
+QUAL = ['A', 'G', 200, 5.0, None, None, 1.0]   # name, group, intrinsic value, score, verdict, profit growth, FII %: qualifies Positive MoS at a price of 100 (the live row adds volume and market cap)
+def ideas(live, m3h=None, prox=None, wl=None, **kw): return A.swing_ideas(live, {**{k: QUAL for k in live}, **(wl or {})}, m3h, prox, **kw)
 
-class Ideas(unittest.TestCase):
-    def test_in_band_with_positive_mos_is_listed(self):
-        r = A.swing_ideas({'A': row()}, comp(), wl()); i = r['ideas'][0]
-        self.assertEqual(r['pool'], 1); self.assertEqual(i['k'], 'A'); self.assertEqual(i['mos'], 50); self.assertEqual(i['tier'], 'medium')
-    def test_monthly_rsi_band_edges(self):
-        for rsim, listed in ((65.9, 0), (66, 1), (76, 1), (76.1, 0)): self.assertEqual(len(A.swing_ideas({'A': row(rsim=rsim)}, comp(), wl())['ideas']), listed, rsim)
-    def test_needs_positive_margin_of_safety(self):
-        self.assertEqual(A.swing_ideas({'A': row(close=200)}, comp(), wl())['ideas'], []); self.assertEqual(A.swing_ideas({'A': row(close=250)}, comp(), wl())['ideas'], [])
-    def test_avoid_verdict_is_skipped_with_a_reason(self):
-        r = A.swing_ideas({'A': row()}, comp(), wl(A=['Aaa', 'G', 200, 8, 'avoid'])); self.assertEqual(r['ideas'], []); self.assertEqual(r['skipped'][0]['why'], 'Avoid verdict')
-    def test_rocky_filters_apply_inside_the_universe(self):
-        r = A.swing_ideas({'A': row()}, comp(ma10=105, ma10p=104), wl()); self.assertEqual(r['ideas'], []); self.assertIn('Below the 10-week average', r['skipped'][0]['why'])
-    def test_outside_the_universe_is_kept_with_a_warning(self):
-        i = A.swing_ideas({'A': row()}, {}, wl())['ideas'][0]; self.assertFalse(i['inU']); self.assertTrue(any('not applied' in w for w in i['warn'])); self.assertTrue(any('estimate' in w for w in i['warn']))
-    def test_thin_trading_is_flagged_and_ranked_lower(self):
-        both = wl(B=['Bbb', 'G', 200, 8.0, 'buy']); live = {'A': row(), 'B': row(vol=1000)}
-        r = A.swing_ideas(live, {**comp('A'), **comp('B')}, both); self.assertEqual([i['k'] for i in r['ideas']], ['A', 'B']); self.assertTrue(r['ideas'][1]['thin']); self.assertTrue(any('Thinly' in w for w in r['ideas'][1]['warn']))
+class Rules(unittest.TestCase):
+    def test_rule_1_monthly_rsi_band_edges(self):
+        for rsim, inside in ((65.9, 0), (66, 1), (76, 1), (76.1, 0)): self.assertEqual(ideas({'A': row(rsim=rsim)})['pool'], inside, rsim)
+    def test_rule_2_needs_the_3h_macd_above_its_signal_and_above_zero(self):
+        self.assertTrue(A.qualifies(st3())); self.assertFalse(A.qualifies(st3(h=0))); self.assertFalse(A.qualifies(st3(h=-1))); self.assertFalse(A.qualifies(st3(zero=False))); self.assertFalse(A.qualifies(None))
+    def test_the_first_pass_needs_both_the_2h_and_4h_macd_above_signal_and_zero(self):
+        self.assertTrue(A.prox_ok(GOOD))
+        for bad in ([1.0, 2.0, 3.0, 1.0], [2.0, 1.0, 1.0, 3.0], [-1.0, -2.0, 3.0, 1.0], [2.0, 1.0, -1.0, -2.0], [2.0], None, 'x'): self.assertFalse(A.prox_ok(bad), bad)
+    def test_without_the_first_pass_the_pool_is_listed_for_the_daily_run(self):
+        r = ideas({'A': row(), 'B': row(rsim=50)}, sym={'A': 'NSE:AAA'}); self.assertEqual(r['needProx'], [{'k': 'A', 'y': 'NSE:AAA'}]); self.assertEqual((r['ideas'], r['shortlisted'], r['need3h']), ([], 0, []))
+    def test_the_shortlist_is_the_freshest_first_and_capped(self):
+        live = {'S%d' % i: row() for i in range(15)}; prox = {k: [2.0, 1.0, 3.0 + i * 0.5, 1.0] for i, k in enumerate(live)}
+        pool = A.swing_pool(live, {}); short = A.shortlist(pool, prox)
+        self.assertEqual(len(short), A.MAX_3H); self.assertEqual([p['k'] for p in short][:3], ['S0', 'S1', 'S2'])
+        self.assertEqual(A.shortlist(pool, {'S0': [1.0, 2.0, 3.0, 1.0]}), [])
+    def test_a_shortlisted_stock_without_a_3h_check_is_listed_for_the_daily_run_and_is_not_an_idea(self):
+        r = ideas({'A': row()}, prox={'A': GOOD}, sym={'A': 'NSE:AAA'}); self.assertEqual(r['need3h'], [{'k': 'A', 'y': 'NSE:AAA'}]); self.assertEqual((r['ideas'], r['shortlisted'], r['checked']), ([], 1, 0))
+    def test_only_stocks_that_meet_both_rules_are_ideas(self):
+        live = {'A': row(), 'B': row(), 'C': row(), 'D': row(rsim=50)}; prox = {k: GOOD for k in live}
+        m3h = {'A': st3(), 'B': st3(h=-0.5), 'C': st3(zero=False), 'D': st3()}; r = ideas(live, m3h, prox)
+        self.assertEqual([i['k'] for i in r['ideas']], ['A']); self.assertEqual((r['pool'], r['shortlisted'], r['checked']), (3, 3, 3)); self.assertEqual(r['need3h'], [])
+    def test_the_stock_that_crossed_up_most_recently_comes_first(self):
+        live = {'A': row(), 'B': row(), 'C': row()}; prox = {k: GOOD for k in live}
+        r = ideas(live, {'A': st3(since=9), 'B': st3(since=2), 'C': st3(since=None)}, prox); self.assertEqual([i['k'] for i in r['ideas']], ['B', 'A', 'C'])
+    def test_nothing_else_selects_a_stock(self):
+        wl = {'A': ['Aaa', 'G', 90, 3.0, 'avoid', 6354, 1.0]}; r = ideas({'A': row()}, {'A': st3()}, {'A': GOOD}, wl)
+        i = r['ideas'][0]; self.assertEqual(i['k'], 'A'); w = ' | '.join(i['warn'])
+        self.assertIn('Avoid verdict', w); self.assertIn('negative margin of safety', w); self.assertIn('Earnings spike: trailing profit growth 6,354%', w)
+    def test_a_stock_without_a_verdict_has_no_reference_line(self):
+        i = ideas({'A': row()}, {'A': st3()}, {'A': GOOD})['ideas'][0]; self.assertEqual(i['n'], 'A'); self.assertIsNone(i['ref']['vd']); self.assertFalse(any('For reference' in w for w in i['why']))
+    def test_the_card_lists_both_rules_and_the_dashboard_view_for_reference_only(self):
+        i = ideas({'A': row()}, {'A': st3()}, {'A': GOOD}, {'A': ['Aaa', 'G', 200, 8.0, 'buy', 40, 1.0]})['ideas'][0]
+        self.assertEqual(i['why'][0], 'Monthly RSI 70, inside 66-76'); self.assertIn('3-hour MACD above its signal line and above zero (crossed up 3 bars ago', i['why'][1])
+        one = ideas({'A': row()}, {'A': st3(since=1)}, {'A': GOOD})['ideas'][0]; self.assertIn('crossed up 1 bar ago', one['why'][1]); never = ideas({'A': row()}, {'A': st3(since=None)}, {'A': GOOD})['ideas'][0]; self.assertIn('crossed up a while ago', never['why'][1]); self.assertIn('For reference: dashboard verdict buy (score 8.0), margin of safety 50%', i['why'][2])
+        self.assertEqual((i['action'], i['ref']['mos']), ('Buy zone', 50)); self.assertEqual(i['warn'], ['Stop is an estimate (8%): no volatility data'])
+    def test_at_most_eight_ideas(self):
+        live = {'S%d' % i: row() for i in range(11)}; r = ideas(live, {k: st3(since=i) for i, k in enumerate(live)}, {k: GOOD for k in live}); self.assertEqual(len(r['ideas']), 8)
+
+class PositiveMos(unittest.TestCase):
+    def info(self, **ch):
+        i = dict(zip(('n', 'g', 'iv', 'score', 'vd', 'pg', 'fii'), QUAL)); i.update(ch); return list(i.values())
+    def test_a_stock_that_meets_every_rule_qualifies(self): self.assertTrue(A.positive_mos(self.info(), row()))
+    def test_each_rule_has_an_edge(self):
+        for ch, r, ok in ((dict(score=2), row(), 1), (dict(score=1.9), row(), 0), (dict(iv=80), row(), 1), (dict(iv=80), row(107), 0), (dict(fii=0.1), row(), 1), (dict(fii=0.09), row(), 0),
+                          ({}, row(vol=20000), 1), ({}, row(vol=19999), 0)):
+            self.assertEqual(A.positive_mos(self.info(**ch), r), bool(ok), (ch, r))
+    def test_an_unknown_market_cap_fails(self):
+        r = row(); r[10] = None; self.assertFalse(A.positive_mos(self.info(), r)); r[10] = 0; self.assertFalse(A.positive_mos(self.info(), r))
+    def test_a_missing_or_malformed_field_fails(self):
+        for k in ('iv', 'score', 'fii'): self.assertFalse(A.positive_mos(self.info(**{k: None}), row()), k); self.assertFalse(A.positive_mos(self.info(**{k: 'x'}), row()), k)
+        r = row(); r[9] = None; self.assertFalse(A.positive_mos(self.info(), r))
+        self.assertFalse(A.positive_mos(self.info(iv=True), row())); self.assertFalse(A.positive_mos(self.info(iv=0), row())); self.assertFalse(A.positive_mos(None, row())); self.assertFalse(A.positive_mos(['n', 'g', 200, 5], row()))
+    def test_only_strategy_stocks_enter_the_pool(self):
+        live = {'A': row(), 'B': row(), 'C': row()}; r = A.swing_ideas(live, {'A': QUAL, 'B': QUAL[:2] + [200, 1.0] + QUAL[4:]}, None, None)
+        self.assertEqual((r['pool'], [p['k'] for p in r['needProx']]), (1, ['A']))
+
+class Levels(unittest.TestCase):
+    def setUp(self): self._v = A.MOS_MIN_VOL; A.MOS_MIN_VOL = 0   # the strategy's volume floor would hide the liquidity cap being tested
+    def tearDown(self): A.MOS_MIN_VOL = self._v
+    def one(self, rsim=70, vol=200000, atr=None, held=()):
+        return ideas({'A': row(rsim=rsim, vol=vol)}, {'A': st3()}, {'A': GOOD}, comp={'A': {'atr': atr}} if atr else None, held=held)['ideas'][0]
     def test_levels_follow_the_volatility_stop(self):
-        i = A.swing_ideas({'A': row()}, comp(atr=5.0), wl())['ideas'][0]
-        self.assertEqual(i['stopPct'], 4.5); self.assertAlmostEqual(i['stop'], 95.5); self.assertAlmostEqual(i['t1'], 110); self.assertAlmostEqual(i['t2'], 120); self.assertEqual(i['entry'], [100.0, 101.0]); self.assertAlmostEqual(i['rr'], 4.4, places=1)
-        self.assertEqual(A.swing_ideas({'A': row()}, comp(atr=20.0), wl())['ideas'][0]['stopPct'], 9.0)
-    def test_sizing_follows_the_tier_and_both_capitals(self):
-        md = A.swing_ideas({'A': row(rsim=66)}, comp(atr=20.0), wl())['ideas'][0]; hi = A.swing_ideas({'A': row(rsim=75)}, comp(atr=20.0), wl())['ideas'][0]
-        self.assertEqual((md['tier'], hi['tier']), ('medium', 'high')); self.assertEqual(md['risk'], 0.0075); self.assertEqual(hi['risk'], 0.005)    # the band 66-76 holds only the medium and high tiers
+        i = self.one(atr=5.0); self.assertEqual(i['stopPct'], 4.5); self.assertAlmostEqual(i['stop'], 95.5); self.assertAlmostEqual(i['t1'], 110); self.assertAlmostEqual(i['t2'], 120); self.assertEqual(i['entry'], [100.0, 101.0]); self.assertAlmostEqual(i['rr'], 4.4, places=1)
+        self.assertEqual(self.one(atr=20.0)['stopPct'], 9.0); self.assertEqual(self.one()['stopPct'], 8.0)
+    def test_sizing_follows_the_monthly_rsi_tier_for_both_capitals(self):
+        md = self.one(rsim=66, atr=20.0); hi = self.one(rsim=75, atr=20.0)
+        self.assertEqual((md['tier'], hi['tier'], md['risk'], hi['risk']), ('medium', 'high', 0.0075, 0.005))
         self.assertEqual(md['qty']['1000000'], int(1e6 * 0.0075 / (100 - md['stop']))); self.assertEqual(hi['qty']['500000'], int(5e5 * 0.005 / (100 - hi['stop'])))
         self.assertGreater(md['qty']['1000000'], md['qty']['500000']); self.assertGreater(md['qty']['1000000'], hi['qty']['1000000'])
-    def test_3h_state_moves_the_ranking_and_the_action(self):
-        both = wl(B=['Bbb', 'G', 200, 8.0, 'buy']); live = {'A': row(), 'B': row()}; cp = {**comp('A'), **comp('B')}
-        m = {'A': {'kind': 'down', 'h': -1, 'hp': 3, 'since': 4, 'dir': 'down', 'flip': 101, 'zero': True, 'last': 100}, 'B': {'kind': 'rising', 'h': 2, 'hp': 2, 'since': 9, 'dir': 'up', 'flip': 90, 'zero': True, 'last': 100}}
-        r = A.swing_ideas(live, cp, both, m); self.assertEqual([i['k'] for i in r['ideas']], ['B', 'A']); self.assertEqual(r['ideas'][0]['action'], 'Buy zone'); self.assertEqual(r['ideas'][1]['action'], 'Wait for a 3-hour cross-up')
-        self.assertTrue(any('cross up' in w for w in r['ideas'][1]['why']))
-    def test_needs_3h_lists_the_candidates_without_a_state(self):
-        r = A.swing_ideas({'A': row()}, comp(), wl(), None, (), {'A': 'NSE:AAA'}); self.assertEqual(r['need3h'], [{'k': 'A', 'y': 'NSE:AAA'}])
-    def test_held_stock_is_noted(self):
-        self.assertTrue(any('already held' in w.lower() for w in A.swing_ideas({'A': row()}, comp(), wl(), None, {'A'})['ideas'][0]['warn']))
-    def test_top_five_and_the_rest(self):
-        big = {'S%d' % i: ['S', 'G', 200, 5 + i * 0.1, 'buy'] for i in range(9)}; live = {k: row() for k in big}; cp = {}
-        for k in big: cp.update(comp(k))
-        r = A.swing_ideas(live, cp, big); self.assertEqual(len(r['ideas']), 5); self.assertEqual(len(r['also']), 4); self.assertEqual(r['pool'], 9)
-        self.assertEqual([i['k'] for i in r['ideas']], ['S8', 'S7', 'S6', 'S5', 'S4'])
-
-class Spike(unittest.TestCase):
-    def one(self, pg, **kw): return A.swing_ideas({'A': row()}, comp(), {'A': ['Aaa', 'G', 200, 8.0, 'buy', pg]}, **kw)['ideas'][0]
-    def test_trailing_growth_above_300_is_flagged_with_a_warning_and_the_action_is_qualified(self):
-        i = self.one(6354); self.assertTrue(i['spike']); self.assertEqual(i['pg'], 6354)
-        self.assertTrue(any('Earnings spike: trailing profit growth 6,354%' in w for w in i['warn'])); self.assertEqual(i['action'], 'Check the 3-hour chart (verify earnings first)')
-    def test_boundary(self):
-        self.assertFalse(self.one(300)['spike']); self.assertTrue(self.one(300.1)['spike']); self.assertFalse(self.one(-50)['spike'])
-    def test_missing_or_old_style_entries_are_not_flagged(self):
-        self.assertFalse(self.one(None)['spike']); self.assertIsNone(self.one(None)['pg'])
-        old = A.swing_ideas({'A': row()}, comp(), {'A': ['Aaa', 'G', 200, 8.0, 'buy']})['ideas'][0]; self.assertFalse(old['spike']); self.assertEqual(old['action'], 'Check the 3-hour chart')
-    def test_the_penalty_lowers_the_score_by_25(self):
-        self.assertAlmostEqual(self.one(None)['score'] - self.one(5000)['score'], A.SPIKE_PENALTY, places=1)
-    def test_a_spike_stock_no_longer_wins_over_a_clean_one_with_the_same_setup(self):
-        both = {'A': ['Aaa', 'G', 200, 8.37, 'buy', 6354], 'B': ['Bbb', 'G', 200, 7.0, 'buy', 40]}; live = {'A': row(), 'B': row()}; cp = {**comp('A'), **comp('B')}
-        r = A.swing_ideas(live, cp, both); self.assertEqual([i['k'] for i in r['ideas']], ['B', 'A'])
-    def test_a_buy_zone_stock_with_a_spike_keeps_the_buy_colour_prefix_but_says_to_verify(self):
-        m = {'A': {'kind': 'rising', 'h': 1, 'hp': 1, 'since': 9, 'dir': 'up', 'flip': 90, 'zero': True, 'last': 100}}
-        self.assertEqual(self.one(900, m3h=m)['action'], 'Buy zone (verify earnings first)')
-    def test_build_watch_stores_the_rounded_trailing_profit_growth(self):
-        w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); os.makedirs(w + '/stockData')
-        json.dump({'stocks': [{'ticker': 'AAA', 'name': 'Aaa', 'industryGroup': 'G', 'score': 7, 'verdict': 'buy', 'valuation': {'intrinsicValue': 200, 'profitGrowth': 6353.55}}, {'ticker': 'BBB', 'valuation': {'intrinsicValue': 50}}]}, open(w + '/stockData/c001.json', 'w'))
-        A.build_watch(w, w); d = A.J(w + '/agent/watch.json')['w']; self.assertEqual(d['AAA'][5], 6354); self.assertIsNone(d['BBB'][5])
-
-class LiquidityCap(unittest.TestCase):
-    def one(self, vol, **kw): return A.swing_ideas({'A': row(vol=vol)}, comp(atr=5.0), wl(), **kw)['ideas'][0]
-    def test_a_liquid_stock_is_not_capped(self):
-        i = self.one(10_000_000); self.assertFalse(i['liqLimited']); self.assertGreater(i['qty']['1000000'], i['qty']['500000']); self.assertFalse(any('Size limited' in w for w in i['warn']))
-    def test_a_thin_stock_is_limited_to_ten_percent_of_daily_volume(self):
-        i = self.one(2000); self.assertTrue(i['liqLimited']); self.assertEqual(i['qty'], {'500000': 200, '1000000': 200}); self.assertTrue(any('Size limited to 200 shares' in w and 'about Rs 20,000' in w for w in i['warn']))
+    def test_a_liquid_stock_is_not_capped_and_a_thin_one_is_limited_to_ten_percent_of_daily_volume(self):
+        liquid = self.one(vol=10_000_000); self.assertFalse(liquid['liqLimited']); self.assertFalse(any('Size limited' in w for w in liquid['warn']))
+        thin = self.one(vol=2000); self.assertTrue(thin['liqLimited'] and thin['thin']); self.assertEqual(thin['qty'], {'500000': 200, '1000000': 200})
+        self.assertTrue(any('Size limited to 200 shares' in w and 'about Rs 20,000' in w for w in thin['warn'])); self.assertTrue(any('Thinly traded' in w for w in thin['warn']))
     def test_only_the_larger_capital_is_limited_when_that_is_all_that_binds(self):
-        free = self.one(10_000_000)['qty']; v = int((free['500000'] + free['1000000']) / 2 / A.LIQ_PART)
-        i = self.one(v); self.assertEqual(i['qty']['500000'], free['500000']); self.assertEqual(i['qty']['1000000'], int(v * A.LIQ_PART)); self.assertTrue(i['liqLimited'])
+        free = self.one(vol=10_000_000)['qty']; v = int((free['500000'] + free['1000000']) / 2 / A.LIQ_PART); i = self.one(vol=v)
+        self.assertEqual(i['qty']['500000'], free['500000']); self.assertEqual(i['qty']['1000000'], int(v * A.LIQ_PART)); self.assertTrue(i['liqLimited'])
     def test_unknown_volume_leaves_the_size_alone(self):
-        i = A.swing_ideas({'A': [100, 2, 1, 2, 1, 58, 70, 1, 5, None, 1e4, None]}, comp(), wl())['ideas'][0]; self.assertFalse(i['liqLimited']); self.assertGreater(i['qty']['500000'], 0)
-
-class DailyMacd(unittest.TestCase):
-    def one(self, d1, **kw):
-        r = A.swing_ideas({'A': row()}, comp(), wl(), d1=d1, **kw); return r
-    def test_points_scale_with_the_gap(self):
-        self.assertEqual(A.d1_points(0.0), 20); self.assertEqual(A.d1_points(0.5), 20); self.assertAlmostEqual(A.d1_points(1.75), 10); self.assertEqual(A.d1_points(3.0), 0); self.assertEqual(A.d1_points(9), 0)
-    def test_not_checked_is_neutral_and_listed_for_the_daily_run(self):
-        r = self.one(None); i = r['ideas'][0]; self.assertIsNone(i['d1']); self.assertEqual(r['need1d'], [{'k': 'A', 'y': None}]); self.assertIn('Daily MACD not checked', i['warn'])
-        self.assertEqual(self.one({}, sym={'A': 'NSE:AAA'})['need1d'], [{'k': 'A', 'y': 'NSE:AAA'}])
-    def test_below_or_at_the_signal_line_is_skipped_with_a_reason(self):
-        for macd in (0.5, 0.99, 1.0):
-            r = self.one({'A': [macd, 1.0]}); self.assertEqual(r['ideas'], []); self.assertEqual(r['skipped'][0]['why'], 'Daily MACD below its signal line'); self.assertEqual(r['need1d'], [])
-    def test_above_the_signal_line_records_the_gap_and_the_reason(self):
-        i = self.one({'A': [1.5, 1.0]})['ideas'][0]; self.assertEqual(i['d1'], {'macd': 1.5, 'sig': 1.0, 'gap': 0.5}); self.assertNotIn('Daily MACD not checked', i['warn'])
-        self.assertTrue(any('gap 0.50% of price: close to the cross' in w for w in i['why']))
-        self.assertTrue(any('already stretched' in w for w in self.one({'A': [4.0, 1.0]})['ideas'][0]['why']))
-    def test_the_closest_to_the_signal_ranks_first(self):
-        both = wl(B=['Bbb', 'G', 200, 8.0, 'buy']); live = {'A': row(), 'B': row()}; cp = {**comp('A'), **comp('B')}
-        r = A.swing_ideas(live, cp, both, d1={'A': [3.0, 1.0], 'B': [1.2, 1.0]}); self.assertEqual([i['k'] for i in r['ideas']], ['B', 'A']); self.assertGreater(r['ideas'][0]['score'], r['ideas'][1]['score'])
-    def test_a_checked_fresh_cross_outscores_an_unchecked_one(self):
-        self.assertGreater(self.one({'A': [1.2, 1.0]})['ideas'][0]['score'], self.one(None)['ideas'][0]['score'])
-    def test_m1d_run_writes_the_states_and_ignores_malformed_entries(self):
-        w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); os.makedirs(w + '/liveSnapshot'); os.makedirs(w + '/stockData')
-        json.dump({'stocks': [{'ticker': 'AAA', 'name': 'Aaa', 'industryGroup': 'G', 'score': 7, 'verdict': 'buy', 'valuation': {'intrinsicValue': 200}}]}, open(w + '/stockData/c001.json', 'w'))
-        json.dump({'asof': A.today(), 'rows': [{'k': 'AAA', 'y': 'NSE:AAA', 'c': row()}]}, open(w + '/liveSnapshot/c001.json', 'w')); json.dump({'stocks': {}}, open(w + '/agent/compact.json', 'w')); A.build_watch(w, w)
-        json.dump({'AAA': [1.5, 1.0], 'BAD': 'x', 'BAD2': [1], 'BAD3': ['a', 'b']}, open(w + '/agent/macd1d.json', 'w'))
-        o = A.m1d_run(w); self.assertEqual(A.J(w + '/agent/d1.json')['s'], {'AAA': [1.5, 1.0]}); self.assertEqual(o['ideas'][0]['d1']['gap'], 0.5); self.assertEqual(o['d1Asof'], A.today()); self.assertEqual(o['need1d'], [])
-    def test_stale_daily_states_are_ignored(self):
-        w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); os.makedirs(w + '/liveSnapshot'); os.makedirs(w + '/stockData')
-        json.dump({'stocks': [{'ticker': 'AAA', 'name': 'Aaa', 'industryGroup': 'G', 'score': 7, 'verdict': 'buy', 'valuation': {'intrinsicValue': 200}}]}, open(w + '/stockData/c001.json', 'w'))
-        json.dump({'asof': A.today(), 'rows': [{'k': 'AAA', 'y': 'NSE:AAA', 'c': row()}]}, open(w + '/liveSnapshot/c001.json', 'w')); json.dump({'stocks': {}}, open(w + '/agent/compact.json', 'w')); A.build_watch(w, w)
-        json.dump({'d': '2000-01-01', 's': {'AAA': [0, 1]}}, open(w + '/agent/d1.json', 'w')); o = A.swing_run(w); self.assertEqual(len(o['ideas']), 1); self.assertIsNone(o['d1Asof'])
+        c = [100, 2, 1, 2, 1, 58, 70, 1, 5, None, 1e4, None]; i = A.swing_card({'k': 'A', 'y': None, 'close': 100, 'mrsi': 70}, st3(), c, QUAL, set()); self.assertFalse(i['liqLimited']); self.assertGreater(i['qty']['500000'], 0)
+    def test_a_held_stock_is_noted(self): self.assertTrue(any('already held' in w.lower() for w in self.one(held={'A'})['warn']))
 
 class Files(unittest.TestCase):
-    def mk(self):
+    def mk(self, with_watch=True):
         w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); os.makedirs(w + '/liveSnapshot'); os.makedirs(w + '/stockData')
-        json.dump({'stocks': [{'ticker': 'AAA ·x', 'name': 'Aaa Ltd', 'industryGroup': 'G', 'score': 7, 'verdict': 'buy', 'valuation': {'intrinsicValue': 200}}, {'ticker': 'NOIV', 'valuation': {}}]}, open(w + '/stockData/c001.json', 'w'))
+        json.dump({'stocks': [{'ticker': 'AAA ·x', 'name': 'Aaa Ltd', 'industryGroup': 'G', 'score': 7, 'verdict': 'buy', 'liquidity': {'marketCap': 50000, 'avgVolume': 300000}, 'valuation': {'intrinsicValue': 200, 'profitGrowth': 6353.55, 'fiiHolding': 1.0}}, {'ticker': 'NOIV', 'valuation': {}}]}, open(w + '/stockData/c001.json', 'w'))
         json.dump({'asof': A.today(), 'rows': [{'k': 'AAA', 'y': 'NSE:AAA', 'c': row()}]}, open(w + '/liveSnapshot/c001.json', 'w'))
-        json.dump({'stocks': {}}, open(w + '/agent/compact.json', 'w')); return w
-    def test_build_watch_keeps_only_stocks_with_an_intrinsic_value(self):
-        w = self.mk(); A.build_watch(w, w); d = A.J(w + '/agent/watch.json')['w']; self.assertEqual(list(d), ['AAA']); self.assertEqual(d['AAA'], ['Aaa Ltd', 'G', 200, 7, 'buy', None])
-    def test_swing_run_writes_swing_json(self):
-        w = self.mk(); A.build_watch(w, w); o = A.swing_run(w); self.assertEqual(A.J(w + '/agent/swing.json')['ideas'][0]['k'], 'AAA'); self.assertEqual(o['need3h'], [{'k': 'AAA', 'y': 'NSE:AAA'}])
-    def test_swing_run_without_a_watch_file_does_nothing(self):
-        w = self.mk(); self.assertIsNone(A.swing_run(w)); self.assertFalse(os.path.exists(w + '/agent/swing.json'))
-    def test_m3h_run_merges_the_states(self):
-        w = self.mk(); A.build_watch(w, w)
-        json.dump({'AAA': [200 - i * 0.8 for i in range(100)] + [120 + i * 3 for i in range(6)]}, open(w + '/agent/bars3h.json', 'w'))
-        o = A.m3h_run(w); i = o['ideas'][0]; self.assertEqual(i['m3h']['kind'], 'fresh_up'); self.assertEqual(i['action'], 'Buy zone'); self.assertEqual(o['need3h'], []); self.assertEqual(o['m3hAsof'], A.today())
-    def test_stale_3h_states_are_ignored(self):
-        w = self.mk(); A.build_watch(w, w)
-        json.dump({'d': '2000-01-01', 's': {'AAA': {'kind': 'rising', 'h': 1, 'hp': 1, 'since': 3, 'dir': 'up', 'flip': 1, 'zero': True, 'last': 1}}}, open(w + '/agent/m3h.json', 'w'))
-        self.assertIsNone(A.swing_run(w)['ideas'][0]['m3h'])
+        if with_watch: A.build_watch(w, w)
+        return w
+    def test_build_watch_keeps_only_stocks_with_an_intrinsic_value_and_the_rounded_profit_growth(self):
+        w = self.mk(); d = A.J(w + '/agent/watch.json')['w']; self.assertEqual(list(d), ['AAA']); self.assertEqual(d['AAA'], ['Aaa Ltd', 'G', 200, 7, 'buy', 6354, 1.0])
+        json.dump({'stocks': [{'ticker': 'B', 'valuation': {'intrinsicValue': 50}}]}, open(w + '/stockData/c001.json', 'w')); A.build_watch(w, w); self.assertIsNone(A.J(w + '/agent/watch.json')['w']['B'][5])
+    def test_swing_run_lists_the_pool_for_the_first_pass(self):
+        w = self.mk(); o = A.swing_run(w); self.assertEqual(A.J(w + '/agent/swing.json')['pool'], 1); self.assertEqual(o['needProx'], [{'k': 'AAA', 'y': 'NSE:AAA'}]); self.assertIsNone(o['proxAsof'])
+    def test_swing_run_without_a_live_snapshot_does_nothing(self):
+        w = tempfile.mkdtemp(); os.makedirs(w + '/agent'); self.assertIsNone(A.swing_run(w)); self.assertFalse(os.path.exists(w + '/agent/swing.json'))
+    def test_the_whole_chain_prox_then_3h(self):
+        w = self.mk()
+        json.dump({'AAA': [2.0, 1.0, 3.0, 1.0], 'BAD': 'x', 'BAD2': [1], 'BAD3': ['a', 'b', 'c', 'd']}, open(w + '/agent/macdprox.json', 'w'))
+        o = A.prox_run(w); self.assertEqual(A.J(w + '/agent/prox.json')['s'], {'AAA': [2.0, 1.0, 3.0, 1.0]}); self.assertEqual((o['shortlisted'], o['need3h'], o['proxAsof']), (1, [{'k': 'AAA', 'y': 'NSE:AAA'}], A.today())); self.assertEqual(o['needProx'], [])
+        json.dump({'AAA': [100.0] * 80 + [100 + 4 * i for i in range(1, 8)], 'SHORT': [1, 2, 3]}, open(w + '/agent/bars3h.json', 'w'))
+        o = A.m3h_run(w); self.assertEqual([i['k'] for i in o['ideas']], ['AAA']); self.assertEqual((o['checked'], o['need3h'], o['m3hAsof']), (1, [], A.today())); self.assertIn(o['ideas'][0]['m3h']['kind'], ('fresh_up', 'rising')); self.assertTrue(o['ideas'][0]['m3h']['zero'])
+    def test_stale_first_pass_and_3h_states_are_ignored(self):
+        w = self.mk(); old = {'d': '2000-01-01', 's': {'AAA': GOOD}}
+        json.dump(old, open(w + '/agent/prox.json', 'w')); json.dump({'d': '2000-01-01', 's': {'AAA': st3()}}, open(w + '/agent/m3h.json', 'w'))
+        o = A.swing_run(w); self.assertEqual((o['shortlisted'], o['ideas'], o['proxAsof'], o['m3hAsof']), (0, [], None, None)); self.assertEqual(len(o['needProx']), 1)
 
 if __name__ == '__main__': unittest.main()

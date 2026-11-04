@@ -915,53 +915,45 @@ test('rocky page: the learning line reads the review figures when there is no wr
 
 // ---- the Rocky page: best swing trades of the day (src/rocky/swing.js), the risk-tier columns and the store that reads the swing document
 const EMPTY_ST = { curve: [], closed: [], open: [] };
-const IDEA = (o) => Object.assign({ k: 'AAA', n: 'Aaa Ltd', g: 'Textiles', close: 100, mrsi: 71, mos: 20, sc: 7, vd: 'buy', thin: false, inU: true, tier: 'high', risk: 0.005, score: 81.3, action: 'Buy zone',
-  entry: [100, 101], stop: 92.5, stopPct: 7.5, t1: 110, t2: 120, rr: 2.7, qty: { '500000': 47, '1000000': 94 }, why: ['Fundamentals: buy (score 7)', 'Margin of safety 20%'], warn: [] }, o);
-const SWING = (o) => Object.assign({ asof: '2026-11-03', dataAsof: '2026-11-03', m3hAsof: '2026-11-03', band: [66, 76], pool: 22, ideas: [IDEA()], also: [], skipped: [], capitals: [500000, 1000000] }, o);
-test('rocky page: best swing trades say so when the document is missing or the day has no idea', async () => {
+const IDEA = (o) => Object.assign({ k: 'AAA', n: 'Aaa Ltd', g: 'Textiles', close: 100, mrsi: 71, thin: false, tier: 'high', risk: 0.005, action: 'Buy zone', m3h: { since: 3, h: 1.5 },
+  entry: [100, 101], stop: 92.5, stopPct: 7.5, t1: 110, t2: 120, rr: 2.7, qty: { '500000': 47, '1000000': 94 }, why: ['Monthly RSI 71, inside 66-76', '3-hour MACD above its signal line and above zero'], warn: [] }, o);
+const SWING = (o) => Object.assign({ asof: '2026-11-03', dataAsof: '2026-11-03', band: [66, 76], pool: 124, shortlisted: 12, checked: 12, ideas: [IDEA()], capitals: [500000, 1000000] }, o);
+test('rocky page: best swing trades say so when the document is missing or no stock meets both rules', async () => {
   const none = await rockyPage({ state: EMPTY_ST });
   assert.ok(/Best swing trades for the day/.test(none) && /appear after the next daily run/.test(none));
-  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [] }) }), /No stock fits today: monthly RSI 66-76, positive margin of safety, daily MACD above its signal line/);
-  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: undefined }) }), /No stock fits today/);
+  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [] }) }), /No Positive MoS stock meets both rules today: monthly RSI 66-76, and a 3-hour MACD above its signal line and above zero/);
+  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: undefined }) }), /No Positive MoS stock meets both rules today/);
 });
-test('rocky page: a swing idea shows rank, action, score, tier, the levels in rupees, shares for both capitals, the reasons and the caveat', async () => {
+test('rocky page: a swing idea shows rank, action, cross age, tier, the levels in rupees, shares for both capitals, the two rules and the caveat', async () => {
   const html = await rockyPage({ state: EMPTY_ST, swing: SWING() });
   assert.ok(html.includes('rky-idea rky-idea-top') && html.includes('<span class="rky-rank">1</span><b>AAA</b>') && html.includes('Aaa Ltd · Textiles'));
-  assert.ok(html.includes('rky-act rky-act-buy">Buy zone') && html.includes('Score 81') && html.includes('High risk tier'));
+  assert.ok(html.includes('rky-act rky-act-buy">Buy zone') && html.includes('3-hour cross 3 bars ago') && html.includes('High risk tier'));
   assert.ok(html.includes('₹100.00 – 101.00') && html.includes('₹92.50 (−7.5%)') && html.includes('₹110.00') && html.includes('₹120.00') && html.includes('2.7 : 1'));
   assert.ok(html.includes('Shares at ₹5L / ₹10L</b><span>47 / 94</span>'), 'shares for both capitals');
-  assert.ok(html.includes('<li>Fundamentals: buy (score 7)</li>') && /22 stocks fit your rule today \(monthly RSI 66-76/.test(html));
-  assert.ok(/Data as of 2026-11-03 · 3-hour check 2026-11-03/.test(html) && /not a prediction/.test(html) && !/style=/.test(html));
+  assert.ok(html.includes('<li>Monthly RSI 71, inside 66-76</li>') && !/Score/.test(html.split('Equity curve')[0]), 'no score: only the two rules select');
+  assert.ok(/124 stocks qualify your Positive MoS strategy and have a monthly RSI of 66-76\. 12 passed a first pass on the 2-hour and 4-hour MACD and 12 got the exact 3-hour check; 1 meet both rules, freshest 3-hour cross first\. Data as of 2026-11-03\./.test(html));
+  assert.ok(/not a prediction/.test(html) && /Only the two rules above select a stock/.test(html) && !/style=/.test(html));
 });
-test('rocky page: an idea with an earnings spike carries its chip and warning, and one without does not', async () => {
-  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ k: 'SPK', spike: true, pg: 6354, action: 'Buy zone (verify earnings first)', warn: ['Earnings spike: trailing profit growth 6,354%'] }), IDEA({ k: 'OK1', spike: false })] }) });
-  assert.strictEqual((html.match(/Earnings spike<\/span>/g) || []).length, 1, 'only the idea with a spike gets the chip');
-  assert.ok(html.includes('rky-act rky-act-buy">Buy zone (verify earnings first)') && html.includes('Earnings spike: trailing profit growth 6,354%'));
-});
-test('rocky page: only the first idea is marked as the top one; thin, outside-universe and unrated ideas carry their flags and warnings', async () => {
-  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA(), IDEA({ k: 'BBB', thin: true, inU: false, tier: 'medium', action: 'Wait: momentum fading', warn: ['Thinly traded', 'Stop is an estimate'] }), IDEA({ k: 'CCC', tier: 'low', action: 'Check the 3-hour chart' }), IDEA({ k: 'DDD', tier: 'odd', action: undefined })] }) });
+test('rocky page: only the first idea is the top one; thin ideas, unknown tiers and an unknown cross age carry what the data says', async () => {
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA(), IDEA({ k: 'BBB', thin: true, tier: 'medium', m3h: { since: null }, warn: ['Thinly traded', 'Stop is an estimate'] }), IDEA({ k: 'CCC', tier: 'odd', m3h: undefined, action: 'Wait' }), IDEA({ k: 'DDD', m3h: { since: 1 } })] }) });
+  assert.ok(html.includes('3-hour cross 1 bar ago') && !html.includes('1 bars ago') && html.includes('3-hour cross 3 bars ago'), 'singular and plural');
   assert.strictEqual((html.match(/rky-idea-top/g) || []).length, 1);
-  assert.ok(html.includes('rky-act rky-act-wait">Wait: momentum fading') && html.includes('Medium risk tier') && html.includes('<span class="rky-chip">Thin</span>') && html.includes('Outside Rocky universe'));
+  assert.ok(html.includes('Medium risk tier') && html.includes('<span class="rky-chip">Thin</span>') && html.includes('3-hour cross a while ago'));
   assert.ok(html.includes('<div class="rky-warn">Thinly traded</div><div class="rky-warn">Stop is an estimate</div>'));
-  assert.ok(html.includes('rky-act ">Check the 3-hour chart') && html.includes('Low risk tier') && html.includes('Unrated risk tier'), 'other actions and unknown tiers get no colour');
-  assert.ok(html.includes('rky-act ">') && (html.match(/Outside Rocky universe/g) || []).length === 1, 'only the idea outside the universe is flagged');
+  assert.ok(html.includes('rky-act ">Wait') && html.includes('Unrated risk tier') && (html.match(/3-hour cross a while ago/g) || []).length === 2, 'a non-buy action gets no colour; a missing state reads as a while ago');
+  assert.ok((html.match(/<span class="rky-chip">Thin<\/span>/g) || []).length === 1, 'only the thin idea is flagged');
 });
-test('rocky page: missing figures in an idea show a dash, and a missing 3-hour check or date is said plainly', async () => {
-  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ m3hAsof: null, dataAsof: null, band: undefined, capitals: undefined, ideas: [IDEA({ entry: undefined, stop: null, qty: undefined, why: undefined, warn: undefined, score: undefined })] }) });
+test('rocky page: missing figures in an idea show a dash, and a missing data date is said plainly', async () => {
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ dataAsof: null, band: undefined, capitals: undefined, ideas: [IDEA({ entry: undefined, stop: null, qty: undefined, why: undefined, warn: undefined })] }) });
   assert.ok(/Entry zone<\/b><span>– – –/.test(html) && /Stop<\/b><span>– \(−7\.5%\)/.test(html) && /Shares at <\/b><span><\/span>/.test(html));
-  assert.ok(/Data as of \? · no 3-hour check yet/.test(html) && /monthly RSI -,/.test(html) && /Score –/.test(html));
+  assert.ok(/Data as of \?\./.test(html) && /monthly RSI of -\./.test(html));
   const noQty = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ qty: undefined })] }) });
   assert.ok(/Shares at ₹5L \/ ₹10L<\/b><span>– \/ –/.test(noQty));
 });
-test('rocky page: the rest of the list and the skipped stocks are listed, and saved text in the swing section stays text', async () => {
-  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ k: HOSTILE, n: HOSTILE, g: HOSTILE, action: HOSTILE, why: [HOSTILE], warn: [HOSTILE] })],
-    also: [{ k: 'ZZZ', n: HOSTILE, score: 40.2, close: 55.3, mrsi: 70, mos: 49, thin: true, action: HOSTILE }, { k: 'YYY', n: 'Y', score: 30, close: 10, mrsi: 66, mos: 5, thin: false, action: 'Buy zone' }],
-    skipped: [{ k: 'SKP', why: HOSTILE }, { k: 'SK2', why: 'Avoid verdict' }], pool: HOSTILE, dataAsof: HOSTILE, m3hAsof: HOSTILE }) });
+test('rocky page: saved text in the swing section stays text', async () => {
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ k: HOSTILE, n: HOSTILE, g: HOSTILE, action: HOSTILE, why: [HOSTILE], warn: [HOSTILE] })], pool: HOSTILE, shortlisted: HOSTILE, checked: HOSTILE, dataAsof: HOSTILE }) });
   assert.ok(!html.includes('<img'), 'no markup from saved data');
-  assert.ok(/Also on the list/.test(html) && html.includes('ZZZ') && html.includes('YYY') && /<td class="num">40<\/td><td class="num">55\.30<\/td>/.test(html));
-  assert.ok(html.includes('skipped by Rocky\'s filters: SKP (&lt;img src=x onerror=alert(1)&gt;); SK2 (Avoid verdict).'));
-  const plain = await rockyPage({ state: EMPTY_ST, swing: SWING() });
-  assert.ok(!/Also on the list/.test(plain) && !/skipped by Rocky/.test(plain), 'no empty lists');
+  assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'));
 });
 test('rocky page: picks and open positions show the risk tier with the monthly RSI, and a dash when there is none', async () => {
   const html = await rockyPage({ state: { curve: [], closed: [], open: [{ k: 'OLD', d: 'd', q: 1, entry: 10, last: 10, stop: 9, target: 13 }, { k: 'NEW', d: 'd', q: 1, entry: 10, last: 10, stop: 9, target: 13, tier: 'medium', mrsi: 65.4 }] },
@@ -988,6 +980,72 @@ test('rocky store: the live listener keeps the five ledger documents and the swi
   assert.ok(S.rocky.ready && globalThis.__rkRender.includes('rocky'));
   delete globalThis.__rkDb; delete globalThis.__rkRender;
 });
+
+test('rocky store: signed out says so, a failing listener retries a few times, a silent one is retried once, and a listener that throws still opens the page', async () => {
+  const load = (db, rendered) => { globalThis['__rkDb2' + rendered.id] = db; return alone(() => loadWithStubs('src/rocky/store.js', '', { '../core/store.js': 'export const dbCapabilityPromise = Promise.resolve(globalThis.__rkDb2' + rendered.id + ');', '../core/lazy.js': 'export const renderLoadedPart = (k) => { globalThis.__rkRender2' + rendered.id + '.push(k); };' })); };
+  const ctx = (id) => { globalThis['__rkRender2' + id] = []; return { id, get rendered(){ return globalThis['__rkRender2' + id]; } }; };
+  const timers = []; const schedule = (fn, ms) => { timers.push({ fn, ms }); return timers.length; };
+  const c1 = ctx('a'); const none = await load(null, c1); await none.startRockySync(true, schedule);
+  assert.ok(none.rocky.noDb && none.rocky.ready && c1.rendered.includes('rocky'), 'signed out: no database, the page is told');
+  let fail, subs = 0; const c2 = ctx('b'); const S = await load({ collection: () => ({ onSnapshot: (ok, bad) => { subs++; fail = bad; return () => { subs--; }; } }) }, c2);
+  await S.startRockySync(true, schedule); assert.strictEqual(subs, 1);
+  const silent = timers.find(x => x.ms === 8000); assert.ok(silent, 'a listener that delivers nothing is checked after 8 seconds');
+  timers.length = 0; fail(new Error('listener down'));
+  assert.ok(S.rocky.ready); assert.deepStrictEqual(timers.map(x => x.ms), [3000], 'the first failure retries after 3 seconds');
+  await timers[0].fn(); assert.strictEqual(subs, 1, 'the retry replaced the old listener instead of stacking another');
+  const n = timers.length; silent.fn(); assert.strictEqual(timers.length, n + 1, 'nothing was heard: it retries again, later');
+  for (let i = 0; i < 6; i++) { timers.length = 0; fail(new Error('again')); }
+  assert.deepStrictEqual(timers, [], 'after five retries it stops asking');
+  const c3 = ctx('c'); const boom = await load({ collection: () => { throw new Error('no collection'); } }, c3); await boom.startRockySync(true, schedule); assert.ok(boom.rocky.ready && c3.rendered.includes('rocky'), 'a database that throws still opens the page');
+  for (const id of ['a', 'b', 'c']) { delete globalThis['__rkDb2' + id]; delete globalThis['__rkRender2' + id]; }
+});
+
+// ---- src/core/util.js: the small shared helpers (ids, ticker parts, rounding, markup-safe text)
+test('util: ticker parts come from the "SYMBOL · Industry" line, and a missing industry is a dash', () => {
+  const UT = load('src/core/util.js'), s = { ticker: 'TCS · IT - Software' };
+  assert.strictEqual(UT.tickerKey(s), 'TCS'); assert.strictEqual(UT.tickerSymbol(s), 'TCS'); assert.strictEqual(UT.tickerIndustry(s), 'IT - Software');
+  assert.strictEqual(UT.tickerIndustry({ ticker: 'ABC' }), '—'); assert.strictEqual(UT.tickerKey(null), ''); assert.strictEqual(UT.tickerKey({}), '');
+});
+test('util: rounding helpers give null for anything that is not a finite number', () => {
+  const UT = load('src/core/util.js');
+  assert.strictEqual(UT.fixedOrNull(1.2345), '1.2'); assert.strictEqual(UT.fixedOrNull(1.2346, 3), '1.235'); assert.strictEqual(UT.fixedOrNull('1'), null); assert.strictEqual(UT.fixedOrNull(NaN), null); assert.strictEqual(UT.fixedOrNull(Infinity), null);
+  assert.strictEqual(UT.round2OrNull(1.005 + 1e-9), 1.01); assert.strictEqual(UT.round2OrNull(2.5), 2.5); assert.strictEqual(UT.round2OrNull(undefined), null); assert.strictEqual(UT.round2OrNull(NaN), null);
+});
+test('util: a document id keeps only the allowed characters, and an empty one becomes x', () => {
+  const UT = load('src/core/util.js');
+  assert.strictEqual(UT.sanitizeDocId('NSE:TCS-1.2_a'), 'NSE:TCS-1.2_a'); assert.strictEqual(UT.sanitizeDocId('a b/c<d>'), 'a_b_c_d_'); assert.strictEqual(UT.sanitizeDocId(''), 'x'); assert.strictEqual(UT.sanitizeDocId(42), '42');
+});
+test('util: markup is neutralised, once, and an up or down change is coloured', () => {
+  const UT = load('src/core/util.js');
+  assert.strictEqual(UT.safeText('<b>x</b> &amp; &lt;'), '&lt;b&gt;x&lt;/b&gt; &amp; &lt;'); assert.strictEqual(UT.safeText(null), '');
+  assert.strictEqual(UT.escapeHtml('<img src="x" onerror=\'a\'> & more'), '&lt;img src=&quot;x&quot; onerror=&#39;a&#39;&gt; &amp; more');
+  assert.strictEqual(UT.pctChangeSpan(null), '–'); assert.strictEqual(UT.pctChangeSpan(1.234), '<span class="chg-up">+1.23%</span>'); assert.strictEqual(UT.pctChangeSpan(-2), '<span class="chg-down">-2.00%</span>'); assert.strictEqual(UT.pctChangeSpan(0), '<span class="">0.00%</span>');
+});
+
+test('util: the Screener link is consolidated by default, plain when that was checked and is blank, and the symbol is encoded', () => {
+  const UT = load('src/core/util.js');
+  assert.strictEqual(UT.screenerUrl({ ticker: 'tcs · IT' }), 'https://www.screener.in/company/TCS/consolidated/');
+  assert.strictEqual(UT.screenerUrl({ ticker: 'ABC', screenerConsolidated: false }), 'https://www.screener.in/company/ABC/');
+  assert.strictEqual(UT.screenerUrl({ ticker: 'M&M · Auto' }), 'https://www.screener.in/company/M%26M/consolidated/');
+});
+test('util: days until a date count from the given day, are zero today, and are null when missing, unreadable or past', () => {
+  const UT = load('src/core/util.js');
+  assert.strictEqual(UT.daysUntil('2026-11-10', '2026-11-03'), 7); assert.strictEqual(UT.daysUntil('2026-11-03', '2026-11-03'), 0); assert.strictEqual(UT.daysUntil('2026-11-10T09:00:00', '2026-11-03'), 7);
+  assert.strictEqual(UT.daysUntil('2026-11-02', '2026-11-03'), null); assert.strictEqual(UT.daysUntil('', '2026-11-03'), null); assert.strictEqual(UT.daysUntil('soon', '2026-11-03'), null); assert.strictEqual(UT.daysUntil(null), null);
+  assert.strictEqual(UT.daysUntil('2999-01-01') > 0, true, 'without a given day it counts from this device\'s date');
+});
+test('util: days since a date are null for nothing or nonsense and positive for a long-past day', () => {
+  const UT = load('src/core/util.js');
+  assert.strictEqual(UT.daysSinceDate(''), null); assert.strictEqual(UT.daysSinceDate(null), null); assert.strictEqual(UT.daysSinceDate('not a date'), null);
+  assert.ok(UT.daysSinceDate('2000-01-01') > 9000); assert.ok(UT.daysSinceDate('2000-01-01T10:00:00Z') > 9000); assert.strictEqual(UT.daysSinceDate('2999-01-01'), 0, 'a future date is never negative');
+});
+test('util: dates and timestamps read in India time, are empty for nothing and pass nonsense through', () => {
+  const UT = load('src/core/util.js');
+  assert.match(UT.formatDeepRefreshTimestamp('2026-11-03T05:00:00Z'), /3 Nov.*10:30.*IST$/); assert.strictEqual(UT.formatDeepRefreshTimestamp(''), ''); assert.strictEqual(UT.formatDeepRefreshTimestamp('bad'), 'bad');
+  assert.match(UT.formatUploadTimestamp('2026-11-03T05:00:00Z'), /3 Nov 2026.*10:30.*IST$/); assert.strictEqual(UT.formatUploadTimestamp(null), ''); assert.strictEqual(UT.formatUploadTimestamp('bad'), 'bad');
+  assert.match(UT.formatDate('2026-11-03'), /3 Nov 2026/); assert.strictEqual(UT.formatDate(''), ''); assert.strictEqual(UT.formatDate('bad'), 'bad');
+});
+test('util: sleep resolves after the wait', async () => { const UT = load('src/core/util.js'); const t0 = Date.now(); await UT.sleep(5); assert.ok(Date.now() - t0 >= 4); });
 
 // =========================================================== safe markup sink (src/core/safehtml.js): markup text becomes elements without script-capable parts
 {
@@ -1111,7 +1169,10 @@ test('link guard: a click on a grid link does not reach the row that would open 
 }));
 
 // =========================================================== score history (recorded by each import)
-const H = load('src/history/scorehistory.js', 'export { BUCKETS, SCORE_ENGINE, addPoint, bucketId, bucketOf, pointFor, tickerKey };');
+const H = load('src/history/scorehistory.js', 'export { BUCKETS, SCORE_ENGINE, addPoint, bucketId, bucketOf, cutoffYmd, pointFor, tickerKey };');
+test('score history: dates are kept as YYYYMMDD numbers and points older than three years are dropped', () => {
+  assert.strictEqual(H.ymdOf(new Date(2026, 10, 4)), 20261104); assert.strictEqual(H.cutoffYmd(20261104), 20231104);
+});
 test('history: a stock always lands in the same one of 64 buckets', () => {
   assert.strictEqual(H.bucketOf('AAA1'), H.bucketOf('AAA1'));
   for(const k of ['AAA1', 'BBB2', '500325', 'X-Y_Z']) assert.ok(H.bucketOf(k) >= 0 && H.bucketOf(k) < H.BUCKETS);
@@ -1636,6 +1697,11 @@ test('trade call: history keeps one point a day and lists when the call changed'
     assert.deepStrictEqual(R.mergeRecent(full, [], H.weekBucket), full, 'nothing recent: the stock\'s own bars');
     assert.deepStrictEqual(R.mergeRecent([], recent, H.weekBucket), [], 'a stock with no bars of its own is not given a partial history');
   });
+  test('recent bars: a saved stock keeps only its latest 40 weekly and 12 monthly bars, and an unknown stock has none', () => {
+    const W = Array.from({ length: 45 }, (_, i) => bk('2026-01-05T03:45:00Z', i)), M = Array.from({ length: 15 }, (_, i) => bk('2026-01-01T03:45:00Z', i));
+    R.noteRecentSaved('KEEPER', '2026-10-20T04:00:00Z', W, M); const got = R.recentBarsOf('KEEPER');
+    assert.deepStrictEqual([got.w.length, got.m.length, got.w[0][4], got.m[0][4]], [40, 12, 5, 3]); assert.strictEqual(R.recentBarsOf('NO-SUCH-STOCK'), null);
+  });
   test('recent bars: a recent row older than the stock\'s own save is ignored, a newer one is laid on top', () => {
     R.setRecentFromDocs([{ id: 'c001', data: { at: '2026-10-20T04:00:00Z', rows: [{ k: 'ABC', w: [bk('2026-10-12T03:45:00Z', 5), bk('2026-10-19T03:45:00Z', 6)], m: [] }] } }]);
     const own = { '1W': [bk('2026-10-05T03:45:00Z', 4), bk('2026-10-12T03:45:00Z', 50)], '1M': [bk('2026-10-01T03:45:00Z', 9)] };
@@ -1692,6 +1758,9 @@ test('trade call: history keeps one point a day and lists when the call changed'
     const base = f => mk(120, (i, px) => (i === 119 ? px * f : px * 1.004));
     assert.ok(T2.computeTech2(base(1.05)).score > T2.computeTech2(base(0.95)).score);
   });
+  test('tech score 2: a run far beyond anything in the history scores near the top of the scale', () => {
+    assert.ok(T2.computeTech2(mk(120, (i, px) => (i === 119 ? px * 1.5 : px * 1.03))).score > 9);
+  });
   test('tech score 2: a stronger recent run scores higher than a weaker one', () => {
     const weak = T2.computeTech2(mk(120, (i, px) => (i === 119 ? px * 1.012 : px * 1.0005)));
     const strong = T2.computeTech2(mk(120, (i, px) => (i === 119 ? px * 1.08 : px * 1.012)));
@@ -1733,6 +1802,17 @@ test('trade call: history keeps one point a day and lists when the call changed'
     assert.deepStrictEqual(N.cleanReading({ lines: ['<b>a</b>  b', '', 'c', 'd', 'e'] }), ['a b', 'c', 'd']);
     assert.deepStrictEqual(N.cleanReading(null), []);
     assert.ok(N.readingPrompt(N.buildTiles({ 'NSE:NIFTY': { close: 1, change: 1 } }), [{ date: '2026-10-28', title: 'RBI' }]).includes('2026-10-28: RBI'));
+  });
+  test('news: a reading line is coloured by whether it helps or hurts, and mixed or empty text is neutral', () => {
+    assert.strictEqual(N.readingTone('Lower oil supports margins'), 'positive');
+    assert.strictEqual(N.readingTone('Rising costs weigh on profits'), 'negative');
+    assert.strictEqual(N.readingTone('Helps exporters but raises costs'), 'mixed');
+    assert.strictEqual(N.readingTone('Mixed signals, stay cautious'), 'mixed');
+    assert.strictEqual(N.readingTone(''), 'mixed'); assert.strictEqual(N.readingTone(null), 'mixed');
+  });
+  test('news: the result-date note says "Confirmed" once and hides the repeated TradingView wording', () => {
+    assert.strictEqual(N.dateNote('Results expected (TradingView date, can change)'), '');
+    assert.strictEqual(N.dateNote('Results date (confirmed)'), 'Confirmed'); assert.strictEqual(N.dateNote('Board meeting'), 'Board meeting');
   });
   test('news: briefings keep the link and date of the headline they came from and drop made-up or unlinked ones', () => {
     // TradingView gives publish times as Unix seconds: 2026-10-28 15:30 IST, the same minute plus an hour, and 2026-10-29 06:30 IST

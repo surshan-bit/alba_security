@@ -4,7 +4,7 @@ Modes (all file based; WORK dir holds the JSON docs):
   build   WORK  ALBADATA   -> writes WORK/compact.json (static fundamentals + bar stats for the Positive MoS universe)
   daily   WORK  [--nifty X] -> reads WORK/live/*.json (liveSnapshot docs), compact, state, weights -> updates state.json, picks.json, log.json
   weekly  WORK             -> recalibrates weights.json from closed paper trades, writes learn.json
-  m1d     WORK             -> reads WORK/agent/macd1d.json ({key: [daily MACD, daily signal]}), writes d1.json and refreshes swing.json
+  prox    WORK             -> reads WORK/agent/macdprox.json ({key: [2h MACD, 2h signal, 4h MACD, 4h signal]}), writes prox.json and refreshes swing.json
   m3h     WORK             -> reads WORK/agent/bars3h.json ({key: [3-hour closes]}), writes m3h.json and refreshes swing.json (best swing trades of the day)
 """
 import json,glob,sys,os,math,datetime as dt
@@ -13,10 +13,9 @@ TIME_DAYS=30; MAX_PER_GROUP=2   # TIME_DAYS: legacy positions opened before the 
 RSI_LO=45; RSI_HI=75; NEAR_HIGH=0.85   # hard entry filters (see entry_blocks)
 TIER_RISK={'low':0.01,'medium':0.0075,'high':0.005}; MRSI_HIGH=70; MRSI_MEDIUM=60   # risk-reward tiers by monthly RSI: above 70 high, above 60 medium, otherwise low (unknown counts as high)
 RR_MIN=3.0; GATE_DAYS=70       # 1:3 gate: target = RR_MIN x stop distance; new positions may run 70 days (10 weeks, as tested)
-SPIKE_PG=300; SPIKE_PENALTY=25   # earnings-spike check: trailing profit growth above 300% costs 25 points and carries a warning
+SPIKE_PG=300   # informational: trailing profit growth above 300% is flagged on a swing idea (it does not change the selection)
 LIQ_PART=0.10   # a position may be at most 10% of the stock's average daily volume, so it can be sold without moving the price
-D1_FRESH=(0.5,3.0)   # daily-MACD gap as a percent of price: at or under 0.5 earns full points, 3 or more none (closest to the signal line ranks highest)
-SWING_MRSI=(66,76); LIQ_LAKH=50; T1_PCT=10.0; T2_PCT=20.0; CAPITALS=(500000,1000000)   # swing ideas: monthly-RSI band, liquid = turnover of at least Rs 50 lakh a day, targets, capitals shown
+SWING_MRSI=(66,76); MOS_MIN_SCORE=2; MOS_MIN_PCT=-25; MOS_MIN_FII=0.1; MOS_MIN_VOL=20000; LIQ_LAKH=50; T1_PCT=10.0; T2_PCT=20.0; CAPITALS=(500000,1000000); MAX_3H=12   # swing ideas: monthly-RSI band, liquid = turnover of at least Rs 50 lakh a day, targets, capitals shown, exact 3-hour checks per day
 REGIME_MIN=0.6   # market filter: new entries only while at least this share of the universe has a positive 1-month change
 FEATS=['fund','mos','trend','rsi','mom','near']
 W0={'fund':1.0,'mos':1.0,'trend':1.5,'rsi':0.7,'mom':0.8,'near':0.8}
@@ -54,7 +53,7 @@ def build_watch(work,D):
     for f in sorted(glob.glob(D+'/stockData/c*.json')):
         for s in J(f)['stocks']:
             v=s.get('valuation') or {}; iv=v.get('intrinsicValue')
-            if isinstance(iv,(int,float)) and iv>0: pg=v.get('profitGrowth'); w[s['ticker'].split(' ·')[0].strip()]=[(s.get('name') or '')[:24],s.get('industryGroup'),iv,s.get('score'),s.get('verdict'),round(pg) if isinstance(pg,(int,float)) else None]
+            if isinstance(iv,(int,float)) and iv>0: pg=v.get('profitGrowth'); w[s['ticker'].split(' ·')[0].strip()]=[(s.get('name') or '')[:24],s.get('industryGroup'),iv,s.get('score'),s.get('verdict'),round(pg) if isinstance(pg,(int,float)) else None,v.get('fiiHolding')]
     S(work+'/agent/watch.json',{'built':today(),'w':w}); print('watch',len(w))
 
 # ---- 3-hour MACD (12, 26, 9) ----
@@ -84,89 +83,86 @@ def macd_state(c):
     flip=hi if pos else lo
     return {'kind':kind,'h':round(h[-1],2),'hp':round(max(h[-12:]),2),'since':since,'dir':cross[1] if cross else None,'flip':round(flip,2),'zero':m[-1]>0,'last':c[-1]}
 
-def m3h_text(st):
-    if not st: return None
-    if st['kind']=='fresh_up': return '3-hour MACD crossed up %d bars ago (histogram %s)'%(st['since'],st['h'])
-    if st['kind']=='rising': return '3-hour MACD histogram rising (%s)'%st['h']
-    if st['kind']=='fading': return '3-hour MACD histogram fading (%s, peak %s); a 3-hour close below %s would cross down'%(st['h'],st['hp'],st['flip'])
-    return '3-hour MACD below its signal line; a 3-hour close above %s would cross up'%st['flip']
+def qualifies(st):
+    """Rule 2 of the swing selection: the 3-hour MACD is above its signal line and above zero."""
+    return bool(st) and st['h']>0 and st['zero']
 
-M3H_POINTS={'fresh_up':25,'rising':25,'fading':12,'down':0,None:10}
-M3H_ACTION={'fresh_up':'Buy zone','rising':'Buy zone','fading':'Wait: momentum fading','down':'Wait for a 3-hour cross-up',None:'Check the 3-hour chart'}
+def prox_ok(p):
+    """First pass only (TradingView has no 3-hour MACD column): the 2-hour and 4-hour MACD are both above their signal line and above zero."""
+    return isinstance(p,(list,tuple)) and len(p)>=4 and p[0]>p[1] and p[0]>0 and p[2]>p[3] and p[2]>0
 
-def d1_points(gap):
-    """0-20 points for how close the daily MACD is to its signal line (gap in percent of price): a fresh cross-up scores highest."""
-    lo,hi=D1_FRESH
-    return 20*clip(1-(gap-lo)/(hi-lo),0,1)
+def positive_mos(info,c):
+    """The saved dashboard strategy "Positive MoS" (its month-RSI 30-80 and any-MACD rules are implied by rule 1): fundamental score >= 2,
+    margin of safety >= -25% (green or orange), FII holding >= 0.1%, a known market cap and average volume >= 20,000 shares.
+    info is the watch entry [name, group, intrinsic value, score, verdict, profit growth, FII %]; c is the live row (close in 0, average volume in 9, market cap in 10)."""
+    if not info or len(info)<7: return False
+    iv,score,fii,close,vol,mcap=info[2],info[3],info[6],c[0],c[9],c[10]
+    nums=(iv,score,fii,close,vol,mcap)
+    if not all(isinstance(x,(int,float)) and not isinstance(x,bool) for x in nums) or iv<=0: return False
+    return score>=MOS_MIN_SCORE and (iv-close)/iv*100>=MOS_MIN_PCT and fii>=MOS_MIN_FII and mcap>0 and vol>=MOS_MIN_VOL
 
-def swing_ideas(live,comp,wl,m3h=None,held=(),sym=None,d1=None):
-    """Best swing trades of the day. Pool: monthly RSI 66-76, positive margin of safety, not an 'Avoid' verdict. Stocks inside Rocky's universe must also pass its
-    hard entry filters (otherwise they are listed as skipped); others are kept with 'trend not checked'. Ranked by fundamentals, margin of safety, trend,
-    the 3-hour MACD state and liquidity. Entry zone = last close to +1%; stop = Rocky's volatility stop; Target 1 = +10%, Target 2 = +20%.
-    Sizing follows the monthly-RSI risk tier. A ranking of candidates, not a prediction."""
-    m3h=m3h or {}; sym=sym or {}; d1=d1 or {}; ideas=[]; skipped=[]; pool=0; need1d=[]
-    for k,v in wl.items():
-        n,g,iv,sc,vd=v[:5]; pg=v[5] if len(v)>5 else None
-        c=live.get(k)
-        if not c or not c[0] or c[6] is None: continue
-        close=c[0]; mrsi=c[6]; mos=(iv-close)/iv*100
-        if not (SWING_MRSI[0]<=mrsi<=SWING_MRSI[1]) or mos<=0: continue
-        pool+=1
-        if vd=='avoid': skipped.append({'k':k,'n':n,'why':'Avoid verdict'}); continue
-        m=comp.get(k)
-        if m:
-            bl=entry_blocks(m,close,c[5],c[8])
-            if bl: skipped.append({'k':k,'n':n,'why':'; '.join(bl)}); continue
-        dd=d1.get(k)
-        if not dd: need1d.append({'k':k,'y':sym.get(k)})
-        elif dd[0]<=dd[1]: skipped.append({'k':k,'n':n,'why':'Daily MACD below its signal line'}); continue
-        gap=None if not dd else (dd[0]-dd[1])/close*100
-        turn=(c[9] or 0)*close/1e5; thin=turn<LIQ_LAKH
-        atr=m.get('atr') if m else None; sp=clip(atr*0.9,4.5,9.0) if atr else 8.0
-        entry=close; stop=entry*(1-sp/100); tier=risk_tier(mrsi); rk=TIER_RISK[tier]
-        st=m3h.get(k); spike=isinstance(pg,(int,float)) and pg>SPIKE_PG
-        score=(sc or 0)/10*30+min(mos,50)/50*15+(25 if m else 10)+(5 if 69<=mrsi<=72 else 0)+M3H_POINTS[st['kind'] if st else None]+(10 if gap is None else d1_points(gap))-(15 if thin else 0)-(SPIKE_PENALTY if spike else 0)
-        why=['Fundamentals: %s (score %s)'%(vd,sc),'Margin of safety %d%%'%round(mos),'Monthly RSI %d, inside your 66-76 band'%round(mrsi)]
-        why.append('Passes Rocky\'s trend filters (above a rising 10-week average, weekly RSI %d)'%round(c[5]) if m else 'Trend not checked: outside Rocky\'s filtered universe')
-        if gap is not None: why.append('Daily MACD above its signal line (gap %.2f%% of price: %s)'%(gap,'close to the cross' if gap<=D1_FRESH[1]/2 else 'already stretched from the cross'))
-        if st: why.append(m3h_text(st))
-        warns=[]
-        if spike: warns.append('Earnings spike: trailing profit growth %s%%. Check what the revenue is made of and the latest quarter before buying'%format(pg,',.0f'))
-        if gap is None: warns.append('Daily MACD not checked')
-        if thin: warns.append('Thinly traded (about Rs %d lakh a day): exits may be hard, use limit orders'%round(turn))
-        if not m: warns.append('Outside Rocky\'s universe, so its trend filters were not applied')
-        if not atr: warns.append('Stop is an estimate (8%%): no volatility data')
-        if k in held: warns.append('Already held in Rocky\'s paper ledger')
-        qty={}; maxq=int(c[9]*LIQ_PART) if c[9] else None; limited=False
-        for cap in CAPITALS:
-            q=int(min(cap*rk/(entry-stop),cap*POSCAP*(rk/RISK)/entry))
-            if maxq is not None and q>maxq: q=maxq; limited=True
-            qty[str(cap)]=q
-        if limited: warns.append('Size limited to %s shares (10%% of the average daily volume) so you can exit: about Rs %s'%(format(maxq,','),format(round(maxq*entry),',')))
-        ideas.append({'k':k,'y':sym.get(k),'n':n,'g':g,'close':round(close,2),'mrsi':round(mrsi,1),'mos':round(mos),'sc':sc,'vd':vd,'wrsi':None if c[5] is None else round(c[5]),'turn':round(turn),'thin':thin,'inU':bool(m),
-            'tier':tier,'risk':rk,'score':round(max(0,min(100,score)),1),'m3h':st,'action':M3H_ACTION[st['kind'] if st else None]+(' (verify earnings first)' if spike else ''),'pg':round(pg) if isinstance(pg,(int,float)) else None,'spike':spike,'d1':None if gap is None else {'macd':round(dd[0],2),'sig':round(dd[1],2),'gap':round(gap,2)},
-            'entry':[round(entry,2),round(entry*1.01,2)],'stop':round(stop,2),'stopPct':round(sp,1),'t1':round(entry*(1+T1_PCT/100),2),'t2':round(entry*(1+T2_PCT/100),2),'rr':round(T2_PCT/sp,1),'qty':qty,'liqLimited':limited,'why':why,'warn':warns})
-    ideas.sort(key=lambda x:-x['score'])
-    return {'band':list(SWING_MRSI),'pool':pool,'ideas':ideas[:5],'also':[{k:i[k] for k in('k','n','score','close','mrsi','mos','vd','thin','action')} for i in ideas[5:12]],'skipped':skipped[:10],
-            'need3h':[{'k':i['k'],'y':i['y']} for i in ideas[:6] if not i['m3h']],'need1d':need1d,'capitals':list(CAPITALS)}
+def swing_pool(live,sym,wl=None):
+    """The candidates: stocks that qualify the Positive MoS strategy (when the watch list is given) and have a monthly RSI between 66 and 76."""
+    return [{'k':k,'y':sym.get(k),'close':c[0],'mrsi':c[6]} for k,c in live.items() if c[0] and c[6] is not None and SWING_MRSI[0]<=c[6]<=SWING_MRSI[1] and (wl is None or positive_mos(wl.get(k),c))]
+
+def shortlist(pool,prox):
+    """The pool stocks whose 2-hour and 4-hour MACD agree, freshest first (smallest 4-hour gap as a share of price), at most MAX_3H: those get the exact 3-hour check."""
+    ok=[p for p in pool if prox_ok(prox.get(p['k']))]
+    ok.sort(key=lambda p:(prox[p['k']][2]-prox[p['k']][3])/p['close'])
+    return ok[:MAX_3H]
+
+def swing_card(p,st,c,info,held):
+    """One idea: the two rules it met, the levels from Rocky's volatility stop, the sizes by risk tier, and warnings. The dashboard fields only inform; they never select."""
+    n,g,iv,sc,vd,pg=(info+[None]*6)[:6] if info else [p['k'],None,None,None,None,None]
+    close=p['close']; mos=(iv-close)/iv*100 if iv else None
+    entry=close; sp=8.0 if not p.get('atr') else clip(p['atr']*0.9,4.5,9.0); stop=entry*(1-sp/100)
+    tier=risk_tier(p['mrsi']); rk=TIER_RISK[tier]; turn=(c[9] or 0)*close/1e5; thin=turn<LIQ_LAKH
+    qty={}; maxq=int(c[9]*LIQ_PART) if c[9] else None; limited=False
+    for cap in CAPITALS:
+        q=int(min(cap*rk/(entry-stop),cap*POSCAP*(rk/RISK)/entry))
+        if maxq is not None and q>maxq: q=maxq; limited=True
+        qty[str(cap)]=q
+    why=['Monthly RSI %d, inside %d-%d'%(round(p['mrsi']),*SWING_MRSI),'3-hour MACD above its signal line and above zero (crossed up %s, histogram %s)'%('a while ago' if st['since'] is None else '%d bar%s ago'%(st['since'],'' if st['since']==1 else 's'),st['h'])]
+    if vd: why.append('For reference: dashboard verdict %s (score %s)%s'%(vd,sc,'' if mos is None else ', margin of safety %d%%'%round(mos)))
+    w=[]
+    if thin: w.append('Thinly traded (about Rs %d lakh a day): exits may be hard, use limit orders'%round(turn))
+    if limited: w.append('Size limited to %s shares (10%% of the average daily volume) so you can exit: about Rs %s'%(format(maxq,','),format(round(maxq*entry),',')))
+    if vd=='avoid': w.append('The dashboard has an Avoid verdict on this stock')
+    if mos is not None and mos<=0: w.append('Price is above the dashboard\'s intrinsic value (negative margin of safety)')
+    if isinstance(pg,(int,float)) and pg>SPIKE_PG: w.append('Earnings spike: trailing profit growth %s%%. Check what the revenue is made of before buying'%format(pg,',.0f'))
+    if not p.get('atr'): w.append('Stop is an estimate (8%): no volatility data')
+    if p['k'] in held: w.append('Already held in Rocky\'s paper ledger')
+    return {'k':p['k'],'y':p['y'],'n':n,'g':g,'close':round(close,2),'mrsi':round(p['mrsi'],1),'tier':tier,'risk':rk,'thin':thin,'m3h':st,'action':'Buy zone','entry':[round(entry,2),round(entry*1.01,2)],'stop':round(stop,2),'stopPct':round(sp,1),
+            't1':round(entry*(1+T1_PCT/100),2),'t2':round(entry*(1+T2_PCT/100),2),'rr':round(T2_PCT/sp,1),'qty':qty,'liqLimited':limited,'ref':{'vd':vd,'sc':sc,'mos':None if mos is None else round(mos),'pg':pg},'why':why,'warn':w}
+
+def swing_ideas(live,wl,m3h=None,prox=None,held=(),sym=None,comp=None):
+    """The best swing trades: (1) monthly RSI 66-76 and (2) the 3-hour MACD above its signal line and above zero. Nothing else selects or ranks:
+    freshest 3-hour cross-up first. Because TradingView has no 3-hour MACD column, the 2-hour and 4-hour MACD shortlist at most MAX_3H stocks,
+    and only those get the exact 3-hour check; the result says how many were checked. A ranking of candidates, not a prediction."""
+    m3h=m3h or {}; prox=prox or {}; sym=sym or {}; comp=comp or {}; wl=wl or {}
+    pool=swing_pool(live,sym,wl); short=shortlist(pool,prox) if prox else []
+    for p in pool: p['atr']=(comp.get(p['k']) or {}).get('atr')
+    ideas=[swing_card(p,m3h[p['k']],live[p['k']],wl.get(p['k']),held) for p in short if qualifies(m3h.get(p['k']))]
+    ideas.sort(key=lambda i:(i['m3h']['since'] if i['m3h']['since'] is not None else 999,-i['m3h']['h']/i['close']))
+    return {'band':list(SWING_MRSI),'pool':len(pool),'shortlisted':len(short),'checked':sum(1 for p in short if p['k'] in m3h),'ideas':ideas[:8],
+            'needProx':[{'k':p['k'],'y':p['y']} for p in pool] if not prox else [],'need3h':[{'k':p['k'],'y':p['y']} for p in short if p['k'] not in m3h],'capitals':list(CAPITALS)}
 
 def swing_run(work):
-    wl=J(work+'/agent/watch.json'); comp=(J(work+'/agent/compact.json') or {}).get('stocks',{})
-    if not wl: return None
     live={};sym={};asof=None
     for f in sorted(glob.glob(work+'/liveSnapshot/*.json')):
         d=J(f); asof=max(asof or '',d.get('asof') or '')
         for r in d['rows']: live[r['k']]=(r['c']+[None]*12)[:12]; sym[r['k']]=r.get('y')
-    m=J(work+'/agent/m3h.json',{}); m3h=m.get('s',{}) if m.get('d')==today() else {}
-    dm=J(work+'/agent/d1.json',{}); d1=dm.get('s',{}) if dm.get('d')==today() else {}
+    if not live: return None
+    fresh=lambda name:(lambda m:m.get('s',{}) if m.get('d')==today() else {})(J(work+'/agent/%s.json'%name,{}) or {})
+    m3h=fresh('m3h'); prox=fresh('prox'); wl=(J(work+'/agent/watch.json') or {}).get('w',{}); comp=(J(work+'/agent/compact.json') or {}).get('stocks',{})
     held={o['k'] for o in (J(work+'/agent/state.json',{}) or {}).get('open',[])}
-    out=swing_ideas(live,comp,wl['w'],m3h,held,sym,d1); out.update({'asof':today(),'dataAsof':asof,'m3hAsof':m.get('d') if m3h else None,'d1Asof':dm.get('d') if d1 else None})
-    S(work+'/agent/swing.json',out); print('swing pool',out['pool'],'need1d',len(out['need1d']),'ideas',[i['k']+':'+str(i['score']) for i in out['ideas']],'need3h',[x['k'] for x in out['need3h']]); return out
+    out=swing_ideas(live,wl,m3h,prox,held,sym,comp); out.update({'asof':today(),'dataAsof':asof,'proxAsof':today() if prox else None,'m3hAsof':today() if m3h else None})
+    S(work+'/agent/swing.json',out); print('swing pool',out['pool'],'shortlisted',out['shortlisted'],'checked',out['checked'],'ideas',[i['k'] for i in out['ideas']],'needProx',len(out['needProx']),'need3h',[x['k'] for x in out['need3h']]); return out
 
-def m1d_run(work):
-    raw=J(work+'/agent/macd1d.json',{}) or {}
-    res={k:[v[0],v[1]] for k,v in raw.items() if isinstance(v,(list,tuple)) and len(v)>=2 and all(isinstance(x,(int,float)) for x in v[:2])}
-    S(work+'/agent/d1.json',{'d':today(),'s':res}); print('daily MACD for',len(res),'stocks'); return swing_run(work)
+def prox_run(work):
+    raw=J(work+'/agent/macdprox.json',{}) or {}
+    res={k:[float(x) for x in v[:4]] for k,v in raw.items() if isinstance(v,(list,tuple)) and len(v)>=4 and all(isinstance(x,(int,float)) for x in v[:4])}
+    S(work+'/agent/prox.json',{'d':today(),'s':res}); print('2h/4h MACD for',len(res),'stocks'); return swing_run(work)
 
 def m3h_run(work):
     bars=J(work+'/agent/bars3h.json',{}) or {}; res={}
@@ -364,4 +360,4 @@ if __name__=='__main__':
         daily(w,n)
     elif m=='weekly': weekly(w)
     elif m=='m3h': m3h_run(w)
-    elif m=='m1d': m1d_run(w)
+    elif m=='prox': prox_run(w)
