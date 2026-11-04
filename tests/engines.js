@@ -912,6 +912,10 @@ test('rocky page: picks, rejected picks, open and closed positions are tables, a
   assert.ok(html.includes('C29') && !html.includes('C4<') && /C5</.test(html), 'only the latest 25 closed trades, newest first');
   assert.ok(/Last review 2026-10-01: &lt;img/.test(html), 'the learning note is escaped');
 });
+test('rocky page: a weights-history entry without a change list still shows its date', async () => {
+  const html = await rockyPage({ state: { curve: [], closed: [], open: [] }, weights: { v: 2, w: { momentum: 1 }, hist: [{ d: '2026-10-05' }, { d: '2026-10-12', ch: { momentum: [1, 1.1] } }] } });
+  assert.ok(html.includes('2026-10-05: </p>') && html.includes('2026-10-12: momentum 1→1.1'));
+});
 test('rocky page: the learning line reads the review figures when there is no written note, and no page-stamp without picks', async () => {
   const st = { curve: [], closed: [], open: [] };
   assert.match(await rockyPage({ state: st, learn: { d: '2026-10-01', hit: 55, avg: 1.2 } }), /hit rate 55%, average 1\.2% per trade, weights updated/);
@@ -921,20 +925,20 @@ test('rocky page: the learning line reads the review figures when there is no wr
 
 // ---- the Rocky page: best swing trades of the day (src/rocky/swing.js), the risk-tier columns and the store that reads the swing document
 const EMPTY_ST = { curve: [], closed: [], open: [] };
-const IDEA = (o) => Object.assign({ k: 'AAA', n: 'Aaa Ltd', g: 'Textiles', close: 100, mrsi: 71, thin: false, tier: 'high', risk: 0.005, action: 'Buy zone', m2h: { since: 3, h: 1.5 }, m3h: { since: 5, h: 0.8 }, wrsi: 58,
+const IDEA = (o) => Object.assign({ k: 'AAA', n: 'Aaa Ltd', g: 'Textiles', close: 100, mrsi: 71, thin: false, tier: 'high', risk: 0.005, action: 'Buy zone', m2h: { since: 3, h: 1.5 }, m3h: { since: 5, h: 0.8 }, m1d: { since: 9, h: 0.5 }, wrsi: 58,
   entry: [100, 101], stop: 92.5, stopPct: 7.5, t1: 110, t2: 120, rr: 2.7, qty: { '500000': 47, '1000000': 94 }, warn: [] }, o);
 const SWING = (o) => Object.assign({ asof: '2026-11-03', dataAsof: '2026-11-03', band: [66, 76], pool: 124, checked: 12, ideas: [IDEA()], capitals: [500000, 1000000] }, o);
 test('rocky page: best swing trades say so when the document is missing or no stock meets the rules', async () => {
   const none = await rockyPage({ state: EMPTY_ST });
   assert.ok(/Best swing trades for the day/.test(none) && /appear after the next daily run/.test(none));
-  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [] }) }), /No Positive MoS stock meets the rules today: weekly MACD above its signal line, monthly RSI 66-76, and a 2-hour MACD \(30, 60, 5\) above its signal line/);
+  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [] }) }), /No Positive MoS stock meets the rules today: weekly MACD above its signal line, monthly RSI 66-76, and the 2-hour and 1-day MACD \(30, 60, 5\) above their signal lines/);
   assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: undefined }) }), /No Positive MoS stock meets the rules today/);
 });
 test('rocky page: the swing grid leads with weekly RSI, monthly RSI and the 2-hour cross age, then tier, levels in rupees, shares for both capitals and notes', async () => {
   const html = await rockyPage({ state: EMPTY_ST, swing: SWING() });
-  const head = ['#', 'Stock', 'W RSI', 'M RSI', '2-hr cross (bars ago)', '3-hr cross (bars ago)', 'Tier', 'Entry', 'Stop', 'T1 +10%', 'T2 +20%', 'Shares at ₹5L / ₹10L', 'Notes'];
+  const head = ['#', 'Stock', 'W RSI', 'M RSI', '1-day cross (bars ago)', '2-hr cross (bars ago)', '3-hr cross (bars ago)', 'Tier', 'Entry', 'Stop', 'T1 +10%', 'T2 +20%', 'Shares at ₹5L / ₹10L', 'Notes'];
   assert.ok(head.every((h, i) => i === 0 || html.indexOf('>' + h + '</th>') > html.indexOf('>' + head[i - 1] + '</th>') || i === 1), 'columns in order');
-  assert.ok(html.includes('<td>1</td><td><b>AAA</b><br><span class="rky-sub">Aaa Ltd</span></td><td class="num">58</td><td class="num">71</td><td class="num">3</td><td class="num">5</td><td>High</td>'));
+  assert.ok(html.includes('<td>1</td><td><b>AAA</b><br><span class="rky-sub">Aaa Ltd</span></td><td class="num">58</td><td class="num">71</td><td class="num">9</td><td class="num">3</td><td class="num">5</td><td>High</td>'));
   assert.ok(html.includes('₹100.00') && html.includes('₹92.50 (−7.5%)') && html.includes('₹110.00') && html.includes('₹120.00') && html.includes('<td class="num">47 / 94</td><td>–</td>'));
   assert.ok(!/Score/.test(html.split('Equity curve')[0]) && !html.includes('rky-idea'), 'a grid, not cards; no score: only the two rules select');
   assert.ok(/124 stocks qualify your Positive MoS strategy and have a monthly RSI of 66-76 with the weekly MACD above its signal line\. 12 got the 2-hour MACD check; 1 meet all the rules, freshest 2-hour cross first\. Data as of 2026-11-03\./.test(html));

@@ -5,6 +5,7 @@ Modes (all file based; WORK dir holds the JSON docs):
   daily   WORK  [--nifty X] -> reads WORK/live/*.json (liveSnapshot docs), compact, state, weights -> updates state.json, picks.json, log.json
   weekly  WORK             -> recalibrates weights.json from closed paper trades, writes learn.json
   m2h     WORK             -> reads WORK/agent/bars2h.json ({key: [2-hour closes]}), writes m2h.json and refreshes swing.json (best swing trades of the day)
+  m1d     WORK             -> reads WORK/agent/bars1d.json ({key: [daily closes]}), writes m1d.json: the final rule, a daily MACD (30, 60, 5) above its signal line
   m3h     WORK             -> reads WORK/agent/bars3h.json ({key: [3-hour closes]}), writes m3h.json: the 3-hour cross age shown beside each idea (information only, it selects nothing)
 """
 import json,glob,sys,os,math,datetime as dt
@@ -131,18 +132,21 @@ def swing_card(p,st,c,info,held):
     return {'k':p['k'],'y':p['y'],'n':n,'g':g,'close':round(close,2),'mrsi':round(p['mrsi'],1),'wrsi':None if c[5] is None else round(c[5],1),'tier':tier,'risk':rk,'thin':thin,'m2h':st,'action':'Buy zone','entry':[round(entry,2),round(entry*1.01,2)],'stop':round(stop,2),'stopPct':round(sp,1),
             't1':round(entry*(1+T1_PCT/100),2),'t2':round(entry*(1+T2_PCT/100),2),'rr':round(T2_PCT/sp,1),'qty':qty,'liqLimited':limited,'ref':{'vd':vd,'sc':sc,'mos':None if mos is None else round(mos),'pg':pg},'why':why,'warn':w}
 
-def swing_ideas(live,wl,m2h=None,held=(),sym=None,comp=None,m3h=None):
-    """The best swing trades: stocks that qualify Positive MoS with a weekly MACD above its signal line, then (1) monthly RSI 66-76 and (2) the 2-hour MACD (30, 60, 5) above its signal line.
+def swing_ideas(live,wl,m2h=None,held=(),sym=None,comp=None,m3h=None,m1d=None):
+    """The best swing trades: stocks that qualify Positive MoS with a weekly MACD above its signal line, then (1) monthly RSI 66-76,
+    (2) the 2-hour MACD (30, 60, 5) above its signal line and (3) the daily MACD (30, 60, 5) above its signal line (the final rule, checked only for stocks that pass 2).
     Nothing else selects or ranks: the freshest 2-hour cross-up comes first. At most MAX_BARS pool stocks are checked per run. A ranking of candidates, not a prediction."""
-    m2h=m2h or {}; m3h=m3h or {}; sym=sym or {}; comp=comp or {}; wl=wl or {}
+    m2h=m2h or {}; m3h=m3h or {}; m1d=m1d or {}; sym=sym or {}; comp=comp or {}; wl=wl or {}
     pool=swing_pool(live,sym,wl); checked=pool[:MAX_BARS]
     for p in pool: p['atr']=(comp.get(p['k']) or {}).get('atr')
-    ideas=[swing_card(p,m2h[p['k']],live[p['k']],wl.get(p['k']),held) for p in checked if qualifies(m2h.get(p['k']))]
+    cand=[p for p in checked if qualifies(m2h.get(p['k']))]
+    ideas=[swing_card(p,m2h[p['k']],live[p['k']],wl.get(p['k']),held) for p in cand if qualifies(m1d.get(p['k']))]
     ideas.sort(key=lambda i:(i['m2h']['since'] if i['m2h']['since'] is not None else 999,-i['m2h']['h']/i['close']))
     ideas=ideas[:8]
-    for i in ideas: i['m3h']=m3h.get(i['k'])
-    return {'band':list(SWING_MRSI),'pool':len(pool),'checked':sum(1 for p in checked if p['k'] in m2h),'ideas':ideas,
-            'need2h':[{'k':p['k'],'y':p['y']} for p in checked if p['k'] not in m2h],'need3h':[{'k':i['k'],'y':i['y']} for i in ideas if i['k'] not in m3h],'capitals':list(CAPITALS)}
+    for i in ideas: i['m1d']=m1d.get(i['k']); i['m3h']=m3h.get(i['k'])
+    return {'band':list(SWING_MRSI),'pool':len(pool),'checked':sum(1 for p in checked if p['k'] in m2h),'passed2h':len(cand),'ideas':ideas,
+            'need2h':[{'k':p['k'],'y':p['y']} for p in checked if p['k'] not in m2h],'need1d':[{'k':p['k'],'y':p['y']} for p in cand if p['k'] not in m1d],
+            'need3h':[{'k':i['k'],'y':i['y']} for i in ideas if i['k'] not in m3h],'capitals':list(CAPITALS)}
 
 def swing_run(work):
     live={};sym={};asof=None
@@ -151,11 +155,11 @@ def swing_run(work):
         for r in d['rows']: live[r['k']]=(r['c']+[None]*12)[:12]; sym[r['k']]=r.get('y')
     if not live: return None
     fresh=lambda name:(lambda m:m.get('s',{}) if m.get('d')==today() else {})(J(work+'/agent/%s.json'%name,{}) or {})
-    m2h=fresh('m2h'); m3h=fresh('m3h')
+    m2h=fresh('m2h'); m3h=fresh('m3h'); m1d=fresh('m1d')
     wl=(J(work+'/agent/watch.json') or {}).get('w',{}); comp=(J(work+'/agent/compact.json') or {}).get('stocks',{})
     held={o['k'] for o in (J(work+'/agent/state.json',{}) or {}).get('open',[])}
-    out=swing_ideas(live,wl,m2h,held,sym,comp,m3h); out.update({'asof':today(),'dataAsof':asof,'m2hAsof':today() if m2h else None})
-    S(work+'/agent/swing.json',out); print('swing pool',out['pool'],'checked',out['checked'],'ideas',[i['k'] for i in out['ideas']],'need2h',[x['k'] for x in out['need2h']],'need3h',[x['k'] for x in out['need3h']]); return out
+    out=swing_ideas(live,wl,m2h,held,sym,comp,m3h,m1d); out.update({'asof':today(),'dataAsof':asof,'m2hAsof':today() if m2h else None})
+    S(work+'/agent/swing.json',out); print('swing pool',out['pool'],'checked',out['checked'],'ideas',[i['k'] for i in out['ideas']],'need2h',[x['k'] for x in out['need2h']],'need1d',[x['k'] for x in out['need1d']],'need3h',[x['k'] for x in out['need3h']]); return out
 
 def _bars_run(work,name):
     bars=J(work+'/agent/bars%s.json'%name,{}) or {}; res={}
@@ -166,6 +170,7 @@ def _bars_run(work,name):
 
 def m2h_run(work): return _bars_run(work,'2h')
 def m3h_run(work): return _bars_run(work,'3h')
+def m1d_run(work): return _bars_run(work,'1d')
 
 def build(work,D):
     uni=set(J('%s/universe.json'%work)) if os.path.exists('%s/universe.json'%work) else None
@@ -357,3 +362,4 @@ if __name__=='__main__':
     elif m=='weekly': weekly(w)
     elif m=='m2h': m2h_run(w)
     elif m=='m3h': m3h_run(w)
+    elif m=='m1d': m1d_run(w)

@@ -28,7 +28,7 @@ class Macd(unittest.TestCase):
 def row(close=100, rsim=70, vol=200000): return [close, 2, 1, 2, 1, 58, rsim, 1, 5, vol, 1e4, None]
 def st2(kind='fresh_up', h=1.5, since=3, zero=True): return {'kind': kind, 'h': h, 'hp': h, 'since': since, 'dir': 'up', 'flip': 90, 'zero': zero, 'last': 100}
 QUAL = ['A', 'G', 200, 5.0, None, None, 1.0]   # name, group, intrinsic value, score, verdict, profit growth, FII %: qualifies Positive MoS at a price of 100 (the live row adds volume and market cap)
-def ideas(live, m2h=None, wl=None, **kw): return A.swing_ideas(live, {**{k: QUAL for k in live}, **(wl or {})}, m2h, **kw)
+def ideas(live, m2h=None, wl=None, m1d='all', **kw): return A.swing_ideas(live, {**{k: QUAL for k in live}, **(wl or {})}, m2h, m1d={k: st2() for k in live} if m1d == 'all' else m1d, **kw)   # by default every stock also passes the daily rule
 
 class Rules(unittest.TestCase):
     def test_rule_1_monthly_rsi_band_edges(self):
@@ -55,6 +55,12 @@ class Rules(unittest.TestCase):
         wl = {'A': ['Aaa', 'G', 90, 3.0, 'avoid', 6354, 1.0]}; r = ideas({'A': row()}, {'A': st2()}, wl)
         i = r['ideas'][0]; self.assertEqual(i['k'], 'A'); w = ' | '.join(i['warn'])
         self.assertIn('Avoid verdict', w); self.assertIn('negative margin of safety', w); self.assertIn('Earnings spike: trailing profit growth 6,354%', w)
+    def test_the_final_rule_needs_the_daily_macd_above_its_signal_line(self):
+        live = {'A': row(), 'B': row(), 'C': row()}; m2h = {k: st2() for k in live}
+        r = ideas(live, m2h, m1d={'A': st2(since=30), 'B': st2(h=-0.3)}); self.assertEqual([i['k'] for i in r['ideas']], ['A'])
+        self.assertEqual((r['passed2h'], [x['k'] for x in r['need1d']]), (3, ['C']), 'a stock that passed the 2-hour rule and has no daily check yet is listed for the daily run')
+        self.assertEqual(r['ideas'][0]['m1d']['since'], 30)
+        self.assertEqual(ideas(live, {'A': st2(h=-1), 'B': st2(), 'C': st2()}, m1d={})['need1d'], [{'k': 'B', 'y': None}, {'k': 'C', 'y': None}], 'only stocks above their 2-hour signal need the daily bars')
     def test_the_card_carries_the_3h_state_when_known_and_the_daily_run_asks_for_the_rest(self):
         r = ideas({'A': row(), 'B': row()}, {'A': st2(), 'B': st2()}, m3h={'A': st2(since=4)}); by = {i['k']: i for i in r['ideas']}
         self.assertEqual(by['A']['m3h']['since'], 4); self.assertIsNone(by['B']['m3h']); self.assertEqual([x['k'] for x in r['need3h']], ['B'])
@@ -130,7 +136,9 @@ class Files(unittest.TestCase):
     def test_the_whole_chain_2h_bars_to_ideas(self):
         w = self.mk()
         json.dump({'AAA': [100.0] * 120 + [100 + 4 * i for i in range(1, 8)], 'SHORT': [1, 2, 3]}, open(w + '/agent/bars2h.json', 'w'))
-        o = A.m2h_run(w); self.assertEqual([i['k'] for i in o['ideas']], ['AAA']); self.assertEqual((o['checked'], o['need2h'], o['m2hAsof']), (1, [], A.today())); self.assertIn(o['ideas'][0]['m2h']['kind'], ('fresh_up', 'rising')); self.assertTrue(o['ideas'][0]['m2h']['zero'])
+        o = A.m2h_run(w); self.assertEqual((o['ideas'], o['need1d']), ([], [{'k': 'AAA', 'y': 'NSE:AAA'}]), 'the daily rule is still to be checked')
+        json.dump({'AAA': [100.0] * 120 + [100 + 4 * i for i in range(1, 8)]}, open(w + '/agent/bars1d.json', 'w')); o = A.m1d_run(w); self.assertEqual((o['need1d'], [i['k'] for i in o['ideas']]), ([], ['AAA']))
+        self.assertEqual([i['k'] for i in o['ideas']], ['AAA']); self.assertEqual((o['checked'], o['need2h'], o['m2hAsof']), (1, [], A.today())); self.assertIn(o['ideas'][0]['m2h']['kind'], ('fresh_up', 'rising')); self.assertTrue(o['ideas'][0]['m2h']['zero'])
     def test_stale_2h_states_are_ignored(self):
         w = self.mk(); json.dump({'d': '2000-01-01', 's': {'AAA': st2()}}, open(w + '/agent/m2h.json', 'w'))
         o = A.swing_run(w); self.assertEqual((o['ideas'], o['m2hAsof']), ([], None)); self.assertEqual(len(o['need2h']), 1)
