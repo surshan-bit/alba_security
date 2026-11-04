@@ -927,11 +927,11 @@ test('rocky page: the learning line reads the review figures when there is no wr
 const EMPTY_ST = { curve: [], closed: [], open: [] };
 const IDEA = (o) => Object.assign({ k: 'AAA', n: 'Aaa Ltd', g: 'Textiles', close: 100, mrsi: 71, thin: false, tier: 'high', risk: 0.005, action: 'Buy zone', m2h: { since: 3, h: 1.5 }, m3h: { since: 5, h: 0.8 }, m1d: { since: 9, h: 0.5 }, wrsi: 58,
   entry: [100, 101], stop: 92.5, stopPct: 7.5, t1: 110, t2: 120, rr: 2.7, qty: { '500000': 47, '1000000': 94 }, warn: [] }, o);
-const SWING = (o) => Object.assign({ asof: '2026-11-03', dataAsof: '2026-11-03', band: [66, 76], pool: 124, checked: 12, ideas: [IDEA()], capitals: [500000, 1000000] }, o);
+const SWING = (o) => Object.assign({ asof: '2026-11-03', dataAsof: '2026-11-03', pool: 124, checked: 12, ideas: [IDEA()], capitals: [500000, 1000000] }, o);
 test('rocky page: best swing trades say so when the document is missing or no stock meets the rules', async () => {
   const none = await rockyPage({ state: EMPTY_ST });
   assert.ok(/Best swing trades for the day/.test(none) && /appear after the next daily run/.test(none));
-  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [] }) }), /No Positive MoS stock meets the rules today: weekly MACD above its signal line, monthly RSI 66-76, and the 2-hour and 1-day MACD \(30, 60, 5\) above their signal lines/);
+  assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [] }) }), /No Positive MoS stock meets the rules today: weekly MACD above its signal line, and the 2-hour and 1-day MACD \(30, 60, 5\) above their signal lines/);
   assert.match(await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: undefined }) }), /No Positive MoS stock meets the rules today/);
 });
 test('rocky page: the swing grid leads with weekly RSI, monthly RSI and the 2-hour cross age, then tier, levels in rupees, shares for both capitals and notes', async () => {
@@ -941,7 +941,7 @@ test('rocky page: the swing grid leads with weekly RSI, monthly RSI and the 2-ho
   assert.ok(html.includes('<td>1</td><td><b>AAA</b><br><span class="rky-sub">Aaa Ltd</span></td><td class="num">58</td><td class="num">71</td><td class="num">9</td><td class="num">3</td><td class="num">5</td><td>High</td>'));
   assert.ok(html.includes('₹100.00') && html.includes('₹92.50 (−7.5%)') && html.includes('₹110.00') && html.includes('₹120.00') && html.includes('<td class="num">47 / 94</td><td>–</td>'));
   assert.ok(!/Score/.test(html.split('Equity curve')[0]) && !html.includes('rky-idea'), 'a grid, not cards; no score: only the two rules select');
-  assert.ok(/124 stocks qualify your Positive MoS strategy and have a monthly RSI of 66-76 with the weekly MACD above its signal line\. 12 got the 2-hour MACD check; 1 meet all the rules, freshest 2-hour cross first\. Data as of 2026-11-03\./.test(html));
+  assert.ok(/124 stocks qualify your Positive MoS strategy and have the weekly MACD above its signal line \(any monthly RSI\)\. 12 got the 2-hour MACD check; 1 meet all the rules, freshest 2-hour cross first\. Data as of 2026-11-03\./.test(html));
   assert.ok(/not a prediction/.test(html) && /Only the rules above select a stock/.test(html) && !/style=/.test(html));
 });
 test('rocky page: the grid keeps the rank order, and warnings, unknown tiers and unknown cross ages carry what the data says', async () => {
@@ -953,9 +953,9 @@ test('rocky page: the grid keeps the rank order, and warnings, unknown tiers and
   assert.ok(below.includes('<td class="num">below</td>') && !below.includes('<td class="num">2</td><td>High</td>'), 'a 3-hour MACD under its signal line says so');
 });
 test('rocky page: missing figures in an idea show a dash, and a missing data date is said plainly', async () => {
-  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ dataAsof: null, band: undefined, capitals: undefined, ideas: [IDEA({ entry: undefined, stop: null, qty: undefined, warn: undefined })] }) });
+  const html = await rockyPage({ state: EMPTY_ST, swing: SWING({ dataAsof: null, capitals: undefined, ideas: [IDEA({ entry: undefined, stop: null, qty: undefined, warn: undefined })] }) });
   assert.ok(/<td class="num">–<\/td><td class="num">– \(−7\.5%\)<\/td>/.test(html));
-  assert.ok(/Data as of \?\./.test(html) && /monthly RSI of - with the weekly MACD/.test(html));
+  assert.ok(/Data as of \?\./.test(html) && /the weekly MACD above its signal line \(any monthly RSI\)/.test(html));
   const noQty = await rockyPage({ state: EMPTY_ST, swing: SWING({ ideas: [IDEA({ qty: undefined })] }) });
   assert.ok(/Shares at ₹5L \/ ₹10L<\/th>/.test(noQty) && noQty.includes('<td class="num">– / –</td>'));
 });

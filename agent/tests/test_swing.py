@@ -31,8 +31,10 @@ QUAL = ['A', 'G', 200, 5.0, None, None, 1.0]   # name, group, intrinsic value, s
 def ideas(live, m2h=None, wl=None, m1d='all', **kw): return A.swing_ideas(live, {**{k: QUAL for k in live}, **(wl or {})}, m2h, m1d={k: st2() for k in live} if m1d == 'all' else m1d, **kw)   # by default every stock also passes the daily rule
 
 class Rules(unittest.TestCase):
-    def test_rule_1_monthly_rsi_band_edges(self):
-        for rsim, inside in ((65.9, 0), (66, 1), (76, 1), (76.1, 0)): self.assertEqual(ideas({'A': row(rsim=rsim)})['pool'], inside, rsim)
+    def test_any_monthly_rsi_is_allowed_and_only_sets_the_tier(self):
+        r = ideas({'LOW': row(rsim=30), 'MID': row(rsim=65), 'HIGH': row(rsim=90), 'NONE': row(rsim=None)}, {k: st2() for k in ('LOW', 'MID', 'HIGH', 'NONE')})
+        self.assertEqual(r['pool'], 4); by = {i['k']: i for i in r['ideas']}
+        self.assertEqual((by['LOW']['tier'], by['MID']['tier'], by['HIGH']['tier'], by['NONE']['tier']), ('low', 'medium', 'high', 'high')); self.assertIsNone(by['NONE']['mrsi'])
     def test_rule_2_needs_the_2h_macd_above_its_signal_line_whatever_its_level(self):
         self.assertTrue(A.qualifies(st2())); self.assertTrue(A.qualifies(st2(zero=False))); self.assertFalse(A.qualifies(st2(h=0))); self.assertFalse(A.qualifies(st2(h=-1))); self.assertFalse(A.qualifies(None))
     def test_the_pool_needs_the_weekly_macd_above_its_signal_line(self):
@@ -41,12 +43,12 @@ class Rules(unittest.TestCase):
         bad = row(); bad[2] = 'x'; self.assertFalse(A.weekly_ok(bad)); bad[1] = True; bad[2] = 0; self.assertFalse(A.weekly_ok(bad))
     def test_the_macd_uses_the_users_chart_setting(self): self.assertEqual((A.MACD_FAST, A.MACD_SLOW, A.MACD_SIG), (30, 60, 5))
     def test_the_pool_is_listed_for_the_daily_run_and_capped(self):
-        r = ideas({'A': row(), 'B': row(rsim=50)}, sym={'A': 'NSE:AAA'}); self.assertEqual(r['need2h'], [{'k': 'A', 'y': 'NSE:AAA'}]); self.assertEqual((r['ideas'], r['checked']), ([], 0))
+        r = ideas({'A': row()}, sym={'A': 'NSE:AAA'}); self.assertEqual(r['need2h'], [{'k': 'A', 'y': 'NSE:AAA'}]); self.assertEqual((r['ideas'], r['checked']), ([], 0))
         many = {'S%d' % i: row() for i in range(A.MAX_BARS + 5)}; r = ideas(many); self.assertEqual((r['pool'], len(r['need2h'])), (A.MAX_BARS + 5, A.MAX_BARS))
     def test_only_stocks_that_meet_both_rules_are_ideas(self):
-        live = {'A': row(), 'B': row(), 'C': row(), 'D': row(rsim=50)}
+        live = {'A': row(), 'B': row(), 'C': row(), 'D': row(rsim=50)}   # D has a low monthly RSI, which is allowed
         m2h = {'A': st2(), 'B': st2(h=-0.5), 'C': st2(zero=False), 'D': st2()}; r = ideas(live, m2h)
-        self.assertEqual([i['k'] for i in r['ideas']], ['A', 'C']); self.assertEqual((r['pool'], r['checked']), (3, 3)); self.assertEqual(r['need2h'], [])
+        self.assertEqual([i['k'] for i in r['ideas']], ['A', 'C', 'D']); self.assertEqual((r['pool'], r['checked']), (4, 4)); self.assertEqual(r['need2h'], [])
         self.assertEqual([i['warn'] for i in r['ideas']][1][:1], ['The 2-hour MACD line is still below zero'], 'a MACD line below zero still qualifies, with a warning')
     def test_the_stock_that_crossed_up_most_recently_comes_first(self):
         live = {'A': row(), 'B': row(), 'C': row()}
@@ -71,8 +73,8 @@ class Rules(unittest.TestCase):
         i = ideas({'A': row()}, {'A': st2()})['ideas'][0]; self.assertEqual(i['n'], 'A'); self.assertIsNone(i['ref']['vd']); self.assertFalse(any('For reference' in w for w in i['why']))
     def test_the_card_lists_both_rules_and_the_dashboard_view_for_reference_only(self):
         i = ideas({'A': row()}, {'A': st2()}, {'A': ['Aaa', 'G', 200, 8.0, 'buy', 40, 1.0]})['ideas'][0]
-        self.assertEqual(i['why'][0], 'Monthly RSI 70, inside 66-76'); self.assertIn('2-hour MACD (30, 60, 5) above its signal line (crossed up 3 bars ago', i['why'][1])
-        one = ideas({'A': row()}, {'A': st2(since=1)})['ideas'][0]; self.assertIn('crossed up 1 bar ago', one['why'][1]); never = ideas({'A': row()}, {'A': st2(since=None)})['ideas'][0]; self.assertIn('crossed up a while ago', never['why'][1]); self.assertIn('For reference: dashboard verdict buy (score 8.0), margin of safety 50%', i['why'][2])
+        self.assertIn('2-hour MACD (30, 60, 5) above its signal line (crossed up 3 bars ago', i['why'][0])
+        one = ideas({'A': row()}, {'A': st2(since=1)})['ideas'][0]; self.assertIn('crossed up 1 bar ago', one['why'][0]); never = ideas({'A': row()}, {'A': st2(since=None)})['ideas'][0]; self.assertIn('crossed up a while ago', never['why'][0]); self.assertIn('For reference: dashboard verdict buy (score 8.0), margin of safety 50%', i['why'][1])
         self.assertEqual((i['action'], i['ref']['mos']), ('Buy zone', 50)); self.assertEqual(i['warn'], ['Stop is an estimate (8%): no volatility data'])
     def test_at_most_eight_ideas(self):
         live = {'S%d' % i: row() for i in range(11)}; r = ideas(live, {k: st2(since=i) for i, k in enumerate(live)}); self.assertEqual(len(r['ideas']), 8)

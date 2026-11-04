@@ -1,8 +1,8 @@
 // The "Best swing trades for the day" section of the Rocky page: a ranked grid built from the `swing` document that Rocky's daily run writes.
-// Candidates are the stocks that qualify the saved Positive MoS strategy; then the rules: weekly MACD above its signal line, monthly RSI 66-76, and the 2-hour and 1-day MACD (30, 60, 5) above their signal lines. Pure: takes that document, returns markup (all saved text is escaped).
+// Candidates are the stocks that qualify the saved Positive MoS strategy; then the rules: weekly MACD above its signal line, and the 2-hour and 1-day MACD (30, 60, 5) above their signal lines. Pure: takes that document, returns markup (all saved text is escaped).
 import { TIER_LABEL, e, fmt, list, num, table } from './fmt.js';
 
-const NO_IDEAS = 'No Positive MoS stock meets the rules today: weekly MACD above its signal line, monthly RSI 66-76, and the 2-hour and 1-day MACD (30, 60, 5) above their signal lines. Staying in cash is a valid call.';
+const NO_IDEAS = 'No Positive MoS stock meets the rules today: weekly MACD above its signal line, and the 2-hour and 1-day MACD (30, 60, 5) above their signal lines. Staying in cash is a valid call.';
 const NOT_YET = 'The best swing trades appear after the next daily run.';
 const CAVEAT = 'A ranking of candidates, not a prediction: in testing, about 4 in 10 comparable swing trades hit their stop within three weeks. Only the rules above select a stock; the dashboard\'s own view is shown for reference. Confirm the 2-hour chart before buying, use limit orders (especially on thin stocks), size by the stop and never risk more than your tier allows. This is a paper ledger\'s analysis, not advice.';
 
@@ -11,7 +11,7 @@ const lakhs = (c) => '₹' + fmt(c / 100000) + 'L';
 // Bars since the MACD last crossed up; 'below' when it is under its signal line now; a dash when unknown.
 const crossBars = (m) => !m ? '–' : num(m.h) && m.h <= 0 ? 'below' : num(m.since) ? String(m.since) : '–';
 
-// One row per idea. The lead columns are the rules (weekly MACD, monthly RSI, 2-hour and 1-day MACD cross ages), the weekly RSI and the 3-hour MACD cross age (information only); then the levels, the sizes and the warnings.
+// One row per idea. The lead columns are the rules (weekly MACD, 2-hour and 1-day MACD cross ages), the monthly RSI (which only sets the tier), the weekly RSI and the 3-hour MACD cross age (information only); then the levels, the sizes and the warnings.
 function columns(caps){
   return [
     { h: '#', f: (i) => String(i.rank) },
@@ -32,8 +32,7 @@ function columns(caps){
 }
 
 function summary(sw, n){
-  const band = list(sw.band);
-  return '<p class="rky-sub">' + e(sw.pool) + ' stocks qualify your Positive MoS strategy and have a monthly RSI of ' + e(band[0]) + '-' + e(band[1]) + ' with the weekly MACD above its signal line. ' + e(sw.checked) +
+  return '<p class="rky-sub">' + e(sw.pool) + ' stocks qualify your Positive MoS strategy and have the weekly MACD above its signal line (any monthly RSI). ' + e(sw.checked) +
     ' got the 2-hour MACD check; ' + n + ' meet all the rules, freshest 2-hour cross first. Data as of ' + e(sw.dataAsof || '?') + '.</p>';
 }
 

@@ -16,7 +16,7 @@ TIER_RISK={'low':0.01,'medium':0.0075,'high':0.005}; MRSI_HIGH=70; MRSI_MEDIUM=6
 RR_MIN=3.0; GATE_DAYS=70       # 1:3 gate: target = RR_MIN x stop distance; new positions may run 70 days (10 weeks, as tested)
 SPIKE_PG=300   # informational: trailing profit growth above 300% is flagged on a swing idea (it does not change the selection)
 LIQ_PART=0.10   # a position may be at most 10% of the stock's average daily volume, so it can be sold without moving the price
-SWING_MRSI=(66,76); MOS_MIN_SCORE=2; MOS_MIN_PCT=-25; MOS_MIN_FII=0.1; MOS_MIN_VOL=20000; LIQ_LAKH=50; T1_PCT=10.0; T2_PCT=20.0; CAPITALS=(500000,1000000); MAX_BARS=40; MACD_FAST=30; MACD_SLOW=60; MACD_SIG=5; MIN_BARS=2*MACD_SLOW   # swing ideas: monthly-RSI band, liquid = turnover of at least Rs 50 lakh a day, targets, capitals shown, 2-hour checks per day
+MOS_MIN_SCORE=2; MOS_MIN_PCT=-25; MOS_MIN_FII=0.1; MOS_MIN_VOL=20000; LIQ_LAKH=50; T1_PCT=10.0; T2_PCT=20.0; CAPITALS=(500000,1000000); MAX_BARS=120; MACD_FAST=30; MACD_SLOW=60; MACD_SIG=5; MIN_BARS=2*MACD_SLOW   # swing ideas: monthly-RSI band, liquid = turnover of at least Rs 50 lakh a day, targets, capitals shown, 2-hour checks per day
 REGIME_MIN=0.6   # market filter: new entries only while at least this share of the universe has a positive 1-month change
 FEATS=['fund','mos','trend','rsi','mom','near']
 W0={'fund':1.0,'mos':1.0,'trend':1.5,'rsi':0.7,'mom':0.8,'near':0.8}
@@ -104,8 +104,8 @@ def weekly_ok(c):
     return all(isinstance(x,(int,float)) and not isinstance(x,bool) for x in (c[1],c[2])) and c[1]>c[2]
 
 def swing_pool(live,sym,wl=None):
-    """The candidates: stocks that qualify the Positive MoS strategy (when the watch list is given), have a monthly RSI between 66 and 76 and a weekly MACD above its signal line."""
-    return [{'k':k,'y':sym.get(k),'close':c[0],'mrsi':c[6]} for k,c in live.items() if c[0] and c[6] is not None and SWING_MRSI[0]<=c[6]<=SWING_MRSI[1] and weekly_ok(c) and (wl is None or positive_mos(wl.get(k),c))]
+    """The candidates: stocks that qualify the Positive MoS strategy (when the watch list is given) and have a weekly MACD above its signal line. Any monthly RSI is allowed; it only sets the risk tier."""
+    return [{'k':k,'y':sym.get(k),'close':c[0],'mrsi':c[6]} for k,c in live.items() if c[0] and weekly_ok(c) and (wl is None or positive_mos(wl.get(k),c))]
 
 def swing_card(p,st,c,info,held):
     """One idea: the two rules it met, the levels from Rocky's volatility stop, the sizes by risk tier, and warnings. The dashboard fields only inform; they never select."""
@@ -118,7 +118,7 @@ def swing_card(p,st,c,info,held):
         q=int(min(cap*rk/(entry-stop),cap*POSCAP*(rk/RISK)/entry))
         if maxq is not None and q>maxq: q=maxq; limited=True
         qty[str(cap)]=q
-    why=['Monthly RSI %d, inside %d-%d'%(round(p['mrsi']),*SWING_MRSI),'2-hour MACD (30, 60, 5) above its signal line (crossed up %s, histogram %s)'%('a while ago' if st['since'] is None else '%d bar%s ago'%(st['since'],'' if st['since']==1 else 's'),st['h'])]
+    why=['2-hour MACD (30, 60, 5) above its signal line (crossed up %s, histogram %s)'%('a while ago' if st['since'] is None else '%d bar%s ago'%(st['since'],'' if st['since']==1 else 's'),st['h'])]
     if vd: why.append('For reference: dashboard verdict %s (score %s)%s'%(vd,sc,'' if mos is None else ', margin of safety %d%%'%round(mos)))
     w=[]
     if thin: w.append('Thinly traded (about Rs %d lakh a day): exits may be hard, use limit orders'%round(turn))
@@ -129,12 +129,12 @@ def swing_card(p,st,c,info,held):
     if not st['zero']: w.append('The 2-hour MACD line is still below zero')
     if not p.get('atr'): w.append('Stop is an estimate (8%): no volatility data')
     if p['k'] in held: w.append('Already held in Rocky\'s paper ledger')
-    return {'k':p['k'],'y':p['y'],'n':n,'g':g,'close':round(close,2),'mrsi':round(p['mrsi'],1),'wrsi':None if c[5] is None else round(c[5],1),'tier':tier,'risk':rk,'thin':thin,'m2h':st,'action':'Buy zone','entry':[round(entry,2),round(entry*1.01,2)],'stop':round(stop,2),'stopPct':round(sp,1),
+    return {'k':p['k'],'y':p['y'],'n':n,'g':g,'close':round(close,2),'mrsi':None if p['mrsi'] is None else round(p['mrsi'],1),'wrsi':None if c[5] is None else round(c[5],1),'tier':tier,'risk':rk,'thin':thin,'m2h':st,'action':'Buy zone','entry':[round(entry,2),round(entry*1.01,2)],'stop':round(stop,2),'stopPct':round(sp,1),
             't1':round(entry*(1+T1_PCT/100),2),'t2':round(entry*(1+T2_PCT/100),2),'rr':round(T2_PCT/sp,1),'qty':qty,'liqLimited':limited,'ref':{'vd':vd,'sc':sc,'mos':None if mos is None else round(mos),'pg':pg},'why':why,'warn':w}
 
 def swing_ideas(live,wl,m2h=None,held=(),sym=None,comp=None,m3h=None,m1d=None):
-    """The best swing trades: stocks that qualify Positive MoS with a weekly MACD above its signal line, then (1) monthly RSI 66-76,
-    (2) the 2-hour MACD (30, 60, 5) above its signal line and (3) the daily MACD (30, 60, 5) above its signal line (the final rule, checked only for stocks that pass 2).
+    """The best swing trades: stocks that qualify Positive MoS with a weekly MACD above its signal line (any monthly RSI), then (1) the 2-hour MACD (30, 60, 5)
+    above its signal line and (2) the daily MACD (30, 60, 5) above its signal line (checked only for stocks that pass 1).
     Nothing else selects or ranks: the freshest 2-hour cross-up comes first. At most MAX_BARS pool stocks are checked per run. A ranking of candidates, not a prediction."""
     m2h=m2h or {}; m3h=m3h or {}; m1d=m1d or {}; sym=sym or {}; comp=comp or {}; wl=wl or {}
     pool=swing_pool(live,sym,wl); checked=pool[:MAX_BARS]
@@ -144,7 +144,7 @@ def swing_ideas(live,wl,m2h=None,held=(),sym=None,comp=None,m3h=None,m1d=None):
     ideas.sort(key=lambda i:(i['m2h']['since'] if i['m2h']['since'] is not None else 999,-i['m2h']['h']/i['close']))
     ideas=ideas[:8]
     for i in ideas: i['m1d']=m1d.get(i['k']); i['m3h']=m3h.get(i['k'])
-    return {'band':list(SWING_MRSI),'pool':len(pool),'checked':sum(1 for p in checked if p['k'] in m2h),'passed2h':len(cand),'ideas':ideas,
+    return {'pool':len(pool),'checked':sum(1 for p in checked if p['k'] in m2h),'passed2h':len(cand),'ideas':ideas,
             'need2h':[{'k':p['k'],'y':p['y']} for p in checked if p['k'] not in m2h],'need1d':[{'k':p['k'],'y':p['y']} for p in cand if p['k'] not in m1d],
             'need3h':[{'k':i['k'],'y':i['y']} for i in ideas if i['k'] not in m3h],'capitals':list(CAPITALS)}
 
