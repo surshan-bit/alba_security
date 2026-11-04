@@ -57,6 +57,8 @@ function wlBuild(universe, bseMap, picks){
 // A BSE-only stock with no saved TradingView symbol: search by company name and accept ONLY a BSE stock whose
 // description equals the company name (ignoring Ltd / Limited / punctuation). Near matches are left for a person.
 const wlNorm = t => String(t || '').toLowerCase().replace(/&/g, ' and ').replace(/\b(limited|ltd|the|co|company|pvt|private)\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+// The saved BSE symbols as a plain copy. The database hands the record back locked, and new symbols are added to this map after a lookup.
+function bseMapOf(snap){ return snap && snap.exists ? Object.assign({}, snap.data()) : {}; }
 async function wlResolveBse(items){
   const found = {};
   for(const it of items.slice(0, 40)){
@@ -216,7 +218,7 @@ async function wlRunSync(){
 
     current = 'build'; fiSet('build', 'running', '', 0.5);
     let bse = {};
-    try { const bs = await fiRetry(() => db.doc('stockMeta/bseAlpha').get()); if(bs && bs.exists) bse = bs.data() || {}; } catch(e){ console.error('Could not read the BSE symbol map', e); }
+    try { bse = bseMapOf(await fiRetry(() => db.doc('stockMeta/bseAlpha').get())); } catch(e){ console.error('Could not read the BSE symbol map', e); }
     let plan = wlBuild(stocks, bse, picks);
     if(plan.needsLookup.length){
       fiSet('build', 'running', 'Looking up ' + plan.needsLookup.length + ' BSE symbol(s)…', 0.5);

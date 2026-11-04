@@ -2775,7 +2775,7 @@ test('weekly MACD 30/60/5 for every stock: only that reading of a saved block ch
   assert.deepStrictEqual([down.changed, down.chunksWritten, down.failed], [1, 0, 1]);
 });
 // ---- Refresh all stocks (src/refresh/tvrefresh.js): the snapshot and bar steps, driven with a made-up TradingView and database
-const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG', 'fundamentalCsvUploadLog', 'tabId']);
+const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG', 'fundamentalCsvUploadLog', 'tabId', 'strategies', 'watchlistSyncLog', 'TV_SERVER']);
 const TV_DEFAULTS = { tickerSymbol: (s) => s.ticker, sanitizeDocId: (x) => x, sleep: () => Promise.resolve(), sameValue: (a, b) => JSON.stringify(a) === JSON.stringify(b) };   // what the real helpers do, without their imports and waits
 // A stand-in for an imported function: it calls whatever the running test put in globalThis.__T (looked up at call time) or a default. Made here, not in the stub's text, so it is not counted as source code.
 globalThis.__TVFN = (n) => (...a) => (globalThis.__T[n] ? globalThis.__T[n](...a) : (TV_DEFAULTS[n] || (() => undefined))(...a));
@@ -2789,11 +2789,11 @@ async function loadAllStubbed(file, extra, keep){
   }
   return loadWithStubs(file, extra, stubs);
 }
-const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { noteLivePrices, paintHint, rsBars, rsCross, rsReport, rsSnapshot, rsTech2, runSnapshot, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
+const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { noteLivePrices, paintHint, rsBars, rsCross, rsFixSymbols, rsReport, rsSnapshot, rsTech2, runSnapshot, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
   ['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js']);
 const tvStock = (name) => ({ name, ticker: name, pillars: { val: 0.5 } });
 const tvRun = (db, names, over) => Object.assign({ db, today: '2026-11-04', stored: new Map(), prevRows: new Map(), todo: names.map((n) => ({ s: tvStock(n), sym: 'N:' + n })), ctx: null, batchLeft: {}, updated: 0, unchanged: 0, scored: 0, kept: 0, chunksSaved: 0,
-  retried: 0, answeredAgain: 0, carried: 0, skipped: [], batchSecs: [], tvWaitMs: 0, saveMs: 0, stopped: false, livePx: new Map(), crossRead: 0, crossChanged: 0, crossFailed: 0, barsUpdated: 0, batchSaved: 0, chunkWrites: 0, techBlocksSaved: 0, compacted: 0, staleBefore: 0, noneBefore: 0, filled: 0, histFailed: 0, noHistoryLeft: 0 }, over);
+  retried: 0, answeredAgain: 0, carried: 0, skipped: [], batchSecs: [], tvWaitMs: 0, saveMs: 0, stopped: false, livePx: new Map(), symbolFixes: [], crossRead: 0, crossChanged: 0, crossFailed: 0, barsUpdated: 0, batchSaved: 0, chunkWrites: 0, techBlocksSaved: 0, compacted: 0, staleBefore: 0, noneBefore: 0, filled: 0, histFailed: 0, noHistoryLeft: 0 }, over);
 const tvDb = (fail) => { const saved = []; return { saved, doc: (p) => ({ set: async (d) => { if(fail && fail(p, saved.length)) throw new Error('database down'); saved.push([p, d]); } }) }; };
 const tvAnswer = (symbols, lacking) => ({ data: Object.fromEntries(symbols.filter((x) => !(lacking || []).includes(x)).map((x) => [x, { close: 10, 'RSI|1M': 60 }])) });
 
@@ -2924,6 +2924,8 @@ test('refresh all stocks, result: the heading and bullets tell what was done, wi
   assert.ok(text.includes('4 stocks without a TradingView symbol: A, B, C …') && text.includes('2 stocks had no price today') && text.includes('3 stocks skipped, mostly: no price : kept its figures (list below)'));
   M.rsReport(run({ updated: 1, histRan: true, tech2Saved: 2, tech2Failed: 1 })); assert.ok(shown[3][1].join('\n').includes('Technical Score 2: 2 of 2 stocks (100%), 1 not saved'));
   M.rsReport(run({ updated: 1, histRan: true, crossRead: 2000, crossChanged: 40, crossFailed: 2 })); assert.ok(shown[shown.length - 1][1].join('\n').includes('Weekly MACD 30/60/5: 2,000 stocks read, 40 changed, 2 batches not saved'));
+  M.rsReport(run({ updated: 1, symbolFixes: ['A NSE:OLD → NSE:NEW'] })); assert.ok(shown[shown.length - 1][1].join('\n').includes('1 saved TradingView symbol was out of date and corrected (priced from the next run): A NSE:OLD → NSE:NEW'));
+  M.rsReport(run({ updated: 1, symbolFixes: ['A', 'B', 'C', 'D', 'E'] })); assert.ok(shown[shown.length - 1][1].join('\n').includes('5 saved TradingView symbols were out of date and corrected (priced from the next run): A; B; C; D …'));
   M.rsReport(run({ updated: 1, histRan: true, crossFailed: -1 })); assert.ok(shown[shown.length - 1][1].join('\n').includes('The weekly MACD 30/60/5 could not be read'));
   M.rsReport(run({ updated: 1, histRan: true, tech2Failed: -1 })); assert.ok(shown[shown.length - 1][1].join('\n').includes('Technical Score 2 could not be calculated'));
 }));
@@ -3038,6 +3040,23 @@ test('refresh all stocks: a run copes with a quota refusal, unreadable saved rec
   } finally { globalThis.document = keepDoc; console.error = keepErr; }
 }));
 
+test('refresh all stocks, symbol check: a stock still without a price today is searched by its ISIN again, and a failure never stops the run', () => alone(async () => {
+  const stocks = ['A', 'B', 'C'].map(tvStock), [A, B, C] = stocks, keep = console.error, errors = [], asked = [];
+  const T = globalThis.__T = { log: [], stocks, priceHistoryByTicker: {}, COMPACT_LAG: 1, correctIsinSymbols: async (list) => { asked.push(list.map((s) => s.name)); return [{ stock: B, from: 'NSE:OLD', to: 'BSE:NEW' }]; } };
+  const M = await loadTvRefresh(), todo = stocks.map((s) => ({ s, sym: 'N:' + s.name }));
+  const run = tvRun(tvDb(), [], { todo }); run.livePx.set('A', 10);   // A was priced today; B and C were not
+  await M.rsFixSymbols(run);
+  assert.deepStrictEqual(asked, [['B', 'C']]); assert.deepStrictEqual(run.symbolFixes, ['B NSE:OLD → BSE:NEW']);
+  const priced = tvRun(tvDb(), [], { todo }); stocks.forEach((s) => priced.livePx.set(s.name, 1)); asked.length = 0; await M.rsFixSymbols(priced);
+  assert.strictEqual(asked.length, 0);   // every stock was priced: nothing to search
+  const stopped = tvRun(tvDb(), [], { todo, stopped: true }); await M.rsFixSymbols(stopped); M.__stop(true); await M.rsFixSymbols(tvRun(tvDb(), [], { todo })); M.__stop(false);
+  assert.strictEqual(asked.length, 0);   // Stop was pressed
+  const many = Array.from({ length: 30 }, (_, i) => ({ s: tvStock('X' + i), sym: 'N:X' + i })); asked.length = 0;
+  await M.rsFixSymbols(tvRun(tvDb(), [], { todo: many })); assert.strictEqual(asked[0].length, 20);   // at most 20 stocks a run
+  console.error = (m) => errors.push(String(m));
+  try { T.correctIsinSymbols = async () => { throw new Error('no connection'); }; const broken = tvRun(tvDb(), [], { todo }); await M.rsFixSymbols(broken); assert.deepStrictEqual(broken.symbolFixes, []); } finally { console.error = keep; }
+  assert.deepStrictEqual(errors, ['Could not search the TradingView symbols again']);
+}));
 test('refresh all stocks: a run that cannot start says why, a run that fails part-way reports it, and the next run can start', () => alone(async () => {
   const shown = [], errors = [], keepDoc = globalThis.document, keepErr = console.error, db = { collection: () => ({ get: async () => ({ docs: [] }) }), doc: () => ({ get: async () => ({ exists: false }), set: async () => {} }) };
   globalThis.document = { getElementById: () => null }; console.error = (m) => errors.push(String(m));
@@ -3079,6 +3098,157 @@ test('refresh all stocks, bars step: placed stocks are saved in batches and scor
   const run2 = tvRun(tvDb(), [], { ctx: Object.assign({}, ctx, { ready: new Map(ctx.ready), jobs: new Map() }), batchLeft: {} });
   await M.rsBars(run2); M.__stop(false);
   assert.deepStrictEqual([run2.compacted, onebyone.length, run2.stopped], [1, 0, true]);
+}));
+
+// ---- ISIN to TradingView symbol (src/tv/isin.js)
+test('symbol check: a saved symbol whose ISIN now finds a different symbol is corrected and saved, the rest are left alone', () => alone(async () => {
+  const ISIN = { A: 'INE000A00011', B: 'INE000B00012', C: 'INE000C00013', D: 'INE000D00014', E: 'INE000E00015' }, updates = [], calls = [];
+  const saved = { [ISIN.A]: 'NSE:OLDA', [ISIN.B]: 'NSE:SAMEB', [ISIN.C]: 'BSE:OLDC', [ISIN.E]: 'NSE:OLDE' };
+  globalThis.__ISIN = { db: Promise.resolve({ doc: () => ({ get: async () => ({ exists: true, data: () => saved }), update: async (d) => { updates.push(d); }, set: async () => {} }) }),
+    tvCall: async (tool, args) => {
+      calls.push(tool);
+      if(tool === 'mcp-tv-get-symbol-data'){ const isin = args.symbol.endsWith('NEWA') ? ISIN.A : args.symbol.endsWith('SAMEB') ? ISIN.B : args.symbol.endsWith('NEWC') ? ISIN.C : 'OTHER'; return { data: { isin } }; }
+      const by = { [ISIN.A]: [{ exchange: 'NSE', symbol: 'NSE:NEWA' }], [ISIN.B]: [{ exchange: 'NSE', symbol: 'NSE:SAMEB' }], [ISIN.C]: [{ exchange: 'NSE', symbol: 'NSE:WRONG' }, { exchange: 'BSE', symbol: 'BSE:NEWC' }], [ISIN.E]: [] };
+      if(args.query === ISIN.E) throw new Error('search failed');
+      return { data: { symbols: by[args.query] || [] } };
+    } };
+  const I = await loadWithStubs('src/tv/isin.js', '', { 'core/store.js': 'export const dbCapabilityPromise = globalThis.__ISIN.db;', 'connector.js': 'export const tvCall = (...a) => globalThis.__ISIN.tvCall(...a);' });
+  const st = (n, isin) => ({ name: n, isin });
+  const fixed = await I.correctIsinSymbols([st('A', ISIN.A), st('B', ISIN.B), st('C', ISIN.C), st('D', ISIN.D), st('E', ISIN.E), st('F', 'bad'), st('G')]);
+  assert.deepStrictEqual(fixed.map((x) => [x.stock.name, x.from, x.to]).sort(), [['A', 'NSE:OLDA', 'NSE:NEWA'], ['C', 'BSE:OLDC', 'BSE:NEWC']]);   // B is unchanged, D has no saved symbol, E's search failed, F and G have no valid ISIN
+  assert.deepStrictEqual(updates, [{ [ISIN.A]: 'NSE:NEWA', [ISIN.C]: 'BSE:NEWC' }]);   // saved once, only the corrections
+  assert.strictEqual(I.isinSymbolCached(st('A', ISIN.A)), 'NSE:NEWA'); assert.strictEqual(I.isinSymbolCached(st('E', ISIN.E)), 'NSE:OLDE');
+  updates.length = 0; assert.deepStrictEqual(await I.correctIsinSymbols([st('B', ISIN.B)]), []); assert.strictEqual(updates.length, 0);   // nothing found: nothing saved
+  for(const code of ['no_mcp', 'quota']){
+    globalThis.__ISIN.tvCall = async () => { throw Object.assign(new Error('refused'), { code }); };
+    await assert.rejects(I.correctIsinSymbols([st('B', ISIN.B)]), /refused/);   // no connection or no quota stops the whole lookup
+  }
+}));
+test('symbol lookup: a stock with an ISIN is searched once and its symbol saved, and saved pairs from the last run fill the gaps without a search', () => alone(async () => {
+  const ISIN = { A: 'INE000A00011', B: 'INE000B00012', C: 'INE000C00013', D: 'INE000D00014' }, sets = [], searched = [];
+  globalThis.__ISIN = { db: Promise.resolve({ doc: () => ({ get: async () => ({ exists: false }), update: async () => {}, set: async (d) => { sets.push(d); } }) }),
+    tvCall: async (tool, args) => { if(tool === 'mcp-tv-get-symbol-data') return { data: { isin: ISIN.A } }; searched.push(args.query); if(args.query === ISIN.C) throw new Error('search failed'); return { data: { symbols: args.query === ISIN.A ? [{ exchange: 'NSE', symbol: 'NSE:AAA' }] : [] } }; } };
+  const I = await loadWithStubs('src/tv/isin.js', '', { 'core/store.js': 'export const dbCapabilityPromise = globalThis.__ISIN.db;', 'connector.js': 'export const tvCall = (...a) => globalThis.__ISIN.tvCall(...a);' });
+  const st = (n, isin) => ({ name: n, isin });
+  const left = await I.resolveIsinSymbols([st('A', ISIN.A), st('B', ISIN.B), st('C', ISIN.C), st('N')]);
+  assert.deepStrictEqual(left.map((x) => x.name), ['B', 'C', 'N']);   // B has no listing, C's search failed, N has no ISIN
+  assert.deepStrictEqual(sets, [{ [ISIN.A]: 'NSE:AAA' }]); assert.strictEqual(I.isinSymbolCached(st('A', ISIN.A)), 'NSE:AAA'); assert.strictEqual(I.isinSymbolCached(st('Z', 'bad')), null);
+  searched.length = 0; await I.resolveIsinSymbols([st('B', ISIN.B), st('A', ISIN.A)]); assert.strictEqual(searched.length, 0);   // found or failed ISINs are not searched twice
+  globalThis.__ISIN.tvCall = async () => { throw Object.assign(new Error('quota'), { code: 'quota' }); };
+  await assert.rejects(I.resolveIsinSymbols([st('D', ISIN.D)]), /quota/);
+  sets.length = 0;
+  const left2 = await I.useSavedSymbols([st('D', ISIN.D), st('A', ISIN.A), st('B', ISIN.B), st('N')], (s) => ({ D: 'BSE:DDD', A: 'NSE:IGNORED', B: 'bad symbol' })[s.name]);
+  assert.deepStrictEqual(left2.map((x) => x.name), ['B', 'N']);   // D is filled from the saved pair, A already has a symbol, B's pair is not a symbol, N has no ISIN
+  assert.deepStrictEqual(sets, [{ [ISIN.D]: 'BSE:DDD' }]);
+}));
+// ---- Watchlist sync (src/import/wlsync.js)
+test('watchlist sync: the saved BSE symbols are copied into a plain object that can take new symbols, because the database returns the record locked', () => alone(async () => {
+  const keep = globalThis.window; globalThis.window = { addEventListener: () => {} }; globalThis.__T = { stocks: [] };
+  try {
+    const W = await loadAllStubbed('src/import/wlsync.js', 'export { bseMapOf };', []);
+    const locked = Object.freeze({ 543913: 'AAA' }), map = W.bseMapOf({ exists: true, data: () => locked });
+    map['543914'] = 'SWATIPRO';   // adding to the locked record itself throws "object is not extensible"
+    assert.deepStrictEqual(map, { 543913: 'AAA', 543914: 'SWATIPRO' }); assert.deepStrictEqual(locked, { 543913: 'AAA' });
+    assert.throws(() => { 'use strict'; locked['543914'] = 'X'; }, /not extensible/);
+    assert.deepStrictEqual(W.bseMapOf({ exists: true, data: () => null }), {}); assert.deepStrictEqual(W.bseMapOf({ exists: false }), {}); assert.deepStrictEqual(W.bseMapOf(undefined), {});
+  } finally { globalThis.window = keep; }
+}));
+
+test('watchlist sync: BSE symbols found by the lookup are saved and the run carries on, although the database returns the saved map locked', () => alone(async () => {
+  const keepWin = globalThis.window, keepErr = console.error, errors = [], updates = [], shown = [];
+  globalThis.window = { addEventListener: () => {} }; console.error = (m) => errors.push(String(m));
+  try {
+    const doc = { get: async () => ({ exists: true, data: () => Object.freeze({ 543913: 'AAA' }) }), update: async (d) => { updates.push(d); }, set: async () => {} }, db = { doc: () => doc };
+    globalThis.__T = { stocks: [{ name: 'Swati Projects Ltd', ticker: '543914 · Industrial' }], strategies: [{ id: 's1', name: 'W MACD', rules: [{}] }], watchlistSyncLog: { put: () => {} }, TV_SERVER: 'TradingView',
+      getFiRunning: () => false, getFiOwner: () => true, getFiDb: () => db, getDb: () => ({ collection: () => ({ doc: () => ({ set: async () => {} }) }) }), fiRetry: (fn) => fn(), fiTakeLock: async () => () => {},
+      fiShowResult: (...a) => shown.push(a), getFiState: () => null, qualifyingStocks: (u) => u, sanitizeDocId: (x) => x,
+      tvCall: async (tool) => { if(tool === 'mcp-tv-search-symbols') return { data: { symbols: [{ exchange: 'BSE', type: 'stock', description: 'Swati Projects Limited', symbol: 'BSE:SWATIPRO' }] } }; throw new Error('TradingView stopped answering'); } };
+    const W = await loadAllStubbed('src/import/wlsync.js', 'export { picked };', []);
+    W.picked.add('s1');
+    await W.wlRunSync();
+    assert.deepStrictEqual(updates, [{ 543914: 'SWATIPRO' }]);   // the new symbol was found and saved
+    assert.strictEqual(shown.length, 1); assert.strictEqual(shown[0][0], 'err');
+    assert.ok(shown[0][1][0].text.startsWith('Sync stopped: TradingView stopped answering'));   // the run got past the matching step; the made-up TradingView then fails on the lists
+    assert.ok(!errors.some((m) => /not extensible/.test(m)));
+  } finally { globalThis.window = keepWin; console.error = keepErr; }
+}));
+
+// A made-up TradingView for the watchlist sync: five watchlist tools over a list of lists. The symbols in `refused` are not kept when added (as a symbol TradingView drops).
+async function wlHarness(lists, refused, over){
+  const shown = [], doc = { get: async () => ({ exists: true, data: () => Object.freeze({}) }), update: async () => {}, set: async () => {} };
+  let nextId = 1000;
+  const accept = (a) => (a || []).filter((x) => !refused.has(x)), find = (id) => lists.find((l) => String(l.id) === id);
+  const watch = (tool, a) => {
+    if(tool === 'mcp-watchlist-list-watchlists') return { watchlists: lists.map((l) => Object.assign({}, l, { symbols: l.symbols.slice() })) };
+    if(tool === 'mcp-watchlist-create-watchlist') lists.push({ id: nextId++, name: a.name, type: 'custom', symbols: accept(a.symbols) });
+    if(tool === 'mcp-watchlist-add-to-watchlist') find(a.watchlist_id).symbols.push(...accept(a.symbols));
+    if(tool === 'mcp-watchlist-update-watchlist') find(a.watchlist_id).name = a.name;
+    if(tool === 'mcp-watchlist-delete-watchlist') lists.splice(lists.indexOf(find(a.watchlist_id)), 1);
+    return {};
+  };
+  const universe = { list: [] }, T = globalThis.__T = { stocks: [], strategies: [{ id: 's1', name: 'W MACD', rules: [{}] }], watchlistSyncLog: { put: () => {} }, TV_SERVER: 'TradingView', running: false, db: { doc: () => doc }, watch,
+    getFiRunning: () => T.running, getFiOwner: () => true, getFiDb: () => T.db, getDb: () => ({ collection: () => ({ doc: () => ({ set: async () => {} }) }) }), fiRetry: (fn) => fn(), fiTakeLock: async () => () => {},
+    fiShowResult: (...a) => shown.push(a), getFiState: () => null, qualifyingStocks: () => universe.list, sanitizeDocId: (x) => x, fiErr: (e) => e.message, tvErrorText: (e) => e.message,
+    tvMcp: async () => ({ callTool: async (server, tool, input) => ({ payload: T.watch(tool, input) }) }),
+    tvCall: async (tool, args) => {
+      if(tool !== 'mcp-tv-search-symbols') return T.watch(tool, args);
+      if(args.query === 'Swati Projects Ltd') return { data: { symbols: [{ exchange: 'BSE', type: 'stock', description: 'Swati Projects Limited', symbol: 'BSE:SWATIPRO' }] } };
+      return { data: { symbols: args.query === 'BBB' ? [{ exchange: 'BSE', type: 'stock', symbol: 'BSE:BBB' }] : [] } };
+    } };
+  Object.assign(T, over);
+  const W = await loadAllStubbed('src/import/wlsync.js', 'export { picked };', []); W.picked.add('s1');
+  const texts = (i) => shown[i][1].map((l) => l.text).join('\n');
+  return { W, T, shown, texts, universe, lists, doc, sync: async () => { await W.wlRunSync(); return texts(shown.length - 1); } };
+}
+const wlStock = (name, code) => ({ name: name + ' Ltd', ticker: (code || name) + ' · Industrial' });
+test('watchlist sync: a list is created, left alone when nothing changed, replaced when it did, a symbol TradingView drops is found on the other exchange, and the old fixed lists are removed', () => alone(async () => {
+  const keepWin = globalThis.window, keepErr = console.error;
+  globalThis.window = { addEventListener: () => {} }; console.error = () => {};
+  try {
+    const lists = [{ id: 900, name: 'Alba - Green', type: 'custom', symbols: ['NSE:X'] }, { id: 901, name: 'W MACD (syncing)', type: 'custom', symbols: [] }, { id: 902, name: 'Mine', type: 'custom', symbols: ['NSE:Y'] }];
+    const h = await wlHarness(lists, new Set(['NSE:BBB', 'NSE:CCC'])), { W, T, shown, texts, universe } = h, names = () => lists.map((l) => l.name);
+    universe.list = [wlStock('AAA'), wlStock('Swati Projects', '543914')];
+    await W.wlRunSync();   // creates the list, clears the leftover temporary list, removes the old fixed list
+    assert.strictEqual(shown[0][0], 'ok'); assert.ok(texts(0).includes('W MACD: 2 symbols (+2 / −0)') && texts(0).includes('Removed old lists: Alba - Green'), texts(0));
+    assert.deepStrictEqual(names(), ['Mine', 'W MACD']); assert.deepStrictEqual(lists[1].symbols, ['NSE:AAA', 'BSE:SWATIPRO']);
+    await W.wlRunSync(); assert.ok(texts(1).includes('W MACD: 2 symbols, unchanged'), texts(1));
+    universe.list = [wlStock('AAA'), wlStock('Swati Projects', '543914'), wlStock('BBB'), wlStock('CCC')];
+    await W.wlRunSync();   // BBB is found on BSE; CCC is not found anywhere
+    assert.strictEqual(shown[2][0], 'warn'); assert.ok(texts(2).includes('W MACD: 3 symbols (+2 / −0)') && texts(2).includes('TradingView could not resolve: NSE:CCC.'), texts(2));
+    assert.deepStrictEqual(lists.find((l) => l.name === 'W MACD').symbols.sort(), ['BSE:BBB', 'BSE:SWATIPRO', 'NSE:AAA']);
+    universe.list = []; await W.wlRunSync(); assert.strictEqual(shown[3][0], 'warn'); assert.ok(texts(3).includes('W MACD: no stock matches, list left as it is'));
+    W.picked.clear(); await W.wlRunSync(); assert.ok(texts(4).startsWith('Tick at least one strategy to sync.'));
+    W.picked.add('s1'); T.db = null; await W.wlRunSync(); assert.ok(texts(5).startsWith('The database is not available in this view'));
+    T.db = { doc: () => h.doc }; T.strategies.splice(0, 1, { id: 's1', name: 'Same', rules: [{}] }, { id: 's2', name: 'Same', rules: [{}] }); W.picked.add('s2'); await W.wlRunSync(); assert.ok(texts(6).startsWith('Each ticked strategy needs its own name'));
+    T.strategies.splice(0, 2, { id: 's1', name: 'W MACD', rules: [{}] }); T.running = true; const before = shown.length; await W.wlRunSync(); assert.strictEqual(shown.length, before);   // another job is running: nothing happens
+  } finally { globalThis.window = keepWin; console.error = keepErr; }
+}));
+test('watchlist sync: stocks with - or & or a BSE code are matched as far as they can be, and every problem with TradingView stops the sync with a message and leaves the lists alone', () => alone(async () => {
+  const keepWin = globalThis.window, keepErr = console.error;
+  globalThis.window = { addEventListener: () => {} }; console.error = () => {};
+  try {
+    const lists = [], h = await wlHarness(lists, new Set()), { T, universe, sync } = h;
+    universe.list = [wlStock('J&K', 'J&KBANK'), wlStock('KL', 'KLBRENG-B'), wlStock('AB', 'A-B'), wlStock('AAA'), wlStock('AAA again', 'AAA'), wlStock('Nowhere', '543999')];
+    const text = await sync();   // a BSE stock TradingView cannot name is left out, and the symbols with - or & that were not checked are listed
+    assert.ok(text.includes('W MACD: 4 symbols') && text.includes('No TradingView symbol yet (left out): 543999 Nowhere Ltd') && text.includes('Symbols with - or & that were not checked beforehand: A-B.'), text);
+    assert.deepStrictEqual(lists[0].symbols, ['NSE:J&KBANK', 'NSE:KLBRENG_B', 'NSE:A_B', 'NSE:AAA']); assert.strictEqual(h.shown[0][0], 'warn');
+    universe.list = [wlStock('AAA'), wlStock('BBB')];
+    const listsAs = (...a) => { lists.splice(0, lists.length, ...a); };
+    listsAs({ id: 1, name: 'W MACD', type: 'custom', symbols: ['NSE:X'] }, { id: 2, name: 'W MACD', type: 'custom', symbols: [] });
+    assert.ok((await sync()).includes('there are 2 lists called "W MACD" in TradingView'));
+    listsAs({ id: 1, name: 'W MACD', type: 'custom', symbols: ['NSE:X'] });
+    const real = T.watch;
+    T.watch = (tool, a) => tool === 'mcp-watchlist-list-watchlists' ? {} : real(tool, a); assert.ok((await sync()).includes('TradingView returned an unexpected reply when listing watchlists'));
+    T.watch = (tool, a) => tool === 'mcp-watchlist-list-watchlists' ? JSON.stringify(real(tool, a)) : real(tool, a); assert.ok((await sync()).includes('W MACD: 2 symbols'));   // a reply that arrives as text is read as JSON, and the sync goes through
+    T.watch = real; listsAs({ id: 1, name: 'W MACD', type: 'custom', symbols: ['NSE:X'] }); T.tvMcp = async () => null; assert.ok((await sync()).startsWith('Sync stopped: The TradingView connector is not available in this view.')); T.tvMcp = async () => ({ callTool: async (s, tool, input) => ({ payload: T.watch(tool, input) }) });
+    T.watch = (tool, a) => tool === 'mcp-watchlist-create-watchlist' ? {} : real(tool, a); listsAs({ id: 1, name: 'W MACD', type: 'custom', symbols: ['NSE:X'] }); assert.ok((await sync()).includes('could not create the temporary list in TradingView'));   // the list was not created
+    T.watch = (tool, a) => tool === 'mcp-watchlist-delete-watchlist' ? {} : real(tool, a); universe.list = [wlStock('AAA'), wlStock('ZZZ')];   // a delete that does not happen
+    listsAs({ id: 1, name: 'W MACD', type: 'custom', symbols: ['NSE:X'] }); assert.ok((await sync()).includes('"W MACD" could not be deleted'));
+    T.watch = (tool, a) => { if(tool === 'mcp-watchlist-delete-watchlist'){ lists.splice(0, lists.length); return {}; } return real(tool, a); };   // a delete that takes other lists with it
+    listsAs({ id: 1, name: 'W MACD', type: 'custom', symbols: ['NSE:X'] }, { id: 2, name: 'Other', type: 'custom', symbols: [] }); assert.ok((await sync()).includes('Safety stop: after deleting "W MACD" these lists are also gone: Other'));
+    T.watch = real; listsAs({ id: 1, name: 'W MACD', type: 'custom', symbols: ['NSE:X'] });
+    T.watch = (tool, a) => tool === 'mcp-watchlist-update-watchlist' ? {} : real(tool, a); assert.ok((await sync()).includes('could not be renamed; it is saved as "W MACD (syncing)" in TradingView'));   // the rename did not happen
+  } finally { globalThis.window = keepWin; console.error = keepErr; }
 }));
 
 // ---- Fundamental import (src/import/fund-import.js, fundreport.js)

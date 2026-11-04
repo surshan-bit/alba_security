@@ -258,6 +258,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.355 &middot; 2026-11-04</h3>
+            <ul>
+              <li><strong>TradingView Watchlist Sync no longer stops on new BSE stocks:</strong> when an import added BSE-only stocks, the sync looked up their TradingView symbols and then stopped with &ldquo;Cannot add property &hellip; object is not extensible&rdquo;. The looked-up symbols are now added to a copy of the saved list, so the sync goes through.</li>
+              <li><strong>Renamed companies fix themselves in Refresh all stocks:</strong> a company that is renamed or moves exchange keeps its ISIN but gets a new TradingView symbol, so the saved symbol stopped returning prices and the stock quietly kept old figures. A stock TradingView still gives no price for after the retry is now searched by its ISIN again (up to 20 a run), the corrected symbol is saved, and the Result lists the stocks that were corrected. They are priced from the next run.</li>
+            </ul>
             <h3>v1.354 &middot; 2026-11-04</h3>
             <ul>
               <li><strong>Strategies: &ldquo;W MACD 30/60/5 vs signal&rdquo; now covers every stock:</strong> in v1.353 only the few stocks whose bars changed that day had a reading, so the filter showed far too few stocks (for example Shyam Metalics, which is above its signal line, was missing). Refresh all stocks now works the reading out for every stock on every run from its saved weekly bars and today&rsquo;s price, so Above signal, Below signal and Just crossed up are right on any weekday. Stocks show it after their next Refresh all stocks. Scores and ratings are unchanged.</li>
