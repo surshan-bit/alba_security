@@ -51,9 +51,9 @@ function barsFor(s){
   return Object.assign({}, saved, { '1W': followPrice(saved['1W'], px, periodStartSec('W', now), FOLLOW_SECS['1W']), '1M': followPrice(saved['1M'], px, periodStartSec('M', now), FOLLOW_SECS['1M']) });
 }
 // The events under each timeframe's bars, for the kinds of event currently shown.
-function rebuildEvents(ctx){
+const rebuildEvents = (ctx) => {
   ORDER.forEach((k) => { ctx.byBar[k] = eventsByBar(ctx.events, ctx.bars[k], PERIOD_SECS[k], ctx.shown); });
-}
+};
 // Reads the saved bars and events of one stock into the state the two charts share.
 function createChart(root, s){
   const bars = barsFor(s), macd = {}, events = stockChartEvents(s), groups = EVENT_GROUPS.filter((g) => events.some((e) => e.group === g.id));
