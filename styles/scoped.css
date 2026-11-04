@@ -26,9 +26,7 @@
 .scope-news-body *{box-sizing:border-box;max-width:100%;}
 .scope-news-body :is(.news-text,.news-card,.news-why,.news-hint,.news-status,.news-empty,.news-watch,.news-link){overflow-wrap:anywhere;min-width:0;}
 .scope-events-panel .news-row{padding:6px 0;}
-@media (max-width:900px){
-.sheet-slot :is([data-analysis-full],[data-biz-full]){display:none !important;}
-}
+
 :root[data-theme="white"] .scope-section-settings .settings-row{padding-top:18px;padding-bottom:18px;}
 :root[data-theme="white"] .scope-section-settings .settings-subhead{margin-top:28px;}
 :root[data-theme="white"] .scope-section-trackrecord .analysis-panel-head .analysis-panel-title{display:flex;align-items:center;gap:10px;font-size:var(--t-lg);font-weight:700;letter-spacing:.06em;color:#1b1f2a;}

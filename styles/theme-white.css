@@ -295,7 +295,7 @@
   :root[data-theme="white"] :is(.strat-table td,.biz-table > tbody > tr > td){font-size:var(--t-sm);padding:10px 4px;line-height:1.3;}
   /* Every value in a grid cell is the same size and weight (scores, MoS, % changes, ratings, names, prices); only the colour and the pill tell them apart. */
   :root[data-theme="white"] :is(.strat-table,.biz-table) td :is(a,span,b,button,.num){font-size:var(--t-sm);font-weight:500;letter-spacing:0;}
-  :root[data-theme="white"] :is(.strat-table,.biz-table) td .badge{font-size:var(--t-sm) !important;font-weight:var(--w-reg);padding:2px 8px;}
+  :root[data-theme="white"] :is(.strat-table,.biz-table) td .badge{font-weight:var(--w-reg);padding:2px 8px;}
   :root[data-theme="white"] :is(.strat-table,.biz-table) td .badge--tight{padding:var(--pad-tight);}
   :root[data-theme="white"] :is(.strat-table,.biz-table) td{font-variant-numeric:tabular-nums;}
   :root[data-theme="white"] :is(.strat-table th,.biz-table > thead > tr > th,.strat-table th){font-size:var(--t-sm);font-weight:500;padding:8px 4px;text-transform:none;letter-spacing:0;white-space:nowrap;}
@@ -304,7 +304,7 @@
   :root[data-theme="white"] :is(.biz-showing,.strat-count,.analysis-leaderboard-head .rk-headline){display:block;width:100%;margin:0;padding:0;text-align:left;font-size:var(--t-sm);line-height:1.4;color:var(--muted);white-space:normal;overflow:visible;}
   :root[data-theme="white"] .strat-count b{font-weight:inherit;}
   /* the same spacing on every grid screen: 10px under the Filters row, the count line, 10px above the grid */
-  :root[data-theme="white"] .analysis-leaderboard-head{justify-content:flex-start !important;margin:5px 0 10px !important;}
+  
   :root[data-theme="white"] .strat-result-head{gap:0;margin:0 0 8px;}
   /* Strategies: less empty space between the setup line, the Filters row and the grid */
   :root[data-theme="white"] .strat-layout .strat-main .strat-panel:has(.strat-result-head){margin-top:0;padding-top:0;}
@@ -335,15 +335,14 @@
 :root[data-theme="white"] .strat-layout .strat-main .sort-select{border:1px solid #c9cfdf;border-radius:8px;background-color:#fff;padding-left:10px;}
 
 /* Score and rating pills in the grids (Fund, Tech, Tech 2, W / M Tech Rating, ...): black, regular weight; the pill colour carries the meaning. */
-:root[data-theme="white"] :is(.strat-table,.biz-table,.peers-table) td .badge{color:#000 !important;font-weight:var(--w-reg) !important;}
+
 /* Column headings in the grids: black, regular weight, like the values under them. */
-:root[data-theme="white"] :is(.strat-table,.biz-table) thead th{color:#000 !important;font-weight:var(--w-reg) !important;}
+
 /* Explorer's # (row number) looks like the # column in Analysis and Strategies: same size and weight as the cell values, heading weight in the heading. */
-:root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{font-weight:500 !important;font-size:inherit;color:inherit !important;}
-:root[data-theme="white"] .biz-table > thead > tr > th:first-child::before{font-weight:var(--w-reg) !important;color:#000 !important;}
+:root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{font-size:inherit;}
+
 /* The # column (row numbers) is regular weight in every grid. */
-:root[data-theme="white"] :is(.analysis-lb-rank,.strat-table td.analysis-lb-rank){font-weight:var(--w-reg) !important;}
-:root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{font-weight:var(--w-reg) !important;}
+
 /* Strategies, all screen sizes: the Sort by box is boxed like the one in Analysis, and Track these picks is an outlined button like Refresh. */
 
 /* The Delete button stays a visible red outlined button (it was a plain text button and hard to spot). */

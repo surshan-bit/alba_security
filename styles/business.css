@@ -54,7 +54,7 @@
 /* Industry screen: no filled panel; the page background shows through. The sticky first column uses the page colour so scrolled cells still hide behind it. */
 .biz-expand{background:transparent;}
 .biz-table > tbody > .biz-row > .biz-name,.biz-table > thead > tr > th:first-child{background:var(--bg);}
-.biz-news-head{margin-top:16px!important;}
+
 .biz-table > tbody > .biz-row:hover > .biz-name,.biz-table > tbody > .biz-row:focus > .biz-name{background:linear-gradient(var(--row-hover),var(--row-hover)),var(--bg);}
 .biz-table > tbody > .biz-detail > td,.biz-detail-box{background:transparent;}
 .biz-side .biz-controls{display:flex;flex-direction:column;align-items:stretch;gap:14px;margin:0;}
@@ -66,9 +66,9 @@
 .biz-news-bar .biz-news-head{margin:0;}
 /* News line: heading and button share one centre line; the button is filled so it reads as an action. */
 .biz-detail-box .biz-news-bar{display:flex;align-items:center;gap:12px;}
-.biz-detail-box .biz-news-bar h3.biz-news-head{margin:0 !important;line-height:1;padding:0;}
-.biz-detail-box .biz-news-bar .biz-newsbtn{background:transparent !important;border:1px solid var(--line) !important;color:var(--accent) !important;font-weight:600;height:30px;padding:0 14px;display:inline-flex;align-items:center;line-height:1;}
-.biz-detail-box .biz-news-bar .biz-newsbtn:hover:not(:disabled){border-color:var(--accent) !important;background:rgba(255,255,255,.04) !important;}
+.biz-detail-box .biz-news-bar h3.biz-news-head{line-height:1;padding:0;}
+.biz-detail-box .biz-news-bar .biz-newsbtn{font-weight:600;height:30px;padding:0 14px;display:inline-flex;align-items:center;line-height:1;}
+
 .biz-detail-box .biz-news-bar .biz-newsbtn:disabled{opacity:.5;cursor:default;}
 .biz-news-bar .biz-newsstatus{margin:0;font-size:var(--t-sm);}
 .pcs-chg.up{background:color-mix(in srgb,var(--buy) 13%,transparent);}
@@ -112,7 +112,7 @@ a.stock-link{color:inherit;text-decoration:none;}
 @media (max-width:760px){.biz-news .biz-nrow{grid-template-columns:48px 10px minmax(0,1fr);}.biz-news .biz-nrow .biz-news-meta{display:none;}}
 
 /* Industry detail: name and count on top, four summary cards, then the short stock table. */
-.biz-dname{font-weight:600;text-transform:none !important;letter-spacing:0 !important;color:var(--text) !important;margin:0;}
+.biz-dname{font-weight:600;margin:0;}
 .biz-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 12px;}
 .biz-kpi{background:var(--panel2);border-radius:8px;padding:8px 12px;min-width:0;}
 .biz-kpi small{display:block;color:var(--muted);font-size:var(--t-sm);}
@@ -123,4 +123,4 @@ a.stock-link{color:inherit;text-decoration:none;}
 .biz-colsnote .biz-colsbtn{margin-left:0;}
 @media (max-width:760px){.biz-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}}
 .biz-detail-box .biz-lean .strat-table{width:100%;}
-.biz-detail-box .biz-ft{display:block;color:var(--muted) !important;}
+.biz-detail-box .biz-ft{display:block;}

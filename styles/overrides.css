@@ -1,0 +1,71 @@
+/* The rules that must beat every other layer (they used to need the important flag). This final layer wins over legacy, scoped, detail, phone and type by order alone, so no declaration needs the important flag. Each block names the file it came from. */
+
+/* from shell.css */
+.nav-item[hidden]{display:none;}
+.app-section.inline-detail-open > :not(.inline-detail-host){display:none;}
+.app-section table thead th{border-bottom:1px solid var(--line);}
+
+/* from analysis.css */
+.analysis-leaderboard.lb-full .analysis-leaderboard-head{margin-top:0;}
+:root[data-theme="white"] body .panel-body.panel-body :is(.rk-toolbtn,.rk-main,.rk-barbtn){font-size:var(--t-md);font-weight:500;}
+
+/* from data-refresh.css */
+.fund-research-list.fr-tagged{padding-left:0;}
+
+/* from strategies.css */
+.strat-selcell{text-align:center;}
+.pc-psum .badge{padding:2px 10px;font-size:var(--t-sm);}
+.strat-main select.sr-add:not([multiple]):not([size]){background-image:none;padding-right:2px;}
+
+/* from business.css */
+.biz-news-head{margin-top:16px;}
+.biz-detail-box .biz-news-bar h3.biz-news-head{margin:0;}
+.biz-detail-box .biz-news-bar .biz-newsbtn{background:transparent;border:1px solid var(--line);color:var(--accent);}
+.biz-detail-box .biz-news-bar .biz-newsbtn:hover:not(:disabled){border-color:var(--accent);background:rgba(255,255,255,.04);}
+.biz-dname{text-transform:none;letter-spacing:0;color:var(--text);}
+.biz-detail-box .biz-ft{color:var(--muted);}
+
+/* from phone.css */
+@media (max-width:600px){
+.analysis-leaderboard-head{gap:var(--ph-space);margin-bottom:12px;}
+.analysis-leaderboard-head > div:last-child{gap:var(--ph-space);}
+.analysis-leaderboard-head .analysis-filter-label{gap:0;}
+}
+@media (max-width:900px){
+.sheet-slot > *{display:flex;}
+.sheet-panel .strat-total{display:flex;}
+}
+
+/* from theme-white.css */
+@media (max-width:900px){
+:root[data-theme="white"] :is(.strat-table,.biz-table) td .badge{font-size:var(--t-sm);}
+:root[data-theme="white"] .analysis-leaderboard-head{justify-content:flex-start;margin:5px 0 10px;}
+}
+:root[data-theme="white"] :is(.strat-table,.biz-table,.peers-table) td .badge{color:#000;font-weight:var(--w-reg);}
+:root[data-theme="white"] :is(.strat-table,.biz-table) thead th{color:#000;font-weight:var(--w-reg);}
+:root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{font-weight:500;color:inherit;}
+:root[data-theme="white"] .biz-table > thead > tr > th:first-child::before{font-weight:var(--w-reg);color:#000;}
+:root[data-theme="white"] :is(.analysis-lb-rank,.strat-table td.analysis-lb-rank){font-weight:var(--w-reg);}
+:root[data-theme="white"] .biz-table > tbody > .biz-row > .biz-name::before{font-weight:var(--w-reg);}
+
+/* from refresh-kit.css */
+.strat-table th.strat-selcell,.strat-table td.strat-selcell,.strat-table th.rk-cell,.strat-table td.rk-cell{text-align:left;}
+.biz-detail-box .rk-main{background:transparent;border:1px solid var(--line);color:var(--accent);}
+.biz-detail-box .rk-main:hover:not(:disabled){border-color:var(--accent);background:rgba(255,255,255,.04);}
+.strat-group > summary.analysis-panel-title::before{content:"";transform:none;}
+@media (max-width:640px){
+.analysis-leaderboard-head > div:last-child{gap:8px;}
+.strat-main .strat-panel:first-child{padding-top:2px;margin-top:0;}
+.strat-main .strat-panel{margin-top:8px;}
+.analysis-leaderboard-head{gap:10px;margin-bottom:12px;}
+}
+
+/* from late-global.css */
+table :is(th,td),table :is(th,td).num,table :is(th,td).analysis-lb-score{text-align:left;}
+select:not([multiple]):not([size]){background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%23f6f1e9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:8px 5px;padding-right:30px;}
+:root[data-theme="white"] select:not([multiple]):not([size]){background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%230e1218'/%3E%3C/svg%3E");}
+
+/* from scoped.css */
+@media (max-width:900px){
+.sheet-slot :is([data-analysis-full],[data-biz-full]){display:none;}
+}

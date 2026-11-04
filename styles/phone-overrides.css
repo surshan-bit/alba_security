@@ -1,0 +1,25 @@
+/* The phone rules that must also beat the override rules (a white-theme rule has a higher selector weight than a phone one, so a layer of its own is what makes the phone rule win). */
+@media (max-width:600px){
+.analysis-leaderboard-head{gap:6px;margin-bottom:6px;}
+.strat-layout .strat-main > .strat-phonebar ~ .strat-panel:is(:has(> .strat-fold),:has(.strat-result-head)){margin-top:0;padding-top:0;}
+.tl-pstrip span{font-size:var(--t-xs);font-weight:600;color:var(--muted);}
+.tl-pstrip b{font-size:var(--t-md);font-weight:600;}
+.tl-prow-name{font-size:var(--t-md);font-weight:600;}
+.tl-prow-ret{font-size:var(--t-md);font-weight:700;}
+.tl-prow-sub{font-size:var(--t-sm);}
+.tl-prow-sub .tl-signal-badge{font-size:var(--t-xs);}
+.tl-prow-det{font-size:var(--t-sm);}
+.tl-prow-det dt{font-size:var(--t-xs);font-weight:600;color:var(--muted);}
+.tl-prow-det dd{font-size:var(--t-sm);font-weight:600;}
+.tl-prow-why{font-size:var(--t-sm);}
+.tl-form{padding:18px 18px 22px;}
+.tl-form-actions .tl-btn-primary{color:#fff;background:var(--accent);}
+.scope-trade-ideas-run{color:#fff;background:var(--accent);font-size:var(--t-sm);}
+.tl-top5-title{font-size:var(--t-md);font-weight:600;}
+.tl-held-tag{font-size:var(--t-xs);font-weight:700;}
+.tl-top5-head > span:first-child{font-size:var(--t-md);font-weight:600;}
+.tl-top5-price{font-size:var(--t-sm);font-weight:600;}
+.tl-top5-why{font-size:var(--t-sm);}
+.tl-news{font-size:var(--t-xs);}
+.tl-ideas-short{font-size:var(--t-sm);}
+}

@@ -33,10 +33,10 @@ html{font-size:112.5%;}
 .live-toggle{display:inline-flex;align-items:center;height:26px;padding:0 7px;font-size:0;}
 .live-toggle::before{content:attr(data-short);font-size:var(--t-xs);}
 .live-toggle.live::before{content:"\25CF " attr(data-short);animation:livePulse 1.6s ease-in-out infinite;}
-.analysis-leaderboard-head{gap:var(--ph-space)!important;margin-bottom:12px!important;}
+
 .live-toggle.live{animation:none;}
-.analysis-leaderboard-head > div:last-child{gap:var(--ph-space)!important;width:100%;}
-.analysis-leaderboard-head .analysis-filter-label{flex:1 1 100%;font-size:0;gap:0 !important;}
+.analysis-leaderboard-head > div:last-child{width:100%;}
+.analysis-leaderboard-head .analysis-filter-label{flex:1 1 100%;font-size:0;}
 .analysis-leaderboard-head .sort-select{width:100%;height:var(--ph-ctl-lg);font-size:var(--t-sm);}
 .analysis-leaderboard-head .analysis-reset-btn{flex:1 1 0;padding:0 6px;font-size:var(--t-sm);height:var(--ph-ctl-lg);white-space:nowrap;}
 .analysis-leaderboard-head .analysis-panel-title{font-size:var(--t-sm);}
@@ -172,13 +172,13 @@ html{font-size:112.5%;}
   .sheet-panel .biz-controls{padding-top:0;}
   .sheet-slot{display:block;margin-top:10px;padding:14px 0 6px;border-top:1px solid var(--line);}
   .sheet-slot:empty{display:none;}
-  .sheet-slot > *{display:flex !important;flex-wrap:wrap;align-items:center;gap:8px;overflow:visible;}
+  .sheet-slot > *{flex-wrap:wrap;align-items:center;gap:8px;overflow:visible;}
   .sheet-slot .analysis-filter-label{flex:1 0 100%;justify-content:space-between;}
   .sheet-slot .sort-select{flex:1;min-width:0;}
   .sheet-slot :is(.analysis-reset-btn,.biz-expand,.rk-bar,.rk-toolbtn){flex:1 1 calc(50% - 8px);min-width:max-content;}
   .sheet-slot .rk-bar > *{width:100%;}
   .sheet-slot .biz-match-toggle{flex:1 0 100%;width:auto;}
-  .sheet-panel .strat-total{display:flex !important;flex-wrap:wrap;gap:8px;margin-top:10px;padding:14px 0 6px;border-top:1px solid var(--line);}
+  .sheet-panel .strat-total{flex-wrap:wrap;gap:8px;margin-top:10px;padding:14px 0 6px;border-top:1px solid var(--line);}
   .sheet-panel .strat-total .strat-sort{flex:1 0 100%;justify-content:space-between;}
   .sheet-panel .strat-total :is(.strat-btn,.rk-bar,.rk-toolbtn){flex:1 1 calc(50% - 8px);min-width:max-content;}
   .sheet-panel .strat-total .rk-bar > *{width:100%;}
