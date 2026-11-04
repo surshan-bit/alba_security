@@ -18,6 +18,7 @@ import { COMPACT_LAG, lagOf } from '../prices/recent.js';
 import { saveCrossStates, saveDailyStates, saveRecentBars, saveTechBlocks, sameValue } from './barchunks.js';
 import { dailyChoice, wireDailyPicker } from './dailypick.js';
 import { dailyReportLine, dailyStocksOf, readDailyStates } from './dailymacd.js';
+import { loadDailyBars, saveDailyBars } from './dailystore.js';
 import { strategies } from '../strategies/state.js';
 import { correctIsinSymbols, isinOf, isinSymbolCached, resolveIsinSymbols, useSavedSymbols } from '../tv/isin.js';
 import { tvCall, tvErrorText, tvIsQuota, tvIstDate, tvMcp } from '../tv/connector.js';
@@ -358,9 +359,11 @@ async function rsDaily(run){
   fiSet('verify', 'running', 'Daily MACD 30/60/5: reading ' + num(list.length) + ' stocks…', 0.2);
   const progress = (d, n) => fiSet('verify', 'running', 'Daily MACD 30/60/5: ' + num(d) + ' of ' + num(n) + ' stocks', 0.2 + 0.2 * d / n);
   try {
-    const r = await readDailyStates(list, { symbolOf: snapshotSymbol, keyOf: s => sanitizeDocId(tickerSymbol(s)), stop: () => stopAsked }, progress);
+    const io = { symbolOf: snapshotSymbol, keyOf: s => sanitizeDocId(tickerSymbol(s)), stop: () => stopAsked, today: tvIstDate, loadBars: (s, sym) => loadDailyBars(run.db, sym),
+      saveBars: (s, sym, bars, isNew) => saveDailyBars(run.db, { sym, key: pcTickerKey(s), name: s.name }, bars, isNew) };
+    const r = await readDailyStates(list, io, progress);
     const saved = await saveDailyStates(run.db, r.results, run.today, () => {});
-    run.dailyResult = { name: strategy.name, stocks: list.length, total, read: r.results.length, changed: saved.changed, failed: r.failures.length, notSaved: saved.failed, abort: r.abort };
+    run.dailyResult = { name: strategy.name, stocks: list.length, total, read: r.results.length, changed: saved.changed, failed: r.failures.length, stored: r.stored, storeFailed: r.storeFailed, notSaved: saved.failed, abort: r.abort };
   } catch(e){ console.error('The daily MACD could not be read', e); run.dailyResult = { name: strategy.name, problem: 'it could not be read' }; }
 }
 

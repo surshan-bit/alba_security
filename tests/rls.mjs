@@ -59,13 +59,13 @@ function seed(db){
     update public.profiles set plan = 'free' where uid in ('${U.free}', '${U.other}');
     update public.profiles set plan = 'pro', pro_until = now() + interval '30 days' where uid = '${U.pro}';
     update public.profiles set trial_end = now() - interval '1 day' where uid = '${U.expired}';
-    insert into public.docs (path, data) values ('stockMeta/main', '{}'), ('stockUpdates/u1', '{}'), ('stockData/a', '{}'), ('stockResearch/r', '{}'), ('priceHistory/p', '{}'),
+    insert into public.docs (path, data) values ('stockMeta/main', '{}'), ('stockUpdates/u1', '{}'), ('stockData/a', '{}'), ('stockResearch/r', '{}'), ('priceHistory/p', '{}'), ('priceHistory1D/p', '{}'),
       ('data/users/${U.free}/prefs', '{}'), ('data/users/${U.other}/prefs', '{}'), ('users/${U.free}', '{}'), ('users/${U.other}', '{}')`);
 }
 
 // ---- the cases
 const FREE_SHARED = ['stockMeta/main', 'stockUpdates/u1'];
-const PRO_SHARED = ['priceHistory/p', 'stockData/a', 'stockResearch/r'];
+const PRO_SHARED = ['priceHistory/p', 'priceHistory1D/p', 'stockData/a', 'stockResearch/r'];
 const list = paths => paths.slice().sort().join(',');
 
 function readCases(db){

@@ -75,7 +75,7 @@ create policy shared_read_free on public.docs for select to authenticated
   using (path like 'stockMeta/%' or path like 'stockUpdates/%');
 drop policy if exists shared_read_pro on public.docs;
 create policy shared_read_pro on public.docs for select to authenticated
-  using ((path like 'stockData/%' or path like 'stockResearch/%' or path like 'priceHistory/%') and public.has_pro());
+  using ((path like 'stockData/%' or path like 'stockResearch/%' or path like 'priceHistory/%' or path like 'priceHistory1D/%') and public.has_pro());
 drop policy if exists shared_write_owner on public.docs;
 create policy shared_write_owner on public.docs for all to authenticated
   using (public.is_owner() and path not like 'data/users/%') with check (public.is_owner() and path not like 'data/users/%');
