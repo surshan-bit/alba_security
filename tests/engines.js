@@ -2597,6 +2597,256 @@ test('price chart: both charts are drawn, the pointer shows a tooltip and links 
   } finally { saved.forEach(([k, v]) => { if(v === undefined) delete G[k]; else G[k] = v; }); Date.now = realNow; }
 }));
 
+// ---- Refresh all stocks: what one batch of TradingView answers turns into
+test('refresh snapshot: a usable price is a row, a missing one keeps the earlier row or is skipped, and a protected technical block is counted as kept', () => {
+  const R = load('src/refresh/snapshotrows.js');
+  assert.ok(R.isPriced({ A: { close: 5 } }, { sym: 'A' }));
+  [{}, { A: {} }, { A: { close: '5' } }, { A: { close: 0 } }, { A: { close: -1 } }].forEach((d) => assert.ok(!R.isPriced(d, { sym: 'A' })));
+  const stock = (name, extra) => Object.assign({ name, ticker: name, pillars: { val: 0.5 } }, extra);
+  const batch = [{ s: stock('SCORED'), sym: 'N:SCORED' }, { s: stock('KEPT', { technical: { src: 'bars', basis: { week: 1 }, asof: '2026-11-03' } }), sym: 'N:KEPT' }, { s: stock('LOST'), sym: 'N:LOST' }, { s: stock('GONE'), sym: 'N:GONE' }, { s: stock('PLAIN', { pillars: {} }), sym: 'N:PLAIN' }];
+  const data = { 'N:SCORED': { close: 10, 'RSI|1M': 60, 'RSI|1W': 55 }, 'N:KEPT': { close: 20, 'RSI|1M': 60 }, 'N:PLAIN': { close: 30 } };
+  const prev = new Map([['LOST', { y: 'N:LOST', c: [1], d: '2026-11-02', t: 'T' }]]);
+  const out = R.snapshotRows(batch, data, prev, '2026-11-04');
+  assert.deepStrictEqual(out.rows.map((r) => r.k), ['SCORED', 'KEPT', 'LOST', 'PLAIN']);
+  assert.deepStrictEqual(out.rows[2], { k: 'LOST', y: 'N:LOST', c: [1], d: '2026-11-02', t: 'T' });   // the earlier figures are carried
+  assert.strictEqual(out.rows[0].y, 'N:SCORED'); assert.strictEqual(out.rows[0].c[0], 10);
+  assert.deepStrictEqual([out.scored, out.kept, out.carried], [1, 1, 1]);
+  assert.deepStrictEqual(out.skipped.map((x) => x.sym), ['LOST', 'GONE']);
+  assert.ok(out.skipped[0].reason.includes('kept its figures from 2026-11-02') && out.skipped[1].reason === 'TradingView returned no price (N:GONE)');
+  assert.deepStrictEqual(R.skippedForFailure(batch.slice(0, 2), 'busy'), [{ sym: 'SCORED', name: 'SCORED', reason: 'busy' }, { sym: 'KEPT', name: 'KEPT', reason: 'busy' }]);
+});
+
+test('refresh snapshot: bars carried by the snapshot call are placed when they line up, and the reason is counted when they do not', () => {
+  const R = load('src/refresh/snapshotrows.js'), { BAR_COLUMNS } = load('src/refresh/historyplan.js');
+  const stock = (name) => ({ name, ticker: name });
+  const bars = [[1.65e9, 1, 2, 0.5, 1.5, 10]];
+  const job = (needW, needM) => ({ h: { '1W': bars, '1M': bars }, needW, needM });
+  const s = ['READY', 'NOANSWER', 'MISSING', 'UNCLEAR', 'OTHER'].map(stock);
+  const ctx = { jobs: new Map([[s[0], job(false, false)], [s[1], job(true, false)], [s[2], job(true, false)], [s[3], job(false, true)]]), ready: new Map(), nowS: 1.75e9 };
+  const full = Object.fromEntries(BAR_COLUMNS.filter((c) => c.endsWith('|1M')).map((c) => [c, 1]));
+  const batch = s.map((x, i) => ({ s: x, sym: 'S' + i }));
+  const left = {};
+  R.collectBatchBars(batch, { S0: {}, S2: { close: 1 }, S3: full }, ctx, left);
+  assert.deepStrictEqual([...ctx.ready.keys()].map((x) => x.name), ['READY']);
+  assert.deepStrictEqual(ctx.ready.get(s[0]), { s: s[0], W: bars, M: bars, w: false, m: false });
+  assert.deepStrictEqual(left, { noAnswer: 1, missing: 1, unclear: 1 });   // the stock that asked for nothing is not counted
+  R.collectBatchBars([batch[1]], {}, ctx, left); assert.strictEqual(left.noAnswer, 2);
+});
+
+// ---- Refresh all stocks (src/refresh/tvrefresh.js): the snapshot and bar steps, driven with a made-up TradingView and database
+const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG']);
+const TV_DEFAULTS = { tickerSymbol: (s) => s.ticker, sanitizeDocId: (x) => x, sleep: () => Promise.resolve(), sameValue: (a, b) => JSON.stringify(a) === JSON.stringify(b) };   // what the real helpers do, without their imports and waits
+// A stand-in for an imported function: it calls whatever the running test put in globalThis.__T (looked up at call time) or a default. Made here, not in the stub's text, so it is not counted as source code.
+globalThis.__TVFN = (n) => (...a) => (globalThis.__T[n] ? globalThis.__T[n](...a) : (TV_DEFAULTS[n] || (() => undefined))(...a));
+async function loadTvRefresh(){
+  const fs = require('fs'), src = fs.readFileSync(path.join(root, 'src/refresh/tvrefresh.js'), 'utf8'), keep = new Set(['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js']), stubs = {};
+  for(const m of src.matchAll(/^import \{([^}]*)\} from '([^']+)';/gm)){
+    if(keep.has(m[2])) continue;
+    stubs[m[2]] = m[1].split(',').map((n) => n.trim()).concat(m[2] === '../tv/connector.js' ? ['tvIsFatal'] : []).map((n) => TV_VALUES.has(n) ? `export const ${n} = globalThis.__T.${n};` : `export const ${n} = globalThis.__TVFN('${n}');`).join('\n');
+  }
+  return loadWithStubs('src/refresh/tvrefresh.js', 'export { paintHint, rsBars, rsReport, rsSnapshot, rsTech2, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };', stubs);
+}
+const tvStock = (name) => ({ name, ticker: name, pillars: { val: 0.5 } });
+const tvRun = (db, names, over) => Object.assign({ db, today: '2026-11-04', stored: new Map(), prevRows: new Map(), todo: names.map((n) => ({ s: tvStock(n), sym: 'N:' + n })), ctx: null, batchLeft: {}, updated: 0, unchanged: 0, scored: 0, kept: 0, chunksSaved: 0,
+  retried: 0, answeredAgain: 0, carried: 0, skipped: [], batchSecs: [], tvWaitMs: 0, saveMs: 0, stopped: false, barsUpdated: 0, batchSaved: 0, chunkWrites: 0, techBlocksSaved: 0, compacted: 0, staleBefore: 0, noneBefore: 0, filled: 0, histFailed: 0, noHistoryLeft: 0 }, over);
+const tvDb = (fail) => { const saved = []; return { saved, doc: (p) => ({ set: async (d) => { if(fail && fail(p, saved.length)) throw new Error('database down'); saved.push([p, d]); } }) }; };
+const tvAnswer = (symbols, lacking) => ({ data: Object.fromEntries(symbols.filter((x) => !(lacking || []).includes(x)).map((x) => [x, { close: 10, 'RSI|1M': 60 }])) });
+
+test('refresh all stocks, snapshot step: batches of 50 are saved one record each, unchanged records are not saved again, and a missing stock is asked for again', () => alone(async () => {
+  const T = globalThis.__T = { log: [], calls: [], fiSet: (...a) => T.log.push(a.join('|')), tvErrorText: (e) => e.message, tvIsFatal: (e) => /fatal/.test(e.message), stocks: [], priceHistoryByTicker: {}, COMPACT_LAG: 1 };
+  const names = Array.from({ length: 52 }, (_, i) => 'S' + i);
+  T.tvCall = async (tool, args) => { T.calls.push(args.symbols.length); return tvAnswer(args.symbols, T.calls.length === 1 ? ['N:S3'] : (T.calls.length === 3 ? ['N:S3'] : [])); };   // S3 is missing once; still missing from the retry
+  const M = await loadTvRefresh(), db = tvDb(), run = tvRun(db, names);
+  await M.rsSnapshot(run);
+  assert.deepStrictEqual(T.calls, [50, 2, 1]);   // two batches (the next one is already asked while the first is saved), then S3 alone
+  assert.deepStrictEqual(db.saved.map((x) => x[0]), ['liveSnapshot/c001', 'liveSnapshot/c002']);
+  assert.deepStrictEqual([run.updated, run.unchanged, run.chunksSaved, run.retried, run.answeredAgain], [51, 0, 2, 1, 0]);
+  assert.deepStrictEqual(run.skipped.map((x) => x.sym), ['S3']);
+  assert.ok(T.log.some((l) => l.startsWith('run|done|51 saved')));
+  T.calls.length = 0; db.saved.length = 0; run.skipped.length = 0;
+  T.tvCall = async (tool, args) => { T.calls.push(args.symbols.length); return tvAnswer(args.symbols, ['N:S3']); };
+  const again = tvRun(db, names, { stored: run.stored });   // the same answers on the same day: nothing to save
+  await M.rsSnapshot(again);
+  assert.deepStrictEqual([again.updated, again.unchanged, db.saved.length], [0, 51, 0]);
+  assert.ok(T.log.some((l) => l.includes('51 unchanged')));
+}));
+
+test('refresh all stocks, snapshot step: a failed call skips its stocks, three in a row or a fatal error stop the run, and a save that fails is reported', () => alone(async () => {
+  const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), tvErrorText: (e) => e.message, tvIsFatal: (e) => /fatal/.test(e.message), stocks: [], priceHistoryByTicker: {}, COMPACT_LAG: 1 };
+  const names = Array.from({ length: 101 }, (_, i) => 'S' + i);
+  let n = 0; T.tvCall = async (tool, args) => { n++; if(n === 1) throw new Error('rate limited'); return tvAnswer(args.symbols); };
+  const M = await loadTvRefresh(), db = tvDb(), run = tvRun(db, names);
+  await M.rsSnapshot(run);   // the first batch fails, the other two are saved
+  assert.strictEqual(run.skipped.length, 50); assert.strictEqual(run.skipped[0].reason, 'rate limited'); assert.deepStrictEqual([run.updated, run.chunksSaved], [51, 2]);
+  assert.deepStrictEqual(db.saved.map((x) => x[0]), ['liveSnapshot/c002', 'liveSnapshot/c003']);
+  T.tvCall = async () => { throw new Error('slow'); };
+  await assert.rejects(M.rsSnapshot(tvRun(tvDb(), names)), /slow Three batches in a row failed, so the run stopped\./);
+  T.tvCall = async () => { throw new Error('fatal: not connected'); };
+  await assert.rejects(M.rsSnapshot(tvRun(tvDb(), names)), /fatal: not connected/);
+  T.tvCall = async (tool, args) => tvAnswer(args.symbols);
+  const broken = tvRun(tvDb((p) => true), names.slice(0, 3));   // every save fails
+  await M.rsSnapshot(broken);
+  assert.deepStrictEqual([broken.updated, broken.skipped.length], [0, 3]); assert.ok(broken.skipped[0].reason.startsWith('could not be saved: database down'));
+  M.__stop(true);
+  const stopped = tvRun(tvDb(), names); await M.rsSnapshot(stopped);   // Stop pressed: nothing is asked
+  assert.ok(stopped.stopped && stopped.updated === 0);
+  M.__stop(false);
+}));
+
+test('refresh all stocks, snapshot step: bars carried by the call are collected for the stocks that asked for them', () => alone(async () => {
+  const T = globalThis.__T = { log: [], fiSet: () => {}, tvErrorText: (e) => e.message, tvIsFatal: () => false, stocks: [], priceHistoryByTicker: {}, COMPACT_LAG: 1 };
+  T.tvCall = async (tool, args) => { T.cols = args.columns; return tvAnswer(args.symbols); };
+  const M = await loadTvRefresh(), run = tvRun(tvDb(), ['A', 'B']);
+  const bars = [[1.75e9, 1, 2, 0.5, 1.5, 10]], ctx = { jobs: new Map([[run.todo[0].s, { h: { '1W': bars, '1M': bars }, needW: false, needM: false }]]), ready: new Map(), nowS: 1.75e9 };
+  run.ctx = ctx; await M.rsSnapshot(run);
+  assert.ok(T.cols.length > 12 && T.cols.includes('close|1M'));   // the bar columns ride along with the snapshot columns
+  assert.deepStrictEqual([...ctx.ready.keys()].map((s) => s.name), ['A']);
+}));
+
+test('refresh snapshot calls: requests keep TradingView\'s pace, ask again after a pause, and a failure is judged by how many came before it', () => alone(async () => {
+  const waits = [], realNow = Date.now; let now = 1000;
+  const T = globalThis.__T = { sleep: async (ms) => { waits.push(ms); now += ms; }, tvErrorText: (e) => e.message, tvIsFatal: (e) => /fatal/.test(e.message), calls: [] };
+  Date.now = () => now;
+  try {
+    const stubs = { '../core/util.js': 'export const sleep = globalThis.__TVFN("sleep"), sanitizeDocId = globalThis.__TVFN("sanitizeDocId"), tickerSymbol = globalThis.__TVFN("tickerSymbol");', '../tv/connector.js': 'export const tvCall = globalThis.__TVFN("tvCall"); export const tvErrorText = globalThis.__TVFN("tvErrorText"); export const tvIsFatal = globalThis.__TVFN("tvIsFatal");' };
+    const C = await loadWithStubs('src/refresh/snapshotcall.js', '', stubs), batch = [{ sym: 'A' }, { sym: 'B' }];
+    T.tvCall = async (tool, args) => { T.calls.push([tool, args]); if(args.symbols[0] === 'BAD') throw new Error('rate limited'); return { data: {} }; };
+    const f = C.snapshotFetcher(['close']);
+    assert.deepStrictEqual(await f.fetch(batch), { payload: { data: {} } });
+    assert.deepStrictEqual(T.calls[0], ['mcp-tv-get-symbol-data-batch', { symbols: ['A', 'B'], columns: ['close'] }]);
+    assert.deepStrictEqual(waits, []);   // the first call goes straight out
+    now += 100; await f.fetch(batch); assert.deepStrictEqual(waits, [200]);   // 300 ms after the previous start
+    waits.length = 0; f.slowDown(); now += 100; await f.fetch(batch); assert.deepStrictEqual(waits, [1400]);   // longer after a failed call, once
+    waits.length = 0; now += 400; await f.fetch(batch); assert.deepStrictEqual(waits, []);
+    assert.strictEqual((await f.fetch([{ sym: 'BAD' }])).error.message, 'rate limited');
+    waits.length = 0; await f.again(['A']); assert.deepStrictEqual(waits, [1000]);
+    await assert.rejects(f.again(['BAD']), /rate limited/);
+    waits.length = 0; now += 50; await f.fetch(batch); assert.deepStrictEqual(waits, [250]);   // asking again counts as the latest call, even when it failed
+    const run = { skipped: [] }, state = { failed: 2 }, stock = (n) => ({ s: { name: n, ticker: n }, sym: n });
+    assert.deepStrictEqual(C.settleBatch(run, state, batch, { payload: null }), {}); assert.strictEqual(state.failed, 0);
+    assert.strictEqual(C.settleBatch(run, state, batch, { payload: { data: 1 } }).data, 1);
+    assert.strictEqual(C.settleBatch(run, state, [stock('X')], { error: new Error('busy') }), null);
+    assert.deepStrictEqual(run.skipped, [{ sym: 'X', name: 'X', reason: 'busy' }]); assert.strictEqual(state.failed, 1);
+    assert.throws(() => C.settleBatch(run, state, batch, { error: new Error('fatal: gone') }), /fatal: gone/);
+    state.failed = 2; assert.throws(() => C.settleBatch(run, state, batch, { error: new Error('busy') }), /busy Three batches in a row failed/);
+    const tries = []; let failTimes = 1;
+    const db = { doc: (p) => ({ set: async (d) => { tries.push(p); if(failTimes-- > 0) throw new Error('db down'); } }) };
+    waits.length = 0; assert.strictEqual(await C.setWithRetry(db, 'a/b', {}), null); assert.deepStrictEqual([tries, waits], [['a/b', 'a/b'], [1500]]);
+    failTimes = 5; assert.strictEqual((await C.setWithRetry(db, 'a/c', {})).message, 'db down');
+  } finally { Date.now = realNow; }
+}));
+
+
+test('refresh all stocks, Technical Score 2 step: unchanged records are not saved again, a failed save is counted, and a failure of the whole step is reported as such', () => alone(async () => {
+  const stocks = [tvStock('A')], chunks = [{ id: 't1', doc: { rows: [1, 2] } }, { id: 't2', doc: { rows: [3] } }, { id: 't3', doc: { rows: [4, 5, 6] } }];
+  const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks, priceHistoryByTicker: {}, COMPACT_LAG: 1, pcTickerKey: (s) => s.name, buildTech2Chunks: () => chunks };
+  const M = await loadTvRefresh(), errors = [], realError = console.error; console.error = (...a) => errors.push(a[0]);
+  try {
+    const skipped = tvRun(tvDb(), [], { histRan: false, tech2Saved: 0, tech2Failed: 0 });
+    await M.rsTech2(skipped); assert.deepStrictEqual(T.log, ['verify|done|']);   // the history stages did not run
+    const saved = [], db = { collection: () => ({ get: async () => ({ docs: [{ id: 't1', exists: true, data: () => ({ asof: '2026-11-04', rows: [1, 2] }) }, { id: 'old', exists: false, data: () => ({}) }] }) }),
+      doc: (p) => ({ set: async () => { if(p.endsWith('t2')) throw new Error('db down'); saved.push(p); } }) };
+    const run = tvRun(db, [], { histRan: true, tech2Saved: 0, tech2Failed: 0 });
+    await M.rsTech2(run);
+    assert.deepStrictEqual(saved, ['techScore2/t3']); assert.deepStrictEqual([run.tech2Saved, run.tech2Failed], [5, 1]);   // t1 unchanged (2) + t3 (3); t2 failed
+    assert.ok(errors.some((e) => String(e).includes('Could not save Tech 2 t2')));
+    const noRead = tvRun({ collection: () => ({ get: async () => { throw new Error('offline'); } }), doc: db.doc }, [], { histRan: true, tech2Saved: 0, tech2Failed: 0 });
+    await M.rsTech2(noRead); assert.ok(errors.includes('Could not read the saved Tech 2 scores')); assert.strictEqual(noRead.tech2Saved, 5);   // nothing was known, so t1 and t3 are saved (t2 still fails)
+    T.buildTech2Chunks = () => { throw new Error('bad bars'); };
+    const broken = tvRun(db, [], { histRan: true, tech2Saved: 0, tech2Failed: 0 }); await M.rsTech2(broken);
+    assert.strictEqual(broken.tech2Failed, -1);
+    const stopped = tvRun(db, [], { histRan: true, stopped: true, tech2Saved: 0, tech2Failed: 0 }); T.log.length = 0; await M.rsTech2(stopped); assert.deepStrictEqual(T.log, ['verify|done|']);
+  } finally { console.error = realError; }
+}));
+
+test('refresh all stocks, result: the heading and bullets tell what was done, with the % done and only the problems there are', () => alone(async () => {
+  const stocks = [tvStock('A'), tvStock('B')], shown = [];
+  const T = globalThis.__T = { log: [], stocks, priceHistoryByTicker: {}, COMPACT_LAG: 1, duration: (ms) => ms + ' ms', fiShowResult: (kind, lines) => shown.push([kind, lines.map((l) => l.text)]) };
+  const M = await loadTvRefresh(), base = { lines: [], skipped: [], noSymbol: [], t0: Date.now(), planned: 4, histRan: false, tech2Saved: 0, tech2Failed: 0 };
+  const run = (o) => tvRun(tvDb(), [], Object.assign({}, base, { lines: [], skipped: [], noSymbol: [] }, o));
+  M.rsReport(run({ updated: 3, unchanged: 1 }));
+  assert.strictEqual(shown[0][0], 'ok'); assert.ok(shown[0][1][0].startsWith('Done in ')); assert.strictEqual(shown[0][1][1], '• Prices and snapshot: 4 of 4 stocks (100%), 1 unchanged'); assert.strictEqual(shown[0][1].length, 2);
+  M.rsReport(run({}));
+  assert.strictEqual(shown[1][0], 'err'); assert.ok(shown[1][1][0].startsWith('Nothing saved, '));
+  M.rsReport(run({ stopped: true, runError: 'quota used up', planned: 0, updated: 1, histRan: true, noneBefore: 2, filled: 1, staleBefore: 5, barsUpdated: 4, batchSaved: 3, techBlocksSaved: 3, tech2Saved: 2, tech2Failed: 1,
+    noSymbol: ['A', 'B', 'C', 'D'], carried: 2, skipped: [{ reason: 'no price (N:A): kept its figures from 2026-11-02' }, { reason: 'no price (N:B): kept its figures from 2026-11-03' }, { reason: 'other' }] }));
+  const text = shown[2][1].join('\n');
+  assert.ok(text.startsWith('Stopped after ') && text.includes('Stopped because: quota used up') && text.includes('Prices and snapshot: 1 of 0 stocks'));
+  assert.ok(text.includes('Full history: 1 of 2 stocks (50%)') && text.includes('Weekly and monthly bars: 4 of 5 stocks (80%) (1 one by one)') && text.includes('Technical scores (completed weeks): 4 calculated'));
+  assert.ok(!text.includes('Technical Score 2:'));   // not reported for a stopped run
+  assert.ok(text.includes('4 stocks without a TradingView symbol: A, B, C …') && text.includes('2 stocks had no price today') && text.includes('3 stocks skipped, mostly: no price : kept its figures (list below)'));
+  M.rsReport(run({ updated: 1, histRan: true, tech2Saved: 2, tech2Failed: 1 })); assert.ok(shown[3][1].join('\n').includes('Technical Score 2: 2 of 2 stocks (100%), 1 not saved'));
+  M.rsReport(run({ updated: 1, histRan: true, tech2Failed: -1 })); assert.ok(shown[4][1].join('\n').includes('Technical Score 2 could not be calculated'));
+}));
+
+
+test('refresh all stocks, page: the buttons follow the run, the hint counts saved histories, Stop is remembered, and the skipped list downloads as a CSV', () => withPage('<button id="tvSnapshotBtn">Go</button><button id="tvStopBtn" hidden>Stop</button><div id="tvRefreshHint"></div><div id="fiResult"></div>', async (win) => {
+  const stocks = [tvStock('A'), tvStock('B'), tvStock('C')], doc = win.document;
+  const T = globalThis.__T = { log: [], stocks, priceHistoryByTicker: { A: { '1W': [1] }, B: { '1W': [] } }, COMPACT_LAG: 1, pcTickerKey: (s) => s.name, ensureAllPriceBars: async () => {}, fiEl: (id) => doc.getElementById(id), tvIstDate: () => '2026-11-04' };
+  const M = await loadTvRefresh();
+  M.setButtons(true);
+  assert.ok(doc.getElementById('tvSnapshotBtn').disabled && !doc.getElementById('tvStopBtn').hidden);
+  M.setButtons(false); assert.ok(!doc.getElementById('tvSnapshotBtn').disabled && doc.getElementById('tvStopBtn').hidden);
+  win.document.body.innerHTML = ''; M.setButtons(true);   // a page without the buttons is left alone
+  doc.body.innerHTML = '<button id="tvSnapshotBtn"></button><button id="tvStopBtn"></button><div id="tvRefreshHint"></div><div id="fiResult"></div>';
+  await M.paintHint(); assert.strictEqual(doc.getElementById('tvRefreshHint').textContent, '1 of 3 stocks have saved price history. 2 have none.');
+  T.ensureAllPriceBars = async () => { throw new Error('offline'); }; await M.paintHint(); assert.strictEqual(doc.getElementById('tvRefreshHint').textContent, '');
+  doc.getElementById('tvRefreshHint').remove(); await M.paintHint();   // no hint element: nothing to paint
+  M.init_refresh_tvrefresh();
+  doc.getElementById('tvStopBtn').click();
+  assert.ok(doc.getElementById('tvStopBtn').disabled && doc.getElementById('tvStopBtn').textContent === 'Stopping…');
+  const stopped = tvRun(tvDb(), ['X']); await M.rsSnapshot(stopped); assert.ok(stopped.stopped);   // the click was remembered by the run
+  M.__stop(false);
+  let blob = null, link = null; const hadWindow = globalThis.window; globalThis.window = win; win.URL.createObjectURL = (b) => { blob = b; return 'blob:x'; }; win.HTMLAnchorElement.prototype.click = function(){ link = this.download; };
+  M.skippedReport([], 'snapshot'); assert.strictEqual(doc.querySelector('#fiResult button'), null);
+  M.skippedReport([{ sym: 'A', name: 'Say "hi"', reason: 'no price' }], 'snapshot');
+  const btn = doc.querySelector('#fiResult button'); assert.strictEqual(btn.textContent, 'Download the 1 skipped stocks (.csv)');
+  btn.click(); assert.strictEqual(link, 'skipped-snapshot-2026-11-04.csv'); assert.ok(blob);
+  doc.getElementById('fiResult').remove(); M.skippedReport([{ sym: 'A' }], 'snapshot');   // no result area: nothing added
+  if(hadWindow === undefined) delete globalThis.window; else globalThis.window = hadWindow;
+}));
+
+
+const tvBarsCtx = (over) => Object.assign({ plan: { stale: [] }, jobs: new Map(), ready: new Map(), failedBars: [], abort: '', byImportance: (l) => l, bars: async (left) => left.length }, over);
+
+test('refresh all stocks, bars step: without a plan or with nothing stale the step is skipped or reported as none needed', () => alone(async () => {
+  const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks: [], priceHistoryByTicker: {}, COMPACT_LAG: 1 };
+  const M = await loadTvRefresh(), db = tvDb();
+  await M.rsBars(tvRun(db, [], { ctx: null }));
+  assert.deepStrictEqual(T.log, ['update|done|skipped', 'tech|done|skipped']);
+  T.log.length = 0; const idle = tvRun(db, [], { ctx: tvBarsCtx() });
+  await M.rsBars(idle);
+  assert.deepStrictEqual(T.log, ['tech|done|none needed', 'update|done|all up to date']);
+  T.log.length = 0; const failed = tvRun(db, [], { ctx: tvBarsCtx({ failedBars: [{ sym: 'X' }], abort: 'quota used up' }), staleBefore: 4, noneBefore: 3, filled: 1 });
+  await M.rsBars(failed);
+  assert.deepStrictEqual([failed.stopped, failed.runError, failed.histFailed, failed.noHistoryLeft, failed.skipped.length], [true, 'quota used up', 1, 2, 1]);
+  assert.ok(T.log.includes('update|done|0 of 4 updated') && T.log.includes('tech|done|none needed'));
+  T.log.length = 0; M.__stop(true);
+  await M.rsBars(tvRun(db, [], { ctx: tvBarsCtx({ plan: { stale: [1] } }) }));   // Stop pressed before the step
+  assert.ok(T.log.includes('tech|done|skipped')); M.__stop(false);
+}));
+
+test('refresh all stocks, bars step: placed stocks are saved in batches and scored, long-behind stocks are rewritten, and the rest go one by one', () => alone(async () => {
+  const stocks = ['A', 'B', 'C', 'D'].map(tvStock), [A, B, C, D] = stocks;
+  const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks, priceHistoryByTicker: { A: { '1W': [1], '1M': [2] }, B: { '1W': [1], '1M': [2] } }, COMPACT_LAG: 5, pcTickerKey: (s) => s.name, tvIstDate: () => '2026-11-04',
+    lagOf: (k) => k === 'A' ? 9 : k === 'B' ? 7 : 0, saveFullBars: async (s) => s.name === 'A', saveRecentBars: async (db, list) => ({ saved: new Set(['A', 'B']), failed: new Set(['C']), chunksWritten: 1, records: 2 }),
+    saveTechBlocks: async () => ({ computed: 2, chunksWritten: 1, records: 1, failed: 1 }) };
+  const M = await loadTvRefresh(), onebyone = [];
+  const ctx = tvBarsCtx({ plan: { stale: stocks }, jobs: new Map([[A, 1], [B, 1], [C, 1], [D, 1]]), ready: new Map([[A, { s: A }], [B, { s: B }], [C, { s: C }]]), bars: async (left, key, track, workers, lean, prog) => { onebyone.push(left.map((s) => s.name), prog.total); return left.length; } });
+  const run = tvRun(tvDb(), [], { ctx, batchLeft: { missing: 0 }, staleBefore: 4 });
+  await M.rsBars(run);
+  assert.deepStrictEqual(onebyone, [['D', 'C'], 2]);   // D was never placed; C could not be saved
+  assert.deepStrictEqual([run.batchSaved, run.barsUpdated, run.chunkWrites, run.compacted, run.techBlocksSaved], [2, 4, 2, 1, 2]);
+  assert.strictEqual(run.batchLeft.callFailed, 1);   // D asked for bars but the snapshot call gave no reason for it
+  assert.ok(T.log.includes('update|done|2 stocks in 2 batches (1 unchanged)') && T.log.includes('tech|done|2 scores in 1 batches, 1 could not be saved') && T.log.includes('update|done|2 in batches, 2 one by one'));
+  assert.ok(T.log.some((l) => l.startsWith('update|running|Rewriting 2 stocks in full')));
+  // Stop pressed during the rewrite ends it early and skips the one-by-one step
+  T.log.length = 0; onebyone.length = 0; let stopped = false; T.saveFullBars = async () => { M.__stop(true); return true; };
+  const run2 = tvRun(tvDb(), [], { ctx: Object.assign({}, ctx, { ready: new Map(ctx.ready), jobs: new Map() }), batchLeft: {} });
+  await M.rsBars(run2); M.__stop(false);
+  assert.deepStrictEqual([run2.compacted, onebyone.length, run2.stopped], [1, 0, true]);
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
