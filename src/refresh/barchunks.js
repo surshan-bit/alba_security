@@ -7,7 +7,7 @@ import { stocks } from '../core/stocks.js';
 import { sanitizeDocId, sleep, tickerSymbol } from '../core/util.js';
 import { priceApply, pcTickerKey, priceHistoryByTicker, priceSymbolByTicker } from '../prices/store.js';
 import { noteRecentSaved, recentRow } from '../prices/recent.js';
-import { computeTechnical, techLiveCrossState } from '../engine/technical.js';
+import { computeTechnical, techCarryDaily, techLiveCrossState } from '../engine/technical.js';
 
 const CHUNK = 50;          // stocks per record
 const WORKERS = 6;         // records saved at the same time
@@ -98,7 +98,7 @@ async function saveTechBlocks(db, done, today, progress){
     if(pv == null) continue;
     let t = null;
     try { t = computeTechnical(W, M, pv, today); } catch(e){ console.error('Technical score failed for ' + tickerSymbol(s), e); }
-    if(t){ rows.set(sanitizeDocId(tickerSymbol(s)), t); computed++; }
+    if(t){ const key = sanitizeDocId(tickerSymbol(s)); rows.set(key, techCarryDaily(rows.get(key), t)); computed++; }
   }
   return Object.assign({ computed }, await writeTechChunks(db, { old, rows }, today, progress));
 }
@@ -121,4 +121,21 @@ async function saveCrossStates(db, items, today, progress){
   return Object.assign({ read, changed }, await writeTechChunks(db, { old, rows }, today, progress));
 }
 
-export { saveCrossStates, saveRecentBars, saveTechBlocks, sameValue };
+// Step 5. The daily MACD 30/60/5 state of the stocks in `items` ([{ key, state, asof }]: `asof` = the day of the newest daily bar), saved with each stock's technical block
+// (states.dayMacd3060 and raw.dayMacdAsof) and nothing else of it changes. A stock with no saved block is left alone. Returns { read, changed, records, chunksWritten, failed }.
+async function saveDailyStates(db, items, today, progress){
+  const old = await readChunks(db, 'techBlocks');
+  const rows = techRowsOf(old);
+  let read = 0, changed = 0;
+  for(const { key, state, asof } of items){
+    const t = rows.get(key);
+    if(!t) continue;
+    read++;
+    if(t.states && t.states.dayMacd3060 === state && t.raw && t.raw.dayMacdAsof === asof) continue;
+    rows.set(key, Object.assign({}, t, { states: Object.assign({}, t.states, { dayMacd3060: state }), raw: Object.assign({}, t.raw, { dayMacdAsof: asof }) }));
+    changed++;
+  }
+  return Object.assign({ read, changed }, await writeTechChunks(db, { old, rows }, today, progress));
+}
+
+export { saveCrossStates, saveDailyStates, saveRecentBars, saveTechBlocks, sameValue };

@@ -2,14 +2,13 @@
 // whether it comes from price bars alone (`priceBased`). Price-based rules can be replayed on old bars later; the
 // others read today's stored fundamentals, so a backtest using them would look ahead.
 import { verdictLabel } from '../core/stocks.js';
-import { MACD_CROSS_WEEKLY, techScore3 } from '../engine/technical.js';
+import { MACD_CROSS_DAILY, MACD_CROSS_WEEKLY, techScore3 } from '../engine/technical.js';
 import { isPinned } from '../core/pins.js';
-import { tickerIndustry } from '../core/util.js';
+import { daysSinceDate, daysUntil, tickerIndustry } from '../core/util.js';
 import { mosPct, mosRatingAny } from '../list/metrics.js';
 import { stockResearchAgeDays } from '../research/status.js';
 import { NEWS_DAYS, daysSinceEvent, newsCounts } from './news.js';
 import { MCAP_LARGE_CR, MCAP_MID_CR, capClass } from '../core/capclass.js';
-import { daysUntil } from '../core/util.js';
 
 const rawOf = (s) => (s.technical && s.technical.raw) || {};
 const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
@@ -34,7 +33,18 @@ const MACD_CROSS_OPTIONS = [
   ['above', 'Above signal', 'buy'],
   ['below', 'Below signal', 'avoid']
 ];
+// The same three choices for the daily MACD, read by the daily import of Refresh all stocks for one strategy's stocks (src/refresh/dailymacd.js). A reading older than
+// DAILY_FRESH_DAYS (a long weekend) counts as missing, so a rule never rests on days-old data without saying so.
+const { fast: DAY_FAST, slow: DAY_SLOW, signal: DAY_SIGNAL } = MACD_CROSS_DAILY;
+const DAILY_FRESH_DAYS = 4;
+const MACD_DAILY_OPTIONS = [
+  ['cross_up', 'Just crossed up (latest day)', 'mbuy'],
+  ['above', 'Above signal', 'buy'],
+  ['below', 'Below signal', 'avoid']
+];
 const macdState = (key) => (s) => (s.technical && s.technical.states && s.technical.states[key]) || null;
+
+const dayMacdState = (s) => { const age = daysSinceDate(rawOf(s).dayMacdAsof); return age !== null && age <= DAILY_FRESH_DAYS ? macdState('dayMacd3060')(s) : null; };
 
 const ALL_FIELDS = [
   { id: 'score', group: 'Fundamental', label: 'Fundamental score', type: 'num', unit: '/10', dp: 1, get: (s) => num(s.score) },
@@ -65,6 +75,8 @@ const ALL_FIELDS = [
   { id: 'weekMacd', group: 'Technical', label: 'W Tech Rating', type: 'enum', priceBased: true, get: macdState('weekMacd'), options: MACD_OPTIONS, noneLabel: NONE_LABEL },
   // Not priceBased: the learning search has no menu for it, so applying a suggestion must not drop a rule the user chose by hand.
   { id: 'weekMacd3060', group: 'Technical', label: `W MACD ${MACD_FAST}/${MACD_SLOW}/${MACD_SIGNAL} vs signal`, type: 'enum', get: macdState('weekMacd3060'), options: MACD_CROSS_OPTIONS, noneLabel: NONE_LABEL },
+  // Not priceBased, for the same reason as the weekly one. Only the stocks of the strategy chosen for the daily import have a reading.
+  { id: 'dayMacd3060', group: 'Technical', label: `D MACD ${DAY_FAST}/${DAY_SLOW}/${DAY_SIGNAL} vs signal`, type: 'enum', get: dayMacdState, options: MACD_DAILY_OPTIONS, noneLabel: NONE_LABEL },
   { id: 'monthMacd', group: 'Technical', label: 'M Tech Rating', type: 'enum', priceBased: true, get: macdState('monthMacd'), options: MACD_OPTIONS, noneLabel: NONE_LABEL },
   { id: 'weekPct', group: 'Technical', label: 'Weekly % change', type: 'num', unit: '%', dp: 1, priceBased: true, get: (s) => num(rawOf(s).weekPctChange) },
   { id: 'monthPct', group: 'Technical', label: 'Monthly % change', type: 'num', unit: '%', dp: 1, priceBased: true, get: (s) => num(rawOf(s).monthPctChange) },

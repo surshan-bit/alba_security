@@ -55,9 +55,18 @@
                   <li>Fetch price, MACD, RSI and new bars: 50 stocks per call, about 45 calls (about 3 minutes)</li>
                   <li>Save the weekly and monthly bars in batches of 50</li>
                   <li>Calculate the technical scores in batches of 50</li>
+                  <li>Optional: read daily (1D) bars for the stocks of one strategy (tick the box below)</li>
                   <li>Stop ends the run; the next run carries on</li>
                 </ul></div>
                 <div class="upload-hint" id="tvRefreshHint">The count of stocks with saved history appears after the first run.</div>
+                <div class="daily-import">
+                  <label class="daily-import__tick"><input type="checkbox" class="claude-ctl-box" id="tvDailyOn"> Also import daily (1D) data for one strategy</label>
+                  <div class="daily-import__pick" id="tvDailyPick" hidden>
+                    <label class="daily-import__label" for="tvDailyStrategy">Strategy</label>
+                    <select class="tl-ideas-select" id="tvDailyStrategy" aria-label="Strategy for the daily import"></select>
+                    <span class="upload-hint">Only the stocks that pass that strategy's other rules are read from TradingView, one call each (at most 600 a run). Today's bar counts. Use the rule &ldquo;D MACD 30/60/5 vs signal&rdquo; in the strategy.</span>
+                  </div>
+                </div>
               </div>
               <button type="button" class="select-mode-btn fi-btn-primary scope-tv-snapshot-btn" id="tvSnapshotBtn" title="Saves a fresh price and technical reading for every stock, from TradingView">Refresh all stocks</button>
               <button type="button" class="select-mode-btn" id="tvStopBtn" hidden>Stop</button>
