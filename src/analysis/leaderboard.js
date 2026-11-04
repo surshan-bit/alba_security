@@ -131,7 +131,7 @@ function renderLeaderboardRows(filtered){
 // changes); `openStock(idx)` opens the stock's detail page; `hideTooltip` closes the chart tooltip.
 function wireLeaderboard({ update, rerender, openStock, hideTooltip }){
   // Delegated: the table body persists across redraws, so one listener replaces rebinding every row and pin button.
-  document.getElementById('analysisLeaderboardBody').addEventListener('click', (evt) => {
+  /** @type {HTMLElement} */ (document.getElementById('analysisLeaderboardBody')).addEventListener('click', (evt) => {
     const pinBtn = closestEl(evt, '.pin-btn');
     if(pinBtn){
       evt.stopPropagation();
@@ -198,17 +198,17 @@ function wireColumnDrag(rerender){
     if(!grip || (/** @type {MouseEvent} */ (e).button != null && /** @type {MouseEvent} */ (e).button !== 0)) return;
     const row = grip.closest('.analysis-column-row');
     e.preventDefault();
-    row.classList.add('dragging');
+    /** @type {Element} */ (row).classList.add('dragging');
     const move = (ev) => {
       const y = ev.clientY;
       if(y < 70) window.scrollBy(0, -14); else if(y > window.innerHeight - 70) window.scrollBy(0, 14);
       const next = rowsOf().filter(r => r !== row).find(r => { const b = r.getBoundingClientRect(); return y < b.top + b.height / 2; });
-      if(next){ if(row.nextElementSibling !== next) list.insertBefore(row, next); }
-      else if(list.lastElementChild !== row) list.appendChild(row);
+      if(next){ if(/** @type {Element} */ (row).nextElementSibling !== next) list.insertBefore(/** @type {Element} */ (row), next); }
+      else if(list.lastElementChild !== row) list.appendChild(/** @type {Element} */ (row));
     };
     const end = () => {
       document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', end); document.removeEventListener('pointercancel', end);
-      row.classList.remove('dragging');
+      /** @type {Element} */ (row).classList.remove('dragging');
       commit(/** @type {HTMLElement} */ (row).dataset.col);
     };
     // listened for on the document: moving the row in the list would drop a pointer capture held by its handle
@@ -219,9 +219,9 @@ function wireColumnDrag(rerender){
     if(!grip || (/** @type {KeyboardEvent} */ (e).key !== 'ArrowUp' && /** @type {KeyboardEvent} */ (e).key !== 'ArrowDown')) return;
     e.preventDefault();
     const row = grip.closest('.analysis-column-row'), up = /** @type {KeyboardEvent} */ (e).key === 'ArrowUp';
-    const other = up ? row.previousElementSibling : row.nextElementSibling;
+    const other = up ? /** @type {Element} */ (row).previousElementSibling : /** @type {Element} */ (row).nextElementSibling;
     if(!other) return;
-    if(up) list.insertBefore(row, other); else list.insertBefore(other, row);
+    if(up) list.insertBefore(/** @type {Element} */ (row), other); else list.insertBefore(other, /** @type {Element} */ (row));
     commit(/** @type {HTMLElement} */ (row).dataset.col);
   });
 }

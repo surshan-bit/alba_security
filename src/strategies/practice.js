@@ -20,7 +20,7 @@ const running = new Set();
 
 function fieldGuide(){
   return FIELDS.filter(f => !SKIP.has(f.id)).map(f => {
-    if(f.type === 'enum') return `- ${f.id} (${f.label}): choice, op "in", value = list of ids from [${f.options.map(o => o[0] + '=' + o[1]).join(', ')}]${f.noneLabel ? ", plus 'none' for no rating" : ''}`;
+    if(f.type === 'enum') return `- ${f.id} (${f.label}): choice, op "in", value = list of ids from [${/** @type {any[][] | string[][]} */ (f.options).map(o => o[0] + '=' + o[1]).join(', ')}]${f.noneLabel ? ", plus 'none' for no rating" : ''}`;
     return `- ${f.id} (${f.label}): number${f.unit ? ' in ' + f.unit.trim() : ''}, op one of >=, <=, >, <, between (value [low, high])`;
   }).join('\n');
 }

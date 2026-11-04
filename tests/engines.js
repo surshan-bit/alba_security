@@ -2184,6 +2184,17 @@ test('complexity: a function over the limits is counted once per limit, a nested
   assert.strictEqual(nestingDepth(null), 0);
 });
 
+// ---- the strategy field lookup (src/strategies/lookup.js): a rule's field is found, and an unknown id is named in the error
+test('strategy fields: knownField returns the field a rule names and an unknown id is named in the error', () => {
+  const { knownField } = load('src/strategies/lookup.js');
+  const fields = new Map([['score', { id: 'score', type: 'num' }], ['verdict', { id: 'verdict', type: 'enum' }]]);
+  assert.strictEqual(knownField(fields, 'score'), fields.get('score'), 'the same field object the map holds');
+  assert.deepStrictEqual(knownField(fields, 'verdict'), { id: 'verdict', type: 'enum' });
+  assert.throws(() => knownField(fields, 'no-such-field'), /Unknown strategy field: no-such-field/);
+  assert.throws(() => knownField(fields, ''), /Unknown strategy field: /);
+  assert.throws(() => knownField(new Map(), 'score'), /Unknown strategy field: score/, 'an empty map has no fields');
+});
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

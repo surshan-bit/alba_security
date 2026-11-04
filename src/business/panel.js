@@ -114,7 +114,7 @@ function runNews(spec){
 }
 function paintNewsStatus(){
   const el = document.getElementById('bizNewsStatus'), html = newsStatusHtml();
-  if(el && html){ const t = document.createElement('div'); setHtml(t, html); el.replaceWith(t.firstChild); } else render();
+  if(el && html){ const t = document.createElement('div'); setHtml(t, html); el.replaceWith(/** @type {ChildNode} */ (t.firstChild)); } else render();
   document.querySelectorAll('.biz-newsbtn').forEach(b => { /** @type {HTMLButtonElement} */ (b).disabled = true; });
 }
 
@@ -302,14 +302,14 @@ function wire(el){
     if(closestEl(e, '[data-biz-filters]')){ bizFiltersOpen = !bizFiltersOpen; rememberFiltersOpen('bFiltersOpen', bizFiltersOpen); render(); return; }
     if(closestEl(e, '[data-biz-full]')){ bizFull = !bizFull; browserFullscreen(bizFull); render(); return; }
     const sb = closestEl(e, '[data-biz-strat]');
-    if(sb){ strategyId = sb.dataset.bizStrat; save(); render(); return; }
+    if(sb){ strategyId = /** @type {string} */ (sb.dataset.bizStrat); save(); render(); return; }
     if(closestEl(e, '[data-biz-rebound]')){ rebound = !rebound; save(); render(); ensureData(); return; }
     const shw = closestEl(e, '[data-biz-show]');
     if(shw){ if(/** @type {HTMLButtonElement} */ (shw).disabled) return; showMatched = shw.dataset.bizShow === 'matched'; save(); render(); return; }
     const sz = closestEl(e, '[data-biz-size]');
     if(sz){ heatSize = sz.dataset.bizSize === 'count' ? 'count' : 'chg'; save(); render(); return; }
     const vb = closestEl(e, '[data-biz-view]'), ht = closestEl(e, '[data-biz-heat]');
-    if(vb){ view = vb.dataset.bizView; save(); render(); return; }
+    if(vb){ view = /** @type {string} */ (vb.dataset.bizView); save(); render(); return; }
     if(ht){   // a heat-map tile: back to the table with that industry opened
       view = 'table'; save(); open.add(ht.dataset.bizHeat); render();
       const row = Array.from(el.querySelectorAll('.biz-row')).find(r => /** @type {HTMLElement} */ (r).dataset.bizName === ht.dataset.bizHeat);
@@ -319,8 +319,8 @@ function wire(el){
     const mp = closestEl(e, '[data-biz-matched-pick]');
     if(mp){ if(!mp.hasAttribute('disabled')){ showMatched = mp.dataset.bizMatchedPick === '1'; save(); render(); } return; }
     const pb = closestEl(e, '[data-biz-period]'), gb = closestEl(e, '[data-biz-by]');
-    if(pb){ period = pb.dataset.bizPeriod; save(); open.clear(); render(); ensureData(); return; }
-    if(gb){ by = gb.dataset.bizBy; save(); open.clear(); render(); return; }
+    if(pb){ period = /** @type {string} */ (pb.dataset.bizPeriod); save(); open.clear(); render(); ensureData(); return; }
+    if(gb){ by = /** @type {string} */ (gb.dataset.bizBy); save(); open.clear(); render(); return; }
     if(closestEl(e, '[data-biz-newsstop]')){ stopNewsCollect(); return; }
     const all = closestEl(e, '[data-biz-all]');
     if(all){

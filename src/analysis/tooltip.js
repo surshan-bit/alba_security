@@ -33,19 +33,19 @@ function createAnalysisTooltip(){
     const pad = 16;
     let x = evt.clientX + pad;
     let y = evt.clientY + pad;
-    const rect = tooltip.getBoundingClientRect();
+    const rect = /** @type {HTMLElement} */ (tooltip).getBoundingClientRect();
     if(x + rect.width > window.innerWidth - 8) x = evt.clientX - rect.width - pad;
     if(y + rect.height > window.innerHeight - 8) y = evt.clientY - rect.height - pad;
-    tooltip.style.setProperty('--x', `${Math.max(8, x)}px`);
-    tooltip.style.setProperty('--y', `${Math.max(8, y)}px`);
+    /** @type {HTMLElement} */ (tooltip).style.setProperty('--x', `${Math.max(8, x)}px`);
+    /** @type {HTMLElement} */ (tooltip).style.setProperty('--y', `${Math.max(8, y)}px`);
   }
   function show(evt, s){
     setHtml(tooltip, tooltipContent(s));
-    tooltip.classList.add('show');
+    /** @type {HTMLElement} */ (tooltip).classList.add('show');
     position(evt);
   }
   function hide(){
-    tooltip.classList.remove('show');
+    /** @type {HTMLElement} */ (tooltip).classList.remove('show');
   }
   return { show, position, hide };
 }

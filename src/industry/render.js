@@ -79,7 +79,7 @@ function stocksHtml(members){
 }
 // Opens a stock from a row (one listener on the panel, so rows added by "Show more" work too) and adds rows on "Show more".
 function wireStocks(members, openStock){
-  const panel = detailEl.querySelector('#jump-ind-stocks'); if(!panel) return;
+  const panel = /** @type {HTMLElement} */ (detailEl).querySelector('#jump-ind-stocks'); if(!panel) return;
   let sort = START_SORT, sorted = sortedBy(members, sort);
   const cols = stocksCols(), body = panel.querySelector('tbody'), head = panel.querySelector('thead tr'), more = panel.querySelector('.ind-stocks-more');
   let shown = Math.min(ROW_STEP, sorted.length);
@@ -152,7 +152,7 @@ function bindChart(panel, c, series, events, state){
   let byBar = new Map();
   const redraw = () => { byBar = eventsByBar(events, series, c.span, shown); drawChart(panel, c, series, byBar, lanes(), state); };
   panel.querySelectorAll('.pc-pill').forEach(btn => /** @type {HTMLElement} */ (btn).onclick = () => {
-    state.range = +/** @type {HTMLElement} */ (btn).dataset.i;
+    state.range = +/** @type {HTMLElement} */ /** @type {string} */ ((btn).dataset.i);
     panel.querySelectorAll('.pc-pill').forEach(x => x.setAttribute('aria-pressed', String(x === btn)));
     redraw();
   });
@@ -165,7 +165,7 @@ function bindChart(panel, c, series, events, state){
     const label = c.k === 'W' ? 'Week of ' + fmtD(r[0], { day: 'numeric', month: 'short', year: 'numeric' }) : fmtD(r[0], { month: 'long', year: 'numeric' });
     const evs = (byBar.get(G.off + i) || []).slice().sort((a, z) => z.t - a.t);
     setHtml(tip, `<b>${label}</b><div class="r"><span>Average change</span><span>${sign(r[1], 2)}%</span></div><div class="r"><span>Stocks counted</span><span>${r[2]}</span></div>` +
-      (evs.length ? '<div class="evs">' + evs.slice(0, 5).map(e => `<div class="ev"><span class="pc-evk pc-evk-${e.group}${e.group === 'news' && e.s ? ' s-' + e.s : ''}">${EVENT_GROUPS.find(x => x.id === e.group).glyph}</span><span>${escapeHtml(e.text)}<small>${escapeHtml(e.d + (e.src ? ' · ' + e.src : ''))}</small></span></div>`).join('') + (evs.length > 5 ? `<div class="ev more">+${evs.length - 5} more</div>` : '') + '</div>' : ''));
+      (evs.length ? '<div class="evs">' + evs.slice(0, 5).map(e => `<div class="ev"><span class="pc-evk pc-evk-${e.group}${e.group === 'news' && e.s ? ' s-' + e.s : ''}">${/** @type {{ id: string; label: string; glyph: string; }} */ (EVENT_GROUPS.find(x => x.id === e.group)).glyph}</span><span>${escapeHtml(e.text)}<small>${escapeHtml(e.d + (e.src ? ' · ' + e.src : ''))}</small></span></div>`).join('') + (evs.length > 5 ? `<div class="ev more">+${evs.length - 5} more</div>` : '') + '</div>' : ''));
     const tw = tip.offsetWidth, xx = G.X(i) * (rect.width / G.W);
     tip.style.setProperty('--x', Math.max(0, Math.min(rect.width - tw, xx + 14 + tw > rect.width ? xx - tw - 14 : xx + 14)) + 'px'); tip.classList.add('is-shown');
   });
@@ -218,9 +218,9 @@ function renderIndustryDetail(by, name, backLabel, openStock){
     ${newsHtml(news)}
     ${stocksHtml(members)}`);
   bindJumpSpy(detailEl);
-  detailEl.querySelectorAll('.detail-jump a[data-jump]').forEach(a => a.addEventListener('click', (e) => {
+  /** @type {HTMLElement} */ (detailEl).querySelectorAll('.detail-jump a[data-jump]').forEach(a => a.addEventListener('click', (e) => {
     e.preventDefault();
-    const el = document.getElementById(/** @type {HTMLElement} */ (a).dataset.jump);
+    const el = document.getElementById(/** @type {string} */ (/** @type {HTMLElement} */ (a).dataset.jump));
     if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
   wireStocks(members, openStock);

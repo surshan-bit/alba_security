@@ -66,7 +66,7 @@ function tlOpenAddForm(){
         <span class="tl-msg" id="tlMsg">The stock's current score, verdict and data completeness are saved with the trade as a snapshot.</span>
       </div>
     </div>`);
-  document.getElementById('tlStock').focus();
+  /** @type {HTMLElement} */ (document.getElementById('tlStock')).focus();
 }
 let tlSel = null, tlItems = [], tlActive = -1, tlAutoPrice = null;
 function tlHideSugg(){

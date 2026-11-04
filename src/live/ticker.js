@@ -96,7 +96,7 @@ function paintRow(tr, s, idx, changed){
 // A small live price beside the open stock's ticker (the stock page itself is only redrawn when it is opened again).
 function paintDetail(){
   const idx = getShownIndex(), s = stocks[idx];
-  const host = detailEl.querySelector('.detail-ticker');
+  const host = /** @type {HTMLElement} */ (detailEl).querySelector('.detail-ticker');
   if(!host || !s) return;
   const v = livePrice.get(pcTickerKey(s));
   let chip = /** @type {HTMLElement} */ (host.querySelector('.live-px'));
@@ -171,7 +171,7 @@ function init_live_ticker(){
   if(!search) return;
   btn = document.createElement('button');
   btn.type = 'button';
-  search.parentNode.insertBefore(btn, search.nextSibling);
+  /** @type {ParentNode} */ (search.parentNode).insertBefore(btn, search.nextSibling);
   btn.addEventListener('click', () => {
     enabled = !enabled; fails = 0;
     paintButton(); if(enabled) tick();

@@ -37,12 +37,12 @@ function updateTopbarSection(){
 }
 
 function openSidebar(){
-  sidebar.classList.add('open');
-  sidebarOverlay.classList.add('show');
+  /** @type {HTMLElement} */ (sidebar).classList.add('open');
+  /** @type {HTMLElement} */ (sidebarOverlay).classList.add('show');
 }
 function closeSidebar(){
-  sidebar.classList.remove('open');
-  sidebarOverlay.classList.remove('show');
+  /** @type {HTMLElement} */ (sidebar).classList.remove('open');
+  /** @type {HTMLElement} */ (sidebarOverlay).classList.remove('show');
 }
 
 // Pages that are only needed sometimes load their code the first time they are opened (core/lazy.js).
@@ -108,7 +108,7 @@ function wireJumpLinks(sectionEl, linkSelector, destOf){
     const a = closestEl(e, linkSelector);
     if(!a) return;
     e.preventDefault();
-    const targetId = a.getAttribute('href').slice(1);
+    const targetId = /** @type {string} */ (a.getAttribute('href')).slice(1);
     showSection(destOf(targetId)).then(()=>{
       closeSidebar();
       requestAnimationFrame(()=>{
@@ -125,11 +125,11 @@ warmParts(['strategies', 'news', 'trackrecord', 'rocky', 'refreshlog']);
 const topbarObserver = new MutationObserver(updateTopbarSection);
 Object.values(appSections).forEach(el => { if(el) topbarObserver.observe(el, { attributes: true, attributeFilter: ['class'] }); });
 updateTopbarSection();
-menuToggle.addEventListener('click', ()=>{
-  sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+/** @type {HTMLElement} */ (menuToggle).addEventListener('click', ()=>{
+  /** @type {HTMLElement} */ (sidebar).classList.contains('open') ? closeSidebar() : openSidebar();
 });
-sidebarOverlay.addEventListener('click', closeSidebar);
-detailEl.addEventListener('click', (e)=>{
+/** @type {HTMLElement} */ (sidebarOverlay).addEventListener('click', closeSidebar);
+/** @type {HTMLElement} */ (detailEl).addEventListener('click', (e)=>{
   if(closestEl(e, '.detail-back')) detailBackToAnalysis();
 });
 // Esc is the keyboard shortcut for the "Back to ..." button (not while typing in a box or choosing from a list).
@@ -150,11 +150,11 @@ navItems.forEach(btn=>{
 });
 // The Tools drop-down in the top bar.
 const toolsGroup = document.getElementById('navToolsGroup'), toolsToggle = document.getElementById('navToolsToggle');
-const setToolsOpen = (open) => { toolsGroup.classList.toggle('open', open); toolsToggle.setAttribute('aria-expanded', String(open)); };
-toolsToggle.addEventListener('click', (e)=>{ e.stopPropagation(); setToolsOpen(!toolsGroup.classList.contains('open')); });
+const setToolsOpen = (open) => { /** @type {HTMLElement} */ (toolsGroup).classList.toggle('open', open); /** @type {HTMLElement} */ (toolsToggle).setAttribute('aria-expanded', String(open)); };
+/** @type {HTMLElement} */ (toolsToggle).addEventListener('click', (e)=>{ e.stopPropagation(); setToolsOpen(!/** @type {HTMLElement} */ (toolsGroup).classList.contains('open')); });
 document.addEventListener('click', (e)=>{ if(!closestEl(e, '#navToolsGroup')) setToolsOpen(false); });
 document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') setToolsOpen(false); });
-toolsGroup.querySelectorAll('.nav-item').forEach(btn=> btn.addEventListener('click', ()=> setToolsOpen(false)));
+/** @type {HTMLElement} */ (toolsGroup).querySelectorAll('.nav-item').forEach(btn=> btn.addEventListener('click', ()=> setToolsOpen(false)));
 wireJumpLinks(kbSection, 'a[href^="#help"]', () => 'help');
 wireJumpLinks(refreshlogSection, 'a[href^="#help"], a[href^="#kb"]', (id) => id.startsWith('kb') ? 'knowledgebase' : 'help');
 wireJumpLinks(helpSectionEl, 'a[href^="#kb"]', () => 'knowledgebase');

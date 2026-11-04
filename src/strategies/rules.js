@@ -5,6 +5,7 @@
 // A choice field with a `noneLabel` also offers the choice 'none': stocks that have no reading for it.
 // A rule that is not filled in yet is ignored. A stock with no reading for the field fails the rule.
 import { FIELD_BY_ID } from './fields.js';
+import { knownField } from './lookup.js';
 
 const OPS = {
   num: [['>=', 'at least'], ['<=', 'at most'], ['>', 'above'], ['<', 'below'], ['between', 'between']],
@@ -14,7 +15,7 @@ const OPS = {
 const isNum = (v) => typeof v === 'number' && isFinite(v);
 
 function defaultRule(fieldId){
-  const f = FIELD_BY_ID.get(fieldId);
+  const f = knownField(FIELD_BY_ID, fieldId);
   if(f.type === 'enum') return { field: fieldId, op: 'in', value: [] };
   if(f.type === 'text') return { field: fieldId, op: 'contains', value: '' };
   return { field: fieldId, op: '>=', value: null };
@@ -34,7 +35,7 @@ function ruleReady(rule){
 }
 // -> { pass, value, missing } for one stock.
 function testRule(s, rule){
-  const f = FIELD_BY_ID.get(rule.field);
+  const f = knownField(FIELD_BY_ID, rule.field);
   const value = f.get(s);
   if(value === null || value === undefined){
     if(rule.op === 'in' && f.noneLabel && rule.value.includes('none')) return { pass: true, value: null, missing: false };
@@ -70,7 +71,7 @@ function formatValue(f, v){
   return String(v);
 }
 function describeRule(rule){
-  const f = FIELD_BY_ID.get(rule.field);
+  const f = knownField(FIELD_BY_ID, rule.field);
   const unit = f.unit || '';
   if(f.type === 'enum') return `${f.label} is ${rule.value.map(v => formatValue(f, v)).join(' or ')}`;
   if(f.type === 'text') return `${f.label} contains "${rule.value.trim()}"`;

@@ -60,8 +60,8 @@ function wireSliders(schedule, onRelease){
     /** @type {HTMLInputElement} */ (weekMaxInput).value = /** @type {any} */ (f.weekMax);
     /** @type {HTMLInputElement} */ (monthMinInput).value = /** @type {any} */ (f.monthMin);
     /** @type {HTMLInputElement} */ (monthMaxInput).value = /** @type {any} */ (f.monthMax);
-    weekLabel.textContent = `${f.weekMin}–${f.weekMax}`;
-    monthLabel.textContent = `${f.monthMin}–${f.monthMax}`;
+    /** @type {HTMLElement} */ (weekLabel).textContent = `${f.weekMin}–${f.weekMax}`;
+    /** @type {HTMLElement} */ (monthLabel).textContent = `${f.monthMin}–${f.monthMax}`;
   }
   const onInput = (input, apply) => input.addEventListener('input', () => { apply(Number(input.value)); syncSliderInputs(); schedule(); });
   onInput(weekMinInput, v => { f.weekMin = Math.min(v, f.weekMax); });
@@ -69,7 +69,7 @@ function wireSliders(schedule, onRelease){
   onInput(monthMinInput, v => { f.monthMin = Math.min(v, f.monthMax); });
   onInput(monthMaxInput, v => { f.monthMax = Math.max(v, f.monthMin); });
   [weekMinInput, weekMaxInput, monthMinInput, monthMaxInput].forEach(input => {
-    input.addEventListener('change', () => { saveAnalysisFilters(analysisFilters); onRelease(); });
+    /** @type {HTMLElement} */ (input).addEventListener('change', () => { saveAnalysisFilters(analysisFilters); onRelease(); });
   });
 }
 
@@ -83,7 +83,7 @@ function wireMosSlider(mosBoundLo, mosBoundHi, schedule, onRelease){
     const lo = f.mosLo === null ? mosBoundLo : mosClamp(f.mosLo);
     const hi = f.mosHi === null ? mosBoundHi : mosClamp(f.mosHi);
     mosMinInput.value = lo; mosMaxInput.value = hi;
-    mosLabel.textContent = (f.mosLo === null && f.mosHi === null) ? 'All (' + mosBoundLo + '% to ' + mosBoundHi + '%)' : lo + '% to ' + hi + '%';
+    /** @type {HTMLElement} */ (mosLabel).textContent = (f.mosLo === null && f.mosHi === null) ? 'All (' + mosBoundLo + '% to ' + mosBoundHi + '%)' : lo + '% to ' + hi + '%';
   }
   function setMosRange(lo, hi){
     f.mosLo = lo <= mosBoundLo ? null : lo;
@@ -105,17 +105,17 @@ function wireToggles(update, rerender){
   const f = analysisFilters;
   const colorByBtns = [document.getElementById('colorByWeekBtn'), document.getElementById('colorByMonthBtn')];
   colorByBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      f.colorBy = btn.dataset.colorBy;
-      colorByBtns.forEach(b => b.classList.toggle('active', b === btn));
+    /** @type {HTMLElement} */ (btn).addEventListener('click', () => {
+      f.colorBy = /** @type {string} */ (/** @type {HTMLElement} */ (btn).dataset.colorBy);
+      colorByBtns.forEach(b => /** @type {HTMLElement} */ (b).classList.toggle('active', b === btn));
       saveAnalysisFilters(analysisFilters);
       update();
     });
   });
   const axisButtons = (prefix, own, other) => {
     [document.getElementById(prefix + 'AxisWeekBtn'), document.getElementById(prefix + 'AxisMonthBtn')].forEach(btn => {
-      btn.addEventListener('click', () => {
-        const value = btn.dataset.axisValue;
+      /** @type {HTMLElement} */ (btn).addEventListener('click', () => {
+        const value = /** @type {HTMLElement} */ (btn).dataset.axisValue;
         if(value === f[other]) f[other] = f[own];
         f[own] = value;
         saveAnalysisFilters(analysisFilters);

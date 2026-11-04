@@ -55,7 +55,7 @@ function priceHistoryStatus(s){
   const wkN = Math.ceil((nowS - last) / (7 * 86400)) + 3;
   let moN = null;
   if(lastM){ const a = new Date((lastM + 19800) * 1000), b = new Date((nowS + 19800) * 1000); moN = (b.getUTCFullYear() * 12 + b.getUTCMonth()) - (a.getUTCFullYear() * 12 + a.getUTCMonth()) + 3; }
-  const delta = !!(lastM && wkN < 200 && moN < 50) ? { wkN, moN, lastW:last, lastM } : null;
+  const delta = !!(lastM && wkN < 200 && /** @type {number} */ (moN) < 50) ? { wkN, moN, lastW:last, lastM } : null;
   return ageDays > 14 ? { has:true, needed:true, delta, text:`last bar ${lastTxt}, ${Math.floor(ageDays)} days old` }
                      : { has:true, needed:false, delta, text:`up to date, last bar ${lastTxt}` };
 }

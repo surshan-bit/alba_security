@@ -12,8 +12,8 @@ function askConfirm(message, okLabel, info){
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
     setHtml(box, '<div class="alba-confirm-card"><div class="alba-confirm-msg"></div><div class="alba-confirm-btns"><button type="button" class="strat-btn" id="albaConfirmNo">Cancel</button><button type="button" class="strat-btn alba-confirm-ok" id="albaConfirmOk"></button></div></div>');
-    box.querySelector('.alba-confirm-msg').textContent = message;
-    box.querySelector('#albaConfirmOk').textContent = okLabel || 'OK';
+    /** @type {Element} */ (box.querySelector('.alba-confirm-msg')).textContent = message;
+    /** @type {Element} */ (box.querySelector('#albaConfirmOk')).textContent = okLabel || 'OK';
     if(info) /** @type {HTMLElement} */ (box.querySelector('#albaConfirmNo')).hidden = true;   // a notice: one button
     const done = (v) => { document.removeEventListener('keydown', onKey, true); box.remove(); resolve(v); };
     const onKey = (e) => { if(e.key === 'Escape'){ e.stopPropagation(); done(false); } };
