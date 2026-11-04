@@ -258,6 +258,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.353 &middot; 2026-11-04</h3>
+            <ul>
+              <li><strong>Strategies: new filter &ldquo;W MACD 30/60/5 vs signal&rdquo;:</strong> pick <b>Above signal</b>, <b>Below signal</b> or <b>Just crossed up (this week)</b> for the weekly MACD with a 30-week fast and 60-week slow average and a 5-week signal line. &ldquo;Just crossed up&rdquo; means this week&rsquo;s bar, even while the week is still open, has just moved above the signal line, so it works on any weekday. The reading is worked out by Refresh all stocks, so stocks show it after their next refresh; a stock with fewer than 65 weekly bars has no reading (use &ldquo;None (no rating)&rdquo; to let it through). Existing scores and the Tech Rating are unchanged.</li>
+            </ul>
             <h3>v1.352 &middot; 2026-11-04</h3>
             <ul>
               <li><strong>Cleaner inside (nothing looks different, nothing is scored differently):</strong> five of the longest pieces of code were taken apart into small, tested steps: the price history chart and its hover card, the Refresh all stocks run (snapshot, new bars, Technical Score 2 and the result card), the Fundamental import (reading the file, scoring, checks, writing, rollback and the result card), the live-update listeners that keep pins, research, prices and the trade log current, and the way a scored stock is written into the list. The screens, numbers and messages are the same as in v1.351; the point is that each step can now be tested on its own and fixed without touching the others.</li>
