@@ -2787,7 +2787,7 @@ async function loadAllStubbed(file, extra, keep){
   }
   return loadWithStubs(file, extra, stubs);
 }
-const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { paintHint, rsBars, rsCross, rsReport, rsSnapshot, rsTech2, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
+const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { paintHint, rsBars, rsCross, rsReport, rsSnapshot, rsTech2, runSnapshot, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
   ['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js']);
 const tvStock = (name) => ({ name, ticker: name, pillars: { val: 0.5 } });
 const tvRun = (db, names, over) => Object.assign({ db, today: '2026-11-04', stored: new Map(), prevRows: new Map(), todo: names.map((n) => ({ s: tvStock(n), sym: 'N:' + n })), ctx: null, batchLeft: {}, updated: 0, unchanged: 0, scored: 0, kept: 0, chunksSaved: 0,
@@ -2988,6 +2988,25 @@ test('refresh all stocks, weekly MACD 30/60/5 step: every stock priced today is 
   console.error = (m) => errors.push(m);
   try { T.saveCrossStates = async () => { throw new Error('boom'); }; const broken = tvRun(db, [], { histRan: true }); await M.rsCross(broken); assert.strictEqual(broken.crossFailed, -1); } finally { console.error = keep; }
   assert.deepStrictEqual(errors, ['The weekly MACD 30/60/5 could not be read']);
+}));
+
+test('refresh all stocks: a whole run goes through its steps in order, the weekly MACD 30/60/5 step reads the prices the snapshot step kept, and the result reports it', () => alone(async () => {
+  const stocks = [tvStock('A')], steps = [], shown = [], keep = globalThis.document, bars = [[Math.floor(Date.now() / 1000), 1, 1, 1, 1, 1]];   // current bars: no stock needs new ones
+  globalThis.document = { getElementById: () => null };
+  try {
+    const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks, priceHistoryByTicker: { A: { '1W': bars, '1M': bars } }, pcTickerKey: (s) => s.name, COMPACT_LAG: 1, pillars: 1, getFiRunning: () => false, getFiOwner: () => true, getFiDb: () => db,
+      tvMcp: async () => true, tvIstDate: () => '2026-11-04', debugHandle: () => ({}), loadRuns: async () => [], priorityOrder: (k, l) => l, isinSymbolCached: (s) => 'N:' + s.name, isinOf: () => 'INE1', buildTech2Chunks: () => [], fiShowResult: (...a) => shown.push(a),
+      tvCall: async (tool, args) => (args.symbols ? tvAnswer(args.symbols) : { data: {} }), ensureAllPriceBars: async () => { steps.push('bars loaded'); }, saveRunLog: async (d, kind, at, t0, rec) => { steps.push('log ' + rec.saved); },
+      saveCrossStates: async (d, items) => { steps.push('cross ' + JSON.stringify(items)); return { read: 1, changed: 1, chunksWritten: 0, failed: 0 }; } };
+    const db = { collection: () => ({ get: async () => ({ docs: [] }) }), doc: () => ({ get: async () => ({ exists: false }), set: async () => {} }) };
+    const M = await loadTvRefresh();
+    await M.runSnapshot();
+    assert.strictEqual(steps.join(' | '), 'bars loaded | cross ' + JSON.stringify([{ key: 'A', W: bars, px: 10 }]) + ' | log 1');   // the price the snapshot step kept is read with the saved bars, then the run is logged
+    assert.strictEqual(shown.length, 1); assert.ok(shown[0][1].map((l) => l.text).join('\n').includes('Weekly MACD 30/60/5: 1 stocks read, 1 changed'));
+    assert.ok(T.log.includes('verify|done|'));
+    await M.runSnapshot();   // a second run can start: the "a job is running" flag was released
+    assert.strictEqual(shown.length, 2);
+  } finally { globalThis.document = keep; }
 }));
 
 test('refresh all stocks, bars step: placed stocks are saved in batches and scored, long-behind stocks are rewritten, and the rest go one by one', () => alone(async () => {
