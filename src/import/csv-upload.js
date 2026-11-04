@@ -108,7 +108,7 @@ const fundamentalCsvInputEl = document.getElementById('fundamentalCsvInput');
 function init_import_csv_upload(){
 if(fundamentalCsvInputEl){
   fundamentalCsvInputEl.addEventListener('change', e => {
-    const file = targetEl(e).files && targetEl(e).files[0];
+    const file = targetEl(e).files && /** @type {FileList} */ (targetEl(e).files)[0];
     if(file) handleFundamentalCsvFile(file);
   });
 }

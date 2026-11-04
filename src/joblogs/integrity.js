@@ -28,7 +28,7 @@ function runDataIntegrityCheck(){
       const invalid = factors.some(f => typeof f.weight !== 'number' || (!f.excluded && typeof f.score !== 'number'));
       const expected = expectedScore(factors);
       if(invalid || (expected != null && Math.abs(expected - s.score) > 0.05)){
-        problems.push(`${sym}: fundamentals factor scores (${invalid ? 'invalid' : expected.toFixed(2)} over the factors that count) don't match stock.score (${s.score})`);
+        problems.push(`${sym}: fundamentals factor scores (${invalid ? 'invalid' : /** @type {number} */ (expected).toFixed(2)} over the factors that count) don't match stock.score (${s.score})`);
       }
     }
   });

@@ -219,7 +219,7 @@ function renderAnalysisColumnsPanel(colOrder){
   const grip = '<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true" fill="currentColor"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
   const rows = colOrder.map((id) => {
     const col = ANALYSIS_LB_COLUMN_MAP.get(id);
-    const label = col.label || (id === 'pin' ? 'Pin' : id);
+    const label = (col && col.label) || (id === 'pin' ? 'Pin' : id);
     return `
       <div class="analysis-column-row" data-col="${id}">
         <button type="button" class="analysis-col-grip" data-col="${id}" aria-label="Move ${escapeHtml(label)}: drag it, or press the up and down arrow keys" title="Drag to move">${grip}</button>

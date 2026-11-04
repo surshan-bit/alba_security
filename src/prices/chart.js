@@ -52,11 +52,11 @@ function initPriceChart(s){
   rebuildEvents();
   const span = (k, i) => { const b = bars[k]; return [b[i][0], i + 1 < b.length ? b[i+1][0] : b[i][0] + (k==='1M' ? 31*86400 : k==='1W' ? 7*86400 : 86400)]; };
   const panels = root.querySelector('.pc-panels');
-  const elOf = k => panels.querySelector('[data-k="' + k + '"]');
+  const elOf = k => /** @type {Element} */ (panels).querySelector('[data-k="' + k + '"]');
 
   function drawBands(){
     order.forEach(k => {
-      const g = elOf(k).querySelector('.pc-band'), G = geo[k]; if(!g || !G) return;
+      const g = /** @type {Element} */ (elOf(k)).querySelector('.pc-band'), G = geo[k]; if(!g || !G) return;
       let out = '';
       for(const src in hover){
         if(src === k) continue;
@@ -68,10 +68,10 @@ function initPriceChart(s){
     });
   }
   function draw(k){
-    const c = cfg[k], el = elOf(k), svg = el.querySelector('svg');
+    const c = cfg[k], el = elOf(k), svg = /** @type {Element} */ (el).querySelector('svg');
     const lanes = haveGroups.filter(g => shown.has(g.id)), evH = lanes.length ? lanes.length * LANE + 4 : 0;
     const ms = macd[k], MH = ms ? 70 : 0, MG = ms ? 22 : 0, mBlock = MH + MG;   // the MACD band sits under the volume, above the event tags
-    const W = el.querySelector('.pc-chart').clientWidth || 320, H = 250 + evH + mBlock, padL = 2, padR = W < 520 ? 32 : 44, padT = 8, padB = 22 + evH, volH = 44, gap = 8;
+    const W = /** @type {Element} */ (/** @type {Element} */ (el).querySelector('.pc-chart')).clientWidth || 320, H = 250 + evH + mBlock, padL = 2, padR = W < 520 ? 32 : 44, padT = 8, padB = 22 + evH, volH = 44, gap = 8;
     const all = bars[k], n = Math.min(all.length, c.ranges[state[k]][1]), off = all.length - n, b = all.slice(off);
     const pw = W - padL - padR, ph = H - padT - padB - mBlock - volH - gap, vBase = H - padB - mBlock;   // vBase: the volume bars' baseline
     let lo = Math.min(...b.map(r => r[3])), hi = Math.max(...b.map(r => r[2])); const pad = (hi - lo) * .06; lo -= pad; hi += pad;
@@ -157,17 +157,17 @@ function initPriceChart(s){
       });
     }
     g += `<line class="pc-xh" y1="${padT}" y2="${H - padB}" opacity="0"/>`;
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); setHtml(svg, g);
+    /** @type {SVGSVGElement} */ (svg).setAttribute('viewBox', `0 0 ${W} ${H}`); setHtml(svg, g);
     geo[k] = {W, H, padL, step, X, off, n, b};
     drawBands();
   }
   function onMove(k, e){
-    const G = geo[k], el = elOf(k), rect = el.querySelector('.pc-chart').getBoundingClientRect();
+    const G = geo[k], el = elOf(k), rect = /** @type {Element} */ (/** @type {Element} */ (el).querySelector('.pc-chart')).getBoundingClientRect();
     const px = (e.clientX - rect.left) * (G.W / rect.width);
     const i = Math.max(0, Math.min(G.n - 1, Math.floor((px - G.padL) / G.step))), r = G.b[i];
     hover[k] = G.off + i; drawBands();
-    const xh = el.querySelector('.pc-xh'); xh.setAttribute('x1', String(G.X(i))); xh.setAttribute('x2', String(G.X(i))); xh.setAttribute('opacity', '1');
-    const prev = bars[k][G.off + i - 1], chg = (r[4] / (prev && prev[4] > 0 ? prev[4] : r[1]) - 1) * 100, tip = el.querySelector('.pc-tip');
+    const xh = /** @type {Element} */ (el).querySelector('.pc-xh'); /** @type {Element} */ (xh).setAttribute('x1', String(G.X(i))); /** @type {Element} */ (xh).setAttribute('x2', String(G.X(i))); /** @type {Element} */ (xh).setAttribute('opacity', '1');
+    const prev = bars[k][G.off + i - 1], chg = (r[4] / (prev && prev[4] > 0 ? prev[4] : r[1]) - 1) * 100, tip = /** @type {Element} */ (el).querySelector('.pc-tip');
     const label = k === '1W' ? 'Week of ' + fmtD(r[0], {day:'numeric', month:'short', year:'numeric'}) : fmtD(r[0], {month:'long', year:'numeric'});
     setHtml(tip, `<b>${label}</b><div class="r"><span>Open</span><span>${rs(r[1])}</span></div><div class="r"><span>High</span><span>${rs(r[2])}</span></div><div class="r"><span>Low</span><span>${rs(r[3])}</span></div><div class="r"><span>Close</span><span>${rs(r[4])}</span></div><div class="r"><span>Change</span><span>${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%</span></div><div class="r"><span>Volume</span><span>${vol(r[5])}</span></div>${macdTipHtml(k, G.off + i)}${eventTipHtml(byBar[k].get(G.off + i), barReaction(bars[k], G.off + i), k === '1W' ? 'week' : 'month')}`);
     const tw = /** @type {HTMLElement} */ (tip).offsetWidth, xx = G.X(i) * (rect.width / G.W);
@@ -192,7 +192,7 @@ function initPriceChart(s){
   const eventTipHtml = (list, react, per) => {
     if(!list || !list.length) return '';
     const sorted = list.slice().sort((a, b) => b.t - a.t), more = sorted.length - 5;
-    const glyphFor = e => e.k === 'news' ? '⚡' : (e.glyph || EVENT_GROUPS.find(x => x.id === e.group).glyph);
+    const glyphFor = e => e.k === 'news' ? '⚡' : (e.glyph || /** @type {{ id: string; label: string; glyph: string; }} */ (EVENT_GROUPS.find(x => x.id === e.group)).glyph);
     return '<div class="evs">' + sorted.slice(0, 5).map(e => `<div class="ev"><span class="pc-evk pc-evk-${e.group}${e.k === 'sell' ? ' sell' : ''}${e.group === 'news' && e.s ? ' s-' + e.s : ''}">${glyphFor(e)}</span><span>${escapeHtml(e.text)}<small>${escapeHtml(e.d + (e.src ? ' · ' + e.src : ''))}</small></span></div>`).join('') + (more > 0 ? `<div class="ev more">+${more} more</div>` : '') + (react && list.some(e => e.group === 'news') ? `<div class="evmove">Price: ${per} ${pctTxt(react.same)}, next ${per} ${pctTxt(react.next)}</div>` : '') + '</div>';
   };
   const keyBtn = root.querySelector('#pcKeyToggle');
@@ -203,7 +203,7 @@ function initPriceChart(s){
     keyBtn.textContent = pcKeyOpen ? 'Hide legend' : 'Legend';
   });
   root.querySelectorAll('.pc-evtoggle').forEach(btn => btn.addEventListener('click', () => {
-    const id = /** @type {HTMLElement} */ (btn).dataset.g, on = !shown.has(id);
+    const id = /** @type {string} */ (/** @type {HTMLElement} */ (btn).dataset.g), on = !shown.has(id);
     if(on) shown.add(id); else shown.delete(id);
     btn.setAttribute('aria-pressed', String(on));
     rebuildEvents(); order.forEach(draw);
@@ -216,11 +216,11 @@ function initPriceChart(s){
     // the summary figures are copied as nodes: serialising them to HTML and parsing that again would lose their custom properties under a strict policy
     const figures = root.querySelector('.pc-sums [data-k="' + k + '"]');
     if(figures) /** @type {Element} */ (el.querySelector('.pc-psum')).append(...Array.from(figures.childNodes, n => n.cloneNode(true)));
-    panels.appendChild(el);
-    el.querySelectorAll('.pc-pill').forEach(btn => /** @type {HTMLElement} */ (btn).onclick = () => { state[k] = +/** @type {HTMLElement} */ (btn).dataset.i; el.querySelectorAll('.pc-pill').forEach(x => x.setAttribute('aria-pressed', String(x === btn))); draw(k); });
+    /** @type {Element} */ (panels).appendChild(el);
+    el.querySelectorAll('.pc-pill').forEach(btn => /** @type {HTMLElement} */ (btn).onclick = () => { state[k] = +/** @type {string} */ (/** @type {HTMLElement} */ (btn).dataset.i); el.querySelectorAll('.pc-pill').forEach(x => x.setAttribute('aria-pressed', String(x === btn))); draw(k); });
     const ch = el.querySelector('.pc-chart');
-    ch.addEventListener('pointermove', e => { pend[k] = e; if(!raf[k]) raf[k] = requestAnimationFrame(() => { raf[k] = 0; if(pend[k]) onMove(k, pend[k]); }); });
-    ch.addEventListener('pointerleave', () => { pend[k] = null; delete hover[k]; drawBands(); /** @type {HTMLElement} */ (el.querySelector('.pc-tip')).classList.remove('is-shown'); el.querySelector('.pc-xh').setAttribute('opacity', '0'); });
+    /** @type {Element} */ (ch).addEventListener('pointermove', e => { pend[k] = e; if(!raf[k]) raf[k] = requestAnimationFrame(() => { raf[k] = 0; if(pend[k]) onMove(k, pend[k]); }); });
+    /** @type {Element} */ (ch).addEventListener('pointerleave', () => { pend[k] = null; delete hover[k]; drawBands(); /** @type {HTMLElement} */ (el.querySelector('.pc-tip')).classList.remove('is-shown'); /** @type {Element} */ (el.querySelector('.pc-xh')).setAttribute('opacity', '0'); });
   });
   order.forEach(draw);
   let rz; pcObserver = new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { if(root.isConnected) order.forEach(draw); }, 80); });

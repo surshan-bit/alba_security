@@ -233,12 +233,12 @@ async function ldRefreshCards(c){
         const factsOut = facts.length ? { facts } : {};
         const w = Number(f.weight);
         if(SCORABLE.has(k)){
-          let sc = Number(o.score);
-          sc = isFinite(sc) && isFinite(w) ? Math.round(Math.max(0, Math.min(w, sc)) * 100) / 100 : undefined;
-          entry.score = sc;
+          const sc = Number(o.score);
+          const scored = isFinite(sc) && isFinite(w) ? Math.round(Math.max(0, Math.min(w, sc)) * 100) / 100 : undefined;
+          entry.score = scored;
           if(typeof o.note === 'string' && o.note.trim()) entry.note = o.note.trim().slice(0, 300);
           const nm = String(f.name).replace(/&amp;/g, '&');
-          scoreNotes.push(sc !== undefined && typeof f.score === 'number' && Math.abs(sc - f.score) >= 0.005 ? nm + ' ' + f.score.toFixed(2) + ' → ' + sc.toFixed(2) : null);
+          scoreNotes.push(scored !== undefined && typeof f.score === 'number' && Math.abs(scored - f.score) >= 0.005 ? nm + ' ' + f.score.toFixed(2) + ' → ' + scored.toFixed(2) : null);
         }
         entry.research = { asof: today, headline: o.research.headline.trim().slice(0, 240), points: pts, ...factsOut, positives: strs(o.research.positives, 2), negatives: strs(o.research.negatives, 2), sources: srcs };
         upd[k] = entry;

@@ -216,11 +216,11 @@ async function rsSnapshot(run){
     const res = await pending;
     run.tvWaitMs += Date.now() - w0;
     pending = bi + 1 < batches.length && !stopAsked ? fetchBatch(batches[bi + 1]) : null;
-    if(res.error && tvIsFatal(res.error)) throw res.error;
-    if(res.error && ++failedBatches >= 3){ const e = new Error(tvErrorText(res.error) + ' Three batches in a row failed, so the run stopped.'); throw e; }
-    if(!res.error) failedBatches = 0;
-    if(res.error){ batch.forEach(x => run.skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: tvErrorText(res.error) })); backoff = 1500; run.batchSecs.push(Math.round((Date.now() - b0) / 100) / 10); continue; }
-    const payload = res.payload;
+    if(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error && tvIsFatal(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error)) throw /** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error;
+    if(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error && ++failedBatches >= 3){ const e = new Error(tvErrorText(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error) + ' Three batches in a row failed, so the run stopped.'); throw e; }
+    if(!/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error) failedBatches = 0;
+    if(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error){ batch.forEach(x => run.skipped.push({ sym: tickerSymbol(x.s), name: x.s.name, reason: tvErrorText(/** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).error) })); backoff = 1500; run.batchSecs.push(Math.round((Date.now() - b0) / 100) / 10); continue; }
+    const payload = /** @type {{ payload: any; error?: undefined; } | { error: any; payload?: undefined; }} */ (res).payload;
     const data = Object.assign({}, (payload && payload.data) || {});
     // A stock TradingView leaves out of an answer is usually a one-off miss: ask again for just those symbols before giving up.
     const priced = x => data[x.sym] && typeof data[x.sym].close === 'number' && data[x.sym].close > 0;

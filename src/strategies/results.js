@@ -2,6 +2,7 @@
 import { escapeHtml, tickerSymbol } from '../core/util.js';
 import { stockIndex, stocks } from '../core/stocks.js';
 import { FIELD_BY_ID } from './fields.js';
+import { knownField } from './lookup.js';
 import { describeRule, evaluateStock, formatValue } from './rules.js';
 import { cleanSort } from '../analysis/state.js';
 import { analysisLbCell, analysisRowContext, columnHeaderHtml, compareByColumn, nextSort, sortLabelOf, stockGridColumnIds } from '../analysis/columns.js';
@@ -63,7 +64,7 @@ function whyHtml(query, rules){
   const head = `<div class="strat-why-head"><b>${escapeHtml(s.name)}</b> <span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}</span> &mdash; ${ev.pass ? '<span class="strat-yes">qualifies</span>' : '<span class="strat-no">does not qualify</span>'}</div>`;
   if(!ev.results.length) return head + `<div class="strat-empty">There are no rules to check yet.</div>`;
   const rows = ev.results.map(r => {
-    const f = FIELD_BY_ID.get(r.rule.field);
+    const f = knownField(FIELD_BY_ID, r.rule.field);
     const shown = r.missing ? 'no data' : formatValue(f, r.value === null && f.noneLabel ? 'none' : r.value);
     return `<li class="${r.pass ? 'ok' : 'bad'}"><span class="strat-mark">${r.pass ? '&#10003;' : '&#10007;'}</span> ${escapeHtml(describeRule(r.rule))} <span class="strat-have">(this stock: ${escapeHtml(shown)})</span></li>`;
   }).join('');

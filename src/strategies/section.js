@@ -176,7 +176,7 @@ function init_strategies_section(){
     if(tb && st) tb.textContent = trackLabel(qualifyingStocks(stocks, st.rules));
   });
   window.addEventListener('alba-strategies-status', onSaveStatus);
-  window.addEventListener('alba-strategies-reloaded', () => { if(document.getElementById('section-strategies').classList.contains('active')) renderStrategiesSection(); });
+  window.addEventListener('alba-strategies-reloaded', () => { if(/** @type {HTMLElement} */ (document.getElementById('section-strategies')).classList.contains('active')) renderStrategiesSection(); });
   const sec = document.getElementById('section-strategies');
   if(!sec) return;
   wireRulesEditor(sec, selectedStrategy, renderStrategiesSection);

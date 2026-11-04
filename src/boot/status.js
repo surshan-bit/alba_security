@@ -10,7 +10,7 @@ function wireBootRetry(){
 function bootMessage(text, isError){
   const el = document.getElementById('bootStatus'); if(!el) return;
   el.hidden = false;
-  el.querySelector('.boot-msg').textContent = text;
+  /** @type {Element} */ (el.querySelector('.boot-msg')).textContent = text;
   /** @type {HTMLElement} */ (el.querySelector('.boot-retry')).hidden = !isError;
   el.classList.toggle('boot-error', !!isError);
 }

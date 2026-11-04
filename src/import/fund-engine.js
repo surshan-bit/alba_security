@@ -341,7 +341,7 @@ function scoreOne(r, pct, moatPct) {
   const presentScores = factors.filter(f => f.score != null).map(f => f.score);
   // Factors that do not apply (na) are not counted as zero: the weights that do apply are scaled up to make 10 again.
   const naWeight = factors.filter(f => f.na).reduce((a, f) => a + f.weight, 0);
-  const score = presentScores.length ? Math.round(presentScores.reduce((a, b) => a + b, 0) * (10 / (10 - naWeight)) * 100) / 100 : null;
+  const score = presentScores.length ? Math.round(/** @type {number[]} */ (presentScores).reduce((a, b) => a + b, 0) * (10 / (10 - naWeight)) * 100) / 100 : null;
   const verdict = scoreToVerdict(score);
   const by = k => (factors.find(f => f.key === k).score || 0);
   const tradWeight = 5.85 - factors.filter(f => f.na && ['fin', 'prof', 'growth', 'val'].includes(f.key)).reduce((a, f) => a + f.weight, 0);

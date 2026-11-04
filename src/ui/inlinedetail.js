@@ -10,7 +10,7 @@ import { tickerSymbol } from '../core/util.js';
 import { recordView } from './viewstack.js';
 
 // Where the detail panel rests (a hidden holder in the page) when no stock is open; it is handed back here when a detail view closes.
-const detailHome = detailEl.parentNode;
+const detailHome = /** @type {HTMLElement} */ (detailEl).parentNode;
 /** @type {{ section: any, host: any, scroll: any } | null} */
 let current = null;   // { section, host, scroll } while a stock is open in place
 
@@ -19,7 +19,7 @@ function closeInlineDetail(restoreScroll){
   if(!current) return;
   const { section, host, scroll } = current;
   current = null;
-  if(detailEl.parentNode === host){ detailHome.appendChild(detailEl); detailEl.textContent = ''; }
+  if(/** @type {HTMLElement} */ (detailEl).parentNode === host){ /** @type {ParentNode} */ (detailHome).appendChild(/** @type {HTMLElement} */ (detailEl)); /** @type {HTMLElement} */ (detailEl).textContent = ''; }
   host.remove();
   section.classList.remove('inline-detail-open');
   setDetailBackTo(null);
@@ -49,7 +49,7 @@ function openStockInline(section, label, idx){
     host.className = 'inline-detail-host';
     section.appendChild(host);
     section.classList.add('inline-detail-open');
-    host.appendChild(detailEl);
+    host.appendChild(/** @type {HTMLElement} */ (detailEl));
     current = { section, host, scroll };
   }
   // No label (a stock opened from a link, e.g. in a new tab): there is no page to go back to, so no Back button.
@@ -70,7 +70,7 @@ function openIndustryInline(section, label, by, name){
     host.className = 'inline-detail-host';
     section.appendChild(host);
     section.classList.add('inline-detail-open');
-    host.appendChild(detailEl);
+    host.appendChild(/** @type {HTMLElement} */ (detailEl));
     current = { section, host, scroll };
   }
   setDetailBackTo({ label, onBack: () => { const key = section.id.replace(/^section-/, ''); closeInlineDetail(true); recordView({ s: key }); } });

@@ -4,6 +4,7 @@
 import { escapeHtml } from '../core/util.js';
 import { stocks } from '../core/stocks.js';
 import { FIELDS, FIELD_BY_ID } from './fields.js';
+import { knownField } from './lookup.js';
 import { OPS, defaultRule, describeRule, isNum, qualifyingStocks, ruleReady, testRule, withOp } from './rules.js';
 import { saveStrategies } from './state.js';
 
@@ -37,7 +38,7 @@ const TRASH = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" strok
 let undo = null;
 
 function ruleRowHtml(rule, i, all){
-  const f = FIELD_BY_ID.get(rule.field);
+  const f = knownField(FIELD_BY_ID, rule.field);
   const ops = OPS[f.type];
   let tail;
   if(!ruleReady(rule)) tail = `<span class="sr-count sr-incomplete" title="Fill in a value for this rule to apply it">not applied yet</span>`;
@@ -87,7 +88,7 @@ function wireRulesEditor(root, getStrategy, onChange){
     if(t.classList.contains('sr-field')){ st.rules[i] = defaultRule(t.value); commit(); }
     else if(t.classList.contains('sr-op')){ st.rules[i] = withOp(rule, t.value); commit(); }
     else if(t.classList.contains('sr-v1') || t.classList.contains('sr-v2')){
-      if(FIELD_BY_ID.get(rule.field).type === 'text') rule.value = t.value;
+      if(knownField(FIELD_BY_ID, rule.field).type === 'text') rule.value = t.value;
       else {
         const v = t.value.trim() === '' ? null : Number(t.value);
         const val = isNum(v) ? v : null;

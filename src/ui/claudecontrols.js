@@ -7,8 +7,8 @@ function row(id, title, sub, on, disabled){
   lab.className = 'settings-row claude-ctl-row';
   setHtml(lab, '<div class="settings-row-text"><div class="settings-row-title"></div><div class="settings-row-sub"></div></div>' +
     '<input type="checkbox" class="claude-ctl-box" data-claude-step="' + id + '" aria-label="' + title.replace(/"/g, '&quot;') + '">');
-  lab.querySelector('.settings-row-title').textContent = title;
-  lab.querySelector('.settings-row-sub').textContent = sub;
+  /** @type {Element} */ (lab.querySelector('.settings-row-title')).textContent = title;
+  /** @type {Element} */ (lab.querySelector('.settings-row-sub')).textContent = sub;
   const box = /** @type {HTMLInputElement} */ (lab.querySelector('input'));
   box.checked = on; box.disabled = disabled;
   return lab;

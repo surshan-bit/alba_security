@@ -159,7 +159,7 @@ function strategyGroup(){
   stocks.forEach(s => {
     if(!analysisPasses(s, 'astrat', null, ideasPassSet())) return;
     all++;
-    strategies.forEach(x => { if(sets.get(x.id).has(s)) counts.set(x.id, counts.get(x.id) + 1); });
+    strategies.forEach(x => { if(/** @type {Set<any>} */ (sets.get(x.id)).has(s)) counts.set(x.id, /** @type {number} */ (counts.get(x.id)) + 1); });
   });
   const hiddenNoteHtml = hiddenNote();
   const buttons = [filterButton('astrat', 'all', !chosen, 'text', 'All', all, 'Do not narrow Analysis by a strategy')]
@@ -282,8 +282,8 @@ function renderAnalysisFilterPanel(rerender){
   if(host) setHtml(host, analysisFiltersHtml());
   const panel = document.getElementById('analysisFilterPanel'), toggle = document.getElementById('analysisFiltersToggle'), summary = document.getElementById('analysisFiltersSummary');
   if(panel && toggle && summary){
-    const names = Array.from(panel.querySelectorAll('.filter-btn.active')).filter(b => !['all'].includes(/** @type {HTMLElement} */ (b).dataset.averdict || /** @type {HTMLElement} */ (b).dataset.amos || /** @type {HTMLElement} */ (b).dataset.atechw || /** @type {HTMLElement} */ (b).dataset.atechm || /** @type {HTMLElement} */ (b).dataset.arebound || /** @type {HTMLElement} */ (b).dataset.astrat || /** @type {HTMLElement} */ (b).dataset.aideas)).map(b => {
-      const c = b.cloneNode(true); /** @type {Element} */ (c).querySelectorAll('.filter-n').forEach(n => n.remove()); return c.textContent.trim();
+    const names = Array.from(panel.querySelectorAll('.filter-btn.active')).filter(b => !(/** @type {(string | undefined)[]} */ (['all'])).includes(/** @type {HTMLElement} */ (b).dataset.averdict || /** @type {HTMLElement} */ (b).dataset.amos || /** @type {HTMLElement} */ (b).dataset.atechw || /** @type {HTMLElement} */ (b).dataset.atechm || /** @type {HTMLElement} */ (b).dataset.arebound || /** @type {HTMLElement} */ (b).dataset.astrat || /** @type {HTMLElement} */ (b).dataset.aideas)).map(b => {
+      const c = b.cloneNode(true); /** @type {Element} */ (c).querySelectorAll('.filter-n').forEach(n => n.remove()); return /** @type {string} */ (c.textContent).trim();
     });
     summary.textContent = names.length ? names.join(', ') : 'All stocks';
     const cnt = document.getElementById('analysisFiltersCount'), shown = document.getElementById('analysisLeaderboardCount');

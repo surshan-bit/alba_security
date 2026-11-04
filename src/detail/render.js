@@ -107,7 +107,7 @@ function bindDetailLinks(s){
     });
   }
 
-  detailEl.querySelectorAll('.proxy-tag-link').forEach(tag => {
+  /** @type {HTMLElement} */ (detailEl).querySelectorAll('.proxy-tag-link').forEach(tag => {
     tag.addEventListener('click', (e)=>{
       e.preventDefault();
       showSection('help').then(() => document.getElementById('glossary-data-proxy')?.scrollIntoView({block:'start'}));

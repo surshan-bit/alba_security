@@ -9,8 +9,8 @@ import { setHtml } from '../core/safehtml.js';
 function init_ui_globalsearch(){
   const input = document.getElementById('globalSearch'), box = document.getElementById('globalSuggest'), clear = document.getElementById('globalSearchClear');
   // A shorter prompt on phones, so the whole of it fits in the box.
-  const longHint = input.getAttribute('placeholder') || '', phoneQuery = window.matchMedia('(max-width: 900px)');
-  const setHint = () => input.setAttribute('placeholder', phoneQuery.matches ? 'Search a company' : longHint);
+  const longHint = /** @type {HTMLElement} */ (input).getAttribute('placeholder') || '', phoneQuery = window.matchMedia('(max-width: 900px)');
+  const setHint = () => /** @type {HTMLElement} */ (input).setAttribute('placeholder', phoneQuery.matches ? 'Search a company' : longHint);
   setHint(); phoneQuery.addEventListener('change', setHint);
   if(!input || !box) return;
   let items = [], active = -1;
@@ -22,7 +22,7 @@ function init_ui_globalsearch(){
   };
   const show = () => {
     const q = /** @type {HTMLInputElement} */ (input).value.trim().toLowerCase();
-    clear.classList.toggle('show', /** @type {HTMLInputElement} */ (input).value.length > 0);
+    /** @type {HTMLElement} */ (clear).classList.toggle('show', /** @type {HTMLInputElement} */ (input).value.length > 0);
     if(!q){ hide(); return; }
     items = buildSuggestions(q); active = -1;
     if(!items.length){ setHtml(box, '<div class="sg-empty">No stock found</div>'); box.classList.add('show'); return; }
@@ -34,7 +34,7 @@ function init_ui_globalsearch(){
   };
   const pick = (s) => {
     const idx = stockIndex.get(s);
-    hide(); /** @type {HTMLInputElement} */ (input).value = ''; clear.classList.remove('show'); input.blur();
+    hide(); /** @type {HTMLInputElement} */ (input).value = ''; /** @type {HTMLElement} */ (clear).classList.remove('show'); input.blur();
     if(idx === undefined) return;
     // The full-width detail view, with "Back to <page>" to return to where the search was made.
     const labels = { analysis: 'Analysis', strategies: 'Strategies', business: 'Explorer' };
@@ -56,7 +56,7 @@ function init_ui_globalsearch(){
     const it = closestEl(e, '.sg-item'); if(!it) return;
     e.preventDefault(); pick(items[Number(it.dataset.i)]);
   });
-  clear.addEventListener('click', () => { /** @type {HTMLInputElement} */ (input).value = ''; clear.classList.remove('show'); hide(); input.focus(); });
+  /** @type {HTMLElement} */ (clear).addEventListener('click', () => { /** @type {HTMLInputElement} */ (input).value = ''; /** @type {HTMLElement} */ (clear).classList.remove('show'); hide(); input.focus(); });
   document.addEventListener('mousedown', (e) => { if(!closestEl(e, '.topbar-search')) hide(); });
   // "/" jumps to the box from anywhere (unless typing in another field).
   document.addEventListener('keydown', (e) => {

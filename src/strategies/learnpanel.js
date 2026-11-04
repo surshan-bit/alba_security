@@ -152,7 +152,7 @@ function wireLearnPanel(root, getStrategy, rerender){
     if(e.target === m || closestEl(e, '#stratLearnClose')){ closeLearnModal(); return; }
     if(!st) return;
     const t = closestEl(e, '.lm-tab');
-    if(t){ tab = t.dataset.tab; redraw(); if(tab !== 'past' && !hasPractice(tab)) ask(tab); return; }
+    if(t){ tab = /** @type {string} */ (t.dataset.tab); redraw(); if(tab !== 'past' && !hasPractice(tab)) ask(tab); return; }
     const pa = closestEl(e, '.pr-ask');
     if(pa){ ask(pa.dataset.h, !!pa.dataset.refresh); return; }
     if(closestEl(e, '#stratLearnRun')){ runLearn(st, getStrategy); return; }
