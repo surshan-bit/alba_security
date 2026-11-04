@@ -2407,6 +2407,23 @@ const CHART_BARS = (n, step, t0) => Array.from({ length: n }, (_, i) => { const 
 const CHART_MS = (n, from) => ({ from, macd: Array.from({ length: n }, (_, i) => Math.sin(i / 4)), signal: Array.from({ length: n }, (_, i) => Math.sin(i / 4 - .5)), hist: Array.from({ length: n }, (_, i) => Math.sin(i / 4) - Math.sin(i / 4 - .5) - (i % 2 ? .6 : 0)) });
 const CHART_CFG = { title: 'Weekly', ranges: [], def: 0, lbl: { day: 'numeric', month: 'short' }, every: 0 };
 
+test('chart events: each event lands on the bar that contains its time, hidden kinds are left out, and the price reaction is read from neighbouring closes', async () => {
+  const E = await loadWithStubs('src/prices/events.js', '', EVENT_STUBS);
+  const bars = [[100, 10, 0, 0, 10, 0], [200, 10, 0, 0, 20, 0], [300, 20, 0, 0, 10, 0]];
+  const ev = (t, group) => ({ t, group });
+  const map = E.eventsByBar([ev(100, 'news'), ev(199, 'news'), ev(250, 'trade'), ev(250, 'news'), ev(99, 'news'), ev(400, 'news'), ev(399, 'news')], bars, 100, new Set(['news']));
+  assert.deepStrictEqual([...map.keys()], [0, 1, 2]);   // before the first bar and past the last bar's span: dropped; the trade lane is hidden
+  assert.strictEqual(map.get(0).length, 2); assert.strictEqual(map.get(1).length, 1); assert.strictEqual(map.get(2).length, 1);
+  assert.strictEqual(E.eventsByBar([ev(1, 'news')], [], 100, new Set(['news'])).size, 0);   // no bars: nothing to attach to
+  assert.strictEqual(E.barReaction(bars, 7), null);
+  const mid = E.barReaction(bars, 1);
+  assert.ok(Math.abs(mid.same - 100) < 1e-9 && Math.abs(mid.next + 50) < 1e-9);
+  const first = E.barReaction(bars, 0);   // the first bar compares with its own open
+  assert.strictEqual(first.same, 0); assert.ok(first.next > 99);
+  const last = E.barReaction(bars, 2); assert.strictEqual(last.next, null);
+  assert.strictEqual(E.barReaction([[1, 0, 0, 0, 5, 0]], 0).same, null);   // an open of zero is no base
+});
+
 test('price chart tooltip: prices, change and volume read in Indian units, and the heading names the week or month', () => {
   const T = load('src/prices/charttip.js');
   const bar = [1.65e9, 100, 110, 90, 105, 2.5e7];
@@ -2445,6 +2462,7 @@ test('price chart tooltip: events are listed newest first, escaped, capped at fi
   assert.ok(html.includes('>E<') && html.includes('>T<') && html.includes('Price: week +2.0%, next week n/a'));
   const many = T.eventTipHtml(Array.from({ length: 7 }, (_, i) => ev({ t: i })), null, 'month', groups);
   assert.ok(many.includes('+2 more') && !many.includes('evmove'));
+  assert.ok(T.eventTipHtml([ev({})], { same: -2.04, next: 3 }, 'week', groups).includes('Price: week -2.0%, next week +3.0%'));
   assert.ok(!T.eventTipHtml([ev({ k: 'earn', group: 'earn' })], { same: 1, next: 1 }, 'week', groups).includes('evmove'));   // reaction only for news
 });
 
@@ -2479,6 +2497,21 @@ test('price chart drawing: candle bodies change with the room, narrow charts get
   assert.ok(labels(draw(60, 900, cfg)) > 0);
   const edge = draw(40, 300);   // the first label hugs the left edge, a late one the right
   assert.ok(edge.includes('text-anchor="start"'));
+});
+
+test('price chart drawing: up and down candles get their own colours at every body width, and date labels stay inside the chart', () => {
+  const S = load('src/prices/chartsvg.js');
+  const run = (up, n, W) => S.buildChartSvg({ view: Array.from({ length: n }, (_, i) => [1.65e9 + i * 604800, 100, 110, 90, up ? 105 : 95, 1000]), off: 0, cfg: CHART_CFG, ms: null, lanes: [], byBar: new Map(), W }).html;
+  [[true, 'var(--buy)', 'var(--avoid)'], [false, 'var(--avoid)', 'var(--buy)']].forEach(([up, own, other]) => {
+    [[20, 900], [150, 900]].forEach(([n, W]) => {   // wide bodies (rects) and mid-width bodies (paths)
+      const html = run(up, n, W);
+      assert.ok(html.includes(own) && !html.includes(other), own + ' ' + n);
+    });
+  });
+  const labelled = (W) => S.buildChartSvg({ view: CHART_BARS(2, 604800, 1.65e9), off: 0, cfg: { title: '', ranges: [], def: 0, lbl: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, every: 1 }, ms: null, lanes: [], byBar: new Map(), W }).html;
+  const html = labelled(150);
+  assert.ok(html.includes('text-anchor="start"') && html.includes('text-anchor="end"'));
+  assert.ok(labelled(900).includes('text-anchor="middle"'));
 });
 
 test('price chart drawing: event tags sit in one lane per kind, with the right glyph and colour class', () => {
