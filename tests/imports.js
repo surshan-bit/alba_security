@@ -577,13 +577,16 @@ async function tvRefreshScenarios(){
   // v1.201: a stock TradingView leaves out of an answer is asked for again, and if it still has no price it keeps its earlier figures with their own date
   const miss = DS.stocks.map(s => symOf(s)).find(x => /^[A-Z0-9]+$/.test(x));
   const snapRows = all => [].concat(...Object.entries(all).filter(([k]) => k.startsWith('liveSnapshot/')).map(([, v]) => v.rows));
+  // The stocks whose saved symbol the made-up TradingView has no price for (see the answer of the batch tool in tests/lib/env.js): they are searched again by ISIN during a run.
+  const noPriceIsins = DS.stocks.filter(x => x.isin && /NOTV|ALPHATWO/.test(DS.docs['stockMeta/isinSymbol'][x.isin] || '')).map(x => x.isin);
   // v1.225: Refresh all stocks makes no TradingView symbol search for stocks that have a saved symbol (v1.304 searches only those that have none); it pairs each stock's saved ISIN with the symbol its last run saved
-  await runScenario('refresh all stocks: no symbol search is made, the saved symbols are used and kept', { cfg: { liveCollections: true } }, async page => {
+  await runScenario('refresh all stocks: no symbol search is made for stocks priced today, the saved symbols are used and kept', { cfg: { liveCollections: true } }, async page => {
     await page.click('#tvSnapshotBtn');
     await waitDone(page);
-    // only the stocks that have an ISIN but no saved symbol (BSE-only stocks with no alpha code in this made-up database) are searched
-    const searches = await page.evaluate(() => window.__isinSearches || []), unsaved = DS.stocks.filter(x => x.isin && !DS.docs['stockMeta/isinSymbol'][x.isin]).map(x => x.isin).sort();
-    eq(searches.slice().sort(), unsaved, 'only the stocks with no saved symbol were searched');
+    // only the stocks that have an ISIN but no saved symbol (BSE-only stocks with no alpha code in this made-up database) are searched, and the stock whose saved symbol
+    // TradingView gave no price for (the made-up TradingView does not know BSE:ALPHATWO): its symbol may be dead, so it is searched again by its ISIN
+    const searches = await page.evaluate(() => window.__isinSearches || []), unsaved = DS.stocks.filter(x => x.isin && !DS.docs['stockMeta/isinSymbol'][x.isin]).map(x => x.isin);
+    eq(searches.slice().sort(), unsaved.concat(noPriceIsins).sort(), 'only the stocks with no saved symbol, and the stock with no price for its saved symbol, were searched');
     const a = await readDb(page), map = a.all['stockMeta/isinSymbol'];
     ok(map && Object.keys(map).length > 100, 'the saved symbol list was filled in one go: ' + (map ? Object.keys(map).length : 'missing'));
   });
@@ -594,7 +597,7 @@ async function tvRefreshScenarios(){
     const text = await waitDone(page);
     const searches = await page.evaluate(() => window.__isinSearches || []);
     const unsavedNow = DS.stocks.filter(x => x.isin && !DS.docs['stockMeta/isinSymbol'][x.isin]).map(x => x.isin);
-    eq(searches.slice().sort(), [newStock.isin, ...unsavedNow].sort(), 'the new stock was searched by its ISIN, with no others beyond those that never had a symbol');
+    eq(searches.slice().sort(), [newStock.isin, ...unsavedNow, ...noPriceIsins].sort(), 'the new stock was searched by its ISIN, with no others beyond those that never had a symbol or have no price for their saved one');
     const a = await readDb(page);
     ok(a.all['stockMeta/isinSymbol'][newStock.isin] === 'NSE:' + miss, 'its symbol was saved: ' + a.all['stockMeta/isinSymbol'][newStock.isin]);
     ok(snapRows(a.all).some(r => r.k === sid(miss) && r.c[0] === 111.1), 'it has today\'s figures in the same run');
