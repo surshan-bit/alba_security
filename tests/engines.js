@@ -2195,6 +2195,101 @@ test('strategy fields: knownField returns the field a rule names and an unknown 
   assert.throws(() => knownField(new Map(), 'score'), /Unknown strategy field: score/, 'an empty map has no fields');
 });
 
+// ---- the nine factors of one stock's Fundamental score, each on its own (src/import/fund-engine.js)
+const FX = load('src/import/fund-engine.js', 'export { earningsQuality, cashFlowAdjustment, finFactor, profFactor, growthFactor, valFactor, shareFactor, govFactor, predictFactor, totalScore, subScores };');
+const percentiles = (r, values) => Object.fromEntries(Object.entries(values).map(([k, v]) => [k, new Map([[r, v]])]));
+test('factors: a profit spike far above the multi-year trend is discounted, and the line says by how much', () => {
+  assert.deepStrictEqual(FX.earningsQuality({}), { discount: 1.0, note: '' }, 'no profit growth figures');
+  assert.deepStrictEqual(FX.earningsQuality({ profitGrowth3: 10, profitGrowth5: 20 }), { discount: 1.0, note: '' }, 'no TTM figure');
+  assert.deepStrictEqual(FX.earningsQuality({ profitGrowth3: -5, profitGrowth5: -1, profitGrowthTTM: 50 }), { discount: 1.0, note: '' }, 'a falling trend is not a baseline');
+  assert.strictEqual(FX.earningsQuality({ profitGrowth3: 10, profitGrowthTTM: 35 }).discount, 0.55, 'exactly 3.5x the trend');
+  assert.match(FX.earningsQuality({ profitGrowth3: 10, profitGrowthTTM: 35 }).note, /0\.55x earnings-quality discount/);
+  assert.strictEqual(FX.earningsQuality({ profitGrowth3: 10, profitGrowth5: 10, profitGrowthTTM: 20 }).discount, 0.8, 'exactly twice the trend');
+  assert.match(FX.earningsQuality({ profitGrowth3: 10, profitGrowthTTM: 20 }).note, /0\.8x earnings-quality discount/);
+  assert.deepStrictEqual(FX.earningsQuality({ profitGrowth3: 10, profitGrowthTTM: 19.9 }), { discount: 1.0, note: '' }, 'just under twice the trend');
+});
+test('factors: growth is worth less when it is not backed by cash', () => {
+  const adj = FX.cashFlowAdjustment;
+  assert.deepStrictEqual(adj({}), { mult: 1.0, note: '' }, 'no cash figures');
+  assert.deepStrictEqual(adj({ fcf3: 5, ocf3: 9 }), { mult: 1.0, note: '' }, 'both positive');
+  assert.strictEqual(adj({ fcf3: -5, ocf3: 9 }).mult, 0.75);
+  assert.match(adj({ fcf3: 5, ocf3: 0 }).note, /0\.75x — growth not cash-backed/);
+  assert.deepStrictEqual(adj({ fcf3: null, fcf5: 4, ocf3: null, ocf5: 8 }), { mult: 1.0, note: '' }, 'falls back to the 5-year figures');
+  assert.strictEqual(adj({ fcf5: -1, ocf5: 8 }).mult, 0.75, 'the 5-year figures count when there is no 3-year one');
+  assert.strictEqual(adj({ fcf3: -2 }).mult, 0.85, 'only free cash flow, not positive');
+  assert.match(adj({ ocf3: 0 }).note, /0\.85x — partial cash-flow evidence only/);
+  assert.deepStrictEqual(adj({ fcf3: 3 }), { mult: 1.0, note: '' }, 'only one figure, positive');
+  assert.deepStrictEqual(adj({ ocf5: 3 }), { mult: 1.0, note: '' });
+});
+test('factors: growth combines the percentiles, the earnings-quality discount and the cash adjustment, and keeps both notes', () => {
+  const r = { fcf3: -1, ocf3: 4 }, pct = percentiles(r, { sales3: 80, profit3: 80, profitTTM: 80 });
+  const blank = {}, plain = FX.growthFactor(blank, percentiles(blank, { sales3: 80, profit3: 80, profitTTM: 80 }), { discount: 1, note: '' });
+  assert.strictEqual(plain.key, 'growth'); near(plain.score, 1.125 * 0.8); assert.strictEqual(plain.note, undefined, 'no note when nothing was applied');
+  const both = FX.growthFactor(r, pct, { discount: 0.8, note: ' (0.8x earnings-quality discount — TTM notably ahead of trend)' });
+  near(both.score, 1.125 * 0.8 * 0.8 * 0.75);
+  assert.match(both.note, /^\(0\.8x earnings-quality discount — TTM notably ahead of trend\) \(0\.75x — growth not cash-backed\)$/);
+  const none = FX.growthFactor(r, percentiles(r, { sales3: null, profit3: null, profitTTM: null }), { discount: 0.55, note: ' (x)' });
+  assert.deepStrictEqual([none.score, none.note], [null, '(x)'], 'no percentile at all: no score, and the quality note stays');
+});
+test('factors: a bank or insurer has no Financial Health figure; the others are weighted percentiles', () => {
+  const bank = FX.finFactor({ finKind: 'bank' }, {});
+  assert.deepStrictEqual([bank.score, bank.na], [null, 'banks']);
+  const r = {}, fin = FX.finFactor(r, percentiles(r, { deInv: 100, intCov: 100, quick: 100, altmanZ: 100, currentRatio: 100, debtorDaysInv: 100 }));
+  near(fin.score, 1.8); assert.strictEqual(fin.na, undefined);
+  assert.strictEqual(FX.finFactor(r, percentiles(r, { deInv: null, intCov: null, quick: null, altmanZ: null, currentRatio: null, debtorDaysInv: null })).score, null, 'no percentile at all');
+  near(FX.profFactor(r, percentiles(r, { roceEff: 50, roeEff: 50, opm: 50 })).score, 0.9);
+});
+test('factors: valuation treats a missing or non-positive PEG as neutral and a positive one by its percentile', () => {
+  const val = (peg, extra = {}) => { const r = { peg }; return FX.valFactor(r, percentiles(r, Object.assign({ relPe: 100, pegInv: 100, ownHist: 100 }, extra))).score; };
+  const neutral = 1.125 * (0.764 * 100 + 0.511 * 50 + 0.35 * 100) / 1.625 / 100;   // a missing PEG counts as the middle (50)
+  near(val(null), neutral); near(val(-2), neutral); near(val(0), neutral);
+  near(val(1.5, { pegInv: 0 }), 1.125 * (0.764 * 100 + 0.511 * 0 + 0.35 * 100) / 1.625 / 100, 1e-9);
+  near(val(1.5), 1.125);
+  const r = { peg: 1 }; assert.strictEqual(FX.valFactor(r, percentiles(r, { relPe: null, pegInv: null, ownHist: null })).score, null, 'no percentile: no score');
+  const noPeg = { peg: null }; near(FX.valFactor(noPeg, percentiles(noPeg, { relPe: null, pegInv: null, ownHist: null })).score, 1.125 * 0.5, 1e-9);
+});
+test('factors: moat, reinvestment and margin of safety are their weight times the percentile', () => {
+  assert.deepStrictEqual(FX.shareFactor('moat', 'Moat', 0.9, 50), { key: 'moat', label: 'Moat', weight: 0.9, score: 0.45 });
+  assert.strictEqual(FX.shareFactor('dcf', 'MoS', 1.0, null).score, null);
+  assert.strictEqual(FX.shareFactor('dcf', 'MoS', 1.0, undefined).score, null);
+  assert.strictEqual(FX.shareFactor('dcf', 'MoS', 1.0, 0).score, 0, 'a percentile of 0 is a score of 0, not a missing one');
+});
+test('factors: governance is the Piotroski percentile less pledged shares and a falling promoter holding, adjusted by what funds did, within 0 and 0.9', () => {
+  const gov = (r, piot) => FX.govFactor(r, percentiles(r, { piotroski: piot })).score;
+  assert.strictEqual(gov({}, null), null, 'no Piotroski percentile');
+  near(gov({}, 100), 0.9);
+  near(gov({ pledgePct: 10 }, 100), Math.max(0, 0.9 - 0.0214));
+  near(gov({ promoterHoldingChange: -5 }, 100), 0.9 - 0.0212 + 0, 1e-9 + 0.0212);
+  near(gov({ promoterHoldingChange: 5 }, 50), 0.45, 1e-9, 'a rising promoter holding is not a bonus');
+  near(gov({ fiiChange3: 10, diiChange3: 10 }, 50), 0.45 + 0.05, 1e-9);   // 20 * 0.003 = 0.06 is clamped to 0.05
+  near(gov({ fiiChange3: -10 }, 50), 0.45 - 0.03);
+  assert.strictEqual(gov({ pledgePct: 1000 }, 10), 0, 'never below 0');
+});
+test('factors: predictability follows the spread of profit growth, with a haircut for two windows and the TTM spike left out', () => {
+  const pred = (r, quality = { discount: 1, note: '' }) => FX.predictFactor(r, quality);
+  assert.deepStrictEqual([pred({}).score, pred({ profitGrowth3: 10 }).score], [null, null], 'fewer than two windows');
+  const three = pred({ profitGrowthTTM: 10, profitGrowth3: 12, profitGrowth5: 11 });
+  assert.ok(three.score > 0 && three.score <= 0.675 && three.note === undefined);
+  const two = pred({ profitGrowth3: 10, profitGrowth5: 12 });
+  assert.match(two.note, /0\.9x haircut — only 2 of 3 growth windows available/); assert.ok(two.score > 0);
+  const spike = pred({ profitGrowthTTM: 500, profitGrowth3: 10, profitGrowth5: 12 }, { discount: 0.55, note: ' (x)' });
+  assert.match(spike.note, /0\.9x haircut/, 'the discounted TTM spike is left out, so only two windows count');
+  assert.ok(pred({ profitGrowthTTM: 0, profitGrowth3: 5000, profitGrowth5: 0 }).score <= 0.675, 'capped');
+  assert.strictEqual(pred({ profitGrowth3: 1, profitGrowth5: 1 }).key, 'predict');
+});
+test('factors: the total scales the weights that apply back up to 10, and the sub-scores follow the factors', () => {
+  const f = (key, weight, score, na) => ({ key, weight, score, na });
+  assert.strictEqual(FX.totalScore([f('a', 5, null), f('b', 5, null)]), null, 'no factor has a score');
+  assert.strictEqual(FX.totalScore([f('a', 5, 2.5), f('b', 5, 5)]), 7.5);
+  assert.strictEqual(FX.totalScore([f('fin', 2, null, 'banks'), f('b', 8, 4)]), 5, 'a not-applicable factor\'s weight is shared by the others: 4 * 10 / 8');
+  assert.deepStrictEqual(FX.subScores([], null), { traditionalSubscore: null, buffettSubscore: null, valuationSubscore: null });
+  const all = ['fin', 'prof', 'growth', 'val', 'moat', 'gov', 'predict', 'reinvest', 'dcf'].map(k => f(k, 1, 0.5));
+  const subs = FX.subScores(all, 5);
+  assert.deepStrictEqual(subs, { traditionalSubscore: Math.round((2 / 5.85) * 1000) / 100, buffettSubscore: Math.round((2 / 3.15) * 1000) / 100, valuationSubscore: 5 });
+  const na = all.map(x => (x.key === 'fin' ? Object.assign({}, x, { weight: 1.8, score: null, na: 'banks' }) : x));
+  assert.strictEqual(FX.subScores(na, 5).traditionalSubscore, Math.round((1.5 / (5.85 - 1.8)) * 1000) / 100, 'the Traditional weight drops by the not-applicable factor');
+});
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
