@@ -2892,7 +2892,7 @@ const fiSetup = () => {
   const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), fiSym: (s) => s.ticker, fundamentalCsvUploadLog: new Map(), tabId: 'tab', primeStockCache: async () => {}, lockBusy: () => false, startBeat: () => () => {} };
   return T;
 };
-const fiLoad = () => loadAllStubbed('src/import/fund-import.js', 'export { fiPersist, fiRunImport }; export const __own = (db, assets) => { fiDb = db; fiAssets = assets; fiOwner = !!db; };', ['./fundreport.js']);
+const fiLoad = () => loadAllStubbed('src/import/fund-import.js', 'export { fiPersist, fiRollback, fiRunImport }; export const __own = (db, assets) => { fiDb = db; fiAssets = assets; fiOwner = !!db; };', ['./fundreport.js']);
 
 test('fundamental import, writing: only changed chunks are written, the index goes last, and the result is read back', () => alone(async () => {
   const T = fiSetup(), M = await fiLoad(), old = [fiStock('A'), fiStock('B')], raw = fiRaw(old, 4), writes = [];
@@ -2926,6 +2926,13 @@ test('fundamental import, writing: a failed chunk write or index publish puts th
 }));
 
 const fiCsv = () => { const cols = /const FI_COLUMNS = \[(.*?)\];/.exec(fs.readFileSync(path.join(root, 'src/import/fundreport.js'), 'utf8'))[1].split(',').map((c) => c.trim().replace(/^'|'$/g, '')); return cols.join(',') + '\nrow'; };
+test('fundamental import, writing: rolling back restores a chunk that existed and deletes one that was new', () => alone(async () => {
+  fiSetup(); const M = await fiLoad(), gone = [];
+  const db = fiFakeDb({ 'stockData/c001': { stocks: ['changed'] }, 'stockData/c002': { stocks: ['new'] } }, { del: (p) => gone.push(p) });
+  await M.fiRollback(db, { oldCanon: { c001: '{"stocks":["old"]}' } }, new Set(['c001', 'c002']));
+  assert.deepStrictEqual(gone, ['stockData/c002']); assert.deepStrictEqual(db.docs['stockData/c001'], { stocks: ['old'] });
+}));
+
 const fiImportSetup = (over) => {
   const T = fiSetup(), old = [fiStock('A'), fiStock('B')], raw = fiRaw(old, 4), jobs = [], saved = [];
   const docs = { 'stockMeta/main': raw.meta, 'stockData/c001': raw.docs.c001 };
