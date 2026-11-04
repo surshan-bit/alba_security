@@ -2,7 +2,7 @@
 // whether it comes from price bars alone (`priceBased`). Price-based rules can be replayed on old bars later; the
 // others read today's stored fundamentals, so a backtest using them would look ahead.
 import { verdictLabel } from '../core/stocks.js';
-import { techScore3 } from '../engine/technical.js';
+import { MACD_CROSS_WEEKLY, techScore3 } from '../engine/technical.js';
 import { isPinned } from '../core/pins.js';
 import { tickerIndustry } from '../core/util.js';
 import { mosPct, mosRatingAny } from '../list/metrics.js';
@@ -27,6 +27,13 @@ const MACD_OPTIONS = [
 // Each option may carry a third value, its colour tone, used by the rule editor's tags (buy, mbuy, hold, avoid, orange, accent; none = no tone).
 // A stock with no rating (too little price history, or prices not loaded yet) can be allowed through by choosing this.
 const NONE_LABEL = 'None (no rating)';
+// Weekly MACD 30/60/5 against its signal line. The three states are exclusive; pick two to combine them (e.g. above + just crossed up).
+const { fast: MACD_FAST, slow: MACD_SLOW, signal: MACD_SIGNAL, within: MACD_WITHIN } = MACD_CROSS_WEEKLY;
+const MACD_CROSS_OPTIONS = [
+  ['cross_up', `Just crossed up (${MACD_WITHIN === 1 ? 'this week' : `last ${MACD_WITHIN} weeks`})`, 'mbuy'],
+  ['above', 'Above signal', 'buy'],
+  ['below', 'Below signal', 'avoid']
+];
 const macdState = (key) => (s) => (s.technical && s.technical.states && s.technical.states[key]) || null;
 
 const ALL_FIELDS = [
@@ -56,6 +63,8 @@ const ALL_FIELDS = [
   { id: 'weekRsi', group: 'Technical', label: 'W RSI', type: 'num', unit: '', dp: 1, priceBased: true, get: (s) => num(rawOf(s).weekRsi) },
   { id: 'monthRsi', group: 'Technical', label: 'M RSI', type: 'num', unit: '', dp: 1, priceBased: true, get: (s) => num(rawOf(s).monthRsi) },
   { id: 'weekMacd', group: 'Technical', label: 'W Tech Rating', type: 'enum', priceBased: true, get: macdState('weekMacd'), options: MACD_OPTIONS, noneLabel: NONE_LABEL },
+  // Not priceBased: the learning search has no menu for it, so applying a suggestion must not drop a rule the user chose by hand.
+  { id: 'weekMacd3060', group: 'Technical', label: `W MACD ${MACD_FAST}/${MACD_SLOW}/${MACD_SIGNAL} vs signal`, type: 'enum', get: macdState('weekMacd3060'), options: MACD_CROSS_OPTIONS, noneLabel: NONE_LABEL },
   { id: 'monthMacd', group: 'Technical', label: 'M Tech Rating', type: 'enum', priceBased: true, get: macdState('monthMacd'), options: MACD_OPTIONS, noneLabel: NONE_LABEL },
   { id: 'weekPct', group: 'Technical', label: 'Weekly % change', type: 'num', unit: '%', dp: 1, priceBased: true, get: (s) => num(rawOf(s).weekPctChange) },
   { id: 'monthPct', group: 'Technical', label: 'Monthly % change', type: 'num', unit: '%', dp: 1, priceBased: true, get: (s) => num(rawOf(s).monthPctChange) },
