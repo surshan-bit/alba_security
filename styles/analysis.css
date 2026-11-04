@@ -66,7 +66,7 @@
      Knowledge Base's tables rather than inventing a new table style. */
 .analysis-leaderboard{margin-top:4px;}
 .analysis-leaderboard.lb-full{position:fixed;inset:0;z-index:70;margin:0;padding:12px 20px 16px;background:var(--bg);display:flex;flex-direction:column;overflow:auto;}
-.analysis-leaderboard.lb-full .analysis-leaderboard-head{margin-top:0 !important;}
+
 .analysis-leaderboard.lb-full .strat-table-wrap{flex:1 1 auto;min-height:360px;overflow:auto;}
 .analysis-leaderboard.lb-full .strat-table thead th{position:sticky;top:0;z-index:2;background:var(--bg);}
 body.lb-full-open{overflow:hidden;}
@@ -208,7 +208,7 @@ body.biz-full-open{overflow:hidden;}
 :root[data-theme="white"] .panel-body :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle){border:1px solid #c9cfdf;background:#fff;}
 :root[data-theme="white"] .panel-body :is(.dm-btn,.biz-field,.analysis-icon-btn,.rk-toolbtn,.rk-main,.filters-toggle):hover,:root[data-theme="white"] .panel-body :is(.dm-btn,.analysis-icon-btn)[aria-expanded="true"]{border-color:var(--accent);}
 :root[data-theme="white"] .panel-body .biz-field select{border:0;background:transparent;}
-:root[data-theme="white"] body .panel-body.panel-body :is(.rk-toolbtn,.rk-main,.rk-barbtn){display:inline-flex;align-items:center;justify-content:center;height:36px;min-height:36px;padding:0 14px;font-size:var(--t-md) !important;font-weight:500 !important;letter-spacing:normal;text-transform:none;color:#1b1f2a;}
+:root[data-theme="white"] body .panel-body.panel-body :is(.rk-toolbtn,.rk-main,.rk-barbtn){display:inline-flex;align-items:center;justify-content:center;height:36px;min-height:36px;padding:0 14px;letter-spacing:normal;text-transform:none;color:#1b1f2a;}
 :root[data-theme="white"] .panel-body :is(.rk-toolbtn,.rk-main):hover:not(:disabled){color:var(--accent);}
 .analysis-industry .biz-showing,.analysis-count,.analysis-toolbar .rk-headline{display:inline-flex;align-items:center;min-height:36px;}
 .panel-body{display:flow-root;}   /* the first block's top margin stays inside, so Stocks and Industry start at the same height */
