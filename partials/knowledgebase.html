@@ -266,6 +266,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.356 &middot; 2026-11-04</h3>
+            <ul>
+              <li><strong>Daily (1D) import: far fewer TradingView calls:</strong> a stock that already has saved daily bars is now brought up to date from TradingView's batch call (50 stocks per call), the way the weekly and monthly bars are. Only a stock with no saved daily bars, or one whose saved bars no longer line up (it was missed for several days, or its prices were adjusted by a split), is fetched on its own. The first import of a strategy still reads each stock once; after that a daily run needs only a handful of calls.</li>
+              <li><strong>The daily import waits instead of stopping when TradingView limits calls:</strong> it reads two stocks at a time, and when TradingView suspends the connector for a minute it waits 65 seconds and carries on with the same stock (up to six waits). The Refresh all stocks result says how many stocks were updated in batches and how often it waited.</li>
+            </ul>
             <h3>v1.355 &middot; 2026-11-04</h3>
             <ul>
               <li><strong>Strategies: new daily filter &ldquo;D MACD 30/60/5 vs signal&rdquo;:</strong> Above signal, Below signal or Just crossed up (latest day) for the MACD 30/60/5 on daily bars, today's bar included. To keep TradingView use low, daily bars are imported only for the stocks of one strategy: in Data Refresh tick &ldquo;Also import daily (1D) data for one strategy&rdquo; next to Refresh all stocks, pick the strategy, and the run imports just the stocks that pass its other rules, at most 600 a run. Each stock's last 500 daily bars (about 2 years) are saved, one record per stock in the new collection priceHistory1D, and later runs fetch only the new days. The result lists how many were read and how many records were saved. A stock that was not read, or whose reading is more than 4 days old, shows as &ldquo;None (no rating)&rdquo;. Scores and the weekly filter are unchanged.</li>
