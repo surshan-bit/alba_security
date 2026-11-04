@@ -77,7 +77,7 @@
 .fund-flag{display:flex;gap:6px;font-size:var(--t-sm);line-height:1.35;padding:6px 9px;border-radius:6px;font-weight:600;}
 .fund-flag.fs-avoid{background:rgba(193,82,74,.16);color:var(--avoid);border:1px solid rgba(193,82,74,.4);}
 .fund-flag.fs-hold{background:rgba(201,162,39,.16);color:var(--hold);border:1px solid rgba(201,162,39,.4);}
-.fund-proxy-mark{cursor:help;font-size:.7em;opacity:.8;margin-left:1px;}
+.fund-proxy-mark{cursor:help;font-size:var(--t-xs);opacity:.8;margin-left:1px;}
 .fund-pc-footnote{grid-column:1/-1;font-size:var(--t-sm);color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
 .fund-subsection{margin-bottom:20px;}
 .fund-subsection:last-child{margin-bottom:0;}
@@ -232,9 +232,9 @@ html{scrollbar-color:var(--line) transparent;}
 .hm-tile--down{background:color-mix(in srgb,var(--avoid) var(--mix,18%),var(--bg));}
 .hm-tile--none{background:var(--panel2);}
 .hm-tile:hover,.hm-tile:focus-visible{outline:2px solid var(--text);outline-offset:-2px;z-index:1;}
-.hm-name{-webkit-line-clamp:var(--lines,1);font-size:1em;font-weight:700;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;word-break:break-word;hyphens:auto;}
-.hm-chg{font-size:1em;font-weight:700;font-variant-numeric:tabular-nums;}
-.hm-n{font-size:.85em;opacity:.8;}
+.hm-name{-webkit-line-clamp:var(--lines,1);font-size:inherit;font-weight:700;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;word-break:break-word;hyphens:auto;}
+.hm-chg{font-size:inherit;font-weight:700;font-variant-numeric:tabular-nums;}
+.hm-n{font-size:var(--t-sm);opacity:.8;}
 .hm-legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:var(--t-sm);color:var(--muted);}
 .hm-bar{display:inline-block;width:120px;height:8px;border-radius:4px;background:linear-gradient(90deg,color-mix(in srgb,var(--avoid) 90%,var(--bg)),color-mix(in srgb,var(--avoid) 18%,var(--bg)),color-mix(in srgb,var(--buy) 18%,var(--bg)),color-mix(in srgb,var(--buy) 90%,var(--bg)));}
 .hm-note{margin-left:8px;}
