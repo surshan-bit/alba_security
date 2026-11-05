@@ -3213,7 +3213,11 @@ test('Claude call pool: calls beyond the limit wait, a rejected call is retried 
   for(let i = 0; i < 40; i++) await pool.run(async () => 'ok'); assert.strictEqual(pool.state().limit, 4);   // good calls bring the limit back, up to the maximum
   const ctl = new AbortController(); ctl.abort(); await assert.rejects(pool.run(async () => 'never', ctl.signal), (e) => e.code === 'cancelled');   // stopped while waiting for a turn
   assert.deepStrictEqual(pool.state(), { limit: 4, inFlight: 0, waiting: 0 });
-  assert.deepStrictEqual([null, { code: 'cancelled', message: 'request failed' }, { message: 'Network error' }, { message: 'timed out' }, { message: 'bad' }].map(P.isTransient), [false, false, true, true, false]);
+  const w2 = []; const p3 = P.createCallPool({ sleep: async (ms) => { w2.push(ms); } });
+  for(const e of [{ code: 'cancelled', message: 'request failed' }, { message: 'bad' }, null]) await assert.rejects(p3.run(async () => { throw e; }), () => true);
+  assert.strictEqual(w2.length, 0);   // a stop, an unrelated error and an empty error are not retried
+  for(const m of ['Network error', 'timed out', 'The service is overloaded']) await assert.rejects(p3.run(async () => { throw new Error(m); }), () => true);
+  assert.strictEqual(w2.length, 6);   // these read like a failed request: two waits each
   const pool2 = P.createCallPool(); assert.strictEqual(pool2.state().limit, 6);   // the default start
   await pool2.run(async () => 1);
 });
@@ -3222,6 +3226,27 @@ test('Claude call pool is used by every Claude call: ldAskJson parses the reply 
   assert.deepStrictEqual(await C.ldAskJson(async () => ({ text: '{"a":1}' }), 'p', {}), { a: 1 });
   let calls = 0; assert.deepStrictEqual(await C.ldAskJson(async (p) => { calls++; if(typeof p === 'string') throw { code: 'invalid_request', message: 'old style' }; return '{"b":2}'; }, 'p', {}), { b: 2 }); assert.strictEqual(calls, 2);   // the older call style is tried when the first is refused
   await assert.rejects(C.ldAskJson(async () => { throw { code: 'not_granted', message: 'no' }; }, 'p', {}), (e) => e.fromClaude === true && e.code === 'not_granted');
+  // replies that wrap the JSON in a fence or in prose, and one that holds none
+  assert.deepStrictEqual(await C.ldAskJson(async () => '```json\n{"f":1}\n```', 'p', {}), { f: 1 });
+  assert.deepStrictEqual(await C.ldAskJson(async () => 'Here you go: {"g":2} thanks', 'p', {}), { g: 2 });
+  assert.deepStrictEqual(await C.ldAskJson(async () => '[1,2]', 'p', {}), [1, 2]);
+  await assert.rejects(C.ldAskJson(async () => 'no data here', 'p', {}), (e) => e.code === 'invalid_json' && e.fromClaude);
+  await assert.rejects(C.ldAskJson(async () => null, 'p', {}), (e) => e.code === 'invalid_json');
+});
+test('Claude errors are put in words for the person, and the permission is asked once up front', async () => {
+  const C = await loadWithStubs('src/livedata/claude.js', '', { '../tv/connector.js': 'export const tvErrorText = (e) => "TV: " + e.message;' });
+  const text = (code, message) => C.ldErrText({ fromClaude: true, code, message });
+  assert.ok(/not allowed/.test(text('not_granted'))); for(const c of ['sampling_disabled', 'capability_disabled', 'not_declared', 'capability_removed']) assert.ok(/not available for this account/.test(text(c)));
+  assert.ok(/usage limit/.test(text('rate_limited'))); assert.ok(/could not be read as data/.test(text('invalid_json'))); assert.ok(/sign in again/.test(text('session_expired'))); assert.ok(/too large/.test(text('prompt_too_large')));
+  assert.strictEqual(text('weird', 'The runtime said no'), 'The runtime said no [weird]'); assert.strictEqual(text(undefined, undefined), 'Unknown error');   // anything else keeps what the runtime said
+  assert.strictEqual(C.ldErrText(new Error('boom')), 'TV: boom'); assert.strictEqual(C.ldIsClaudeError(null), false);   // a TradingView error is told apart from Claude's
+  const asked = []; let state = 'denied';
+  globalThis.claude = { use: async () => ({ state: async () => { if(state === 'throws') throw new Error('x'); return state; }, request: async (l) => { asked.push(l); if(state === 'refuses') throw new Error('no'); } }) };
+  await C.ldEnsureClaudeAccess(); assert.deepStrictEqual(asked, [['sample']]);   // not granted yet: asked once
+  for(const s of ['granted', 'unavailable']){ state = s; await C.ldEnsureClaudeAccess(); } assert.strictEqual(asked.length, 1);   // nothing to ask
+  state = 'refuses'; await C.ldEnsureClaudeAccess(); state = 'throws'; await C.ldEnsureClaudeAccess(); assert.strictEqual(asked.length, 2);   // a refusal never stops the run; an unreadable state asks nothing (the first call asks)
+  globalThis.claude = { use: async () => null }; await C.ldEnsureClaudeAccess();
+  delete globalThis.claude; await C.ldEnsureClaudeAccess();
 });
 test('final snapshot chunks: a chunk saved after the close stands until the next session opens, and only then', async () => {
   const F = await loadWithStubs('src/refresh/finalchunk.js', '', {});

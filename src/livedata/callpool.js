@@ -61,4 +61,4 @@ function createCallPool(opts = {}){
   };
 }
 
-export { createCallPool, isTransient };
+export { createCallPool };
