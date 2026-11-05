@@ -85,10 +85,16 @@ async function ldGather(c){
   }));
   halt();
   const stories = storyBodies.filter(Boolean);
-  const gotAnything = [finTtm, finFy, fc, newsRaw, docsRaw].some(x => x && !x.unavailable);
+  const reads = [finTtm, finFy, fc, newsRaw, docsRaw];
+  // TradingView refusing calls for its quota or a suspension would repeat for every stock, so it is passed on as the reason the stock failed (the batch then stops).
+  const refused = reads.find(x => x && x.unavailable && TV_REFUSED_RE.test(String(x.unavailable)));
+  if(refused) throw new Error('TradingView refused the calls: ' + String(refused.unavailable).slice(0, 200));
+  const gotAnything = reads.some(x => x && !x.unavailable);
   if(!gotAnything) throw new Error('TradingView returned no data for ' + sym + '.');
   Object.assign(c, { sym, finTtm, finFy, fc, docsRaw, earnRaw, corpRaw, allHeads, news, allowedUrls, stories });
 }
+
+const TV_REFUSED_RE = /quota|exhausted|suspended/i;   // how TradingView's refusals read (the tool-call quota, a temporary suspension)
 
 // Saves the dated events for the price chart and labels the headlines that have no label yet.
 async function ldSaveEvents(c){
@@ -106,7 +112,7 @@ async function ldSaveEvents(c){
         try {
           halt();
           c.labelled = ldApplyLabels(todo, await ldAskJson(sample, ldLabelPrompt(s.name, todo), { modelTier: 'quick', cache: false, signal }));
-          if(c.labelled) notes.push(c.labelled + ' headline' + (c.labelled === 1 ? '' : 's') + ' c.labelled positive, negative or neutral');
+          if(c.labelled) notes.push(c.labelled + ' headline' + (c.labelled === 1 ? '' : 's') + ' labelled positive, negative or neutral');
         } catch(e){ if(e && e.code === 'cancelled') throw e; failed.push('news labels (' + ldErrText(e) + ')'); }
       }
       if(ecur && ecur.exists) await eref.update({ events: merged }); else await eref.set({ ticker: sym0, events: merged });
@@ -139,9 +145,16 @@ function ldPromptKit(c){
     (tvSections && tvSections.length ? 'TRADINGVIEW DATA:\n' + tvSections.map(k => TV[k]()).join('\n') + '\n\n' : '');
   // Streams nudge the bar between two values while Claude writes.
   const nudge = (from, to, expected) => ({ text }) => set(Math.min(to, from + (to - from) * Math.min(1, text.length / expected)), ldGet(key, 'fund').msg);
-  const ask = (prompt, from, to, expected, tier) => {
+  // Every call is timed with the size of what went in and came out (the progress value `from` tells which step it was), saved with the run's timings.
+  const ask = async (prompt, from, to, expected, tier) => {
     halt();
-    return ldAskJson(sample, prompt, { modelTier: tier || 'quick', cache: false, signal, onText: nudge(from, to, expected) });
+    const a = Date.now(), note = { at: from, inChars: prompt.length, outChars: 0, ms: 0 };
+    c.calls.push(note);
+    try {
+      const r = await ldAskJson(sample, prompt, { modelTier: tier || 'quick', cache: false, signal, onText: nudge(from, to, expected) });
+      note.outChars = r ? JSON.stringify(r).length : 0;
+      return r;
+    } finally { note.ms = Date.now() - a; }
   };
   Object.assign(c, { factors, headFor, ask, TV });
 }
@@ -399,7 +412,7 @@ async function ldRunFundamental(s){
   ldAbort.set(key + '|fund', ctl);
   const signal = ctl.signal;
   const halt = () => { if(signal.aborted) throw { code: 'cancelled' }; };
-  const c = { s, key, sym0, docId, today, set, halt, signal, notes: [], failed: [], labelled: 0 };   // labelled: news headlines labelled by Claude in this run
+  const c = { s, key, sym0, docId, today, set, halt, signal, notes: [], failed: [], labelled: 0, calls: [] };   // labelled: news headlines labelled by Claude in this run
   const t0 = Date.now(), T = {};   // how long each step took (ms), saved when the run ends well
   c.T = T;
   const timed = async (name, fn) => { const a = Date.now(); try { return await fn(); } finally { T[name] = (T[name] || 0) + Date.now() - a; } };
@@ -407,13 +420,16 @@ async function ldRunFundamental(s){
     set(2, 'Preparing…');
     await ldPrepare(c);
     await timed('gather', () => ldGather(c));
-    await timed('events', () => ldSaveEvents(c));
     ldPromptKit(c);
     ldCheckFresh(c);
+    // The chart events (and the headline labels) only need the gathered data, so they are saved while Claude writes the cards. Their document is also the research
+    // document: the cards are saved only after the events, so the two never write it at the same time.
+    const events = timed('events', () => ldSaveEvents(c));
+    events.catch(() => {});   // ldSaveEvents handles its own failures; this only keeps a stray rejection from going unnoticed if the run has already failed
     await timed('missingMetrics', () => ldFillMissingMetrics(c));
     // The factor cards (then their save) and Global & Macro do not need each other, and write to different documents, so they run together.
     await Promise.all([
-      timed('cards', async () => { await ldRefreshCards(c); await ldSaveResearch(c); }),
+      timed('cards', async () => { await ldRefreshCards(c); await events; await ldSaveResearch(c); }),
       timed('globalMacro', () => ldGlobalMacro(c))
     ]);
     await timed('technical', () => ldTechnicalSignals(c));
@@ -433,7 +449,7 @@ async function ldSaveTimings(c, T, t0){
   console.info('[Refresh Fundamental Info] ' + c.sym0 + ' took ' + Math.round(total / 1000) + ' s', T);
   try {
     if(!c.db) return;
-    await c.db.doc('refreshRunLog/fundamental-' + (Math.floor(t0 / 1000) % 10)).set({ v: 1, kind: 'fundamental', ticker: c.sym0, startedAt: new Date(t0).toISOString(), durationMs: total, stepsMs: T, parallel: true, claudeOn: !!c.useClaude });
+    await c.db.doc('refreshRunLog/fundamental-' + (Math.floor(t0 / 1000) % 10)).set({ v: 1, kind: 'fundamental', ticker: c.sym0, startedAt: new Date(t0).toISOString(), durationMs: total, stepsMs: T, calls: c.calls, parallel: true, claudeOn: !!c.useClaude });
   } catch(e){ console.error('Could not save the fundamental refresh timing', e); }
 }
 

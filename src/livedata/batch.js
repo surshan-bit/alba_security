@@ -1,5 +1,5 @@
 // Live Data Refresh for several stocks at once (started from the Analysis, Strategies or Explorer screen).
-import { tickerSymbol } from '../core/util.js';
+import { sleep, tickerSymbol } from '../core/util.js';
 import { refreshAnalysisSoon } from '../analysis/section.js';
 import { redrawWhenIdle } from '../ui/scrollkeep.js';
 import { renderLoadedPart } from '../core/lazy.js';
@@ -11,11 +11,15 @@ import { claudeAnyOn } from './claudegate.js';
 import { activityEnd, activityNotify, activityRun } from '../ui/activity.js';
 import { getRefreshKit } from '../refresh/hook.js';
 
-var ldBatch = null;   // { kind, source, total, done, active: Map(key -> ticker), workers, slow, running, stop, failed[], skipped, note, perm }
+var ldBatch = null;   // { kind, source, total, done, active: Map(key -> ticker), workers (allowed now), maxWorkers, running, stop, failed[], skipped, note, perm }
 // The last finished run of each kind on each screen: { state, pct, text, perm }. Kept so a card still shows its result
 // after the screen redraws and after the other kind has been run.
 var ldBatchLast = { analysis: { fund: null, tech: null }, strat: { fund: null, tech: null } };   // more screens (the Explorer's industries, 'biz-N') are added as they start a run
-const LD_PARALLEL = 3;   // stocks refreshed at the same time by a batch
+const LD_PARALLEL = { fund: 5, tech: 3 };   // stocks refreshed at the same time by a batch (Fundamental waits mostly on Claude; Technical calls only TradingView)
+const LD_RECOVER_AFTER = 3;   // stocks finished cleanly in a row before one worker that stood down after a failure is let back in
+const LD_IDLE_MS = 500;   // how often a worker that stood down looks again
+// A failure that would repeat for every stock: the whole batch stops (Claude's usage limit or permission, or TradingView refusing calls for its quota or a suspension).
+const LD_HALT_RE = /usage limit|not allowed|not available for this account|sign in again|quota|exhausted|suspended/i;
 const LD_BATCH_MAX = { fund: 50, tech: 50 };   // the Fundamental refresh uses the viewer's Claude usage (cheapest model tier), so it is capped
 const otherScreen = (P) => P === 'analysis' ? 'the Strategies screen' : P === 'strat' ? 'the Analysis screen' : 'another screen';
 
@@ -30,6 +34,8 @@ function batchTail(){
   return ok + ' of ' + ldBatch.total + ' refreshed.' + (ldBatch.skipped ? ' ' + ldBatch.skipped + ' not run.' : '') + (ldBatch.failed.length ? ' Failed: ' + ldBatch.failed.slice(0, 5).join('; ') : '');
 }
 const activeNames = () => Array.from(ldBatch.active.values()).join(', ');
+// How many stocks run at once now, e.g. " (5 at a time)", and why it is fewer after a failure.
+const atATime = () => ldBatch.maxWorkers > 1 ? ' (' + ldBatch.workers + ' at a time' + (ldBatch.workers < ldBatch.maxWorkers ? ', slowed after a failure' : '') + ')' : '';
 const KIND_NAME = { fund: 'Fundamental', tech: 'Technical' };
 const STAY_OPEN_NOTE = 'You can move to other screens. If you close the dashboard it pauses and carries on when it is opened again.';
 // The screen that started a run, for the "View" button on the top strip.
@@ -47,7 +53,7 @@ function paintLivePanel(P){
     if(mine && ldBatch.kind === kind){
       const first = ldBatch.active.size ? ldBatch.active.keys().next().value : '', j = first ? ldGet(first, kind) : null;
       const pct = batchPct();
-      state[kind] = { state: 'running', pct, text: ldBatch.stop ? batchStoppingText() : pct + '% · ' + ldBatch.done + ' of ' + ldBatch.total + ' done · ' + activeNames() + (j ? ' · ' + j.msg : '') + (ldBatch.workers > 1 ? ' (' + ldBatch.workers + ' at a time)' : '') + '' };
+      state[kind] = { state: 'running', pct, text: ldBatch.stop ? batchStoppingText() : pct + '% · ' + ldBatch.done + ' of ' + ldBatch.total + ' done · ' + activeNames() + (j ? ' · ' + j.msg : '') + atATime() + '' };
     } else state[kind] = running && !mine ? null : (ldBatchLast[P] || {})[kind] || null;
   }
   // While the panel is closed, a running or failed refresh still shows at the end of its heading.
@@ -92,7 +98,7 @@ function syncActivity(){
   if(!(ldBatch && ldBatch.running)){ activityEnd('batch'); return; }
   const info = {
     title: 'Refreshing ' + KIND_NAME[ldBatch.kind] + ' Info · ' + ldBatch.done + ' of ' + ldBatch.total + ' done',
-    text: ldBatch.stop ? batchStoppingText() : (activeNames() ? activeNames() + ' · ' : '') + STAY_OPEN_NOTE,
+    text: ldBatch.stop ? batchStoppingText() : (activeNames() ? activeNames() + atATime() + ' · ' : '') + STAY_OPEN_NOTE,
     pct: batchPct(), section: sectionOf(ldBatch.source), onStop: ldBatchStop, stopping: ldBatch.stop
   };
   const kit = getRefreshKit();
@@ -114,19 +120,17 @@ function ldBatchStop(){
 }
 // Tells the screen that started a run (the Explorer's industries) that data was saved, so it can redraw, e.g. its "Research done" column.
 function batchStockSaved(){ if(ldBatch) document.dispatchEvent(new window.CustomEvent('alba-batch-done', { detail: { source: ldBatch.source } })); }
-// `stocksToRun`: the stocks to refresh. `source`: the panel that started it.
-async function ldBatchStart(kind, list, source = 'strat'){
-  if(ldBatch && ldBatch.running) return;
-  if(!list.length || list.length > LD_BATCH_MAX[kind]) return;
-  // A few stocks at a time: both refreshes mostly wait on TradingView (and Claude), so the waits overlap.
-  const workers = Math.min(LD_PARALLEL, list.length);
-  ldBatch = { kind, source, total: list.length, done: 0, active: new Map(), workers, slow: false, running: true, stop: false, failed: [], skipped: 0, note: '', perm: false };
-  ldBatchPaint();
-  if(kind === 'fund' && claudeAnyOn()) await ldEnsureClaudeAccess();   // one permission dialog up front, not one per stock
-  let next = 0, halted = false;
+// Runs the stocks of a batch with up to `maxWorkers` workers and returns when all are done or the batch halted.
+async function runWorkers(list, kind, source, maxWorkers){
+  let next = 0, halted = false, clean = 0;
+  // A failure takes one worker out for a while; a few clean stocks in a row bring it back.
+  const outcome = ok => {
+    if(!ok){ ldBatch.workers = Math.max(1, ldBatch.workers - 1); clean = 0; return; }
+    if(++clean >= LD_RECOVER_AFTER && ldBatch.workers < ldBatch.maxWorkers){ ldBatch.workers++; clean = 0; }
+  };
   const worker = async (w) => {
     while(!ldBatch.stop && !halted && next < list.length){
-      if(w > 0 && ldBatch.slow) return;   // after a failure the extra workers stand down: the rest runs one at a time
+      if(w >= ldBatch.workers){ await sleep(LD_IDLE_MS); continue; }   // stood down after a failure: look again shortly
       const i = next++, s = list[i], key = pcTickerKey(s), sym = tickerSymbol(s);
       if(ldRunning(key)){ ldBatch.failed.push(sym + ' (already refreshing)'); ldBatch.done++; continue; }
       ldBatch.active.set(key, sym);
@@ -136,17 +140,29 @@ async function ldBatchStart(kind, list, source = 'strat'){
       if(j && j.state === 'error'){
         if(ldBatch.stop && /Stopped/.test(j.msg)){ ldBatch.done++; continue; }
         ldBatch.failed.push(sym + ' (' + String(j.msg).slice(0, 90) + ')');
-        ldBatch.slow = true;
-        if(j.perm || /usage limit|not allowed|not available for this account|sign in again/i.test(j.msg)){
+        outcome(false);
+        if(j.perm || LD_HALT_RE.test(j.msg)){
           halted = true; ldBatch.note = 'Stopped early: ' + String(j.msg).slice(0, 100) + '.'; ldBatch.perm = !!j.perm;
         }
-      }
+      } else outcome(true);
       ldBatch.done++;
       if(source !== 'strat') setTimeout(batchStockSaved, 1200);   // the saved numbers reach the stock list a moment after the save
       ldBatchPaint();
     }
   };
-  await Promise.all(Array.from({ length: workers }, (_, w) => worker(w)));
+  await Promise.all(Array.from({ length: maxWorkers }, (_, w) => worker(w)));
+}
+
+// `stocksToRun`: the stocks to refresh. `source`: the panel that started it.
+async function ldBatchStart(kind, list, source = 'strat'){
+  if(ldBatch && ldBatch.running) return;
+  if(!list.length || list.length > LD_BATCH_MAX[kind]) return;
+  // Several stocks at a time: both refreshes mostly wait on TradingView (and Claude), so the waits overlap.
+  const maxWorkers = Math.min(LD_PARALLEL[kind], list.length);
+  ldBatch = { kind, source, total: list.length, done: 0, active: new Map(), workers: maxWorkers, maxWorkers, running: true, stop: false, failed: [], skipped: 0, note: '', perm: false };
+  ldBatchPaint();
+  if(kind === 'fund' && claudeAnyOn()) await ldEnsureClaudeAccess();   // one permission dialog up front, not one per stock
+  await runWorkers(list, kind, source, maxWorkers);
   ldBatch.skipped = list.length - ldBatch.done;
   if(ldBatch.stop && !ldBatch.note) ldBatch.note = 'Stopped.';
   ldBatch.running = false; ldBatch.active.clear();
