@@ -2838,9 +2838,9 @@ async function loadAllStubbed(file, extra, keep){
   return loadWithStubs(file, extra, stubs);
 }
 const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { noteLivePrices, paintHint, rsBars, rsCross, rsDaily, rsFixSymbols, rsReport, rsSnapshot, rsTech2, runSnapshot, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
-  ['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js']);
+  ['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js', './finalchunk.js']);
 const tvStock = (name) => ({ name, ticker: name, pillars: { val: 0.5 } });
-const tvRun = (db, names, over) => Object.assign({ db, today: '2026-11-04', stored: new Map(), prevRows: new Map(), todo: names.map((n) => ({ s: tvStock(n), sym: 'N:' + n })), ctx: null, batchLeft: {}, updated: 0, unchanged: 0, scored: 0, kept: 0, chunksSaved: 0,
+const tvRun = (db, names, over) => Object.assign({ db, today: '2026-11-04', stored: new Map(), prevRows: new Map(), todo: names.map((n) => ({ s: tvStock(n), sym: 'N:' + n })), ctx: null, batchLeft: {}, updated: 0, unchanged: 0, reusedFinal: 0, scored: 0, kept: 0, chunksSaved: 0,
   retried: 0, answeredAgain: 0, carried: 0, skipped: [], batchSecs: [], tvWaitMs: 0, saveMs: 0, stopped: false, livePx: new Map(), symbolFixes: [], dailyPick: null, dailyResult: null, crossRead: 0, crossChanged: 0, crossFailed: 0, barsUpdated: 0, batchSaved: 0, chunkWrites: 0, techBlocksSaved: 0, compacted: 0, staleBefore: 0, noneBefore: 0, filled: 0, histFailed: 0, noHistoryLeft: 0 }, over);
 const tvDb = (fail) => { const saved = []; return { saved, doc: (p) => ({ set: async (d) => { if(fail && fail(p, saved.length)) throw new Error('database down'); saved.push([p, d]); } }) }; };
 const tvAnswer = (symbols, lacking) => ({ data: Object.fromEntries(symbols.filter((x) => !(lacking || []).includes(x)).map((x) => [x, { close: 10, 'RSI|1M': 60 }])) });
@@ -3009,6 +3009,45 @@ test('refresh all stocks, page: the buttons follow the run, the hint counts save
 
 const tvBarsCtx = (over) => Object.assign({ plan: { stale: [] }, jobs: new Map(), ready: new Map(), failedBars: [], abort: '', byImportance: (l) => l, bars: async (left) => left.length }, over);
 
+test('final snapshot chunks: a chunk saved after the close stands until the next session opens, and only then', async () => {
+  const F = await loadWithStubs('src/refresh/finalchunk.js', '', {});
+  const ist = (d, h, m) => Date.parse(d + 'T00:00:00Z') + ((h * 60 + m) * 60000) - 19800000, keys = ['A', 'B'];
+  const chunk = (at, over) => Object.assign({ at: new Date(at).toISOString(), rows: [{ k: 'A', c: [1] }, { k: 'B', c: [2] }] }, over);
+  const fin = (savedAt, now, over) => F.chunkIsFinal(chunk(savedAt, over), keys, now);
+  assert.strictEqual(fin(ist('2026-11-02', 15, 45), ist('2026-11-02', 16, 0)), true);   // Monday, saved after the close, asked again the same afternoon
+  assert.strictEqual(fin(ist('2026-11-02', 15, 29), ist('2026-11-02', 16, 0)), false);   // saved a minute before the close: the last prices are not in it
+  assert.strictEqual(fin(ist('2026-11-02', 15, 45), ist('2026-11-03', 8, 0)), true);   // still final the next morning before the market opens
+  assert.strictEqual(fin(ist('2026-11-02', 15, 45), ist('2026-11-03', 9, 15)), false);   // the next session has opened
+  assert.strictEqual(fin(ist('2026-10-30', 16, 0), ist('2026-11-02', 10, 0)), false);   // Friday's close is old news on Monday during the session
+  assert.strictEqual(fin(ist('2026-10-30', 16, 0), ist('2026-11-02', 8, 0)), true);   // ... but fine over the weekend and early Monday
+  assert.strictEqual(fin(ist('2026-11-06', 16, 0), ist('2026-11-07', 12, 0)), true);   // Saturday
+  assert.strictEqual(fin(ist('2026-11-06', 16, 0), ist('2026-11-08', 22, 0)), true);   // Sunday night
+  assert.strictEqual(fin(ist('2026-11-02', 16, 0), ist('2026-11-02', 15, 0)), false);   // saved "in the future" (a wrong clock)
+  assert.strictEqual(fin(ist('2026-10-30', 16, 0), ist('2026-11-02', 16, 0)), false);   // Friday's save when Monday has also closed
+  assert.strictEqual(F.chunkIsFinal(Object.assign(chunk(ist('2026-11-02', 16, 0)), { at: 'not a time' }), keys, ist('2026-11-02', 17, 0)), false);
+  assert.strictEqual(F.chunkIsFinal(undefined, keys, 1), false); assert.strictEqual(F.chunkIsFinal({ at: '2026-11-02T10:30:00Z', rows: 'x' }, keys, 1), false);
+  const now = ist('2026-11-02', 17, 0), at = ist('2026-11-02', 16, 0);
+  assert.strictEqual(fin(at, now, { rows: [{ k: 'A', c: [1] }, { k: 'B', c: [2], d: '2026-10-30' }] }), false);   // a row kept from an earlier day was not priced
+  assert.strictEqual(fin(at, now, { rows: [{ k: 'A', c: [1] }, { k: 'C', c: [2] }] }), false);   // another stock in the chunk
+  assert.strictEqual(fin(at, now, { rows: [{ k: 'A', c: [1] }] }), false);   // a stock is missing
+  assert.strictEqual(fin(at, now, { rows: [{ k: 'A', c: [1] }, { k: 'A', c: [1] }] }), false);   // the same stock twice
+});
+test('refresh all stocks, snapshot step: a chunk saved after the close is not asked for again, and its prices still reach the weekly step', () => alone(async () => {
+  const T = globalThis.__T = { log: [], calls: [], fiSet: (...a) => T.log.push(a.join('|')), tvErrorText: (e) => e.message, tvIsFatal: () => false, stocks: [], priceHistoryByTicker: {}, COMPACT_LAG: 1 };
+  T.tvCall = async (tool, args) => { T.calls.push(args.symbols.slice()); return tvAnswer(args.symbols); };
+  const names = Array.from({ length: 102 }, (_, i) => 'S' + i), M = await loadTvRefresh(), db = tvDb(), realNow = Date.now;
+  const finalChunk = { asof: '2026-11-04', at: '2026-11-04T10:15:00Z', rows: names.slice(0, 50).map((n) => ({ k: n, y: 'N:' + n, c: [10] })) };   // 15:45 Indian time
+  const stored = () => new Map([['c001', finalChunk], ['c002', Object.assign({}, finalChunk, { at: '2026-11-04T08:00:00Z', rows: names.slice(50, 100).map((n) => ({ k: n, c: [10] })) })]]);   // c002 was saved at noon
+  Date.now = () => Date.parse('2026-11-04T11:00:00Z');   // 16:30 Indian time
+  try {
+    const run = tvRun(db, names, { stored: stored() }); await M.rsSnapshot(run);
+    assert.deepStrictEqual(T.calls.map((c) => c.length), [50, 2]);   // c001 is final: not asked for; c002 and the last two stocks are
+    assert.deepStrictEqual([run.reusedFinal, run.unchanged, run.updated, run.livePx.size, run.livePx.get('S0')], [50, 50, 52, 102, 10]);
+    assert.ok(T.log.some((l) => l.startsWith('run|done|52 saved, 50 unchanged')));
+    T.calls.length = 0; const asked = tvRun(db, names, { stored: stored() }); asked.ctx = tvBarsCtx({ plan: { stale: [asked.todo[3].s] } }); await M.rsSnapshot(asked);
+    assert.strictEqual(asked.reusedFinal, 0);   // S3 needs new bars: its chunk is asked for after all
+  } finally { Date.now = realNow; }
+}));
 test('refresh all stocks, bars step: without a plan or with nothing stale the step is skipped or reported as none needed', () => alone(async () => {
   const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks: [], priceHistoryByTicker: {}, COMPACT_LAG: 1 };
   const M = await loadTvRefresh(), db = tvDb();
@@ -3111,13 +3150,13 @@ test('refresh all stocks, daily MACD step: the stocks of the chosen strategy are
   const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks, strategies: [{ id: 's1', name: 'Value', rules: [] }], priceHistoryByTicker: {}, COMPACT_LAG: 1, isinSymbolCached: (s) => 'N:' + s.name,
     dailyStocksOf: (u) => ({ list: u, total: 5, needsOtherRule: false }),
     pcTickerKey: (s) => s.name, tvIstDate: () => '2026-11-04', loadDailyBars: async (d, sym) => ['saved ' + sym], saveDailyBars: async (d, who, bars, isNew) => { stored.push([d === db, who, bars, isNew]); },
-    readDailyStates: async (list, io, progress) => { calls.push([list.length, io.symbolOf(list[0]), io.keyOf(list[0]), io.stop(), io.today(), await io.loadBars(list[0], 'N:A')]); await io.saveBars(list[1], 'N:B', ['bar'], true); await io.pause(1); progress(1, 2); return { results: [{ key: 'A', state: 'above', asof: '2026-11-04' }], failures: [{}], abort: '', stored: 3, storeFailed: 1, pauses: 2, batched: 4 }; },
+    readDailyStates: async (list, io, progress) => { calls.push([list.length, io.symbolOf(list[0]), io.keyOf(list[0]), io.stop(), io.today(), await io.loadBars(list[0], 'N:A')]); await io.saveBars(list[1], 'N:B', ['bar'], true); await io.pause(1); progress(1, 2); return { results: [{ key: 'A', state: 'above', asof: '2026-11-04' }], failures: [{}], abort: '', stored: 3, storeFailed: 1, pauses: 2, batched: 4, deferred: 7 }; },
     saveDailyStates: async (d, results, today) => { saved.push([d === db, results, today]); return { changed: 1, failed: 0 }; } };
   const M = await loadTvRefresh(), pick = { strategyId: 's1' }, run = tvRun(db, [], { dailyPick: pick });
   await M.rsDaily(run);
   assert.strictEqual(JSON.stringify(calls), JSON.stringify([[2, 'N:A', 'A', false, '2026-11-04', ['saved N:A']]])); assert.strictEqual(JSON.stringify(stored), JSON.stringify([[true, { sym: 'N:B', key: 'B', name: 'B' }, ['bar'], true]]));   // the saved bars are read and saved through the run's database
   assert.deepStrictEqual(saved, [[true, [{ key: 'A', state: 'above', asof: '2026-11-04' }], '2026-11-04']]);
-  assert.deepStrictEqual(run.dailyResult, { name: 'Value', stocks: 2, total: 5, read: 1, changed: 1, failed: 1, stored: 3, storeFailed: 1, pauses: 2, batched: 4, notSaved: 0, abort: '' });
+  assert.deepStrictEqual(run.dailyResult, { name: 'Value', stocks: 2, total: 5, read: 1, changed: 1, failed: 1, stored: 3, storeFailed: 1, pauses: 2, batched: 4, deferred: 7, notSaved: 0, abort: '' });
   assert.ok(T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: reading 2 stocks')) && T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: 1 of 2 stocks')));
   M.__stop(true); calls.length = 0; await M.rsDaily(tvRun(db, [], { dailyPick: pick })); M.__stop(false); assert.strictEqual(calls[0][3], true);   // the read is told when Stop is pressed
   const idle = tvRun(db, [], {}); await M.rsDaily(idle); const stopped = tvRun(db, [], { dailyPick: pick, stopped: true }); await M.rsDaily(stopped);
@@ -3281,7 +3320,7 @@ test('daily MACD import: the stocks of a strategy besides its daily rule are cho
   const C = await loadWithStubs('src/tv/connector.js', '', { 'isin.js': 'export const isinOf = () => ""; export const isinSymbolCached = () => null; export const resolveIsinSymbols = async () => [];' });
   const all = { 'N:A': dailyRows(fall), 'N:B': dailyRows([...fall, 400, 410]), 'N:C': dailyRows(fall), 'N:D': dailyRows(fall), 'N:E': dailyRows(fall), 'N:F': dailyRows([...fall, 400]), 'N:G': dailyRows(fall.slice(0, 30)), 'N:EMPTY': [] };
   globalThis.__DM = { qualifying: (u, rules) => { seen.push(rules.map((r) => r.field)); return u; }, merge: C.tvMergeDelta, tvCall: async (tool, args) => {
-    calls.push([args.symbol, args.count]); if(args.symbol === 'N:BAD') throw new Error('bad reply'); if(args.symbol === 'N:QUOTA') throw new Error('quota used up'); return { rows: all[args.symbol].slice(-args.count) }; } };
+    calls.push([args.symbol, args.count]); if(args.symbol === 'N:BAD') throw new Error('bad reply'); if(args.symbol === 'N:QUOTA') throw new Error('quota used up'); if(args.symbol === 'N:LIMIT') throw new Error('quota: access is suspended for one minute'); if(args.symbol.startsWith('N:NEW')) return { rows: all['N:A'] }; return { rows: all[args.symbol].slice(-args.count) }; } };
   const D = await loadWithStubs('src/refresh/dailymacd.js', '', DAILY_STUBS), stocks = Array.from({ length: 650 }, (_, i) => ({ name: 'S' + i }));
   const r = D.dailyStocksOf(stocks, { rules: [{ field: 'score' }, { field: 'dayMacd3060' }, { field: 'verdict', ready: false }] });
   assert.deepStrictEqual(seen, [['score']]); assert.deepStrictEqual([r.list.length, r.total, r.needsOtherRule], [600, 650, false]);   // the daily rule and a rule not ready are left out; at most 600 stocks
@@ -3305,11 +3344,15 @@ test('daily MACD import: the stocks of a strategy besides its daily rule are cho
   calls.length = 0; await D.readDailyStates([mk('C', 'N:C')], Object.assign({}, io, { today: () => '2026-04-14' }), () => {}); await D.readDailyStates([mk('C', 'N:C')], Object.assign({}, io, { today: () => '2028-06-01' }), () => {});
   assert.deepStrictEqual(calls.map((c) => c[1]), [33, 500]);   // the days since the newest saved bar and three more; never more than 500
   const quota = await D.readDailyStates([mk('Q1', 'N:QUOTA'), mk('A', 'N:A'), mk('B', 'N:B'), mk('C', 'N:C'), mk('D', 'N:A'), mk('E', 'N:A')], Object.assign({}, io), () => {});
-  assert.strictEqual(quota.abort, 'quota used up');   // a quota that does not clear stops the read after six waits
-  assert.deepStrictEqual([quota.pauses, pauses.length, pauses[0]], [6, 6, 65000]);
+  assert.deepStrictEqual([quota.abort, quota.pauses, pauses.length], ['quota used up', 0, 0]);   // a long suspension is not waited out: the read stops at once
+  const limit = await D.readDailyStates([mk('L1', 'N:LIMIT'), mk('A', 'N:A')], Object.assign({}, io), () => {});
+  assert.deepStrictEqual([limit.abort, limit.pauses, pauses.length, pauses[0]], ['quota: access is suspended for one minute', 2, 2, 65000]);   // a one-minute suspension that does not clear stops the read after two waits
+  pauses.length = 0; calls.length = 0;
+  const fresh = await D.readDailyStates(Array.from({ length: 130 }, (_, i) => mk('F' + i, 'N:NEW' + i)), io, () => {});
+  assert.deepStrictEqual([calls.length, fresh.deferred, fresh.results.length], [100, 30, 100]);   // at most 100 stocks are fetched on their own per run
   // a quota refusal that clears after a wait: all the stocks are read, the refused one again
   const real = globalThis.__DM.tvCall; let refuse = 2; pauses.length = 0;
-  globalThis.__DM.tvCall = async (tool, args) => { if(refuse > 0 && args.symbol === 'N:A'){ refuse--; throw new Error('quota used up'); } return real(tool, args); };
+  globalThis.__DM.tvCall = async (tool, args) => { if(refuse > 0 && args.symbol === 'N:A'){ refuse--; throw new Error('quota: access is suspended for one minute'); } return real(tool, args); };
   const waited = await D.readDailyStates([mk('A', 'N:A'), mk('C2', 'N:C'), mk('D2', 'N:D')], io, () => {});
   assert.deepStrictEqual([waited.abort, waited.results.length, waited.pauses, pauses.length], ['', 3, 2, 2]);   // refused twice in a row: two waits, then the stock is read
   const pressed = await D.readDailyStates([mk('Q1', 'N:QUOTA')], Object.assign({}, io, { stop: () => true }), () => {}); assert.strictEqual(pressed.pauses, 0);   // Stop pressed: no wait
@@ -3317,7 +3360,7 @@ test('daily MACD import: the stocks of a strategy besides its daily rule are cho
   globalThis.__DM.tvCall = async () => { throw Object.assign(new Error('no connector'), { code: 'no_mcp' }); };
   assert.strictEqual((await D.readDailyStates([mk('A', 'N:A')], io, () => {})).abort, 'no connector');
   const stopped = await D.readDailyStates([mk('A', 'N:A')], Object.assign({}, io, { stop: () => true }), () => {}); assert.deepStrictEqual([stopped.results.length, stopped.failures.length], [0, 0]);   // Stop was pressed
-  assert.deepStrictEqual(await D.readDailyStates([], io, () => {}), { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0, batched: 0 });
+  assert.deepStrictEqual(await D.readDailyStates([], io, () => {}), { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0, batched: 0, deferred: 0 });
   globalThis.__DM.tvCall = async () => { throw 'plain text'; };   // a failure that is not an Error
   assert.strictEqual((await D.readDailyStates([mk('A', 'N:A')], io, () => {})).failures[0].reason, 'plain text');
 }));
@@ -3369,12 +3412,12 @@ test('daily MACD import in batches: stocks with saved bars go through the batch 
   assert.deepStrictEqual(kept.find((k) => k[0] === 'X'), ['X', 71, false]); assert.strictEqual(out.results.find((r) => r.key === 'X').asof, '2026-11-04');
   // 120 stocks go in three batch calls of at most 50
   batches.length = 0; calls.length = 0; data = {}; const many = Array.from({ length: 120 }, (_, i) => mk('M' + i)); many.forEach((s) => { saved[s.key] = history(70); });
-  await D.readDailyStates(many, io, () => {}); assert.deepStrictEqual(batches.map((b) => b.length), [50, 50, 20]); assert.strictEqual(calls.length, 120);   // none lined up (empty answer): each on its own
+  await D.readDailyStates(many, io, () => {}); assert.deepStrictEqual(batches.map((b) => b.length), [50, 50, 20]); assert.strictEqual(calls.length, 100);   // none lined up (empty answer): each on its own, up to 100 a run
   // a batch call that fails for another reason: its stocks go one by one; one that hits the quota: wait, and again
   batches.length = 0; calls.length = 0; batchError = new Error('bad reply'); const failed = await D.readDailyStates([mk('X'), mk('F')], io, () => {});
   assert.deepStrictEqual([failed.abort, failed.results.length, calls.length], ['', 2, 2]);
   const pauses = []; let refuse = 1; batchError = null; data = { 'N:X': wedRow };
-  const quota = await D.readDailyStates([mk('X')], Object.assign({}, io, { pause: async (ms) => { pauses.push(ms); }, batch: async (syms) => { if(refuse-- > 0) throw new Error('quota used up'); return data; } }), () => {});
+  const quota = await D.readDailyStates([mk('X')], Object.assign({}, io, { pause: async (ms) => { pauses.push(ms); }, batch: async (syms) => { if(refuse-- > 0) throw new Error('quota: access is suspended for one minute'); return data; } }), () => {});
   assert.deepStrictEqual([quota.pauses, quota.batched, pauses.length], [1, 1, 1]);
   batchError = Object.assign(new Error('no connector'), { code: 'no_mcp' }); calls.length = 0;
   const gone = await D.readDailyStates([mk('X'), mk('N')], io, () => {}); assert.deepStrictEqual([gone.abort, calls.length, gone.results.length], ['no connector', 0, 0]);
@@ -3403,6 +3446,7 @@ test('daily MACD import, result line: what was read, and the problems there are'
   assert.deepStrictEqual(line({ name: 'Big', stocks: 600, total: 1200, read: 600, changed: 0, failed: 2, notSaved: 1 }), { text: 'Daily MACD 30/60/5 (Big): 600 of 600 stocks read, 0 changed, only the first 600 of 1,200 this run, 2 failed, 1 batches not saved', problem: true });
   assert.deepStrictEqual(line({ name: 'P', stocks: 5, total: 5, read: 5, changed: 0, pauses: 1 }).text, 'Daily MACD 30/60/5 (P): 5 of 5 stocks read, 0 changed, waited 1 time for the TradingView call limit');
   assert.ok(line({ name: 'P', stocks: 5, total: 5, read: 5, changed: 0, pauses: 3 }).text.includes('waited 3 times'));
+  assert.ok(line({ name: 'P', stocks: 5, total: 5, read: 1, changed: 0, deferred: 4 }).text.includes('4 more stocks wait for the next run'));
   assert.deepStrictEqual(line({ name: 'Q', stocks: 5, total: 5, read: 2, changed: 2, abort: 'quota used up' }), { text: 'Daily MACD 30/60/5 (Q): 2 of 5 stocks read, 2 changed. Stopped: quota used up', problem: true });
   assert.deepStrictEqual(line({ problem: 'the chosen strategy no longer exists' }), { text: 'Daily MACD 30/60/5: the chosen strategy no longer exists', problem: true });
 }));

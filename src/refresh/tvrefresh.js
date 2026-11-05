@@ -28,6 +28,7 @@ import { priorityOrder } from './freshness.js';
 import { planHistory, weekStartS, monthStartS, BAR_COLUMNS, TOLERANCE } from './historyplan.js';
 import { collectBatchBars, isPriced, skippedForFailure, snapshotRows } from './snapshotrows.js';
 import { setWithRetry, settleBatch, snapshotFetcher } from './snapshotcall.js';
+import { chunkIsFinal } from './finalchunk.js';
 import { buildTech2Chunks } from '../engine/techscore2.js';
 import { debugHandle } from '../boot/handoff.js';
 import { getFiDb, getFiOwner, getFiRunning, setFiRunning } from '../import/fund-import.js';
@@ -244,15 +245,22 @@ async function rsSnapshot(run){
   const { todo, ctx } = run, fetcher = snapshotFetcher(ctx ? COLS.concat(BAR_COLUMNS) : COLS), state = { failed: 0 };   // with the bars of the stocks that need them, in the same call
   const batches = [];
   for(let i = 0; i < todo.length; i += BATCH) batches.push(todo.slice(i, i + BATCH));
-  const next = (bi) => bi < batches.length && !stopAsked ? fetcher.fetch(batches[bi]) : null;
+  // A chunk saved after the close holds the final prices until the next session (see finalchunk.js): it is not asked for again, unless a stock of it needs new bars.
+  const stale = new Set(ctx && ctx.plan ? ctx.plan.stale : []), nowMs = Date.now();
+  const finalChunk = (bi) => {
+    const batch = batches[bi], old = run.stored.get('c' + String(bi + 1).padStart(3, '0'));
+    return !batch.some(x => stale.has(x.s)) && chunkIsFinal(old, batch.map(x => sanitizeDocId(tickerSymbol(x.s))), nowMs) ? old : null;
+  };
+  const next = (bi) => bi < batches.length && !stopAsked && !finalChunk(bi) ? fetcher.fetch(batches[bi]) : null;
   let pending = next(0);
   for(let bi = 0; bi < batches.length; bi++){
     if(stopAsked){ run.stopped = true; break; }
     const batch = batches[bi], b0 = Date.now();
     fiSet('run', 'running', 'Batch ' + (bi + 1) + ' of ' + batches.length + ' · ' + num(run.updated + run.unchanged) + ' done', bi / batches.length);
-    const w0 = Date.now(), res = await pending;
+    const reuse = finalChunk(bi), w0 = Date.now(), res = reuse ? null : await pending;
     run.tvWaitMs += Date.now() - w0;
     pending = next(bi + 1);
+    if(reuse){ run.unchanged += batch.length; run.reusedFinal += batch.length; noteLivePrices(run, reuse.rows); continue; }
     const payload = settleBatch(run, state, batch, res);
     if(payload) await applyBatch(run, fetcher, { batch, payload, bi }); else fetcher.slowDown();
     run.batchSecs.push(Math.round((Date.now() - b0) / 100) / 10);
@@ -366,7 +374,7 @@ async function rsDaily(run){
       pause: ms => { fiSet('verify', 'running', 'Daily MACD 30/60/5: TradingView asked for a pause, continuing in about a minute…', 0.3); return sleep(ms); } };
     const r = await readDailyStates(list, io, progress);
     const saved = await saveDailyStates(run.db, r.results, run.today, () => {});
-    run.dailyResult = { name: strategy.name, stocks: list.length, total, read: r.results.length, changed: saved.changed, failed: r.failures.length, stored: r.stored, storeFailed: r.storeFailed, pauses: r.pauses, batched: r.batched, notSaved: saved.failed, abort: r.abort };
+    run.dailyResult = { name: strategy.name, stocks: list.length, total, read: r.results.length, changed: saved.changed, failed: r.failures.length, stored: r.stored, storeFailed: r.storeFailed, pauses: r.pauses, batched: r.batched, deferred: r.deferred, notSaved: saved.failed, abort: r.abort };
   } catch(e){ console.error('The daily MACD could not be read', e); run.dailyResult = { name: strategy.name, problem: 'it could not be read' }; }
 }
 
@@ -400,7 +408,7 @@ function rsReport(run){
   const B = (text, strong) => run.lines.push({ text: '• ' + text, cls: strong ? 'fi-line fi-bullet fi-line-strong' : 'fi-line fi-bullet' });
   run.lines.push({ text: (run.stopped ? 'Stopped after ' : run.updated + run.unchanged === 0 ? 'Nothing saved, ' : 'Done in ') + duration(Date.now() - run.t0), cls: 'fi-line fi-line-strong' });
   if(run.runError) B('Stopped because: ' + run.runError, true);
-  B('Prices and snapshot: ' + num(run.updated + run.unchanged) + ' of ' + num(run.planned) + ' stocks' + pct(run.updated + run.unchanged, run.planned) + (run.unchanged ? ', ' + num(run.unchanged) + ' unchanged' : ''));
+  B('Prices and snapshot: ' + num(run.updated + run.unchanged) + ' of ' + num(run.planned) + ' stocks' + pct(run.updated + run.unchanged, run.planned) + (run.unchanged ? ', ' + num(run.unchanged) + ' unchanged' : '') + (run.reusedFinal ? ' (' + num(run.reusedFinal) + ' were final after the close and not asked for again)' : ''));
   if(run.histRan){
     if(run.noneBefore) B('Full history: ' + num(run.filled) + ' of ' + num(run.noneBefore) + ' stocks' + pct(run.filled, run.noneBefore));
     B('Weekly and monthly bars: ' + num(run.barsUpdated) + ' of ' + num(run.staleBefore) + ' stocks' + pct(run.barsUpdated, run.staleBefore) + (run.barsUpdated > run.batchSaved ? ' (' + num(run.barsUpdated - run.batchSaved) + ' one by one)' : ''));
@@ -427,7 +435,7 @@ async function runSnapshot(){
   const db = await begin('Refreshing all stocks from TradingView');
   if(!db) return;
   // Everything the steps count and report. The steps below fill it in; `run.lines` is the result shown at the end.
-  const run = { db, today: tvIstDate(), lines: [], skipped: [], updated: 0, kept: 0, scored: 0, unchanged: 0, stopped: false,
+  const run = { db, today: tvIstDate(), lines: [], skipped: [], updated: 0, kept: 0, scored: 0, unchanged: 0, reusedFinal: 0, stopped: false,
     t0: Date.now(), startedAt: new Date().toISOString(), batchSecs: [], tvWaitMs: 0, saveMs: 0, planned: 0, chunksSaved: 0, runError: '',
     retried: 0, answeredAgain: 0, carried: 0, noSymbol: [], tech2Saved: 0, tech2Failed: 0, livePx: new Map(), crossRead: 0, crossChanged: 0, crossFailed: 0, symbolFixes: [], dailyPick: dailyChoice(), dailyResult: null,
     batchSaved: 0, chunkWrites: 0, compacted: 0, techBlocksSaved: 0, filled: 0, barsUpdated: 0, histFailed: 0, noneBefore: 0, staleBefore: 0, noHistoryLeft: 0, histRan: false };

@@ -11,7 +11,10 @@ const DAILY_KEEP = 500;              // daily bars saved per stock: about 2 year
 const DAILY_EXTRA = 3;               // bars asked on top of the days since the newest saved bar, so the newest saved bars are fetched again and checked
 const DAILY_WORKERS = 2;             // stocks fetched at the same time (few, so TradingView does not see a burst of calls)
 const DAILY_PAUSE_MS = 65000;        // wait after TradingView suspends the connector (it says "for one minute")
-const DAILY_PAUSES = 6;              // waits allowed in one run before the read stops
+const DAILY_PAUSES = 2;              // waits allowed in one run before the read stops: TradingView warns that more calls while suspended mean a longer suspension
+const DAILY_OWN_MAX = 100;           // stocks fetched on their own per run (a first import, or a stock that did not line up); the rest are left for the next run
+// True when TradingView says the suspension lasts one minute; a longer one ("until 00:00 UTC") is not waited out.
+const briefLimit = e => /for one minute/i.test(String((e && e.message) || ''));
 const DAILY_MAX = 600;               // stocks per run, so one run cannot use up the TradingView quota
 const IST_SECONDS = 19800;
 const dayBucket = t => Math.floor((t + IST_SECONDS) / 86400);   // the Indian day a bar belongs to
@@ -63,14 +66,14 @@ async function pool(items, n, fn){
 
 // The pieces of one read: its result (`out`), the progress `tick`, and how a stock is read from the batch call (`batched`, a chunk at a time) or from a call of its own (`single`).
 function dailyReader(total, io, progress){
-  /** @type {{ results: { key: string, state: string, asof: string }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number }} */
-  const out = { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0, batched: 0 };
+  /** @type {{ results: { key: string, state: string, asof: string }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number }} */
+  const out = { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0, batched: 0, deferred: 0 };
   let done = 0, resting = null;
   const tick = () => progress(++done, total);
   const rest = () => { if(!resting){ out.pauses++; resting = Promise.resolve(io.pause(DAILY_PAUSE_MS)).finally(() => { resting = null; }); } return resting; };
   const withRest = async fn => {
     for(;;){
-      try { return await fn(); } catch(e){ if(!(tvIsQuota(e) && (resting || out.pauses < DAILY_PAUSES) && !io.stop())) throw e; await rest(); }   // wait for TradingView, then again
+      try { return await fn(); } catch(e){ if(!(tvIsQuota(e) && briefLimit(e) && (resting || out.pauses < DAILY_PAUSES) && !io.stop())) throw e; await rest(); }   // wait for TradingView, then again
     }
   };
   const fail = (s, e) => {
@@ -107,8 +110,8 @@ function dailyReader(total, io, progress){
  * `io` = { symbolOf(stock), keyOf(stock), stop(), today(), nowS(), loadBars(stock, sym), saveBars(stock, sym, bars, isNew), batch(symbols) -> { symbol: row }, pause(ms) };
  * progress(done, total) after each stock. A stock that fails is listed with its reason and the rest go on; no connection stops the whole read (`abort` says why). When
  * TradingView refuses a call for its quota, all workers wait io.pause(DAILY_PAUSE_MS) and the call is tried again, up to DAILY_PAUSES waits (`pauses` counts them); after that
- * the read stops with the quota message. A bar document that cannot be read is fetched in full; one that cannot be saved is counted (`storeFailed`), its reading still counts.
- * @returns {Promise<{ results: { key: string, state: string, asof: string }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number }>}
+ * the read stops with the quota message. A suspension that is not "for one minute" stops the read at once. At most DAILY_OWN_MAX stocks are fetched on their own per run (`deferred` counts the rest). A bar document that cannot be read is fetched in full; one that cannot be saved is counted (`storeFailed`), its reading still counts.
+ * @returns {Promise<{ results: { key: string, state: string, asof: string }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number }>}
  */
 async function readDailyStates(list, io, progress){
   const rd = dailyReader(list.length, io, progress), loaded = [];
@@ -119,12 +122,13 @@ async function readDailyStates(list, io, progress){
   });
   const own = loaded.filter(x => !x.old || x.old.length < 2), known = loaded.filter(x => x.old && x.old.length >= 2);
   for(let i = 0; i < known.length && !io.stop() && !rd.out.abort; i += BATCH) own.push(...await rd.batched(known.slice(i, i + BATCH)));
-  await pool(own, DAILY_WORKERS, async x => { if(!io.stop() && !rd.out.abort) await rd.single(x); });
+  rd.out.deferred = Math.max(0, own.length - DAILY_OWN_MAX);   // the first import of many stocks is spread over several runs
+  await pool(own.slice(0, DAILY_OWN_MAX), DAILY_WORKERS, async x => { if(!io.stop() && !rd.out.abort) await rd.single(x); });
   return rd.out;
 }
 
 const num = x => x.toLocaleString('en-IN');
-// The line of the Refresh all stocks result about the daily import: `d` = the run's daily result, { name, stocks, total, read, changed, failed, pauses, stored, storeFailed, notSaved, abort }
+// The line of the Refresh all stocks result about the daily import: `d` = the run's daily result, { name, stocks, total, read, changed, failed, pauses, deferred, stored, storeFailed, notSaved, abort }
 // or { name?, problem }. Returns { text, problem } (a problem is shown in bold).
 function dailyReportLine(d){
   const head = 'Daily MACD 30/60/5' + (d.name ? ' (' + d.name + ')' : '') + ': ';
@@ -133,6 +137,7 @@ function dailyReportLine(d){
   if(d.total > d.stocks) parts.push('only the first ' + num(d.stocks) + ' of ' + num(d.total) + ' this run');
   if(d.stored) parts.push(num(d.stored) + ' daily records saved');
   if(d.batched) parts.push(num(d.batched) + ' updated in batches');
+  if(d.deferred) parts.push(num(d.deferred) + ' more stocks wait for the next run');
   if(d.pauses) parts.push('waited ' + num(d.pauses) + ' time' + (d.pauses > 1 ? 's' : '') + ' for the TradingView call limit');
   if(d.failed) parts.push(num(d.failed) + ' failed');
   if(d.storeFailed) parts.push(num(d.storeFailed) + ' daily records could not be saved');
