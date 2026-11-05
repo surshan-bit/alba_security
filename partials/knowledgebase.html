@@ -266,6 +266,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.360 &middot; 2026-11-05</h3>
+            <ul>
+              <li><strong>Claude&rsquo;s limit on calls at once is now respected:</strong> Claude lets a page have only a few calls in flight at the same time and turns the rest away with &ldquo;too many sample calls at once from this page &mdash; let some finish&rdquo;. The dashboard showed that as &ldquo;Your Claude usage limit was reached&rdquo; and stopped the whole batch, although the usage limit had not been reached. The message now says what happened, such a call is tried again after a wait (up to three times), the number of calls in flight starts at four, goes down on a rejection and comes back up after twenty good calls.</li>
+              <li><strong>Three Fundamental stocks at a time instead of five:</strong> because of that limit, more stocks at once only queue for their turn (the first stock of the five-at-a-time run took about eight minutes), while three keep every turn busy and each stock finishes sooner. The real usage-limit message is still shown as before, and still stops the batch.</li>
+            </ul>
             <h3>v1.359 &middot; 2026-11-05</h3>
             <ul>
               <li><strong>Fundamental refresh no longer loses Claude steps when five stocks run at once:</strong> each stock asks Claude four things at once, so five stocks meant about twenty calls together, and Claude turned some of them away at once (&ldquo;request failed&rdquo;). All Claude calls of the page now share one limit on how many are in flight at a time (six to start). A call that is turned away is tried again after a short wait, up to twice, and the limit goes down by one for each rejection and comes back up after twenty good calls. Calls over the limit simply wait their turn.</li>
