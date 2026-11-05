@@ -3009,6 +3009,86 @@ test('refresh all stocks, page: the buttons follow the run, the hint counts save
 
 const tvBarsCtx = (over) => Object.assign({ plan: { stale: [] }, jobs: new Map(), ready: new Map(), failedBars: [], abort: '', byImportance: (l) => l, bars: async (left) => left.length }, over);
 
+const FUND_STUBS = {
+  '../core/store.js': 'export const dbCapabilityPromise = globalThis.__F.dbp;',
+  '../core/util.js': 'export const escapeHtml = (x) => x, sanitizeDocId = (x) => x, tickerIndustry = () => "Ind", tickerSymbol = (s) => s.ticker;',
+  '../core/mos.js': 'export const marginOfSafety = () => null;',
+  '../core/finsector.js': 'export const financialKind = () => "", sectorPromptNote = () => "";',
+  '../detail/pending.js': 'export const fundamentalPendingItems = () => [], globalPendingInfo = () => "ok", technicalPendingItems = () => ({ none: false, keys: [], noScore: false });',
+  '../prices/store.js': 'export const pcTickerKey = (s) => s.ticker;',
+  '../tv/connector.js': 'export const tvCall = (...a) => globalThis.__F.tvCall(...a), tvErrorText = (e) => e.message, tvIstDate = () => "2026-11-05", tvMcp = async () => true;',
+  '../prices/refresh.js': 'export const priceJobs = new Map(), refreshOneNow = async () => {};',
+  './bar.js': 'export const ldAbort = new Map(), ldGet = () => ({ msg: "" }), ldJson = (o, n) => JSON.stringify(o).slice(0, n), ldSet = () => {};',
+  './claude.js': 'export const ldAskJson = (sample, prompt, o) => globalThis.__F.ask(prompt, o), ldEnsureClaudeAccess = async () => {}, ldErrText = (e) => e.message;',
+  './claudegate.js': 'export const claudeAnyOn = () => true, claudeStepOn = () => true;',
+  './symbols.js': 'export const ldVerifiedSymbol = async (s) => ({ sym: "NSE:" + s.ticker });',
+  '../core/sourcetags.js': 'export const SECTION_BASIS = {}, cleanFacts = () => [], tagPoint = (x) => x;',
+  './events.js': 'export const ldApplyLabels = () => 0, ldBuildEvents = () => [{ d: "2026-11-01" }], ldLabelPrompt = () => "", ldMergeEvents = (a, b) => b, ldUnlabeledNews = () => [];'
+};
+const fundStock = () => ({ name: 'Acme', ticker: 'ACME', score: 5, fundamentals: { factors: [{ key: 'fin', name: 'Financial Health', weight: 2, score: 1, metrics: [] }] }, valuation: {} });
+const fundSetup = (over) => {
+  const log = [], store = new Map(), saved = {}, wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const db = { doc: (path) => ({ get: async () => { if(path.startsWith('stockResearch/')) await wait(25); return store.has(path) ? { exists: true, data: () => store.get(path) } : { exists: false }; },
+    set: async (d) => { log.push(path + ':set'); store.set(path, d); saved[path] = d; }, update: async (d) => { log.push(path + ':update'); store.set(path, Object.assign({}, store.get(path), d)); saved[path] = store.get(path); } }) };
+  globalThis.claude = { use: async () => 'sample' };
+  globalThis.__F = Object.assign({ dbp: Promise.resolve(db), tvCall: async (tool) => ({ data: tool === 'mcp-tv-get-news' ? { headlines: [] } : { ok: 1 } }),
+    ask: async (prompt) => { log.push('ask'); return /Fundamental Score factor cards/.test(prompt) ? { factors: { fin: { research: { headline: 'Solid', points: ['One'] } } } } : {}; } }, over || {});
+  return { log, saved };
+};
+test('fundamental refresh: the chart events are saved while Claude writes, before the research is saved, and every Claude call is timed', () => alone(async () => {
+  const { log, saved } = fundSetup(), F = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS);
+  const text = await F.ldRunFundamental(fundStock());
+  assert.ok(/Global & Macro/.test(text));
+  const iAsk = log.indexOf('ask'), iEvents = log.indexOf('stockResearch/ACME:set'), iResearch = log.indexOf('stockResearch/ACME:update');
+  assert.ok(iAsk >= 0 && iAsk < iEvents && iEvents < iResearch, log.join(','));   // Claude was asked before the slow events save finished; the research is saved after it
+  assert.deepStrictEqual(saved['stockResearch/ACME'].events, [{ d: '2026-11-01' }]); assert.strictEqual(saved['stockResearch/ACME'].factors.fin.research.headline, 'Solid');   // neither write lost the other's fields
+  const timing = [...Object.keys(saved)].map((k) => saved[k]).find((d) => d && d.kind === 'fundamental');
+  assert.ok(timing && timing.stepsMs.events >= 0 && timing.calls.length >= 3 && timing.calls.every((c) => c.ms >= 0 && c.inChars > 0 && typeof c.at === 'number'));   // cards, Global & Macro, Strengths
+  assert.ok(timing.calls.some((c) => c.outChars > 0) && timing.calls.some((c) => c.outChars === 2));   // the size of an answer is kept; an empty answer is {} = 2 characters
+}));
+test('fundamental refresh: a failed Claude call is still timed, and TradingView refusing its calls fails the stock with that reason', () => alone(async () => {
+  const busy = fundSetup({ ask: async () => { throw new Error('Claude is busy'); } });
+  const F = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS);
+  assert.ok(/Not done: .*Claude is busy/.test(await F.ldRunFundamental(fundStock())));   // every Claude step failed, only the chart events were saved
+  const busyTiming = Object.values(busy.saved).find((d) => d && d.kind === 'fundamental');
+  assert.ok(busyTiming.calls.length >= 3 && busyTiming.calls.every((c) => c.outChars === 0 && c.ms >= 0));   // the failed calls were timed all the same
+  fundSetup({ tvCall: async () => { throw new Error('tool_pre_invoke blocked: TOOL_QUOTA_EXCEEDED - access is suspended until 00:00 UTC'); } });
+  await assert.rejects(F.ldRunFundamental(fundStock()), /TradingView refused the calls: .*TOOL_QUOTA_EXCEEDED/);
+  fundSetup({ tvCall: async () => { throw new Error('no such symbol'); } });
+  await assert.rejects(F.ldRunFundamental(fundStock()), /TradingView returned no data for NSE:ACME/);   // an ordinary failure keeps its own message
+}));
+const loadLdBatch = () => loadAllStubbed('src/livedata/batch.js', '', []);
+const ldBatchSetup = (names, over) => {
+  const seen = { active: 0, max: 0, workers: [], started: [], texts: [] }, results = {};
+  const T = globalThis.__T = Object.assign({ pcTickerKey: (s) => s.t, tickerSymbol: (s) => s.t, ldRunning: () => false, claudeAnyOn: () => false, getRefreshKit: () => null, sectionOf: () => 'strategies',
+    sleep: () => new Promise((r) => setImmediate(r)), ldGet: (key) => results[key] || { state: 'ok', pct: 100, msg: '' }, activityRun: (id, info) => seen.texts.push(info.text),
+    ldStart: async (s) => { seen.active++; seen.max = Math.max(seen.max, seen.active); seen.workers.push(globalThis.__LB().workers); seen.started.push(s.t); await new Promise((r) => setImmediate(r)); seen.active--; } }, over || {});
+  return { seen, results, list: names.map((t) => ({ t })), T };
+};
+test('batch refresh: five Fundamental stocks run at once, a failure takes one worker out and clean stocks bring it back, and a refusal stops the batch', () => alone(async () => {
+  const realTimeout = globalThis.setTimeout; globalThis.setTimeout = () => 0;   // the redraws after a run are not needed here
+  globalThis.document = { getElementById: () => null, querySelectorAll: () => [], dispatchEvent: () => {} }; globalThis.window = { CustomEvent: function(){} };
+  try {
+    ldBatchSetup([]);
+    const B = await loadLdBatch(); globalThis.__LB = B.getLdBatch;
+    const run = async (names, kind, failures) => { const x = ldBatchSetup(names); globalThis.__T.ldGet = (k) => failures[k] || { state: 'ok', pct: 100, msg: '' }; globalThis.__T.ldStart = x.T.ldStart; globalThis.__T.activityRun = x.T.activityRun; await B.ldBatchStart(kind, x.list, 'strat'); return { x, b: B.getLdBatch() }; };
+    const twelve = Array.from({ length: 12 }, (_, i) => 'S' + i);
+    const ok = await run(twelve, 'fund', {});
+    assert.deepStrictEqual([ok.x.seen.max, ok.b.note, ok.b.failed.length, ok.b.done], [5, 'Finished.', 0, 12]);   // five at a time
+    assert.ok(ok.x.seen.texts.some((t) => /5 at a time/.test(t)));   // the top strip says how many run at once
+    const tech = await run(twelve, 'tech', {}); assert.strictEqual(tech.x.seen.max, 3);   // Technical calls only TradingView: three at a time
+    const one = await run(['A', 'B'], 'fund', {}); assert.strictEqual(one.x.seen.max, 2);   // never more workers than stocks
+    const many = Array.from({ length: 30 }, (_, i) => 'M' + i);
+    const slow = await run(many, 'fund', { M2: { state: 'error', pct: 10, msg: 'Claude did not answer' } });
+    assert.deepStrictEqual([slow.b.failed.length, slow.b.note, slow.b.done], [1, 'Finished.', 30]);   // one failed stock does not stop the others
+    assert.ok(slow.x.seen.workers.includes(4) && slow.x.seen.workers[slow.x.seen.workers.length - 1] === 5);   // one worker stood down after the failure, and came back after three clean stocks
+    assert.ok(slow.x.seen.max <= 5);
+    const stopped = await run(many, 'fund', { M1: { state: 'error', pct: 10, msg: 'tool_pre_invoke blocked: TOOL_QUOTA_EXCEEDED, access is suspended until 00:00 UTC' } });
+    assert.ok(/^Stopped early: tool_pre_invoke/.test(stopped.b.note) && stopped.b.skipped > 0 && stopped.b.done < 30);   // TradingView refusing calls stops the batch
+    const perm = await run(many, 'fund', { M0: { state: 'error', pct: 1, msg: 'Claude needs permission', perm: true } });
+    assert.ok(perm.b.perm && /^Stopped early/.test(perm.b.note));
+  } finally { globalThis.setTimeout = realTimeout; delete globalThis.document; delete globalThis.window; delete globalThis.__LB; }
+}));
 test('final snapshot chunks: a chunk saved after the close stands until the next session opens, and only then', async () => {
   const F = await loadWithStubs('src/refresh/finalchunk.js', '', {});
   const ist = (d, h, m) => Date.parse(d + 'T00:00:00Z') + ((h * 60 + m) * 60000) - 19800000, keys = ['A', 'B'];
