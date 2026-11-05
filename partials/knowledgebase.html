@@ -266,6 +266,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.361 &middot; 2026-11-05</h3>
+            <ul>
+              <li><strong>Fundamental refresh is back to how it worked in v1.357:</strong> the changes of v1.358 to v1.360 (five and then three Fundamental stocks at a time, the shared limit on Claude calls with retries, stopping the batch when TradingView refuses calls, saving the chart events while Claude writes, and timing every Claude call) are taken out again, because running several stocks at once did not give a real speed-up and the batches still stopped. The stocks run as they did in v1.357. The only thing kept is the wording fix &ldquo;labelled positive, negative or neutral&rdquo; in a refresh result.</li>
+              <li><strong>Why a refresh can still stop:</strong> every Fundamental refresh reads about ten items per stock from TradingView (financials, forecasts, news, filings and news stories). TradingView limits how many calls an account may make in a day, and a batch of a hundred stocks together with the day&rsquo;s other refreshes can use it up. The refresh then ends with the TradingView quota message; run the rest after the quota resets (00:00 UTC).</li>
+            </ul>
             <h3>v1.360 &middot; 2026-11-05</h3>
             <ul>
               <li><strong>Claude&rsquo;s limit on calls at once is now respected:</strong> Claude lets a page have only a few calls in flight at the same time and turns the rest away with &ldquo;too many sample calls at once from this page &mdash; let some finish&rdquo;. The dashboard showed that as &ldquo;Your Claude usage limit was reached&rdquo; and stopped the whole batch, although the usage limit had not been reached. The message now says what happened, such a call is tried again after a wait (up to three times), the number of calls in flight starts at four, goes down on a rejection and comes back up after twenty good calls.</li>
