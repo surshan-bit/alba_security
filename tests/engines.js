@@ -3065,7 +3065,7 @@ const ldBatchSetup = (names, over) => {
     ldStart: async (s) => { seen.active++; seen.max = Math.max(seen.max, seen.active); seen.workers.push(globalThis.__LB().workers); seen.started.push(s.t); await new Promise((r) => setImmediate(r)); seen.active--; } }, over || {});
   return { seen, results, list: names.map((t) => ({ t })), T };
 };
-test('batch refresh: five Fundamental stocks run at once, a failure takes one worker out and clean stocks bring it back, and a refusal stops the batch', () => alone(async () => {
+test('batch refresh: three Fundamental stocks run at once, a failure takes one worker out and clean stocks bring it back, and a refusal stops the batch', () => alone(async () => {
   const realTimeout = globalThis.setTimeout; globalThis.setTimeout = () => 0;   // the redraws after a run are not needed here
   globalThis.document = { getElementById: () => null, querySelectorAll: () => [], dispatchEvent: () => {} }; globalThis.window = { CustomEvent: function(){} };
   try {
@@ -3074,15 +3074,15 @@ test('batch refresh: five Fundamental stocks run at once, a failure takes one wo
     const run = async (names, kind, failures) => { const x = ldBatchSetup(names); globalThis.__T.ldGet = (k) => failures[k] || { state: 'ok', pct: 100, msg: '' }; globalThis.__T.ldStart = x.T.ldStart; globalThis.__T.activityRun = x.T.activityRun; await B.ldBatchStart(kind, x.list, 'strat'); return { x, b: B.getLdBatch() }; };
     const twelve = Array.from({ length: 12 }, (_, i) => 'S' + i);
     const ok = await run(twelve, 'fund', {});
-    assert.deepStrictEqual([ok.x.seen.max, ok.b.note, ok.b.failed.length, ok.b.done], [5, 'Finished.', 0, 12]);   // five at a time
-    assert.ok(ok.x.seen.texts.some((t) => /5 at a time/.test(t)));   // the top strip says how many run at once
-    const tech = await run(twelve, 'tech', {}); assert.strictEqual(tech.x.seen.max, 3);   // Technical calls only TradingView: three at a time
+    assert.deepStrictEqual([ok.x.seen.max, ok.b.note, ok.b.failed.length, ok.b.done], [3, 'Finished.', 0, 12]);   // three at a time
+    assert.ok(ok.x.seen.texts.some((t) => /3 at a time/.test(t)));   // the top strip says how many run at once
+    const tech = await run(twelve, 'tech', {}); assert.strictEqual(tech.x.seen.max, 3);   // Technical calls only TradingView: three at a time as well
     const one = await run(['A', 'B'], 'fund', {}); assert.strictEqual(one.x.seen.max, 2);   // never more workers than stocks
     const many = Array.from({ length: 30 }, (_, i) => 'M' + i);
     const slow = await run(many, 'fund', { M2: { state: 'error', pct: 10, msg: 'Claude did not answer' } });
     assert.deepStrictEqual([slow.b.failed.length, slow.b.note, slow.b.done], [1, 'Finished.', 30]);   // one failed stock does not stop the others
-    assert.ok(slow.x.seen.workers.includes(4) && slow.x.seen.workers[slow.x.seen.workers.length - 1] === 5);   // one worker stood down after the failure, and came back after three clean stocks
-    assert.ok(slow.x.seen.max <= 5);
+    assert.ok(slow.x.seen.workers.includes(2) && slow.x.seen.workers[slow.x.seen.workers.length - 1] === 3);   // one worker stood down after the failure, and came back after three clean stocks
+    assert.ok(slow.x.seen.max <= 3);
     const stopped = await run(many, 'fund', { M1: { state: 'error', pct: 10, msg: 'tool_pre_invoke blocked: TOOL_QUOTA_EXCEEDED, access is suspended until 00:00 UTC' } });
     assert.ok(/^Stopped early: tool_pre_invoke/.test(stopped.b.note) && stopped.b.skipped > 0 && stopped.b.done < 30);   // TradingView refusing calls stops the batch
     const perm = await run(many, 'fund', { M0: { state: 'error', pct: 1, msg: 'Claude needs permission', perm: true } });
@@ -3206,9 +3206,10 @@ test('Claude call pool: calls beyond the limit wait, a rejected call is retried 
   assert.deepStrictEqual(await Promise.all(Array.from({ length: 10 }, () => pool.run(work))), Array(10).fill('ok'));
   assert.strictEqual(peak, 3);   // ten calls, three at a time
   let fails = 2; const flaky = async () => { if(fails-- > 0) throw new Error('request failed'); return 'late'; };
-  assert.strictEqual(await pool.run(flaky), 'late'); assert.deepStrictEqual(waits, [1500, 4000]); assert.strictEqual(pool.state().limit, 2);   // two retries with a wait each; the limit fell to the minimum
-  await assert.rejects(pool.run(async () => { throw new Error('request failed'); }), /request failed/); assert.strictEqual(waits.length, 4);   // a third failure is given up
-  await assert.rejects(pool.run(async () => { throw Object.assign(new Error('Your usage limit'), { code: 'rate_limited' }); }), /usage limit/); assert.strictEqual(waits.length, 4);   // a final error is not retried
+  assert.strictEqual(await pool.run(flaky), 'late'); assert.deepStrictEqual(waits, [3000, 6000]); assert.strictEqual(pool.state().limit, 2);   // two retries with a wait each; the limit fell to the minimum
+  await assert.rejects(pool.run(async () => { throw new Error('request failed'); }), /request failed/); assert.strictEqual(waits.length, 5);   // a call that keeps failing is given up after three retries
+  await assert.rejects(pool.run(async () => { throw Object.assign(new Error('Your usage limit'), { code: 'rate_limited' }); }), /usage limit/); assert.strictEqual(waits.length, 5);   // the usage limit is a final error: not retried
+  let tooMany = 1; assert.strictEqual(await pool.run(async () => { if(tooMany-- > 0) throw Object.assign(new Error('too many sample calls at once from this page \u2014 let some finish'), { code: 'rate_limited' }); return 'later'; }), 'later'); assert.strictEqual(waits.length, 6);   // Claude\'s limit on calls at once is retried
   await assert.rejects(pool.run(async () => { throw new Error('something else'); }), /something else/);
   for(let i = 0; i < 40; i++) await pool.run(async () => 'ok'); assert.strictEqual(pool.state().limit, 4);   // good calls bring the limit back, up to the maximum
   const ctl = new AbortController(); ctl.abort(); await assert.rejects(pool.run(async () => 'never', ctl.signal), (e) => e.code === 'cancelled');   // stopped while waiting for a turn
@@ -3217,8 +3218,9 @@ test('Claude call pool: calls beyond the limit wait, a rejected call is retried 
   for(const e of [{ code: 'cancelled', message: 'request failed' }, { message: 'bad' }, null]) await assert.rejects(p3.run(async () => { throw e; }), () => true);
   assert.strictEqual(w2.length, 0);   // a stop, an unrelated error and an empty error are not retried
   for(const m of ['Network error', 'timed out', 'The service is overloaded']) await assert.rejects(p3.run(async () => { throw new Error(m); }), () => true);
-  assert.strictEqual(w2.length, 6);   // these read like a failed request: two waits each
-  const pool2 = P.createCallPool(); assert.strictEqual(pool2.state().limit, 6);   // the default start
+  assert.strictEqual(w2.length, 9);   // these read like a failed request: three waits each
+  const pool2 = P.createCallPool(); assert.strictEqual(pool2.state().limit, 4);   // the default start
+  assert.deepStrictEqual([null, { code: 'rate_limited', message: 'Too many sample calls at once' }, { code: 'rate_limited', message: 'usage limit' }, { code: 'x', message: 'too many at once' }].map(P.isTooManyAtOnce), [false, true, false, false]);
   await pool2.run(async () => 1);
 });
 test('Claude call pool is used by every Claude call: ldAskJson parses the reply and marks a failure as Claude\'s', async () => {
@@ -3237,7 +3239,7 @@ test('Claude errors are put in words for the person, and the permission is asked
   const C = await loadWithStubs('src/livedata/claude.js', '', { '../tv/connector.js': 'export const tvErrorText = (e) => "TV: " + e.message;' });
   const text = (code, message) => C.ldErrText({ fromClaude: true, code, message });
   assert.ok(/not allowed/.test(text('not_granted'))); for(const c of ['sampling_disabled', 'capability_disabled', 'not_declared', 'capability_removed']) assert.ok(/not available for this account/.test(text(c)));
-  assert.ok(/usage limit/.test(text('rate_limited'))); assert.ok(/could not be read as data/.test(text('invalid_json'))); assert.ok(/sign in again/.test(text('session_expired'))); assert.ok(/too large/.test(text('prompt_too_large')));
+  assert.ok(/usage limit/.test(text('rate_limited', 'Your plan limit'))); assert.ok(/too many were running at once/.test(text('rate_limited', 'too many sample calls at once from this page \u2014 let some finish')) && !/usage limit/.test(text('rate_limited', 'too many sample calls at once from this page \u2014 let some finish'))); assert.ok(/could not be read as data/.test(text('invalid_json'))); assert.ok(/sign in again/.test(text('session_expired'))); assert.ok(/too large/.test(text('prompt_too_large')));
   assert.strictEqual(text('weird', 'The runtime said no'), 'The runtime said no [weird]'); assert.strictEqual(text(undefined, undefined), 'Unknown error');   // anything else keeps what the runtime said
   assert.strictEqual(C.ldErrText(new Error('boom')), 'TV: boom'); assert.strictEqual(C.ldIsClaudeError(null), false);   // a TradingView error is told apart from Claude's
   const asked = []; let state = 'denied';

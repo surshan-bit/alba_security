@@ -15,7 +15,9 @@ var ldBatch = null;   // { kind, source, total, done, active: Map(key -> ticker)
 // The last finished run of each kind on each screen: { state, pct, text, perm }. Kept so a card still shows its result
 // after the screen redraws and after the other kind has been run.
 var ldBatchLast = { analysis: { fund: null, tech: null }, strat: { fund: null, tech: null } };   // more screens (the Explorer's industries, 'biz-N') are added as they start a run
-const LD_PARALLEL = { fund: 5, tech: 3 };   // stocks refreshed at the same time by a batch (Fundamental waits mostly on Claude; Technical calls only TradingView)
+// Stocks refreshed at the same time by a batch. Claude lets a page have only a few calls in flight at once (see callpool.js), so more Fundamental stocks at once only queue
+// for those turns: three keep every turn busy while a stock reads TradingView or saves, and each stock finishes sooner. Technical calls only TradingView.
+const LD_PARALLEL = { fund: 3, tech: 3 };
 const LD_RECOVER_AFTER = 3;   // stocks finished cleanly in a row before one worker that stood down after a failure is let back in
 const LD_IDLE_MS = 500;   // how often a worker that stood down looks again
 // A failure that would repeat for every stock: the whole batch stops (Claude's usage limit or permission, or TradingView refusing calls for its quota or a suspension).

@@ -1,6 +1,6 @@
 // Live Data Refresh: Claude access, errors and JSON replies.
 import { tvErrorText } from '../tv/connector.js';
-import { createCallPool } from './callpool.js';
+import { createCallPool, isTooManyAtOnce } from './callpool.js';
 
 // Error text. TradingView errors carry the connector codes, Claude errors the sample codes; ldAskJson marks a failed Claude call
 // with fromClaude, which is how the two are told apart.
@@ -10,6 +10,7 @@ function ldErrText(e){
   if(ldIsClaudeError(e)){
     if(c === 'not_granted') return 'Asking Claude was not allowed for this page. Allow it when asked, then try again.';
     if(c === 'sampling_disabled' || c === 'capability_disabled' || c === 'not_declared' || c === 'capability_removed') return 'Asking Claude from this page is not available for this account.';
+    if(isTooManyAtOnce(e)) return 'Claude turned the call away because too many were running at once from this page. It is tried again by itself; if it keeps happening, run fewer stocks at a time.';
     if(c === 'rate_limited') return 'Your Claude usage limit was reached. Try again later.';
     if(c === 'invalid_json') return 'Claude\'s reply could not be read as data. Try again.';
     if(c === 'session_expired') return 'Please sign in again.';
