@@ -1,5 +1,6 @@
 // Live Data Refresh: Claude access, errors and JSON replies.
 import { tvErrorText } from '../tv/connector.js';
+import { createCallPool } from './callpool.js';
 
 // Error text. TradingView errors carry the connector codes, Claude errors the sample codes; ldAskJson marks a failed Claude call
 // with fromClaude, which is how the two are told apart.
@@ -43,16 +44,19 @@ function ldParseJson(text){
   if(a >= 0 && b > a){ r = tryParse(t.slice(a, b + 1)); if(r) return r.v; }
   throw { code: 'invalid_json', message: 'The reply held no JSON value.', text: t };
 }
+const callPool = createCallPool();   // one limit for every Claude call of the page (see callpool.js)
 async function ldAskJson(sample, prompt, opts){
   const textOf = r => (r && typeof r === 'object' && 'text' in r) ? r.text : r;
-  let reply;
   const fromClaude = e => { if(e && typeof e === 'object') e.fromClaude = true; return e; };
-  try {
-    try { reply = await sample(prompt, opts); }
+  const call = async () => {
+    try { return await sample(prompt, opts); }
     catch(e){
-      if(e && e.code === 'invalid_request') reply = await sample(Object.assign({ prompt }, opts));
-      else throw e;
+      if(e && e.code === 'invalid_request') return sample(Object.assign({ prompt }, opts));
+      throw e;
     }
+  };
+  try {
+    const reply = await callPool.run(call, opts && opts.signal);
     return ldParseJson(textOf(reply));
   } catch(e){ throw fromClaude(e); }
 }

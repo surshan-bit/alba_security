@@ -3049,9 +3049,9 @@ test('fundamental refresh: the chart events are saved while Claude writes, befor
 test('fundamental refresh: a failed Claude call is still timed, and TradingView refusing its calls fails the stock with that reason', () => alone(async () => {
   const busy = fundSetup({ ask: async () => { throw new Error('Claude is busy'); } });
   const F = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS);
-  assert.ok(/Not done: .*Claude is busy/.test(await F.ldRunFundamental(fundStock())));   // every Claude step failed, only the chart events were saved
+  await assert.rejects(F.ldRunFundamental(fundStock()), /Claude steps failed, so the research was not refreshed\..*Claude is busy/);   // every Claude step failed, only the chart events were saved: not a refreshed stock
   const busyTiming = Object.values(busy.saved).find((d) => d && d.kind === 'fundamental');
-  assert.ok(busyTiming.calls.length >= 3 && busyTiming.calls.every((c) => c.outChars === 0 && c.ms >= 0));   // the failed calls were timed all the same
+  assert.ok(busyTiming.calls.length >= 3 && busyTiming.calls.every((c) => c.outChars === 0 && c.ms >= 0 && /Claude is busy/.test(c.err)) && busyTiming.failed.length >= 3);   // the failed calls were timed all the same, with what Claude said
   fundSetup({ tvCall: async () => { throw new Error('tool_pre_invoke blocked: TOOL_QUOTA_EXCEEDED - access is suspended until 00:00 UTC'); } });
   await assert.rejects(F.ldRunFundamental(fundStock()), /TradingView refused the calls: .*TOOL_QUOTA_EXCEEDED/);
   fundSetup({ tvCall: async () => { throw new Error('no such symbol'); } });
@@ -3130,7 +3130,9 @@ test('fundamental refresh: every step runs when its data is there, and each can 
   jobs.delete('ACME'); fundSetup({ techPending: { none: true, keys: [] }, tvCall: richTv, ask: richAsk([]) }); assert.ok(/Technical signals \(The price history refresh did not finish\./.test(await F.ldRunFundamental(richStock())));
   // Global & Macro with nothing tied to a supplied link, Claude answers nothing usable for the cards and Strengths
   fundSetup({ gfInfo: 'not yet researched', tvCall: richTv, ask: async (prompt) => (/Global/.test(prompt) ? { positive: [{ text: 'x', url: 'https://evil/x' }] } : {}) });
-  const nothing = await F.ldRunFundamental(richStock()); assert.ok(/no item could be tied/.test(nothing) && /Claude returned nothing usable/.test(nothing), nothing);
+  await assert.rejects(F.ldRunFundamental(richStock()), /Claude steps failed.*Claude returned nothing usable/);   // nothing usable came back from any Claude step
+  fundSetup({ gfInfo: 'not yet researched', tvCall: richTv, ask: async (prompt) => (/Global/.test(prompt) ? { positive: [{ text: 'x', url: 'https://evil/x' }] } : /LATEST FACTOR STATE/.test(prompt) ? { strengths: [{ text: 'fine' }] } : {}) });
+  const some = await F.ldRunFundamental(richStock()); assert.ok(/no item could be tied/.test(some) && /Strengths and Watch-outs rewritten/.test(some) && /Not done: .*factor cards/.test(some), some);   // one Claude step worked: that is a refresh, with the failed step listed
 }));
 test('fundamental refresh: it cannot start without the database, Claude or the TradingView connector, and Stop ends it', () => alone(async () => {
   fundSetup({ dbp: Promise.resolve(null) }); const F = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS);
@@ -3195,6 +3197,32 @@ test('batch refresh: the panels, the top strip and the result notice follow a ru
     assert.strictEqual(B.getLdBatch().total, 3);
   } finally { globalThis.setTimeout = realTimeout; delete globalThis.document; delete globalThis.window; delete globalThis.__B; }
 }));
+test('Claude call pool: calls beyond the limit wait, a rejected call is retried and lowers the limit, and good calls raise it again', async () => {
+  const P = await loadWithStubs('src/livedata/callpool.js', '', {});
+  const waits = [], sleep = async (ms) => { waits.push(ms); };
+  const pool = P.createCallPool({ start: 3, max: 4, min: 2, sleep });
+  let live = 0, peak = 0;
+  const work = async () => { live++; peak = Math.max(peak, live); await new Promise((r) => setImmediate(r)); live--; return 'ok'; };
+  assert.deepStrictEqual(await Promise.all(Array.from({ length: 10 }, () => pool.run(work))), Array(10).fill('ok'));
+  assert.strictEqual(peak, 3);   // ten calls, three at a time
+  let fails = 2; const flaky = async () => { if(fails-- > 0) throw new Error('request failed'); return 'late'; };
+  assert.strictEqual(await pool.run(flaky), 'late'); assert.deepStrictEqual(waits, [1500, 4000]); assert.strictEqual(pool.state().limit, 2);   // two retries with a wait each; the limit fell to the minimum
+  await assert.rejects(pool.run(async () => { throw new Error('request failed'); }), /request failed/); assert.strictEqual(waits.length, 4);   // a third failure is given up
+  await assert.rejects(pool.run(async () => { throw Object.assign(new Error('Your usage limit'), { code: 'rate_limited' }); }), /usage limit/); assert.strictEqual(waits.length, 4);   // a final error is not retried
+  await assert.rejects(pool.run(async () => { throw new Error('something else'); }), /something else/);
+  for(let i = 0; i < 40; i++) await pool.run(async () => 'ok'); assert.strictEqual(pool.state().limit, 4);   // good calls bring the limit back, up to the maximum
+  const ctl = new AbortController(); ctl.abort(); await assert.rejects(pool.run(async () => 'never', ctl.signal), (e) => e.code === 'cancelled');   // stopped while waiting for a turn
+  assert.deepStrictEqual(pool.state(), { limit: 4, inFlight: 0, waiting: 0 });
+  assert.deepStrictEqual([null, { code: 'cancelled', message: 'request failed' }, { message: 'Network error' }, { message: 'timed out' }, { message: 'bad' }].map(P.isTransient), [false, false, true, true, false]);
+  const pool2 = P.createCallPool(); assert.strictEqual(pool2.state().limit, 6);   // the default start
+  await pool2.run(async () => 1);
+});
+test('Claude call pool is used by every Claude call: ldAskJson parses the reply and marks a failure as Claude\'s', async () => {
+  const C = await loadWithStubs('src/livedata/claude.js', '', { '../tv/connector.js': 'export const tvErrorText = (e) => e.message;' });
+  assert.deepStrictEqual(await C.ldAskJson(async () => ({ text: '{"a":1}' }), 'p', {}), { a: 1 });
+  let calls = 0; assert.deepStrictEqual(await C.ldAskJson(async (p) => { calls++; if(typeof p === 'string') throw { code: 'invalid_request', message: 'old style' }; return '{"b":2}'; }, 'p', {}), { b: 2 }); assert.strictEqual(calls, 2);   // the older call style is tried when the first is refused
+  await assert.rejects(C.ldAskJson(async () => { throw { code: 'not_granted', message: 'no' }; }, 'p', {}), (e) => e.fromClaude === true && e.code === 'not_granted');
+});
 test('final snapshot chunks: a chunk saved after the close stands until the next session opens, and only then', async () => {
   const F = await loadWithStubs('src/refresh/finalchunk.js', '', {});
   const ist = (d, h, m) => Date.parse(d + 'T00:00:00Z') + ((h * 60 + m) * 60000) - 19800000, keys = ['A', 'B'];

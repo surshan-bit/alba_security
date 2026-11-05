@@ -154,6 +154,9 @@ function ldPromptKit(c){
       const r = await ldAskJson(sample, prompt, { modelTier: tier || 'quick', cache: false, signal, onText: nudge(from, to, expected) });
       note.outChars = r ? JSON.stringify(r).length : 0;
       return r;
+    } catch(e){
+      note.err = String((e && e.message) || e).slice(0, 100) + (e && e.code ? ' [' + e.code + ']' : '');   // what Claude said, so a rejected call can be diagnosed from the run log
+      throw e;
     } finally { note.ms = Date.now() - a; }
   };
   Object.assign(c, { factors, headFor, ask, TV });
@@ -188,6 +191,7 @@ async function ldFillMissingMetrics(c){
         });
         if(Object.keys(m).length){ upd[x.key] = { metrics: m, note: typeof o.note === 'string' ? o.note.slice(0, 300) : undefined }; }
       });
+      if(metricsFilled) c.claudeSaved = true;
       notes.push(metricsFilled ? metricsFilled + ' missing metric' + (metricsFilled === 1 ? '' : 's') + ' filled' : 'no missing metric could be found in the TradingView data');
     } catch(e){
       if(e && e.code === 'cancelled') throw e;
@@ -264,6 +268,7 @@ async function ldRefreshCards(c){
       if(c.T) c.T['cards_' + g.step + (g.part ? '_' + g.part : '')] = Date.now() - ga;   // time per card group, so the slowest one is visible
     }
   }));
+  if(cardsRefreshed) c.claudeSaved = true;
   if(cardsRefreshed) notes.push(cardsRefreshed + ' factor card' + (cardsRefreshed === 1 ? '' : 's') + ' refreshed');
   else if(cardGroups.length && !failed.length) failed.push('factor cards (Claude returned nothing usable)');
   const scoreChanges = scoreNotes.filter(Boolean);
@@ -326,7 +331,7 @@ async function ldGlobalMacro(c){
     const uref = db.doc('stockUpdates/' + docId);
     const ucur = await uref.get();
     if(ucur && ucur.exists) await uref.update({ globalFactors: gf }); else await uref.set({ ticker: sym0, globalFactors: gf });
-    gfOut = { pos, neg };
+    gfOut = { pos, neg }; c.claudeSaved = true;
     notes.push('Global & Macro: ' + pos.length + ' positive, ' + neg.length + ' negative, ' + events.length + ' critical event' + (events.length === 1 ? '' : 's'));
   } catch(e){
     if(e && e.code === 'cancelled') throw e;
@@ -386,6 +391,7 @@ async function ldStrengths(c){
     const scur = await sref.get();
     const summary = { asof: today, strengths, watchouts };
     if(scur && scur.exists) await sref.update({ summary }); else await sref.set({ ticker: sym0, asof: today, factors: {}, summary });
+    c.claudeSaved = true;
     notes.push('Strengths and Watch-outs rewritten (' + strengths.length + ' and ' + watchouts.length + ')');
   } catch(e){
     if(e && e.code === 'cancelled') throw e;
@@ -397,6 +403,8 @@ async function ldStrengths(c){
 function ldFinish(c){
   const { notes, failed, skippedOff, useClaude } = c;
   if(!notes.length && failed.length) throw new Error('Nothing was saved. ' + failed.join('; ') + '.');
+  // Every Claude step failed (Claude refused or did not answer): only the chart events were saved, which is not a refresh of this stock.
+  if(useClaude && failed.length && !c.claudeSaved && !skippedOff.length) throw new Error('Claude steps failed, so the research was not refreshed. ' + failed.join('; ') + '.');
   const offText = skippedOff.length ? ' Turned off in Settings: ' + skippedOff.join(', ') + '.' : '';
   return (notes.join('. ') || 'Finished') + '.' + (failed.length ? ' Not done: ' + failed.join('; ') + '.' : '') + offText + (useClaude ? ' Based on TradingView data and Claude, without web search.' : ' Based on TradingView data only.');
 }
@@ -413,7 +421,7 @@ async function ldRunFundamental(s){
   const signal = ctl.signal;
   const halt = () => { if(signal.aborted) throw { code: 'cancelled' }; };
   const c = { s, key, sym0, docId, today, set, halt, signal, notes: [], failed: [], labelled: 0, calls: [] };   // labelled: news headlines labelled by Claude in this run
-  const t0 = Date.now(), T = {};   // how long each step took (ms), saved when the run ends well
+  const t0 = Date.now(), T = {};   // how long each step took (ms), saved when the run ends
   c.T = T;
   const timed = async (name, fn) => { const a = Date.now(); try { return await fn(); } finally { T[name] = (T[name] || 0) + Date.now() - a; } };
   try {
@@ -434,22 +442,21 @@ async function ldRunFundamental(s){
     ]);
     await timed('technical', () => ldTechnicalSignals(c));
     await timed('strengths', () => ldStrengths(c));
-    const text = ldFinish(c);
-    await ldSaveTimings(c, T, t0);
-    return text;
+    await ldSaveTimings(c, T, t0);   // also for a run that ends in failure: that is when the timings and errors are needed
+    return ldFinish(c);
   } finally {
     ldAbort.delete(key + '|fund');
   }
 }
 
-// One small record per finished run in refreshRunLog/fundamental-0..9 (the slot is the start second modulo 10, so the newest ten stay and nothing
+// One small record per run in refreshRunLog/fundamental-0..9 (the slot is the start second modulo 10, so the newest ten stay and nothing
 // needs deleting). It only tells us where the time went. A failed save never matters.
 async function ldSaveTimings(c, T, t0){
   const total = Date.now() - t0;
   console.info('[Refresh Fundamental Info] ' + c.sym0 + ' took ' + Math.round(total / 1000) + ' s', T);
   try {
     if(!c.db) return;
-    await c.db.doc('refreshRunLog/fundamental-' + (Math.floor(t0 / 1000) % 10)).set({ v: 1, kind: 'fundamental', ticker: c.sym0, startedAt: new Date(t0).toISOString(), durationMs: total, stepsMs: T, calls: c.calls, parallel: true, claudeOn: !!c.useClaude });
+    await c.db.doc('refreshRunLog/fundamental-' + (Math.floor(t0 / 1000) % 10)).set({ v: 1, kind: 'fundamental', ticker: c.sym0, startedAt: new Date(t0).toISOString(), durationMs: total, stepsMs: T, calls: c.calls, failed: c.failed.slice(0, 6), parallel: true, claudeOn: !!c.useClaude });
   } catch(e){ console.error('Could not save the fundamental refresh timing', e); }
 }
 

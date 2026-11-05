@@ -266,6 +266,12 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.359 &middot; 2026-11-05</h3>
+            <ul>
+              <li><strong>Fundamental refresh no longer loses Claude steps when five stocks run at once:</strong> each stock asks Claude four things at once, so five stocks meant about twenty calls together, and Claude turned some of them away at once (&ldquo;request failed&rdquo;). All Claude calls of the page now share one limit on how many are in flight at a time (six to start). A call that is turned away is tried again after a short wait, up to twice, and the limit goes down by one for each rejection and comes back up after twenty good calls. Calls over the limit simply wait their turn.</li>
+              <li><strong>A stock is only counted as refreshed when Claude actually did something for it:</strong> before, a stock whose Claude steps all failed still counted as refreshed because its chart events had been saved. Now it is listed as failed, with the reason, so it can be run again. A stock where at least one Claude step worked is still a refresh, with the failed steps listed.</li>
+              <li><strong>Failed runs are timed too:</strong> the run&rsquo;s timing record now also exists for a run that fails, and each Claude call keeps what Claude said when it failed, so the cause of a rejected call can be read from it.</li>
+            </ul>
             <h3>v1.358 &middot; 2026-11-05</h3>
             <ul>
               <li><strong>Fundamental refresh runs five stocks at a time:</strong> a batch of Fundamental refreshes (from Strategies, Analysis or the Explorer) now works on five stocks at once instead of three, so a batch of 146 stocks takes a fraction of the time. Technical refreshes stay at three at a time. Every stock still makes exactly the same TradingView and Claude calls as before.</li>
