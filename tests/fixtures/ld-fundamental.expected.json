@@ -1058,13 +1058,13 @@
    },
    {
     "tier": "quick",
-    "len": 686,
-    "task": " Label each news headline about Company 02 by how it is like"
+    "len": 3201,
+    "task": " These metrics are \"n/a\" in the screener.in CSV import: [pro"
    },
    {
     "tier": "quick",
-    "len": 3201,
-    "task": " These metrics are \"n/a\" in the screener.in CSV import: [pro"
+    "len": 686,
+    "task": " Label each news headline about Company 02 by how it is like"
    },
    {
     "tier": "quick",
