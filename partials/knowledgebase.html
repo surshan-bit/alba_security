@@ -266,6 +266,14 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.358 &middot; 2026-11-05</h3>
+            <ul>
+              <li><strong>Fundamental refresh runs five stocks at a time:</strong> a batch of Fundamental refreshes (from Strategies, Analysis or the Explorer) now works on five stocks at once instead of three, so a batch of 146 stocks takes a fraction of the time. Technical refreshes stay at three at a time. Every stock still makes exactly the same TradingView and Claude calls as before.</li>
+              <li><strong>One failed stock no longer slows the whole batch to one at a time:</strong> before, any single failure made the rest of that batch of 50 run one stock at a time. Now a failure takes one worker out and three clean stocks in a row bring it back. The progress line says how many are running, for example &ldquo;(5 at a time)&rdquo; or &ldquo;(4 at a time, slowed after a failure)&rdquo;.</li>
+              <li><strong>The batch stops when TradingView refuses calls:</strong> if TradingView says its call quota is used up or the connector is suspended, the batch stops with that message instead of trying the remaining stocks one after another, which could extend the suspension.</li>
+              <li><strong>Faster per stock:</strong> the chart events and headline labels are now saved while Claude writes the factor cards, instead of before it. Each Claude call is also timed, with the size of what went in and came out, in the run&rsquo;s timing record, so the slowest calls can be found.</li>
+              <li><strong>Fixed:</strong> the result line of a Fundamental refresh read &ldquo;2 headlines c.labelled positive, negative or neutral&rdquo;; it now says &ldquo;labelled&rdquo;.</li>
+            </ul>
             <h3>v1.357 &middot; 2026-11-05</h3>
             <ul>
               <li><strong>Refresh all stocks skips prices that can no longer change:</strong> a batch of 50 stocks that was saved after the market closed (15:30 Indian time) holds the final prices of that day, so it is not asked for from TradingView again until the next session opens, including over a weekend. A stock that needs new weekly or monthly bars is still asked for. The result line says how many stocks were skipped this way. A market holiday is not known, so on the day after one the prices are asked for as usual.</li>

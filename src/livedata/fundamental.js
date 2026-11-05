@@ -112,7 +112,7 @@ async function ldSaveEvents(c){
         try {
           halt();
           c.labelled = ldApplyLabels(todo, await ldAskJson(sample, ldLabelPrompt(s.name, todo), { modelTier: 'quick', cache: false, signal }));
-          if(c.labelled) notes.push(c.labelled + ' headline' + (c.labelled === 1 ? '' : 's') + ' c.labelled positive, negative or neutral');
+          if(c.labelled) notes.push(c.labelled + ' headline' + (c.labelled === 1 ? '' : 's') + ' labelled positive, negative or neutral');
         } catch(e){ if(e && e.code === 'cancelled') throw e; failed.push('news labels (' + ldErrText(e) + ')'); }
       }
       if(ecur && ecur.exists) await eref.update({ events: merged }); else await eref.set({ ticker: sym0, events: merged });

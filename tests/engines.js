@@ -3014,16 +3014,16 @@ const FUND_STUBS = {
   '../core/util.js': 'export const escapeHtml = (x) => x, sanitizeDocId = (x) => x, tickerIndustry = () => "Ind", tickerSymbol = (s) => s.ticker;',
   '../core/mos.js': 'export const marginOfSafety = () => null;',
   '../core/finsector.js': 'export const financialKind = () => "", sectorPromptNote = () => "";',
-  '../detail/pending.js': 'export const fundamentalPendingItems = () => [], globalPendingInfo = () => "ok", technicalPendingItems = () => ({ none: false, keys: [], noScore: false });',
+  '../detail/pending.js': 'export const fundamentalPendingItems = (s) => globalThis.__F.pend(s), globalPendingInfo = () => globalThis.__F.gfInfo, technicalPendingItems = () => globalThis.__F.techPending;',
   '../prices/store.js': 'export const pcTickerKey = (s) => s.ticker;',
-  '../tv/connector.js': 'export const tvCall = (...a) => globalThis.__F.tvCall(...a), tvErrorText = (e) => e.message, tvIstDate = () => "2026-11-05", tvMcp = async () => true;',
-  '../prices/refresh.js': 'export const priceJobs = new Map(), refreshOneNow = async () => {};',
-  './bar.js': 'export const ldAbort = new Map(), ldGet = () => ({ msg: "" }), ldJson = (o, n) => JSON.stringify(o).slice(0, n), ldSet = () => {};',
+  '../tv/connector.js': 'export const tvCall = (...a) => globalThis.__F.tvCall(...a), tvErrorText = (e) => e.message, tvIstDate = () => "2026-11-05", tvMcp = async () => globalThis.__F.mcp;',
+  '../prices/refresh.js': 'export const priceJobs = globalThis.__F.jobs, refreshOneNow = async (s) => globalThis.__F.refreshOne(s);',
+  './bar.js': 'export const ldAbort = globalThis.__F.aborts, ldGet = () => ({ msg: "" }), ldJson = (o, n) => JSON.stringify(o).slice(0, n), ldSet = () => {};',
   './claude.js': 'export const ldAskJson = (sample, prompt, o) => globalThis.__F.ask(prompt, o), ldEnsureClaudeAccess = async () => {}, ldErrText = (e) => e.message;',
-  './claudegate.js': 'export const claudeAnyOn = () => true, claudeStepOn = () => true;',
+  './claudegate.js': 'export const claudeAnyOn = () => globalThis.__F.claudeOn, claudeStepOn = (id) => !globalThis.__F.off.includes(id);',
   './symbols.js': 'export const ldVerifiedSymbol = async (s) => ({ sym: "NSE:" + s.ticker });',
   '../core/sourcetags.js': 'export const SECTION_BASIS = {}, cleanFacts = () => [], tagPoint = (x) => x;',
-  './events.js': 'export const ldApplyLabels = () => 0, ldBuildEvents = () => [{ d: "2026-11-01" }], ldLabelPrompt = () => "", ldMergeEvents = (a, b) => b, ldUnlabeledNews = () => [];'
+  './events.js': 'export const ldApplyLabels = () => globalThis.__F.labelled, ldBuildEvents = () => [{ d: "2026-11-01" }], ldLabelPrompt = () => "LABELS", ldMergeEvents = (a, b) => b, ldUnlabeledNews = () => globalThis.__F.todo;'
 };
 const fundStock = () => ({ name: 'Acme', ticker: 'ACME', score: 5, fundamentals: { factors: [{ key: 'fin', name: 'Financial Health', weight: 2, score: 1, metrics: [] }] }, valuation: {} });
 const fundSetup = (over) => {
@@ -3031,7 +3031,7 @@ const fundSetup = (over) => {
   const db = { doc: (path) => ({ get: async () => { if(path.startsWith('stockResearch/')) await wait(25); return store.has(path) ? { exists: true, data: () => store.get(path) } : { exists: false }; },
     set: async (d) => { log.push(path + ':set'); store.set(path, d); saved[path] = d; }, update: async (d) => { log.push(path + ':update'); store.set(path, Object.assign({}, store.get(path), d)); saved[path] = store.get(path); } }) };
   globalThis.claude = { use: async () => 'sample' };
-  globalThis.__F = Object.assign({ dbp: Promise.resolve(db), tvCall: async (tool) => ({ data: tool === 'mcp-tv-get-news' ? { headlines: [] } : { ok: 1 } }),
+  globalThis.__F = Object.assign({ dbp: Promise.resolve(db), pend: () => [], gfInfo: 'ok', techPending: { none: false, keys: [], noScore: false }, mcp: true, jobs: new Map(), aborts: new Map(), refreshOne: async () => {}, claudeOn: true, off: [], labelled: 0, todo: [], tvCall: async (tool) => ({ data: tool === 'mcp-tv-get-news' ? { headlines: [] } : { ok: 1 } }),
     ask: async (prompt) => { log.push('ask'); return /Fundamental Score factor cards/.test(prompt) ? { factors: { fin: { research: { headline: 'Solid', points: ['One'] } } } } : {}; } }, over || {});
   return { log, saved };
 };
@@ -3088,6 +3088,112 @@ test('batch refresh: five Fundamental stocks run at once, a failure takes one wo
     const perm = await run(many, 'fund', { M0: { state: 'error', pct: 1, msg: 'Claude needs permission', perm: true } });
     assert.ok(perm.b.perm && /^Stopped early/.test(perm.b.note));
   } finally { globalThis.setTimeout = realTimeout; delete globalThis.document; delete globalThis.window; delete globalThis.__LB; }
+}));
+const richStock = () => ({ name: 'Acme', ticker: 'ACME', score: 5, valuation: { intrinsicValue: 100, currentPrice: 80 }, globalFactors: { old: 1 },
+  fundamentals: { factors: ['fin', 'prof', 'growth', 'val', 'moat', 'gov', 'x'].map((k) => ({ key: k, name: 'F ' + k + ' &amp; co', weight: 2, score: 1, metrics: [['ROE', 'n/a']], research: k === 'x' ? undefined : { headline: 'old' } })) } });
+const richAsk = (log) => async (prompt) => {
+  log.push(prompt.slice(0, 40));
+  if(/metrics are "n\/a"/.test(prompt)) return { factors: { x: { metrics: { ROE: '12%', Other: 'n/a', Bad: {} }, note: 'found' }, nothing: {} } };
+  if(/factor cards/.test(prompt)) return { factors: Object.fromEntries(['fin', 'prof', 'growth', 'val', 'moat', 'gov', 'x'].map((k) => [k, { score: 1.6, note: 'n', research: { headline: 'H ' + k, points: ['a', { text: 'b' }], positives: ['p'], negatives: ['n'], facts: [], sources: [{ url: 'https://n/1', title: 'T' }, { url: 'https://evil/x' }] } }])) };
+  if(/Global & Macro Information/.test(prompt)) return { positive: [{ text: 'good', url: 'https://n/1', source: 'S' }, { text: 'bad link', url: 'https://evil/x' }], negative: [], events: [{ headline: 'ev', url: 'https://n/1', impact: 'weird', why: 'w' }] };
+  if(/LATEST FACTOR STATE/.test(prompt)) return { strengths: [{ text: 'solid', tone: 'strong' }, { text: 'ok', tone: 'x' }], watchouts: [{ text: 'careful', tone: 'concern' }] };
+  return {};
+};
+const richTv = async (tool) => {
+  if(tool === 'mcp-tv-get-news') return { data: { headlines: ['1', '2', '3', '4'].map((n) => ({ id: 'id' + n, title: 'Head ' + n, published: 1793800000, provider: n === '2' ? null : { name: 'Src' }, link: n === '1' ? 'https://n/1' : 'https://n/' + n, paywall: n === '4' })) } };
+  if(tool === 'mcp-tv-get-news-story') return { data: { summary: 'story text' } };
+  return { data: { ok: 1 } };
+};
+test('fundamental refresh: every step runs when its data is there, and each can be switched off or fail on its own', () => alone(async () => {
+  const log = [], jobs = new Map([['ACME', { state: 'ok', msg: 'bars done' }]]), refreshed = [];
+  const { saved } = fundSetup({ pend: (s) => [{ key: 'x', missing: ['ROE'], proxy: false }, { key: 'moat', missing: [], proxy: true }], gfInfo: 'not yet researched', techPending: { none: true, keys: [], noScore: false }, jobs,
+    refreshOne: async (s) => { refreshed.push(s.ticker); }, todo: [{ id: 1 }], labelled: 2, ask: richAsk(log), tvCall: richTv });
+  const F = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS);
+  const text = await F.ldRunFundamental(richStock());
+  assert.ok(/1 missing metric filled/.test(text) && /Global & Macro: 1 positive, 0 negative, 1 critical event/.test(text) && /Strengths and Watch-outs rewritten \(2 and 1\)/.test(text) && /Technical signals updated \(bars done\)/.test(text) && /2 headlines labelled/.test(text), text);
+  assert.deepStrictEqual(refreshed, ['ACME']);
+  assert.strictEqual(saved['stockResearch/ACME'].factors.moat.score, 1.6); assert.strictEqual(saved['stockResearch/ACME'].factors.fin.score, undefined);   // only Moat and Governance (and proxy factors) may be re-scored
+  assert.strictEqual(saved['stockUpdates/ACME'].globalFactors.events[0].impact, 'mixed');
+  assert.strictEqual(saved['stockResearch/ACME'].summary.strengths[1].tone, 'good');
+  // everything off in Settings: nothing is asked, the run says so
+  const off = fundSetup({ off: ['missingMetrics', 'tradCards', 'buffettCards', 'globalMacro', 'strengths', 'newsLabels'], pend: () => [{ key: 'x', missing: ['ROE'], proxy: false }], gfInfo: 'not yet researched', todo: [{ id: 1 }], ask: richAsk(log), tvCall: richTv });
+  log.length = 0; const offText = await F.ldRunFundamental(richStock());
+  assert.ok(/Turned off in Settings: .*missing metrics.*Global & Macro.*Strengths/.test(offText) && !log.length, offText);
+  // Claude switched off altogether: TradingView only
+  fundSetup({ claudeOn: false, tvCall: richTv, ask: richAsk(log) }); assert.ok(/Finished|tagged|Technical/.test(await F.ldRunFundamental(richStock())));
+  // technical bars fail, a label call and a Strengths call fail: each is reported, the rest is kept
+  jobs.set('ACME', { state: 'error', msg: 'no bars' });   // the module keeps the first jobs map: change it in place
+  fundSetup({ techPending: { none: false, keys: [], noScore: true }, todo: [{ id: 1 }], tvCall: richTv,
+    ask: async (prompt) => { if(prompt === 'LABELS' || /LATEST FACTOR STATE/.test(prompt)) throw new Error('boom'); return richAsk([])(prompt); } });
+  const partial = await F.ldRunFundamental(richStock());
+  assert.ok(/Not done: .*news labels \(boom\).*Technical signals \(no bars\).*Strengths and Watch-outs \(boom\)/.test(partial), partial);
+  jobs.delete('ACME'); fundSetup({ techPending: { none: true, keys: [] }, tvCall: richTv, ask: richAsk([]) }); assert.ok(/Technical signals \(The price history refresh did not finish\./.test(await F.ldRunFundamental(richStock())));
+  // Global & Macro with nothing tied to a supplied link, Claude answers nothing usable for the cards and Strengths
+  fundSetup({ gfInfo: 'not yet researched', tvCall: richTv, ask: async (prompt) => (/Global/.test(prompt) ? { positive: [{ text: 'x', url: 'https://evil/x' }] } : {}) });
+  const nothing = await F.ldRunFundamental(richStock()); assert.ok(/no item could be tied/.test(nothing) && /Claude returned nothing usable/.test(nothing), nothing);
+}));
+test('fundamental refresh: it cannot start without the database, Claude or the TradingView connector, and Stop ends it', () => alone(async () => {
+  fundSetup({ dbp: Promise.resolve(null) }); const F = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS);
+  await assert.rejects(F.ldRunFundamental(richStock()), /database is not available/);
+  fundSetup({}); globalThis.claude = undefined; const F2 = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS); await assert.rejects(F2.ldRunFundamental(richStock()), /Asking Claude from this page is not available/);
+  fundSetup({ mcp: false }); const F3 = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS); await assert.rejects(F3.ldRunFundamental(richStock()), /connector is not available/);
+  fundSetup({}); const F4 = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS); globalThis.__F.tvCall = async () => { for(const c of globalThis.__F.aborts.values()) c.abort(); return { data: { ok: 1 } }; };
+  await assert.rejects(F4.ldRunFundamental(richStock()), (e) => e && e.code === 'cancelled'); assert.strictEqual(globalThis.__F.aborts.size, 0);   // the stop switch is removed afterwards
+}));
+const BATCH_STUBS = {
+  '../core/util.js': 'export const sleep = () => new Promise((r) => setImmediate(r)), tickerSymbol = (s) => s.t;',
+  '../analysis/section.js': 'export const refreshAnalysisSoon = () => { globalThis.__B.log.push("analysis"); };',
+  '../ui/scrollkeep.js': 'export const redrawWhenIdle = () => {};',
+  '../core/lazy.js': 'export const renderLoadedPart = () => {};',
+  '../prices/store.js': 'export const pcTickerKey = (s) => s.t;',
+  '../refresh/kit-lookup.js': 'export const sectionOf = (src) => "sec-" + src;',
+  './bar.js': 'export const LD_LABEL = { fund: "Refresh Fundamental", tech: "Refresh Technical" }, ldAbort = globalThis.__B.aborts, ldGet = (k, kind) => globalThis.__B.get(k, kind), ldRunning = () => false, ldStart = (s, kind) => globalThis.__B.start(s, kind);',
+  './claude.js': 'export const ldEnsureClaudeAccess = async () => { globalThis.__B.log.push("access"); };',
+  './claudegate.js': 'export const claudeAnyOn = () => true;',
+  '../ui/activity.js': 'export const activityEnd = (id) => globalThis.__B.log.push("end:" + id), activityNotify = (n) => globalThis.__B.notes.push(n), activityRun = (id, info) => globalThis.__B.runs.push(info);',
+  '../refresh/hook.js': 'export const getRefreshKit = () => globalThis.__B.kit;'
+};
+const fakeEl = (extra) => Object.assign({ hidden: false, textContent: '', disabled: false, title: '', dataset: {}, style: { setProperty(){} }, classList: { toggle(){} }, setAttribute(){}, querySelector(){ return null; }, dispatchEvent(){} }, extra);
+const fakePage = () => {
+  const map = {}, texts = {};
+  ['analysis', 'strat'].forEach((P) => {
+    map[P + 'LdChip'] = fakeEl(); map[P + 'Perm'] = fakeEl();
+    ['fund', 'tech'].forEach((k) => { const btn = fakeEl(); map[P + 'Card-' + k] = fakeEl({ dataset: P === 'strat' && k === 'tech' ? { off: '1', title: 'T', label: 'L' } : {}, querySelector: () => btn }); map[P + 'Bar-' + k] = fakeEl(); map[P + 'Fill-' + k] = fakeEl();
+      map[P + 'Status-' + k] = fakeEl(); map[P + 'Stop-' + k] = fakeEl(); });
+  });
+  return { map, doc: { getElementById: (id) => map[id] || null, querySelectorAll: () => [fakeEl({ dataset: { livePanel: 'analysis' } }), fakeEl({ dataset: { livePanel: 'explorer' } })], dispatchEvent: (e) => { texts.events = (texts.events || 0) + 1; } }, texts };
+};
+test('batch refresh: the panels, the top strip and the result notice follow a run, a stop and a refusal', () => alone(async () => {
+  const realTimeout = globalThis.setTimeout; globalThis.setTimeout = () => 0;
+  const page = fakePage(); globalThis.document = page.doc; globalThis.window = { CustomEvent: function(){} };
+  const B0 = globalThis.__B = { log: [], notes: [], runs: [], aborts: new Map(), kit: null, get: (k) => ({ state: 'ok', pct: 50, msg: 'working' }), start: async () => {} };
+  try {
+    const B = await loadWithStubs('src/livedata/batch.js', '', BATCH_STUBS), list = (n) => Array.from({ length: n }, (_, i) => ({ t: 'T' + i }));
+    const states = {};
+    B0.get = (k) => states[k] || { state: 'ok', pct: 50, msg: 'working' };
+    // 1) Strategies screen, Fundamental, one stock needs Claude permission: the batch stops early; the Analysis panel says another screen is running
+    B0.kit = { repaint(){}, activity: (i) => B0.runs.push(i), batchNotice: () => false };
+    let seenOther = '';
+    B0.start = async (s) => { await new Promise((r) => setImmediate(r)); seenOther = seenOther || page.map['analysisStatus-fund'].textContent; if(s.t === 'T2') states[s.t] = { state: 'error', pct: 5, msg: 'Claude needs permission', perm: true }; };
+    await B.ldBatchStart('fund', list(8), 'strat');
+    let b = B.getLdBatch();
+    assert.ok(b.perm && /^Stopped early/.test(b.note) && b.skipped > 0); assert.ok(/started from the Strategies screen/.test(seenOther), seenOther);
+    assert.ok(B0.notes.some((n) => n.tone === 'warn' && /ended early/.test(n.title)) && B0.log.includes('access') && B0.log.includes('analysis'));
+    assert.strictEqual(page.map['stratPerm'].hidden, false);   // the permission box shows
+    // 2) Analysis screen, Technical, Stop pressed on the second stock: the abort switch is used, the run is "Stopped."
+    B0.kit = null; Object.keys(states).forEach((k) => delete states[k]); B0.notes.length = 0; B0.runs.length = 0;
+    B0.start = async (s) => { const ctl = new AbortController(); B0.aborts.set(s.t + '|fund', ctl); if(s.t === 'T1'){ B.ldBatchStop(); assert.ok(ctl.signal.aborted); states[s.t] = { state: 'error', pct: 5, msg: 'Stopped. Anything already saved was kept.' }; }
+      await new Promise((r) => setImmediate(r)); };
+    await B.ldBatchStart('tech', list(6), 'analysis'); b = B.getLdBatch();
+    assert.ok(b.stop && b.note === 'Stopped.' && b.skipped > 0, b.note); assert.ok(B0.runs.some((i) => i.stopping && /Stopping: finishing/.test(i.text)) && B0.notes.some((n) => /stopped/.test(n.title)));
+    B.ldBatchStop();   // nothing is running any more: pressing Stop again does nothing
+    // 3) Another screen (the Explorer), a plain run, the kit takes the notice
+    B0.kit = { repaint(){}, activity: (i) => B0.runs.push(i), batchNotice: () => true }; B0.notes.length = 0; Object.keys(states).forEach((k) => delete states[k]);
+    B0.start = async () => {}; await B.ldBatchStart('fund', list(3), 'industry'); b = B.getLdBatch();
+    assert.strictEqual(b.note, 'Finished.'); assert.strictEqual(B0.notes.length, 0); assert.ok(page.texts.events >= 0);
+    await B.ldBatchStart('fund', [], 'strat'); await B.ldBatchStart('fund', list(60), 'strat');   // nothing to do / too many stocks for one batch: refused quietly
+    assert.strictEqual(B.getLdBatch().total, 3);
+  } finally { globalThis.setTimeout = realTimeout; delete globalThis.document; delete globalThis.window; delete globalThis.__B; }
 }));
 test('final snapshot chunks: a chunk saved after the close stands until the next session opens, and only then', async () => {
   const F = await loadWithStubs('src/refresh/finalchunk.js', '', {});

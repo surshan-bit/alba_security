@@ -120,15 +120,8 @@ function ldBatchStop(){
 }
 // Tells the screen that started a run (the Explorer's industries) that data was saved, so it can redraw, e.g. its "Research done" column.
 function batchStockSaved(){ if(ldBatch) document.dispatchEvent(new window.CustomEvent('alba-batch-done', { detail: { source: ldBatch.source } })); }
-// `stocksToRun`: the stocks to refresh. `source`: the panel that started it.
-async function ldBatchStart(kind, list, source = 'strat'){
-  if(ldBatch && ldBatch.running) return;
-  if(!list.length || list.length > LD_BATCH_MAX[kind]) return;
-  // Several stocks at a time: both refreshes mostly wait on TradingView (and Claude), so the waits overlap.
-  const maxWorkers = Math.min(LD_PARALLEL[kind], list.length);
-  ldBatch = { kind, source, total: list.length, done: 0, active: new Map(), workers: maxWorkers, maxWorkers, running: true, stop: false, failed: [], skipped: 0, note: '', perm: false };
-  ldBatchPaint();
-  if(kind === 'fund' && claudeAnyOn()) await ldEnsureClaudeAccess();   // one permission dialog up front, not one per stock
+// Runs the stocks of a batch with up to `maxWorkers` workers and returns when all are done or the batch halted.
+async function runWorkers(list, kind, source, maxWorkers){
   let next = 0, halted = false, clean = 0;
   // A failure takes one worker out for a while; a few clean stocks in a row bring it back.
   const outcome = ok => {
@@ -158,6 +151,18 @@ async function ldBatchStart(kind, list, source = 'strat'){
     }
   };
   await Promise.all(Array.from({ length: maxWorkers }, (_, w) => worker(w)));
+}
+
+// `stocksToRun`: the stocks to refresh. `source`: the panel that started it.
+async function ldBatchStart(kind, list, source = 'strat'){
+  if(ldBatch && ldBatch.running) return;
+  if(!list.length || list.length > LD_BATCH_MAX[kind]) return;
+  // Several stocks at a time: both refreshes mostly wait on TradingView (and Claude), so the waits overlap.
+  const maxWorkers = Math.min(LD_PARALLEL[kind], list.length);
+  ldBatch = { kind, source, total: list.length, done: 0, active: new Map(), workers: maxWorkers, maxWorkers, running: true, stop: false, failed: [], skipped: 0, note: '', perm: false };
+  ldBatchPaint();
+  if(kind === 'fund' && claudeAnyOn()) await ldEnsureClaudeAccess();   // one permission dialog up front, not one per stock
+  await runWorkers(list, kind, source, maxWorkers);
   ldBatch.skipped = list.length - ldBatch.done;
   if(ldBatch.stop && !ldBatch.note) ldBatch.note = 'Stopped.';
   ldBatch.running = false; ldBatch.active.clear();
