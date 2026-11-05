@@ -12,6 +12,7 @@ import { mosPct, mosRatingAny, scoreBand } from '../list/metrics.js';
 import { techRatingInfo } from '../detail/technical.js';
 import { newsCellHtml, newsCounts } from '../strategies/news.js';
 import { ideaRankOf, ideasWhen } from './ideasfilter.js';
+import { dayMacdBarsOf } from '../core/daymacd.js';
 
 // Analysis leaderboard column registry (added 2026-10-06) — the table's columns used to be
 // hardcoded in both the <thead> markup and the per-row <td> template, in a fixed order. Both
@@ -31,6 +32,7 @@ const ANALYSIS_LB_COLUMNS = [
   { id: 'monthRsi', label: 'M RSI', num: true },
   { id: 'techW', label: 'W Tech Rating' },
   { id: 'techM', label: 'M Tech Rating' },
+  { id: 'dayMacdBars', label: 'D MACD bars', num: true, title: 'Daily bars in a row (the newest included) that the 1D MACD 30/60/5 has been above its signal line; 0 = at or below it. Filled by the daily import of Refresh all stocks, for the stocks of the strategy chosen there', sortName: 'D MACD bars above signal' },
   { id: 'idea', label: 'Buy / Sell', sortName: 'Buy / Sell rank', title: 'Call and rank (1 is best) among the Upward-trend stocks, from the last Process in the Trade Log: the strategy chosen in Analysis, else the newest result' },
   { id: 'news', label: 'News 14d', num: true, title: 'Positive and negative news items in the last 14 days' },
   { id: 'industry', label: 'Industry' },
@@ -118,6 +120,7 @@ function analysisLbCellRaw(colId, ctx){
     case 'monthRsi': return `<td>${rsiText(r.monthRsi)}</td>`;
     case 'techW': return `<td>${techWCell}</td>`;
     case 'techM': return `<td>${techMCell}</td>`;
+    case 'dayMacdBars': { const n = dayMacdBarsOf(s); return `<td>${n === null ? '' : n}</td>`; }
     case 'weekChg': return `<td data-live="weekChg">${pctChangeSpan(r.weekPctChange)}</td>`;
     case 'monthChg': return `<td data-live="monthChg">${pctChangeSpan(r.monthPctChange)}</td>`;
     case 'price': return `<td data-live="price">${price}</td>`;
@@ -177,6 +180,7 @@ const SORT_VALUE = {
   monthRsi: (s) => rawOf(s, 'monthRsi'),
   techW: (s) => techRank(s, 'weekMacd'),
   techM: (s) => techRank(s, 'monthMacd'),
+  dayMacdBars: dayMacdBarsOf,
   idea: (s) => { const r = ideaRankOf(s, analysisFilters.strategyId); return r ? r.rank : null; },
   news: (s) => { const c = newsCounts(s); return c ? c.pos - c.neg : null; },
   industry: (s) => tickerIndustry(s).toLowerCase(),

@@ -28,11 +28,22 @@ function techMacdCrossState(c, cfg = MACD_CROSS_WEEKLY){
 // The same MACD for daily bars (the 1D import for a strategy). Today's bar is the newest bar, so `within: 1` means "crossed up today".
 const MACD_CROSS_DAILY = { fast: 30, slow: 60, signal: 5, within: 1 };
 const techDailyCrossState = (closes) => techMacdCrossState(closes, MACD_CROSS_DAILY);
+// How many daily bars in a row, ending with the newest, the daily MACD is above its signal line (0 when it is at or below it); null without enough bars.
+// Bars before the slow EMA has settled are not counted.
+function techDailyAboveBars(closes){
+  const r = techMacdSeries(closes, MACD_CROSS_DAILY.fast, MACD_CROSS_DAILY.slow, MACD_CROSS_DAILY.signal);
+  if(!r) return null;
+  let n = 0;
+  for(let i = r.macd.length - 1; i >= r.from && r.macd[i] > r.signal[i]; i--) n++;
+  return n;
+}
 // The daily reading (state and the day of its newest bar) of a saved block is carried into a block calculated afresh from weekly and monthly bars, which know nothing of it.
 function techCarryDaily(prev, next){
   const state = prev && prev.states && prev.states.dayMacd3060;
   if(!state) return next;
-  return Object.assign({}, next, { states: Object.assign({}, next.states, { dayMacd3060: state }), raw: Object.assign({}, next.raw, { dayMacdAsof: prev.raw && prev.raw.dayMacdAsof }) });
+  const raw = Object.assign({}, next.raw, { dayMacdAsof: prev.raw && prev.raw.dayMacdAsof });
+  if(prev.raw && prev.raw.dayMacdBars !== undefined) raw.dayMacdBars = prev.raw.dayMacdBars;
+  return Object.assign({}, next, { states: Object.assign({}, next.states, { dayMacd3060: state }), raw });
 }
 function techMacd(c){
   const r = techMacdSeries(c);
@@ -170,4 +181,4 @@ function techKeepsBarsBlock(t, today, days = 3){
   return techDayNo(today) - techDayNo(t.asof) <= days;
 }
 
-export { MACD_CROSS_DAILY, MACD_CROSS_WEEKLY, computeTechnical, snapshotTechnical, techCompleted, techEma, techCarryDaily, techDailyCrossState, techKeepsBarsBlock, techLiveCrossState, techMacdSeries, techRsi, techScore3 };
+export { MACD_CROSS_DAILY, MACD_CROSS_WEEKLY, computeTechnical, snapshotTechnical, techCompleted, techEma, techCarryDaily, techDailyAboveBars, techDailyCrossState, techKeepsBarsBlock, techLiveCrossState, techMacdSeries, techRsi, techScore3 };
