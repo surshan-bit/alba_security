@@ -3945,3 +3945,42 @@ test('Claude errors are put in words for the person, and the permission is asked
   globalThis.claude = { use: async () => null }; await C.ldEnsureClaudeAccess();
   delete globalThis.claude; await C.ldEnsureClaudeAccess();
 });
+test('analysis sort state: a saved sort of a known column is kept, an unknown one or the old menu key falls back, including the new D MACD bars column', () => alone(async () => {
+  globalThis.__T = {};
+  const S = await loadAllStubbed('src/analysis/state.js', '', []);
+  assert.deepStrictEqual(S.cleanSort('dayMacdBars', 'asc', undefined, null), { col: 'dayMacdBars', dir: 'asc' });
+  assert.deepStrictEqual(S.cleanSort('price', 'sideways', undefined, null), { col: 'price', dir: 'desc' });   // an unknown direction is "desc"
+  assert.deepStrictEqual(S.cleanSort('nonsense', 'asc', 'mos_desc', null), { col: 'mos', dir: 'desc' });   // an unknown column: the old menu key is used
+  assert.deepStrictEqual(S.cleanSort('nonsense', 'asc', undefined, { col: 'score', dir: 'desc' }), { col: 'score', dir: 'desc' });   // ... or the fallback
+}));
+test('analysis grid columns: every column draws its cell, the headers and the Columns panel are drawn, and every sortable column sorts', () => alone(async () => {
+  const T = globalThis.__T = {
+    mosPct: (s) => (typeof s.mos === 'number' ? s.mos : -Infinity), mosRatingAny: (s) => s.rating || null, isPinned: (s) => !!s.pinned, techRatingInfo: (k) => (k ? { cls: 'b-up', label: 'Bullish' } : null),
+    ideaRankOf: (s) => s.idea || null, ideasWhen: () => 'today', newsCounts: (s) => s.news || null, newsCellHtml: () => '<td>news</td>', eventMark: () => '', industryMedianW: (s) => (typeof s.indW === 'number' ? s.indW : null),
+    stockShareLink: () => '#x', tvUrlFor: () => 'https://tv/x', stockResearchAgeDays: (s) => (typeof s.age === 'number' ? s.age : null), stockResearchAsof: () => '2026-11-01', getResearchTriggers: () => new Map(), getResearchTriggerKinds: () => new Map(),
+    researchTriggerDone: () => true, analysisQueuePriceLoad: () => {}, scoreBand: () => 'fs-hi', getAnalysisColumnsPanelOpen: () => !!T.panelOpen, panelOpen: false };
+  const ago = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const C = await loadAllStubbed('src/analysis/columns.js', '', ['../core/daymacd.js', '../core/util.js']);
+  const mk = (name, over) => Object.assign({ name, ticker: name.toUpperCase() + ' · X', score: 6.1, verdict: 'buy', mos: 12.3, rating: 'green', valuation: { currentPrice: 1234.5 }, age: 3, indW: 1.5,
+    technical: { score: 6.5, states: { weekMacd: 'bull_above', monthMacd: 'bull_below' }, raw: { weekRsi: 61.23, monthRsi: 70, weekPctChange: 2, monthPctChange: -1, dayMacdBars: 4, dayMacdAsof: ago(0) } } }, over);
+  const stocks = [mk('Alpha'), mk('Beta', { mos: -5, rating: 'red', pinned: true, age: 40, idea: { label: 'Buy', rank: 2, n: 9, held: true, snap: {} }, news: { pos: 3, neg: 1 }, technical: { states: {}, raw: { weekRsi: 40, dayMacdBars: 0, dayMacdAsof: ago(0) } } }), mk('Gamma', { score: null, valuation: null, mos: undefined, technical: undefined })];
+  const ids = C.stockGridColumnIds();
+  assert.ok(ids.includes('dayMacdBars') && ids.includes('pin') && ids.includes('tv'));
+  const rows = stocks.map((s, i) => ids.map((id) => C.analysisLbCell(id, C.analysisRowContext(s, i, i))));
+  assert.ok(rows.every((r) => r.every((cell) => /^<td/.test(cell))));
+  const cellOf = (s, id) => C.analysisLbCell(id, C.analysisRowContext(s, 0, 0));
+  assert.strictEqual(cellOf(stocks[0], 'dayMacdBars'), '<td class="num">4</td>'); assert.strictEqual(cellOf(stocks[1], 'dayMacdBars'), '<td class="num">0</td>'); assert.strictEqual(cellOf(stocks[2], 'dayMacdBars'), '<td class="num"></td>');
+  assert.ok(/61\.2/.test(cellOf(stocks[0], 'weekRsi')) && /Buy/.test(cellOf(stocks[1], 'idea')) && /Bullish/.test(cellOf(stocks[0], 'techW')) && /1,234\.5/.test(cellOf(stocks[0], 'price')) && /\+1\.5% W/.test(cellOf(stocks[0], 'industry')));
+  assert.ok(/<th class="num" title="Daily bars in a row[^"]*" aria-sort="none"><button[^>]*data-sort-col="dayMacdBars"/.test(C.columnHeaderHtml('dayMacdBars', { col: 'price', dir: 'asc' })) && /D MACD bars/.test(C.columnHeaderHtml('dayMacdBars')) && C.columnHeaderHtml('pin') === '<th class="pin-col"></th>' && C.columnHeaderHtml('nope') === '');
+  assert.ok(/aria-sort="descending"/.test(C.columnHeaderHtml('dayMacdBars', { col: 'dayMacdBars', dir: 'desc' })) && !/data-sort-col/.test(C.columnHeaderHtml('tv', { col: 'price', dir: 'asc' })));   // a column that cannot sort has no button
+  assert.deepStrictEqual([C.nextSort({ col: 'price', dir: 'desc' }, 'price'), C.nextSort(null, 'stock'), C.nextSort({ col: 'price', dir: 'desc' }, 'dayMacdBars'), C.nextSort({ col: 'stock', dir: 'asc' }, 'stock')],
+    [{ col: 'price', dir: 'asc' }, { col: 'stock', dir: 'asc' }, { col: 'dayMacdBars', dir: 'desc' }, { col: 'stock', dir: 'desc' }]);
+  assert.deepStrictEqual([C.sortLabelOf({ col: 'dayMacdBars', dir: 'desc' }), C.sortLabelOf({ col: 'mos', dir: 'asc' }), C.sortLabelOf({ col: 'zzz', dir: 'asc' })], ['D MACD bars above signal (high to low)', 'Margin of Safety (low to high)', 'zzz (low to high)']);
+  const order = (col, dir) => stocks.slice().sort(C.compareByColumn(col, dir)).map((s) => s.name);
+  assert.deepStrictEqual(order('dayMacdBars', 'desc'), ['Alpha', 'Beta', 'Gamma']);   // a stock with no count goes last
+  for(const col of ['score', 'techScore', 'mos', 'stock', 'weekChg', 'monthChg', 'weekRsi', 'monthRsi', 'techW', 'techM', 'idea', 'news', 'industry', 'triggered', 'price']) assert.strictEqual(order(col, 'asc').length, 3, col);   // every sortable column gives an order
+  assert.deepStrictEqual(order('stock', 'asc'), ['Alpha', 'Beta', 'Gamma']); assert.deepStrictEqual(order('weekRsi', 'desc'), ['Alpha', 'Beta', 'Gamma']); assert.deepStrictEqual(order('nothing', 'asc'), ['Alpha', 'Beta', 'Gamma']);
+  T.panelOpen = false; assert.strictEqual(C.renderAnalysisColumnsPanel(ids), '');
+  T.panelOpen = true; const panel = C.renderAnalysisColumnsPanel(['pin', 'dayMacdBars', 'unknown']); assert.ok(/data-col="dayMacdBars"/.test(panel) && /D MACD bars/.test(panel) && /Pin/.test(panel) && /data-col="unknown"/.test(panel));
+  assert.ok(C.analysisColumnOrder().indexOf('dayMacdBars') === C.analysisColumnOrder().indexOf('techM') + 1);
+}));
