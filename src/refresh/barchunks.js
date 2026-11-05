@@ -121,18 +121,21 @@ async function saveCrossStates(db, items, today, progress){
   return Object.assign({ read, changed }, await writeTechChunks(db, { old, rows }, today, progress));
 }
 
-// Step 5. The daily MACD 30/60/5 state of the stocks in `items` ([{ key, state, asof }]: `asof` = the day of the newest daily bar), saved with each stock's technical block
-// (states.dayMacd3060 and raw.dayMacdAsof) and nothing else of it changes. A stock with no saved block is left alone. Returns { read, changed, records, chunksWritten, failed }.
+// Step 5. The daily MACD 30/60/5 state of the stocks in `items` ([{ key, state, asof, bars }]: `asof` = the day of the newest daily bar, `bars` = how many daily bars in a row the MACD
+// has been above its signal), saved with each stock's technical block (states.dayMacd3060, raw.dayMacdAsof and raw.dayMacdBars) and nothing else of it changes. A stock with no saved block is left alone. Returns { read, changed, records, chunksWritten, failed }.
 async function saveDailyStates(db, items, today, progress){
   const old = await readChunks(db, 'techBlocks');
   const rows = techRowsOf(old);
   let read = 0, changed = 0;
-  for(const { key, state, asof } of items){
+  for(const { key, state, asof, bars } of items){
     const t = rows.get(key);
     if(!t) continue;
     read++;
-    if(t.states && t.states.dayMacd3060 === state && t.raw && t.raw.dayMacdAsof === asof) continue;
-    rows.set(key, Object.assign({}, t, { states: Object.assign({}, t.states, { dayMacd3060: state }), raw: Object.assign({}, t.raw, { dayMacdAsof: asof }) }));
+    const above = Number.isInteger(bars) ? bars : undefined;
+    if(t.states && t.states.dayMacd3060 === state && t.raw && t.raw.dayMacdAsof === asof && t.raw.dayMacdBars === above) continue;
+    const raw = Object.assign({}, t.raw, { dayMacdAsof: asof });
+    if(above === undefined) delete raw.dayMacdBars; else raw.dayMacdBars = above;
+    rows.set(key, Object.assign({}, t, { states: Object.assign({}, t.states, { dayMacd3060: state }), raw }));
     changed++;
   }
   return Object.assign({ read, changed }, await writeTechChunks(db, { old, rows }, today, progress));
