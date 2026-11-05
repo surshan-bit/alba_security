@@ -2,7 +2,7 @@
 // than the daily one), in the collection priceHistory1D (see dailystore.js): the first import of a stock fetches its last DAILY_KEEP bars (about 2 years) and later runs fetch
 // the new days only: from the batch call, 50 stocks at a time (dailybatch.js), or, when that does not line up, from a call of its own for the days since; they are merged in and saved. The reading is calculated from the saved bars and kept with the stock's technical block (see barchunks.js, saveDailyStates).
 import { qualifyingStocks, ruleReady } from '../strategies/rules.js';
-import { techDailyAboveBars, techDailyCrossState } from '../engine/technical.js';
+import { techDailyCrossState } from '../engine/technical.js';
 import { alignDaily, dailyBatchBars } from './dailybatch.js';
 import { tvCall, tvIsQuota, tvIstDate, tvMergeDelta, tvToRows, tvValidate } from '../tv/connector.js';
 
@@ -66,7 +66,7 @@ async function pool(items, n, fn){
 
 // The pieces of one read: its result (`out`), the progress `tick`, and how a stock is read from the batch call (`batched`, a chunk at a time) or from a call of its own (`single`).
 function dailyReader(total, io, progress){
-  /** @type {{ results: { key: string, state: string, asof: string, bars: number | null }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number }} */
+  /** @type {{ results: { key: string, state: string, asof: string }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number }} */
   const out = { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0, batched: 0, deferred: 0 };
   let done = 0, resting = null;
   const tick = () => progress(++done, total);
@@ -85,8 +85,8 @@ function dailyReader(total, io, progress){
     try { await io.saveBars(s, sym, bars, !old); out.stored++; } catch(e){ out.storeFailed++; }
   };
   const finish = async ({ s, sym, old }, bars) => {
-    const closes = bars.map(r => r[4]), state = techDailyCrossState(closes);
-    if(state) out.results.push({ key: io.keyOf(s), state, asof: tvIstDate(bars[bars.length - 1][0]), bars: techDailyAboveBars(closes) }); else out.failures.push({ stock: s, reason: 'fewer than 65 daily bars' });
+    const state = techDailyCrossState(bars.map(r => r[4]));
+    if(state) out.results.push({ key: io.keyOf(s), state, asof: tvIstDate(bars[bars.length - 1][0]) }); else out.failures.push({ stock: s, reason: 'fewer than 65 daily bars' });
     await keep(s, sym, old, bars);
   };
   const single = async x => { try { await finish(x, await withRest(() => dailyBarsFor(x.sym, x.old, io.today()))); } catch(e){ fail(x.s, e); } tick(); };
@@ -111,7 +111,7 @@ function dailyReader(total, io, progress){
  * progress(done, total) after each stock. A stock that fails is listed with its reason and the rest go on; no connection stops the whole read (`abort` says why). When
  * TradingView refuses a call for its quota, all workers wait io.pause(DAILY_PAUSE_MS) and the call is tried again, up to DAILY_PAUSES waits (`pauses` counts them); after that
  * the read stops with the quota message. A suspension that is not "for one minute" stops the read at once. At most DAILY_OWN_MAX stocks are fetched on their own per run (`deferred` counts the rest). A bar document that cannot be read is fetched in full; one that cannot be saved is counted (`storeFailed`), its reading still counts.
- * @returns {Promise<{ results: { key: string, state: string, asof: string, bars: number | null }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number }>}
+ * @returns {Promise<{ results: { key: string, state: string, asof: string }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number }>}
  */
 async function readDailyStates(list, io, progress){
   const rd = dailyReader(list.length, io, progress), loaded = [];

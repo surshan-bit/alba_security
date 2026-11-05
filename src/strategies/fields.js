@@ -5,7 +5,6 @@ import { verdictLabel } from '../core/stocks.js';
 import { MACD_CROSS_DAILY, MACD_CROSS_WEEKLY, techScore3 } from '../engine/technical.js';
 import { isPinned } from '../core/pins.js';
 import { daysSinceDate, daysUntil, tickerIndustry } from '../core/util.js';
-import { DAILY_FRESH_DAYS } from '../core/daymacd.js';
 import { mosPct, mosRatingAny } from '../list/metrics.js';
 import { stockResearchAgeDays } from '../research/status.js';
 import { NEWS_DAYS, daysSinceEvent, newsCounts } from './news.js';
@@ -37,6 +36,7 @@ const MACD_CROSS_OPTIONS = [
 // The same three choices for the daily MACD, read by the daily import of Refresh all stocks for one strategy's stocks (src/refresh/dailymacd.js). A reading older than
 // DAILY_FRESH_DAYS (a long weekend) counts as missing, so a rule never rests on days-old data without saying so.
 const { fast: DAY_FAST, slow: DAY_SLOW, signal: DAY_SIGNAL } = MACD_CROSS_DAILY;
+const DAILY_FRESH_DAYS = 4;
 const MACD_DAILY_OPTIONS = [
   ['cross_up', 'Just crossed up (latest day)', 'mbuy'],
   ['above', 'Above signal', 'buy'],

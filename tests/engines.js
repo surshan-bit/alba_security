@@ -635,16 +635,12 @@ test('daily MACD 30/60/5: the same three states from daily closes, and a saved d
   assert.deepStrictEqual(TECH.MACD_CROSS_DAILY, { fast: 30, slow: 60, signal: 5, within: 1 });
   assert.strictEqual(TECH.techDailyCrossState(fall), 'below'); assert.strictEqual(TECH.techDailyCrossState([...fall, 400]), 'cross_up'); assert.strictEqual(TECH.techDailyCrossState([...fall, 400, 410]), 'above');
   assert.strictEqual(TECH.techDailyCrossState(fall.slice(0, 64)), null);   // 65 bars are needed
-  assert.deepStrictEqual([TECH.techDailyAboveBars(fall), TECH.techDailyAboveBars([...fall, 400]), TECH.techDailyAboveBars([...fall, 400, 410]), TECH.techDailyAboveBars([...fall, 400, 410, 405, 420]), TECH.techDailyAboveBars(fall.slice(0, 64))], [0, 1, 2, 4, null]);   // bars in a row above the signal, the newest included; 0 when at or below it; null without 65 bars
-  const rising = Array.from({ length: 200 }, (_, i) => 100 + i * 3); assert.ok(TECH.techDailyAboveBars(rising) > 100 && TECH.techDailyAboveBars(rising) <= 200 - 63);   // a long climb counts only the bars after the slow EMA has settled
   const next = { score: 5, states: { weekMacd: 'bull_above' }, raw: { weekRsi: 50 } };
   assert.strictEqual(TECH.techCarryDaily(undefined, next), next); assert.strictEqual(TECH.techCarryDaily({}, next), next); assert.strictEqual(TECH.techCarryDaily({ states: {} }, next), next);   // nothing to carry
   const carried = TECH.techCarryDaily({ states: { dayMacd3060: 'above' }, raw: { dayMacdAsof: '2026-11-04' } }, next);
   assert.deepStrictEqual(carried, { score: 5, states: { weekMacd: 'bull_above', dayMacd3060: 'above' }, raw: { weekRsi: 50, dayMacdAsof: '2026-11-04' } });
   assert.deepStrictEqual(next.states, { weekMacd: 'bull_above' });   // the new block is not changed
   assert.strictEqual(TECH.techCarryDaily({ states: { dayMacd3060: 'below' } }, next).raw.dayMacdAsof, undefined);
-  assert.strictEqual(TECH.techCarryDaily({ states: { dayMacd3060: 'above' }, raw: { dayMacdAsof: '2026-11-04', dayMacdBars: 7 } }, next).raw.dayMacdBars, 7);   // the number of bars above the signal is carried with it
-  assert.ok(!('dayMacdBars' in TECH.techCarryDaily({ states: { dayMacd3060: 'above' }, raw: { dayMacdAsof: '2026-11-04' } }, next).raw));   // ... and only when there is one
 });
 // ---- v1.182: refresh from TradingView (snapshot readings, no bars) ----
 test('v1.182: a TradingView snapshot is scored by the engine rules and is marked as a snapshot', () => {
@@ -2818,11 +2814,6 @@ test('daily MACD for a strategy: only that reading of a saved block changes, and
   assert.deepStrictEqual([r.read, r.changed, r.chunksWritten, r.failed], [4, 3, 1, 0]);   // SAME is unchanged; NOBLOCK has no block to put it in
   const rows = Object.fromEntries(db.saved[0][1].rows.map((x) => [x.k, x.t]));
   assert.deepStrictEqual(rows.NEW, block({ dayMacd3060: 'cross_up' }, { dayMacdAsof: today }));   // the score, date and other readings are untouched
-  const withBars = await B.saveDailyStates(memoryDb(saved), [{ key: 'SAME', state: 'above', asof: today, bars: 5 }], today, () => {}); assert.deepStrictEqual([withBars.changed, withBars.chunksWritten], [1, 1]);   // only the number of bars changed: it is saved
-  const dbBars = memoryDb(saved); await B.saveDailyStates(dbBars, [{ key: 'SAME', state: 'above', asof: today, bars: 5 }], today, () => {});
-  const sameRow = dbBars.saved[0][1].rows.find((x) => x.k === 'SAME').t; assert.strictEqual(sameRow.raw.dayMacdBars, 5);
-  const noBars = await B.saveDailyStates(memoryDb({ c001: dbBars.saved[0][1] }), [{ key: 'SAME', state: 'above', asof: today, bars: null }], today, () => {}); assert.strictEqual(noBars.changed, 1);   // no count this time: the old one is removed
-  const unchanged = await B.saveDailyStates(memoryDb({ c001: dbBars.saved[0][1] }), [{ key: 'SAME', state: 'above', asof: today, bars: 5 }], today, () => {}); assert.strictEqual(unchanged.changed, 0);
   assert.strictEqual(rows.OLDDAY.raw.dayMacdAsof, today); assert.deepStrictEqual(rows.NOSTATES.states, { dayMacd3060: 'below' }); assert.deepStrictEqual(rows.NOSTATES.raw, { dayMacdAsof: today }); assert.ok(!('NOBLOCK' in rows));
   const again = await B.saveDailyStates(memoryDb({ c001: db.saved[0][1] }), items, today, () => {}); assert.deepStrictEqual([again.changed, again.chunksWritten], [0, 0]);
   const bars = barsAt(mondays('2026-10-26', 40), Array.from({ length: 40 }, (_, i) => 100 + i)), db2 = memoryDb({ c001: { rows: [{ k: 'KEEP', t: block({ dayMacd3060: 'above' }, { dayMacdAsof: today }) }] } });
@@ -3259,20 +3250,6 @@ test('Claude errors are put in words for the person, and the permission is asked
   globalThis.claude = { use: async () => null }; await C.ldEnsureClaudeAccess();
   delete globalThis.claude; await C.ldEnsureClaudeAccess();
 });
-test('daily MACD bars on the grid: a fresh count shows in the D MACD bars column, an old or missing one does not, and the column sorts', async () => {
-  const ago = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-  const D = await loadWithStubs('src/core/daymacd.js', '', {});
-  const stock = (bars, asof) => ({ technical: { raw: { dayMacdBars: bars, dayMacdAsof: asof } } });
-  assert.deepStrictEqual([stock(7, ago(0)), stock(0, ago(1)), stock(3, ago(4)), stock(3, ago(5)), stock(2.5, ago(0)), stock(-1, ago(0)), stock(undefined, ago(0)), stock(3, undefined), { technical: {} }, {}, null].map(D.dayMacdBarsOf), [7, 0, 3, null, null, null, null, null, null, null, null]);   // fresh = at most four days old
-  assert.strictEqual(D.DAILY_FRESH_DAYS, 4);
-  globalThis.__T = {};
-  const C = await loadAllStubbed('src/analysis/columns.js', '', ['../core/daymacd.js', '../core/util.js']);
-  const row = (s) => C.analysisLbCell('dayMacdBars', { s });
-  assert.strictEqual(row(stock(7, ago(0))), '<td class="num">7</td>'); assert.strictEqual(row(stock(0, ago(0))), '<td class="num">0</td>'); assert.strictEqual(row(stock(7, ago(30))), '<td class="num"></td>'); assert.strictEqual(row({}), '<td class="num"></td>');
-  const sorted = [stock(2, ago(0)), {}, stock(9, ago(0)), stock(0, ago(0))].sort(C.compareByColumn('dayMacdBars', 'desc')).map(D.dayMacdBarsOf);
-  assert.deepStrictEqual(sorted, [9, 2, 0, null]);   // a stock with no count goes last
-  assert.ok(C.ANALYSIS_LB_COLUMN_IDS.indexOf('dayMacdBars') === C.ANALYSIS_LB_COLUMN_IDS.indexOf('techM') + 1);   // it sits after the two Tech Rating columns
-});
 test('final snapshot chunks: a chunk saved after the close stands until the next session opens, and only then', async () => {
   const F = await loadWithStubs('src/refresh/finalchunk.js', '', {});
   const ist = (d, h, m) => Date.parse(d + 'T00:00:00Z') + ((h * 60 + m) * 60000) - 19800000, keys = ['A', 'B'];
@@ -3599,8 +3576,8 @@ test('daily MACD import: the stocks of a strategy besides its daily rule are cho
   const count = (k) => calls.filter((c) => c[0] === 'N:' + k).map((c) => c[1]);
   assert.strictEqual(JSON.stringify(['A', 'B', 'C', 'D', 'E', 'F', 'G'].map(count)), JSON.stringify([[500], [10], [10], [10, 500], [500], [500], [500]]));   // a new stock gets 500 bars, an old one only the newest days, and an adjusted one is fetched in full
   const asof = (n) => new Date((Date.parse('2026-01-05T03:45:00Z') / 1000 + (n - 1) * 86400 + 19800) * 1000).toISOString().slice(0, 10);
-  assert.strictEqual(JSON.stringify(out.results.sort((a, b) => a.key.localeCompare(b.key))), JSON.stringify([{ key: 'A', state: 'below', asof: asof(70), bars: 0 }, { key: 'B', state: 'above', asof: asof(72), bars: 2 }, { key: 'C', state: 'below', asof: asof(70), bars: 0 },
-    { key: 'D', state: 'below', asof: asof(70), bars: 0 }, { key: 'E', state: 'below', asof: asof(70), bars: 0 }, { key: 'F', state: 'cross_up', asof: asof(71), bars: 1 }]));   // asof = the day of the newest bar; bars = bars in a row above the signal
+  assert.strictEqual(JSON.stringify(out.results.sort((a, b) => a.key.localeCompare(b.key))), JSON.stringify([{ key: 'A', state: 'below', asof: asof(70) }, { key: 'B', state: 'above', asof: asof(72) }, { key: 'C', state: 'below', asof: asof(70) },
+    { key: 'D', state: 'below', asof: asof(70) }, { key: 'E', state: 'below', asof: asof(70) }, { key: 'F', state: 'cross_up', asof: asof(71) }]));   // asof = the day of the newest bar
   assert.strictEqual(JSON.stringify(kept.sort((a, b) => a[0].localeCompare(b[0]))), JSON.stringify([['A', 70, true], ['B', 72, false], ['D', 70, false], ['E', 70, true], ['G', 30, true]]));   // C was up to date: nothing saved; F's save failed
   assert.strictEqual(JSON.stringify([out.stored, out.storeFailed]), JSON.stringify([5, 1]));
   assert.strictEqual(JSON.stringify(out.failures.map((f) => [f.stock.key, f.reason]).sort()), JSON.stringify([['BAD', 'bad reply'], ['EMPTY', 'daily: no bars returned'], ['G', 'fewer than 65 daily bars'], ['NOSYM', 'no TradingView symbol']]));

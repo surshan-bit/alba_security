@@ -69,7 +69,7 @@ function newerValuation(real, snap, snapAt){
 const newerByAsof = (real, snap) => (real && typeof real === 'object' && typeof real.asof === 'string' && real.asof > snap.asof ? real : snap);
 
 // The weekly and daily MACD 30/60/5 states are saved with a stock's technical block, so a snapshot block that takes the place of an older saved block keeps them
-// (the snapshot itself has no reading of them). The daily state comes with the day of its newest bar and the number of bars above the signal.
+// (the snapshot itself has no reading of them). The daily state comes with the day of its newest bar.
 function withCrossState(snapBlock, saved){
   const st = saved && saved.states;
   if(!st) return snapBlock;
@@ -77,9 +77,7 @@ function withCrossState(snapBlock, saved){
   if(st.weekMacd3060) states.weekMacd3060 = st.weekMacd3060;
   if(!st.dayMacd3060) return Object.assign({}, snapBlock, { states });
   states.dayMacd3060 = st.dayMacd3060;
-  const raw = Object.assign({}, snapBlock.raw, { dayMacdAsof: saved.raw && saved.raw.dayMacdAsof });
-  if(saved.raw && saved.raw.dayMacdBars !== undefined) raw.dayMacdBars = saved.raw.dayMacdBars;
-  return Object.assign({}, snapBlock, { states, raw });
+  return Object.assign({}, snapBlock, { states, raw: Object.assign({}, snapBlock.raw, { dayMacdAsof: saved.raw && saved.raw.dayMacdAsof }) });
 }
 
 // One stock's saved update (`real`, may be undefined) combined with its snapshot row ({ row, asof, at }, may be undefined).
