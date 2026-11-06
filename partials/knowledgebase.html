@@ -266,6 +266,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.364 &middot; 2026-11-06</h3>
+            <ul>
+              <li><strong>The daily (1D) import shows that it is working in batches:</strong> the batch call itself was already used (a run of 350 stocks read 349 in batches), but the progress line counted the stocks one at a time because each one was saved after the other, so it looked like a one-by-one fetch. The saves now run several at a time, and the progress line says how many stocks were brought up to date in batches, for example &ldquo;18 of 348 stocks (348 in batches)&rdquo;.</li>
+            </ul>
             <h3>v1.363 &middot; 2026-11-06</h3>
             <ul>
               <li><strong>The daily (1D) import now brings stocks up to date in batches before the market opens too:</strong> a stock that already has saved daily bars is updated from TradingView&rsquo;s batch call, but the check that the new bar belongs to the right day assumed the market had already opened that day. On a weekday morning before 09:15, when the newest bar is still the previous day&rsquo;s, none of the stocks passed that check, so almost all of them were fetched one by one, and only 100 of those are fetched per run (the result said &ldquo;248 more stocks wait for the next run&rdquo;). The check now uses the latest day whose session has begun, so those runs update every stock in a few batch calls.</li>

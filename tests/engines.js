@@ -3173,14 +3173,14 @@ test('refresh all stocks, daily MACD step: the stocks of the chosen strategy are
   const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks, strategies: [{ id: 's1', name: 'Value', rules: [] }], priceHistoryByTicker: {}, COMPACT_LAG: 1, isinSymbolCached: (s) => 'N:' + s.name,
     dailyStocksOf: (u) => ({ list: u, total: 5, needsOtherRule: false }),
     pcTickerKey: (s) => s.name, tvIstDate: () => '2026-11-04', loadDailyBars: async (d, sym) => ['saved ' + sym], saveDailyBars: async (d, who, bars, isNew) => { stored.push([d === db, who, bars, isNew]); },
-    readDailyStates: async (list, io, progress) => { calls.push([list.length, io.symbolOf(list[0]), io.keyOf(list[0]), io.stop(), io.today(), await io.loadBars(list[0], 'N:A')]); await io.saveBars(list[1], 'N:B', ['bar'], true); await io.pause(1); progress(1, 2); return { results: [{ key: 'A', state: 'above', asof: '2026-11-04' }], failures: [{}], abort: '', stored: 3, storeFailed: 1, pauses: 2, batched: 4, deferred: 7 }; },
+    readDailyStates: async (list, io, progress) => { calls.push([list.length, io.symbolOf(list[0]), io.keyOf(list[0]), io.stop(), io.today(), await io.loadBars(list[0], 'N:A')]); await io.saveBars(list[1], 'N:B', ['bar'], true); await io.pause(1); progress(1, 2, 3); progress(2, 2, 0); return { results: [{ key: 'A', state: 'above', asof: '2026-11-04' }], failures: [{}], abort: '', stored: 3, storeFailed: 1, pauses: 2, batched: 4, deferred: 7 }; },
     saveDailyStates: async (d, results, today) => { saved.push([d === db, results, today]); return { changed: 1, failed: 0 }; } };
   const M = await loadTvRefresh(), pick = { strategyId: 's1' }, run = tvRun(db, [], { dailyPick: pick });
   await M.rsDaily(run);
   assert.strictEqual(JSON.stringify(calls), JSON.stringify([[2, 'N:A', 'A', false, '2026-11-04', ['saved N:A']]])); assert.strictEqual(JSON.stringify(stored), JSON.stringify([[true, { sym: 'N:B', key: 'B', name: 'B' }, ['bar'], true]]));   // the saved bars are read and saved through the run's database
   assert.deepStrictEqual(saved, [[true, [{ key: 'A', state: 'above', asof: '2026-11-04' }], '2026-11-04']]);
   assert.deepStrictEqual(run.dailyResult, { name: 'Value', stocks: 2, total: 5, read: 1, changed: 1, failed: 1, stored: 3, storeFailed: 1, pauses: 2, batched: 4, deferred: 7, notSaved: 0, abort: '' });
-  assert.ok(T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: reading 2 stocks')) && T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: 1 of 2 stocks')));
+  assert.ok(T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: reading 2 stocks')) && T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: 1 of 2 stocks (3 in batches)|')) && T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: 2 of 2 stocks|')));
   M.__stop(true); calls.length = 0; await M.rsDaily(tvRun(db, [], { dailyPick: pick })); M.__stop(false); assert.strictEqual(calls[0][3], true);   // the read is told when Stop is pressed
   const idle = tvRun(db, [], {}); await M.rsDaily(idle); const stopped = tvRun(db, [], { dailyPick: pick, stopped: true }); await M.rsDaily(stopped);
   assert.deepStrictEqual([idle.dailyResult, stopped.dailyResult], [null, null]);   // not asked for, or Stop was pressed
@@ -3434,7 +3434,8 @@ test('daily MACD import in batches: stocks with saved bars go through the batch 
   const io = { symbolOf: (s) => s.sym, keyOf: (s) => s.key, stop: () => false, today: () => '2026-11-04', nowS: () => now, pause: async () => {},
     loadBars: async (s) => saved[s.key] || null, saveBars: async (s, sym, bars, isNew) => { if(saveFails) throw new Error('db down'); kept.push([s.key, bars.length, isNew]); },
     batch: async (syms) => { batches.push(syms.slice()); if(batchError) throw batchError; return data; } };
-  const out = await D.readDailyStates([mk('X'), mk('Y'), mk('Z'), mk('N')], io, () => {});
+  const seen = [], out = await D.readDailyStates([mk('X'), mk('Y'), mk('Z'), mk('N')], io, (d, n, b) => seen.push(b));
+  assert.strictEqual(seen[0], 1);   // the batched count is known before the first save finishes
   assert.deepStrictEqual(batches, [['N:X', 'N:Y', 'N:Z']]);   // one batch call for the three stocks with saved bars; N has none
   assert.deepStrictEqual(out.batched, 1); assert.deepStrictEqual(out.results.map((r) => r.key).sort(), ['N', 'X', 'Y', 'Z']);
   assert.deepStrictEqual(calls.map((c) => c[0]).sort(), ['N:N', 'N:Y', 'N:Z']);   // Y and Z did not line up; N has no history: a call each

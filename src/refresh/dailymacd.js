@@ -69,7 +69,7 @@ function dailyReader(total, io, progress){
   /** @type {{ results: { key: string, state: string, asof: string, bars: number | null }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number }} */
   const out = { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0, batched: 0, deferred: 0 };
   let done = 0, resting = null;
-  const tick = () => progress(++done, total);
+  const tick = () => progress(++done, total, out.batched);
   const rest = () => { if(!resting){ out.pauses++; resting = Promise.resolve(io.pause(DAILY_PAUSE_MS)).finally(() => { resting = null; }); } return resting; };
   const withRest = async fn => {
     for(;;){
@@ -93,12 +93,13 @@ function dailyReader(total, io, progress){
   const batched = async chunk => {   // returns the stocks of the chunk that need a call of their own
     let data;
     try { data = await withRest(() => io.batch(chunk.map(x => x.sym))); } catch(e){ if(tvIsQuota(e) || (e && e.code === 'no_mcp')){ out.abort = e.message; return []; } data = null; }
-    const own = [];
+    const own = [], aligned = [];
     for(const x of chunk){
       const bars = data ? alignDaily(x.old, dailyBatchBars(data[x.sym]), io.nowS()) : null;
-      if(!bars){ own.push(x); continue; }
-      out.batched++; await finish(x, bars); tick();
+      if(bars) aligned.push({ x, bars }); else own.push(x);
     }
+    out.batched += aligned.length;   // counted at once, so the progress line shows the batch before the saves, which run LOADERS at a time
+    await pool(aligned, LOADERS, async a => { await finish(a.x, a.bars); tick(); });
     return own;
   };
   return { out, tick, batched, single };
@@ -108,7 +109,7 @@ function dailyReader(total, io, progress){
  * The daily MACD reading of each stock in `list` and their bars saved. A stock with saved bars is brought up to date from the batch call (BATCH stocks per call, no
  * fetch of its own); one with no saved bars, or whose saved bars do not line up with the batch answer, is fetched on its own, DAILY_WORKERS at a time.
  * `io` = { symbolOf(stock), keyOf(stock), stop(), today(), nowS(), loadBars(stock, sym), saveBars(stock, sym, bars, isNew), batch(symbols) -> { symbol: row }, pause(ms) };
- * progress(done, total) after each stock. A stock that fails is listed with its reason and the rest go on; no connection stops the whole read (`abort` says why). When
+ * progress(done, total, batched) after each stock (`batched` = stocks brought up to date from the batch call so far). A stock that fails is listed with its reason and the rest go on; no connection stops the whole read (`abort` says why). When
  * TradingView refuses a call for its quota, all workers wait io.pause(DAILY_PAUSE_MS) and the call is tried again, up to DAILY_PAUSES waits (`pauses` counts them); after that
  * the read stops with the quota message. A suspension that is not "for one minute" stops the read at once. At most DAILY_OWN_MAX stocks are fetched on their own per run (`deferred` counts the rest). A bar document that cannot be read is fetched in full; one that cannot be saved is counted (`storeFailed`), its reading still counts.
  * @returns {Promise<{ results: { key: string, state: string, asof: string, bars: number | null }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number }>}

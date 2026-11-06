@@ -366,7 +366,7 @@ async function rsDaily(run){
   const { list, total, needsOtherRule } = dailyStocksOf(stocks, strategy);
   if(needsOtherRule){ run.dailyResult = { name: strategy.name, problem: 'the strategy needs a rule besides the daily MACD, to choose the stocks to read' }; return; }
   fiSet('verify', 'running', 'Daily MACD 30/60/5: reading ' + num(list.length) + ' stocks…', 0.2);
-  const progress = (d, n) => fiSet('verify', 'running', 'Daily MACD 30/60/5: ' + num(d) + ' of ' + num(n) + ' stocks', 0.2 + 0.2 * d / n);
+  const progress = (d, n, b) => fiSet('verify', 'running', 'Daily MACD 30/60/5: ' + num(d) + ' of ' + num(n) + ' stocks' + (b ? ' (' + num(b) + ' in batches)' : ''), 0.2 + 0.2 * d / n);
   try {
     const io = { symbolOf: snapshotSymbol, keyOf: s => sanitizeDocId(tickerSymbol(s)), stop: () => stopAsked, today: tvIstDate, loadBars: (s, sym) => loadDailyBars(run.db, sym),
       saveBars: (s, sym, bars, isNew) => saveDailyBars(run.db, { sym, key: pcTickerKey(s), name: s.name }, bars, isNew),
