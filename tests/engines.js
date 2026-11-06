@@ -3404,6 +3404,12 @@ test('daily batch: a stock with saved bars is brought up to date from the batch 
   const fri = bar(12, 13, 11, 12.5, 70), thu = bar(11.2, 12.2, 11, 12, 60);
   assert.strictEqual(out(keep.concat([row(T('2026-11-05'), thu)]), { cur: fri, prev: thu }, '2026-11-07')[4][0], T('2026-11-06'));   // run on a Saturday: Friday's bar
   assert.strictEqual(out(stored(tueFinal), { cur: wed, prev: tueFinal }, '2026-11-06'), null);   // Wednesday is missing between the saved bar and the latest day
+  // before the market opens on a weekday the newest bar is still the previous weekday's: Friday 05:30 Indian time, saved up to Wednesday, TradingView's current bar is Thursday's
+  const preOpen = (d) => Date.parse(d + 'T00:00:00Z') / 1000;   // 05:30 Indian time = 00:00 UTC
+  const thuBar = bar(12, 12.5, 11.5, 12.2, 80), savedWed = [row(T('2026-11-03'), tueFinal), row(T('2026-11-04'), wedFinal)];
+  assert.deepStrictEqual(B.alignDaily(savedWed, { cur: thuBar, prev: wedFinal }, preOpen('2026-11-06')), savedWed.concat([row(T('2026-11-05'), thuBar)]));   // Thursday's bar is added before the Friday open
+  assert.strictEqual(B.alignDaily(savedWed, { cur: thuBar, prev: wedFinal }, now('2026-11-06')), null);   // after the open the current bar would be Friday's: Thursday's would be missing, so it is fetched on its own
+  assert.strictEqual(B.alignDaily(savedWed, { cur: thuBar, prev: wedFinal }, preOpen('2026-11-07')), null);   // a Saturday morning: Friday's bar is missing
   assert.strictEqual(out(stored(tueFinal), { cur: bar(11, 12, 10, 11, 5), prev: bar(8, 12, 7, 11, 200) }, '2026-11-04'), null);   // prices were adjusted since: the previous bar does not match
   assert.strictEqual(out([row(T('2026-11-02'), bar(10.5, 11, 9, 10.5, 100)), row(T('2026-11-03'), tueFinal)], { cur: tueFinal, prev: tueFinal }, '2026-11-04'), null);   // cannot tell the current bar from the previous one
   assert.strictEqual(out(stored(tueFinal), { cur: bar(11, 10, 12, 11, 5), prev: tueFinal }, '2026-11-04'), null);   // a bar whose high is below its close

@@ -8,9 +8,10 @@ const DAILY_BAR_COLUMNS = ['open', 'high', 'low', 'close', 'volume', 'open[1]', 
 const dayNo = t => Math.floor((t + IST) / DAY);
 const weekday = d => (d + 3) % 7;   // day number 0 = 1970-01-01, a Thursday: Monday = 0 ... Sunday = 6
 const isWeekend = d => weekday(d) >= 5;
-// The last weekday on or before day number d, and the first weekday after it.
-const lastWeekdayUpTo = d => { while(isWeekend(d)) d--; return d; };
+// The first weekday after day number d, and the latest weekday whose session has begun by `nowS` (09:15 Indian time): before the open on a weekday morning the
+// newest bar TradingView has is still the previous weekday's, so that is the day the batch's "current" bar belongs to.
 const nextWeekday = d => { d++; while(isWeekend(d)) d++; return d; };
+const latestSessionDay = nowS => { let d = dayNo(nowS); while(isWeekend(d) || d * DAY - IST + OPEN_S > nowS) d--; return d; };
 
 /**
  * The current and the previous daily bar out of a batch row: { cur, prev } with { o, h, l, c, v }, or null when a number is missing.
@@ -51,9 +52,9 @@ function alignDaily(stored, bars, nowS){
   const isPrev = same(bars.prev), isCur = same(bars.cur) && prevIsBefore;
   let out = null;
   if(isCur && !isPrev) out = head.concat([rowOf(L[0], bars.cur)]);   // no session since: the newest bar is still the saved one
-  else if(isPrev && !isCur){   // the saved bar has finished; the new bar is the very next weekday's, which must also be the latest weekday up to today
+  else if(isPrev && !isCur){   // the saved bar has finished; the new bar is the very next weekday's, which must also be the latest weekday whose session has begun
     const next = nextWeekday(dayNo(L[0]));
-    if(next === lastWeekdayUpTo(dayNo(nowS))) out = head.concat([rowOf(L[0], bars.prev), rowOf(next * DAY - IST + OPEN_S, bars.cur)]);
+    if(next === latestSessionDay(nowS)) out = head.concat([rowOf(L[0], bars.prev), rowOf(next * DAY - IST + OPEN_S, bars.cur)]);
   }
   return out && wellFormed(out) ? out : null;
 }
