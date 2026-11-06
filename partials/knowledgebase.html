@@ -266,6 +266,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.363 &middot; 2026-11-06</h3>
+            <ul>
+              <li><strong>The daily (1D) import now brings stocks up to date in batches before the market opens too:</strong> a stock that already has saved daily bars is updated from TradingView&rsquo;s batch call, but the check that the new bar belongs to the right day assumed the market had already opened that day. On a weekday morning before 09:15, when the newest bar is still the previous day&rsquo;s, none of the stocks passed that check, so almost all of them were fetched one by one, and only 100 of those are fetched per run (the result said &ldquo;248 more stocks wait for the next run&rdquo;). The check now uses the latest day whose session has begun, so those runs update every stock in a few batch calls.</li>
+            </ul>
             <h3>v1.362 &middot; 2026-11-05</h3>
             <ul>
               <li><strong>New grid column &ldquo;D MACD bars&rdquo;:</strong> how many daily (1 D) bars in a row, the newest included, the MACD 30/60/5 has been above its signal line. It shows in every stock grid (Analysis, Strategies results, Explorer, peers), after M Tech Rating, and can be sorted, moved or hidden like the other columns. 1 means it crossed up on the newest bar, 0 means it is at or below the signal. The count comes from the daily bars saved by the daily import of Refresh all stocks, so it appears for the stocks of the strategy chosen there, after the next daily import, and is blank for other stocks or when the reading is more than four days old.</li>
