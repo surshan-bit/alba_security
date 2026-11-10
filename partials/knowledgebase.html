@@ -266,6 +266,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.371 &middot; 2026-11-10</h3>
+            <ul>
+              <li><strong>Screen-specific styling folded into page stylesheets (nothing looks different):</strong> the one file of rules written for a single screen or element was split into seven page stylesheets (Help and Knowledge Base, Settings, Trade Log, Data Refresh, buttons, Analysis and Strategies, News), and the hook names those rules hang on now say what the thing is (for example <em>doc-page</em>, <em>tl-panel-body</em>, <em>jump-target</em>) instead of repeating the screen name. The five &ldquo;scroll to this section&rdquo; hooks on the stock page became one shared class. A computed-style comparison of every element on every screen, in the White theme at three widths, found no difference before and after.</li>
+            </ul>
             <h3>v1.370 &middot; 2026-11-10</h3>
             <ul>
               <li><strong>Cleaner inside (nothing looks different, nothing is scored differently):</strong> the last of the long, deeply nested and many-parameter pieces of code were taken apart into small, tested steps, in one release. This covers the first step of Refresh all stocks (full price history), the Explorer table and its heat map, the industry page and its charts, the Analysis section, the Industry Peers and Fundamental Score panels, the Global &amp; Macro panel, the Trade Log (its form, panel and the call shown for each stock), the live price sweep, the other-device view of a running refresh, Refresh Technical Info, Refresh stock events, the data freshness bars, the notification bell, the top bar search and the saved preferences. Every screen reads, sorts and saves exactly as before; where the old and new code could be compared on the same inputs they gave the same results.</li>
