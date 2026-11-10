@@ -1,0 +1,8 @@
+/* The same buttons on a phone: size and padding. Loaded after the Data Refresh page file, because its button rules sit in the same width range and these must win there. */
+@media (max-width:900px){
+:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,.biz-expand,.biz-page .rk-btn){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;height:auto;padding:0 14px;font-size:var(--t-sm);font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2}
+:root[data-theme="white"] :is(.refresh-btn,.strat-btn,.analysis-reset-btn,.select-mode-btn,.rk-main,.biz-expand,.biz-page .rk-btn):not(.active):not(.on):not(.tl-btn-primary):not(.fi-btn-primary){color:var(--text);background:var(--panel);border:1px solid var(--c-c9cfdf)}
+}
+@media (max-width:640px){
+.refreshlog-page :is(.browse-btn,.refresh-btn,.strat-btn,.select-mode-btn){font-size:var(--t-sm);min-height:var(--ph-ctl-lg);box-sizing:border-box}
+}

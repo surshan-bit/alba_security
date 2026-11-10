@@ -165,7 +165,7 @@ function strategyGroup(){
   const hiddenNoteHtml = hiddenNote();
   const buttons = [filterButton('astrat', 'all', { active: !chosen, dot: 'text', label: 'All', count: all, title: 'Do not narrow Analysis by a strategy' })]
     .concat(strategies.map(x => filterButton('astrat', escapeHtml(x.id), { active: x.id === chosen, dot: 'accent', label: `<span class="filter-label">${escapeHtml(x.name)}</span>`, count: counts.get(x.id), title: 'Only stocks that qualify for this strategy today' })));
-  return `<div class="filter-group scope-analysis-strategy-filter" id="analysisStrategyFilter">
+  return `<div class="filter-group analysis-strategy-filter" id="analysisStrategyFilter">
         <h2>Strategy</h2>
         <div class="filter-group-row">
           ${buttons.join('\n          ')}

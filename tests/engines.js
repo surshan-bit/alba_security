@@ -6128,6 +6128,60 @@ test('Analysis section: a page without the panel draws nothing, a resize redraws
   } finally { globalThis.setTimeout = real.st; globalThis.clearTimeout = real.ct; }
 }));
 
+// ---- Hook class names (jump-target, strat-new, strat-restore, strat-learn-run) that the page stylesheets rely on
+test('stock page panels carry the jump-target class the Jump bar scrolls to: Technical Score (none, insufficient data, scored) and Valuation', () => alone(async () => {
+  globalThis.__T = { panelIcon: () => '', verdictLabel: { buy: 'Buy' }, scoreBand: () => 'fs-buy', renderPriceChartMount: () => '', marginOfSafety: (iv, p) => (iv && p ? ((iv - p) / iv) * 100 : null) };
+  const Tp = await loadAllStubbed('src/detail/technical.js', '', []), V = await loadAllStubbed('src/detail/valuation.js', '', []);
+  TV_VALUES.add('verdictLabel');
+  const has = (h) => /class="[^"]*\bjump-target\b[^"]*"/.test(h);
+  assert.ok(has(Tp.renderTechPanel({})) && Tp.renderTechPanel({}).includes('id="jump-tech"') && Tp.renderTechPanel({}).includes('Not available'));
+  assert.ok(has(Tp.renderTechPanel({ technical: { score: null } })) && Tp.renderTechPanel({ technical: { score: null } }).includes('Insufficient Data'));
+  const scored = Tp.renderTechPanel({ technical: { score: 7.5, states: { weekMacd: 'bullish', monthMacd: 'bullish' }, raw: { weekPctChange: 1, monthPctChange: 2, weekRsi: 55, monthRsi: 60 } } });
+  assert.ok(has(scored) && scored.includes('Technical Score &middot; 7.50/10') && scored.includes('tech-fallback'));
+  const val = V.renderValuationPanel({ valuation: { intrinsicValue: 150, currentPrice: 100 } });
+  assert.ok(has(val) && val.includes('id="jump-val"') && val.includes('Margin of safety'));
+}));
+test('Strategies page: the strategy menu offers New and Restore with their hook classes, and the setup panel and picks table carry the strat-dup, strat-track-btn and strat-results classes', () => kcPage('<section id="section-strategies"><div id="stratList"></div><div id="stratMain"></div></section>', async (win) => {
+  const st = { id: 's1', name: 'Quality <b>', published: true, rules: [], goal: { target: 5, days: 30 }, note: '', learned: '' };
+  const T = globalThis.__T = { strategies: [st], stocks: [], appSections: {}, selectedStrategy: () => st, escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), qualifyingStocks: () => [], ruleReady: () => true,
+    dropMenuHtml: (o) => '<div class="dm">' + o.items.map((i) => '<button ' + i.attrs + ' class="' + (i.cls || '') + '">' + i.title + '</button>').join('') + '</div>', setHtml: (el, h) => { el.innerHTML = h; }, keepScroll: (el, fn) => fn(),
+    rulesEditorHtml: () => '', resultsHtml: () => '<table></table>', whyDatalist: () => '', whyHtml: () => '', orderedPicks: (x) => x, sheetFrame: (x) => x, filtersOpenSaved: () => false, trackPanelHtml: () => '', renderTrackPanel: () => {},
+    kit: { defineScope: () => {}, barHtml: () => '', selbarSlot: () => '' }, getStrategiesStatus: () => ({}) };
+  TV_VALUES.add('strategies');
+  const M = await loadAllStubbed('src/strategies/section.js', '', ['../core/evt.js']);
+  M.renderStrategiesSection();
+  const d = win.document;
+  assert.strictEqual(d.getElementById('stratNew').className, 'strat-new'); assert.strictEqual(d.getElementById('stratRestore').className, 'strat-restore');
+  assert.ok(d.querySelector('#stratDup.strat-dup') && d.querySelector('#stratTrackBtn.strat-track-btn') && d.querySelector('#stratResults.strat-results'));
+  assert.ok(!d.querySelector('.strat-name') || d.querySelector('.strat-name').value === 'Quality <b>');
+}));
+test('Strategies page, past-prices pop-up: the Search past prices button carries the strat-learn-run class', () => kcPage('<div id="host"><button id="stratLearn">Suggested Rules</button></div>', async (win) => {
+  const st = { id: 's1', name: 'Q', rules: [], goal: { target: 5, days: 30 } };
+  globalThis.__T = { stocks: [], escapeHtml: (x) => String(x), goalText: () => '5% in 30 days', horizonWeeks: () => 4, HORIZONS: { short: { label: 'Short' }, medium: { label: 'Medium' }, long: { label: 'Long' } }, hasPractice: () => true, practiceHtml: () => '<p>practice</p>', runPractice: () => {}, setHtml: (el, h) => { el.innerHTML = h; }, saveStrategies: () => {} };
+  TV_VALUES.add('HORIZONS'); const M = await loadAllStubbed('src/strategies/learnpanel.js', '', ['../core/evt.js']);
+  M.wireLearnPanel(win.document.getElementById('host'), () => st, () => {});
+  win.document.getElementById('stratLearn').click();
+  assert.ok(win.document.getElementById('stratLearnModal') && win.document.querySelector('.lm-pane').textContent.includes('practice'));
+  win.document.querySelector('.lm-tab[data-tab="past"]').click();
+  const run = win.document.querySelector('#stratLearnRun'); assert.ok(run && run.classList.contains('strat-learn-run') && run.textContent.includes('5% in 30 days'));
+  win.document.getElementById('stratLearnClose').click(); assert.strictEqual(win.document.getElementById('stratLearnModal'), null);
+}));
+test('Technical Score and Valuation panels: every trend label and RSI zone, the provisional note, and every Margin of safety band read correctly', () => alone(async () => {
+  globalThis.__T = { panelIcon: () => '', verdictLabel: { buy: 'Buy' }, scoreBand: (v) => (v >= 7 ? 'fs-buy' : 'fs-avoid'), renderPriceChartMount: () => '', marginOfSafety: (iv, p) => (iv && p ? ((iv - p) / iv) * 100 : null) };
+  const Tp = await loadAllStubbed('src/detail/technical.js', '', []), V = await loadAllStubbed('src/detail/valuation.js', '', []);
+  assert.deepStrictEqual(['bull_above', 'bull_below', 'bear_above', 'bear_below', 'x'].map((k) => (Tp.techRatingInfo(k) || {}).label || null), ['Bullish', 'Turning Up', 'Weakening', 'Bearish', null]);
+  const panel = (raw, states, extra) => Tp.renderTechPanel({ technical: Object.assign({ score: 6, states, raw }, extra || {}) });
+  const hot = panel({ weekPctChange: 3, monthPctChange: -2, weekRsi: 80, monthRsi: 20 }, { weekMacd: 'bull_above', monthMacd: 'bear_below' });
+  assert.ok(hot.includes('pcs-chg up') && hot.includes('pcs-chg down') && hot.includes('pcs-rsi hot') && hot.includes('pcs-rsi cold') && hot.includes('Bullish') && hot.includes('Bearish') && hot.includes('b-avoid'));
+  const flat = panel({ weekPctChange: 0, monthPctChange: null, weekRsi: 50, monthRsi: null }, { weekMacd: 'x', monthMacd: 'bull_below' });
+  assert.ok(flat.includes('pcs-chg flat') && flat.includes('n/a') && flat.includes('&mdash;') && flat.includes('Turning Up') && !flat.includes('tech-prov'));
+  assert.ok(panel({ weekPctChange: 1, monthPctChange: 1, weekRsi: 50, monthRsi: 50 }, {}, { provisional: { score: 5.256 }, basis: { week: 1 } }).includes('Provisional 5.26/10'));
+  assert.ok(!panel({ weekPctChange: 1, monthPctChange: 1 }, {}, { provisional: { score: NaN } }).includes('tech-prov') && !panel({ weekPctChange: 1, monthPctChange: 1 }, {}, { provisional: 'x' }).includes('tech-prov'));
+  const bands = [[100, 70], [100, 90], [100, 110], [100, 130], [100, 100]].map(([iv, px]) => V.renderValuationPanel({ valuation: { intrinsicValue: iv, currentPrice: px } }));
+  assert.ok(bands[0].includes('b-buy') && bands[1].includes('b-mbuy') && bands[2].includes('b-hold') && bands[3].includes('b-avoid') && bands[0].includes('+30.0%') && bands[3].includes('−') && bands[4].includes('Valuation'));
+  assert.ok(V.renderValuationPanel({ valuation: { currentPrice: 100 } }).includes('No reliable intrinsic-value source') && V.renderValuationPanel({}) === '');
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

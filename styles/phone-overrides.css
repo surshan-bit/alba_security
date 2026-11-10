@@ -14,7 +14,7 @@
 .tl-prow-why{font-size:var(--t-sm);}
 .tl-form{padding:18px 18px 22px;}
 .tl-form-actions .tl-btn-primary{color:var(--on-accent);background:var(--accent);}
-.scope-trade-ideas-run{color:var(--on-accent);background:var(--accent);font-size:var(--t-sm);}
+.tl-ideas-run{color:var(--on-accent);background:var(--accent);font-size:var(--t-sm);}
 .tl-top5-title{font-size:var(--t-md);font-weight:600;}
 .tl-held-tag{font-size:var(--t-xs);font-weight:700;}
 .tl-top5-head > span:first-child{font-size:var(--t-md);font-weight:600;}

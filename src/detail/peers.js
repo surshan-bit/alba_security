@@ -34,7 +34,7 @@ function peerGroups(){
   return g;
 }
 const plural = (n) => (n === 1 ? '' : 's');
-const EMPTY_PEERS = `<div class="tech-panel scope-peers-panel" id="peersPanel"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('peers')}Industry Peers</div></div><div class="peers-empty">Peer group not available for this stock.</div></div>`;
+const EMPTY_PEERS = `<div class="tech-panel jump-target" id="peersPanel"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('peers')}Industry Peers</div></div><div class="peers-empty">Peer group not available for this stock.</div></div>`;
 // The peer rows: one per stock sharing the industry, the open stock marked.
 function peerRowsHtml(members, selfIdx, cols){
   return members.map((i, k) => {
@@ -65,7 +65,7 @@ function renderPeersPanel(s, selfIdx){
   const cols = stockGridColumnIds().filter(id => id !== 'industry');   // the columns set in Analysis; every peer shares the industry, so that one is left out
   const lead = peersLead(members, members.indexOf(selfIdx) + 1, industry, group), basis = peersBasis(members, groupMembers, group);
   return `
-    <div class="tech-panel scope-peers-panel" id="peersPanel">
+    <div class="tech-panel jump-target" id="peersPanel">
       <div class="tech-panel-head">
         <div class="tech-panel-title">${panelIcon('peers')}Industry Peers &middot; ${escapeHtml(industry)}</div>
         <span class="completeness-badge complete">${members.length} stock${plural(members.length)}</span>

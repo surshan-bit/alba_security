@@ -27,13 +27,13 @@ function renderGlobalFactorsPanel(s){
   const g = s.globalFactors;
   if(!(g && (g.positive?.length || g.negative?.length))){
     return `
-      <div class="global-panel scope-jump-global" id="jump-global">${panelHead()}
+      <div class="global-panel jump-target" id="jump-global">${panelHead()}
         <p class="global-panel-sub">Not yet researched for this stock. Use the Refresh button at the top of this page and choose Fundamental to research it now; this works for any stock, whatever its rating.</p>
       </div>
     `;
   }
   return `
-    <div class="global-panel scope-jump-global" id="jump-global">${panelHead()}
+    <div class="global-panel jump-target" id="jump-global">${panelHead()}
       <div class="global-cols" data-css="--n:${Math.max(1, g.positive?.length || 0, g.negative?.length || 0)}">
         <div class="global-col">
           <div class="global-col-title pos">&#9650; Positive / tailwind</div>
