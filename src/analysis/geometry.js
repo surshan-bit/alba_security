@@ -19,8 +19,12 @@ function valueFor(s, axis){
 const axisTitle = (axis) => axis === 'month' ? 'M RSI (14)' : 'W RSI (14)';
 const axisShort = (axis) => axis === 'month' ? 'Monthly' : 'Weekly';
 
-// `host` is the element the chart fills; `plottable` the stocks that have both RSI readings.
-function chartGeometry(host, plottable){
+const MARGIN = { marginLeft: 56, marginRight: 24, marginTop: 24, marginBottom: 54 };
+const SIZE = { minW: 640, maxW: 1700, defaultW: 780, minH: 420, maxH: 620, aspect: 0.42 };
+const GRID_TICKS = [0, 20, 40, 60, 80, 100];
+
+// The MoS range of the plottable stocks, and the dot radius for a given MoS.
+function mosScale(plottable){
   const mosValues = plottable.map(s => mosPct(s)).filter(v => v !== -Infinity);
   const mosMin = mosValues.length ? Math.min(...mosValues) : 0;
   const mosMax = mosValues.length ? Math.max(...mosValues) : 0;
@@ -29,28 +33,44 @@ function chartGeometry(host, plottable){
     const t = Math.max(0, Math.min(1, (mos - mosMin) / (mosMax - mosMin)));
     return DOT_R_MIN + (DOT_R_MAX - DOT_R_MIN) * Math.sqrt(t);
   }
+  return { mosMin, mosMax, radiusForMos };
+}
 
-  // Chart size follows the space available, so on a wide desktop the plot fills the panel instead of
-  // sitting centred with blank bands either side. One SVG unit = one pixel, so text stays a fixed size.
+// Chart size follows the space available, so on a wide desktop the plot fills the panel instead of
+// sitting centred with blank bands either side. One SVG unit = one pixel, so text stays a fixed size.
+function chartSize(host){
   const hostW = host.clientWidth || 0;
-  const W = hostW > 0 ? Math.max(640, Math.min(1700, Math.round(hostW))) : 780;
-  const H = Math.round(Math.max(420, Math.min(620, W * 0.42)));
-  const marginLeft = 56, marginRight = 24, marginTop = 24, marginBottom = 54;
-  const plotW = W - marginLeft - marginRight;
-  const plotH = H - marginTop - marginBottom;
-  const clamp = (n) => Math.min(100, Math.max(0, n));
-  const xFor = (rsi) => marginLeft + (clamp(rsi) / 100) * plotW;
-  const yFor = (rsi) => marginTop + plotH - (clamp(rsi) / 100) * plotH;
-  const xAxis = analysisFilters.xAxis, yAxis = analysisFilters.yAxis;
+  const W = hostW > 0 ? Math.max(SIZE.minW, Math.min(SIZE.maxW, Math.round(hostW))) : SIZE.defaultW;
+  const H = Math.round(Math.max(SIZE.minH, Math.min(SIZE.maxH, W * SIZE.aspect)));
+  return { W, H, ...MARGIN, plotW: W - MARGIN.marginLeft - MARGIN.marginRight, plotH: H - MARGIN.marginTop - MARGIN.marginBottom };
+}
 
+// An RSI value (0-100, clamped) to its place on the chart.
+function chartScales({ marginLeft, marginTop, plotW, plotH }){
+  const clamp = (n) => Math.min(100, Math.max(0, n));
+  return {
+    xFor: (rsi) => marginLeft + (clamp(rsi) / 100) * plotW,
+    yFor: (rsi) => marginTop + plotH - (clamp(rsi) / 100) * plotH
+  };
+}
+
+// The gridlines and tick labels.
+function gridSvgOf(size, { xFor, yFor }){
+  const { marginLeft, marginTop, plotW, plotH } = size;
   let gridSvg = '';
-  [0, 20, 40, 60, 80, 100].forEach(t => {
+  GRID_TICKS.forEach(t => {
     gridSvg += `<line class="analysis-grid-line" x1="${xFor(t)}" y1="${marginTop}" x2="${xFor(t)}" y2="${marginTop + plotH}"></line>`;
     gridSvg += `<line class="analysis-grid-line" x1="${marginLeft}" y1="${yFor(t)}" x2="${marginLeft + plotW}" y2="${yFor(t)}"></line>`;
     gridSvg += `<text class="analysis-tick-label" x="${xFor(t)}" y="${marginTop + plotH + 16}" text-anchor="middle">${t}</text>`;
     gridSvg += `<text class="analysis-tick-label" x="${marginLeft - 8}" y="${(yFor(t) + 3).toFixed(1)}" text-anchor="end">${t}</text>`;
   });
+  return gridSvg;
+}
 
+// The quadrant lines and labels, the axis titles and the frame around the plot.
+function frameSvgOf(size, { xFor, yFor }){
+  const { H, marginLeft, marginTop, plotW, plotH } = size;
+  const xAxis = analysisFilters.xAxis, yAxis = analysisFilters.yAxis;
   const quadrantLines = `
     <line class="analysis-quadrant-line" x1="${xFor(50)}" y1="${marginTop}" x2="${xFor(50)}" y2="${marginTop + plotH}"></line>
     <line class="analysis-quadrant-line" x1="${marginLeft}" y1="${yFor(50)}" x2="${marginLeft + plotW}" y2="${yFor(50)}"></line>
@@ -67,10 +87,20 @@ function chartGeometry(host, plottable){
   `;
   const axisBox = `<rect class="analysis-axis-line" x="${marginLeft}" y="${marginTop}" width="${plotW}" height="${plotH}" fill="none"></rect>`;
 
+  return { quadrantLines, quadrantLabels, axisLabels, axisBox };
+}
+
+// `host` is the element the chart fills; `plottable` the stocks that have both RSI readings.
+function chartGeometry(host, plottable){
+  const { mosMin, mosMax, radiusForMos } = mosScale(plottable);
+  const size = chartSize(host), scales = chartScales(size);
+  const gridSvg = gridSvgOf(size, scales);
+  const { quadrantLines, quadrantLabels, axisLabels, axisBox } = frameSvgOf(size, scales);
+
   // MoS range slider bounds follow the data, so the full range always means "no MoS filter".
   const mosBoundLo = Math.floor(mosMin), mosBoundHi = Math.max(Math.ceil(mosMax), Math.floor(mosMin) + 1);
 
-  return { W, H, xFor, yFor, radiusForMos, mosBoundLo, mosBoundHi, gridSvg, axisBox, quadrantLines, quadrantLabels, axisLabels };
+  return { W: size.W, H: size.H, xFor: scales.xFor, yFor: scales.yFor, radiusForMos, mosBoundLo, mosBoundHi, gridSvg, axisBox, quadrantLines, quadrantLabels, axisLabels };
 }
 
 // The stocks inside the current RSI and MoS ranges. A stock with no reading for an RSI passes that range only while

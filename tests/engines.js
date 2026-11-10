@@ -4506,6 +4506,45 @@ test('history step: a database that cannot be read or written does not stop the 
   });
 }));
 
+// ---- Analysis chart geometry (src/analysis/geometry.js)
+const GEO_STUBS = { '../list/metrics.js': 'export const mosPct = (s) => (typeof s.mos === "number" ? s.mos : -Infinity);', './state.js': 'export const analysisFilters = globalThis.__AF;' };
+const geoLoad = (file) => loadWithStubs(file || 'src/analysis/geometry.js', '', GEO_STUBS);
+test('analysis chart geometry: the size follows the space, the scales clamp, dots grow with Margin of Safety and the MoS slider bounds follow the data', () => alone(async () => {
+  globalThis.__AF = { xAxis: 'week', yAxis: 'month' };
+  const G = await geoLoad();
+  const geo = (w, list) => G.chartGeometry({ clientWidth: w }, list || []);
+  assert.deepStrictEqual([geo(0).W, geo(0).H, geo(300).W, geo(300).H, geo(1000).W, geo(1000).H, geo(5000).W, geo(5000).H], [780, 420, 640, 420, 1000, 420, 1700, 620]);
+  assert.strictEqual(G.chartGeometry({}, []).W, 780);   // a host with no width yet
+  const g = geo(1000);
+  assert.deepStrictEqual([g.xFor(0), g.xFor(100), g.xFor(-20), g.xFor(500), g.yFor(0), g.yFor(100)], [56, 976, 56, 976, 366, 24]);   // 0-100 only, outside values are held at the edge
+  const stocks = [{ mos: -10 }, { mos: 30 }, { mos: 70 }, {}];   // the last has no MoS
+  const d = geo(1000, stocks);
+  assert.deepStrictEqual([d.radiusForMos(-10), d.radiusForMos(-Infinity), d.radiusForMos(70), d.radiusForMos(500), d.radiusForMos(-500)], [4, 4, 13, 13, 4]);
+  assert.ok(d.radiusForMos(30) > 4 && d.radiusForMos(30) < 13);
+  assert.deepStrictEqual([d.mosBoundLo, d.mosBoundHi], [-10, 70]);
+  assert.deepStrictEqual([geo(1000, [{ mos: 5 }]).radiusForMos(5), geo(1000, [{ mos: 5 }]).mosBoundLo, geo(1000, [{ mos: 5 }]).mosBoundHi, geo(1000).mosBoundHi], [4, 5, 6, 1]);   // one value or none: a flat range still gets a slider
+  assert.strictEqual((d.gridSvg.match(/analysis-grid-line/g) || []).length, 12);
+  assert.ok(d.gridSvg.includes('text-anchor="middle">60</text>') && d.gridSvg.includes('text-anchor="end">0</text>'));
+  assert.ok(d.quadrantLabels.includes('Monthly strong, Weekly pullback') && d.quadrantLabels.includes('Weekly bounce, Monthly weak') && d.axisLabels.includes('W RSI (14)') && d.axisLabels.includes('M RSI (14)'));
+  globalThis.__AF.xAxis = 'month'; globalThis.__AF.yAxis = 'week';   // the axes can be swapped
+  const swapped = geo(1000);
+  assert.ok(swapped.quadrantLabels.includes('Weekly strong, Monthly pullback') && swapped.axisLabels.indexOf('M RSI (14)') < swapped.axisLabels.indexOf('W RSI (14)'));
+  assert.ok(d.axisBox.includes('class="analysis-axis-line"') && d.quadrantLines.includes('analysis-quadrant-line'));
+  assert.deepStrictEqual([G.valueFor({ technical: { raw: { weekRsi: 61, monthRsi: 70 } } }, 'month'), G.valueFor({ technical: { raw: { weekRsi: 61, monthRsi: 70 } } }, 'week')], [70, 61]);
+}));
+test('analysis chart geometry: the stocks in range follow the RSI and MoS filters, and a blank reading passes only a range left at 0-100', () => alone(async () => {
+  globalThis.__AF = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, mosLo: null, mosHi: null };
+  const G = await geoLoad();
+  const st = (n, w, m, mos) => ({ n, mos, technical: { raw: { weekRsi: w, monthRsi: m } } });
+  const list = [st('a', 50, 50, 10), st('b', 20, 80, 40), st('c', null, 60, 5), st('d', 70, null, -Infinity), { n: 'e' }];
+  const names = () => G.stocksInRange(list).map((s) => s.n).join('');
+  assert.strictEqual(names(), 'abcde');   // everything while the ranges are open
+  globalThis.__AF.weekMin = 30; assert.strictEqual(names(), 'ad');   // c and e have no weekly reading but the weekly range is narrowed
+  Object.assign(globalThis.__AF, { weekMin: 0, monthMax: 60 }); assert.strictEqual(names(), 'ac');
+  Object.assign(globalThis.__AF, { monthMax: 100, mosLo: 8 }); assert.strictEqual(names(), 'ab');   // MoS: a missing MoS is out
+  Object.assign(globalThis.__AF, { mosLo: null, mosHi: 20 }); assert.strictEqual(names(), 'ac');
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
