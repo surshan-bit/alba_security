@@ -246,59 +246,54 @@ function init_tradelog_phone(){
     }
   });
 }
-function renderTradeLogPanel(){
-  document.querySelectorAll('.tl-view-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-tl-view') === tlView));
-  const el = document.getElementById('tradeLogPanelBody');
-  if(!el) return;
-  if(!getTradeDb()){
-    setHtml(el, `<p class="upload-hint">The Trade Log needs a signed-in view: open this dashboard on claude.ai.</p>`);
-    return;
-  }
-  const trades = allTrades();
-  if(trades.length === 0){
-    setHtml(el, `<p class="upload-hint">No trades yet. Use &ldquo;+ Add trade&rdquo; to log a position.</p>`);
-    return;
-  }
-  const models = trades
-    .sort((a, b) => ((b.buy && b.buy.date) || '').localeCompare((a.buy && a.buy.date) || ''))
-    .map(tlTradeModel);
-
-  // Aggregate by entry-verdict bucket — withheld below 2 trades since an "average" of one trade
-  // would just restate that trade's own return and imply more signal than exists yet.
-  let aggregateHtml = '';
-  if(models.length >= 2){
-    const byVerdict = new Map();
-    models.forEach(m => {
-      const v = m.buy.snapshot && m.buy.snapshot.verdict;
-      const ret = tradeReturnPct(m.t);
-      if(!v || ret == null) return;
-      if(!byVerdict.has(v)) byVerdict.set(v, []);
-      byVerdict.get(v).push(ret);
-    });
-    if(byVerdict.size){
-      const chips = Array.from(byVerdict.entries()).map(([v, rets]) => {
-        const avg = rets.reduce((a, b) => a + b, 0) / rets.length;
-        return `<span class="data-chip">${verdictLabel[v] || v}: <b>${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%</b> avg (${rets.length} trade${rets.length === 1 ? '' : 's'})</span>`;
-      }).join('');
-      aggregateHtml = `<div class="data-chips data-chips--spaced">${chips}</div>`;
-    }
-  }
-
-  let listHtml;
-  if(tlView === 'cards'){
-    listHtml = `<div class="tl-cards">${models.map(tlCardHtml).join('')}</div>`;
-  } else {
-    const returnHead = models.some(m => m.isClosed) ? 'Return' : 'Unrealized';
-    const th = (id, label) => sortHeaderHtml(id, label, tlSort);
-    listHtml = `
+// Average return of the trades by the verdict they were bought at. Withheld below 2 trades since an "average" of one trade
+// would just restate that trade's own return and imply more signal than exists yet.
+function tlAggregateHtml(models){
+  if(models.length < 2) return '';
+  const byVerdict = new Map();
+  models.forEach(m => {
+    const v = m.buy.snapshot && m.buy.snapshot.verdict;
+    const ret = tradeReturnPct(m.t);
+    if(!v || ret == null) return;
+    if(!byVerdict.has(v)) byVerdict.set(v, []);
+    byVerdict.get(v).push(ret);
+  });
+  if(!byVerdict.size) return '';
+  const chips = Array.from(byVerdict.entries()).map(([v, rets]) => {
+    const avg = rets.reduce((a, b) => a + b, 0) / rets.length;
+    return `<span class="data-chip">${verdictLabel[v] || v}: <b>${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%</b> avg (${rets.length} trade${rets.length === 1 ? '' : 's'})</span>`;
+  }).join('');
+  return `<div class="data-chips data-chips--spaced">${chips}</div>`;
+}
+// The trades as cards, or as a sortable table.
+function tlListHtml(models){
+  if(tlView === 'cards') return `<div class="tl-cards">${models.map(tlCardHtml).join('')}</div>`;
+  const returnHead = models.some(m => m.isClosed) ? 'Return' : 'Unrealized';
+  const th = (id, label) => sortHeaderHtml(id, label, tlSort);
+  return `
     <div class="help-table-wrap">
       <table class="help-table">
         <thead><tr>${th('name', 'Stock')}${th('buyDate', 'Buy date / price \u00d7 qty')}${th('status', 'Status')}${th('entry', 'Entry score')}${th('data', 'Data at entry')}${th('ret', returnHead)}${th('held', 'Held')}${th('exit', 'Exit score')}${th('call', "Today's call")}<th></th></tr></thead>
         <tbody>${models.slice().sort(compareBy(TL_SORT[tlSort.col], tlSort.dir)).map(tlRowHtml).join('')}</tbody>
       </table>
     </div>`;
-  }
-  keepScroll(el, () => { setHtml(el, aggregateHtml + listHtml + tlPhoneHtml(models)); });
+}
+// A line instead of the table when there is nothing to list.
+function tlEmptyNote(){
+  if(!getTradeDb()) return `<p class="upload-hint">The Trade Log needs a signed-in view: open this dashboard on claude.ai.</p>`;
+  if(allTrades().length === 0) return `<p class="upload-hint">No trades yet. Use &ldquo;+ Add trade&rdquo; to log a position.</p>`;
+  return '';
+}
+function renderTradeLogPanel(){
+  document.querySelectorAll('.tl-view-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-tl-view') === tlView));
+  const el = document.getElementById('tradeLogPanelBody');
+  if(!el) return;
+  const note = tlEmptyNote();
+  if(note){ setHtml(el, note); return; }
+  const models = allTrades()
+    .sort((a, b) => ((b.buy && b.buy.date) || '').localeCompare((a.buy && a.buy.date) || ''))
+    .map(tlTradeModel);
+  keepScroll(el, () => { setHtml(el, tlAggregateHtml(models) + tlListHtml(models) + tlPhoneHtml(models)); });
   const posTab = document.getElementById('tlTabPositions');
   if(posTab) posTab.textContent = 'Positions ' + models.filter(m => !m.isClosed).length;
   syncSignals(models);

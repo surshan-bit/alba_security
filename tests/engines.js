@@ -5982,6 +5982,93 @@ test('Refresh Technical Info: a missing database or connector, a stop, or a fail
   const g = await techRun({ refreshFails: true }); await assert.rejects(g.run(), /bars failed/); assert.deepStrictEqual(g.T.hooks, ['on', 'off']);   // the progress hook is always taken off
 }));
 
+// ---- Trade Log panel (src/tradelog/panel.js): cards, table, aggregate, phone layout and the daily call
+TV_VALUES.add('verdictLabel');
+const TLP_PAGE = '<button class="tl-view-btn" data-tl-view="cards"></button><button class="tl-view-btn" data-tl-view="table"></button><section id="section-trackrecord" data-tl-tab="positions"><div class="tabs-top"><button data-tl-tab="positions" class="on">P</button><button data-tl-tab="ideas">I</button><span id="tlTabPositions"></span></div><div id="tradeLogPanelBody"></div></section>';
+const tlpSetup = async (win, over) => {
+  const live = { name: 'Acme <b>', valuation: { currentPrice: 120 }, liveAt: Date.now() }, off = { name: 'Gone', active: false, valuation: { currentPrice: 40 } };
+  const trade = (id, ticker, extra) => Object.assign({ _id: id, ticker, name: ticker + ' <i>', status: 'open', buy: { date: '2026-10-01', price: 100, quantity: 10, snapshot: { score: 7.5, verdict: 'buy', fundamentalFactorsComplete: 3, fundamentalFactorsTotal: 4 } }, sell: null }, extra);
+  const trades = [trade('t1', 'AAA'), trade('t2', 'OFF', { buy: { date: '2026-10-05', price: 50, quantity: 4, snapshot: { score: 4, verdict: 'avoid' } } }), trade('t3', 'ORPH', { buy: { date: '2026-09-01', price: 0 } }),
+    trade('t4', 'AAA', { status: 'closed', buy: { date: '2026-08-01', price: 80, quantity: 5, snapshot: { score: 6, verdict: 'buy' } }, sell: { date: '2026-09-01', price: 100, quantity: 5, holdingDays: 31, realizedReturnPct: 25, snapshot: { score: 5, verdict: 'hold' } } })];
+  const T = globalThis.__T = Object.assign({ stockByTickerSymbolAny: new Map([['AAA', live], ['OFF', off]]), verdictLabel: { buy: 'Buy', avoid: 'Avoid', hold: 'Hold' }, trades, db: {}, prefs: [], ideas: 0, signalWrites: [], signalDocs: [], tradesList: null, live, off,
+    setHtml: (el, h) => { el.innerHTML = h; }, keepScroll: (el, fn) => fn(), allTrades: () => (T.tradesList || T.trades).slice(), getTradeDb: () => T.db, escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), formatDate: (d) => d || '-', pctChangeSpan: (v) => '<i class="pc">' + v.toFixed(1) + '</i>',
+    completenessBadge: (c, w) => '<cb ' + c.complete + '/' + c.total + '>', prefSet: (k, v) => T.prefs.push([k, v]), ymdOf: () => '20261110', refreshIdeasBody: () => { T.ideas++; },
+    signalCol: () => (T.noSignalCol ? null : { get: async () => { if(T.signalFails) throw new Error('db'); return { docs: T.signalDocs }; }, doc: (id) => ({ set: async (d) => { T.signalWrites.push([id, d]); } }) }),
+    compareBy: (f, dir) => (a, b) => { const x = f(a), y = f(b); return (x == null ? 1 : y == null ? -1 : (x > y ? 1 : x < y ? -1 : 0)) * (dir === 'desc' ? -1 : 1); }, nextSort: (cur, id) => ({ col: id, dir: cur.col === id && cur.dir === 'asc' ? 'desc' : 'asc' }), sortHeaderHtml: (id, label) => '<th data-sort-col="' + id + '">' + label + '</th>',
+    addSignalPoint: (h, day, sig) => (h || []).concat([{ d: day, call: sig.call }]), callChanges: (h) => (h || []).map((x, i) => ({ call: x.call, ymd: '2026110' + i })).reverse(), factsFor: (t, l) => ({ price: l && l.valuation ? l.valuation.currentPrice : null }),
+    tradeSignal: () => ({ call: 'hold', label: 'Hold <i>', reasons: ['why <b>'] }) }, over || {});
+  const M = await loadAllStubbed('src/tradelog/panel.js', '', ['../core/evt.js']);
+  return { T, M, body: () => win.document.getElementById('tradeLogPanelBody'), flat: () => win.document.getElementById('tradeLogPanelBody').innerHTML.replace(/\s+/g, ' ') };
+};
+test('Trade Log panel: it says when the view is signed out or empty, lists open and closed trades as cards with returns, an average by entry verdict and names as text', () => withPage(TLP_PAGE, async (win) => {
+  const { T, M, body, flat } = await tlpSetup(win, { db: null }), $ = (q) => win.document.querySelector(q);
+  M.renderTradeLogPanel(); assert.ok(body().textContent.includes('needs a signed-in view'));
+  T.db = {}; T.tradesList = []; M.renderTradeLogPanel(); assert.ok(body().textContent.includes('No trades yet'));
+  T.tradesList = null; T.noSignalCol = true; M.renderTradeLogPanel();
+  assert.strictEqual(win.document.querySelectorAll('.tl-card').length, 4); assert.ok(!body().querySelector('b') || !body().querySelector('.tl-card-name b'));
+  assert.ok(body().querySelector('.tl-view-btn') === null && $('[data-tl-view="cards"]').classList.contains('active') && !$('[data-tl-view="table"]').classList.contains('active'));
+  assert.deepStrictEqual([...body().querySelectorAll('.tl-card-tk')].map((e) => e.textContent), ['OFF', 'AAA', 'ORPH', 'AAA']);   // newest purchase first
+  const h = flat(); assert.ok(h.includes('AAA &lt;i&gt;') && h.includes('data-tl-open="AAA"') && h.includes('Inactive') && h.includes('Realized return') && h.includes('<i class="pc">25.0</i>') && h.includes('Unrealized return') && h.includes('<i class="pc">20.0</i>') && h.includes('<span class="tl-live">'));
+  assert.ok(h.includes('Buy: <b>+22.5%</b> avg (2 trades)') && h.includes('Avoid: <b>-20.0%</b>') === false || h.includes('Avoid: <b>-20.0%</b> avg (1 trade)'));   // buy: 20% and 25%; avoid: 40 against 50
+  assert.ok(h.includes('data-tl-sell="t1"') && h.includes('data-tl-remove="t4"') && !h.includes('data-tl-sell="t4"') && h.includes('why &lt;b&gt;'));
+  assert.strictEqual(win.document.getElementById('tlTabPositions').textContent, 'Positions 3'); assert.ok(T.ideas >= 1);
+  T.tradesList = [T.trades[0]]; M.renderTradeLogPanel(); assert.ok(!body().querySelector('.data-chips'));   // one trade: no average
+  T.tradesList = [T.trades[2], T.trades[3]]; M.renderTradeLogPanel(); assert.ok(body().querySelector('.data-chips') === null || body().querySelector('.data-chips').textContent.includes('Buy'));   // a trade with no return is left out
+}));
+test('Trade Log panel: the table view sorts by a header, keeps the choice, and the phone layout switches Open and Closed and expands a row', () => withPage(TLP_PAGE, async (win) => {
+  const { T, M, body } = await tlpSetup(win, { noSignalCol: true }), $ = (q) => win.document.querySelector(q);
+  M.init_tradelog_phone(); M.tlSetView('table'); assert.deepStrictEqual(T.prefs, [['albaDashboard.tradeView.v1', 'table']]);
+  assert.ok(body().querySelector('.help-table') && $('[data-tl-view="table"]').classList.contains('active') && body().textContent.includes('Return'));
+  const names = () => [...body().querySelectorAll('.help-table tbody tr')].map((r) => r.querySelector('.analysis-lb-ticker').textContent + r.cells[1].textContent.slice(0, 10)).join('|');
+  assert.ok(names().startsWith('OFF2026-10-05')); M.tlSortBy('buyDate'); assert.ok(names().startsWith('AAA2026-08-01'));   // the same column again reverses it
+  M.tlSortBy('ret'); M.tlSortBy('name'); M.tlSortBy('status'); M.tlSortBy('entry'); M.tlSortBy('data'); M.tlSortBy('held'); M.tlSortBy('exit'); M.tlSortBy('call'); assert.strictEqual(body().querySelectorAll('.help-table tbody tr').length, 4);
+  T.tradesList = [T.trades[0], T.trades[1]]; M.tlSetView('cards'); assert.ok(body().textContent.includes('Unrealized'));   // all open: the table header would say Unrealized
+  T.tradesList = [T.trades[0], T.trades[1]]; M.tlSetView('table'); assert.ok(body().querySelector('thead').textContent.includes('Unrealized') && !body().querySelector('thead').textContent.includes('Return'));
+  T.tradesList = null; M.renderTradeLogPanel();
+  const phone = body().querySelector('.tl-phone'); assert.ok(phone.textContent.includes('Open 3') && phone.textContent.includes('Closed 1') && phone.querySelector('.tl-pstrip').textContent.includes('Invested') && phone.querySelectorAll('.tl-prow').length === 3);
+  $('[data-tl-status="closed"]').click(); assert.ok(body().querySelector('.tl-phone').textContent.includes('Win rate') && body().querySelectorAll('.tl-prow').length === 1);
+  T.tradesList = [T.trades[0]]; $('[data-tl-status="open"]').click(); const row = $('[data-tl-row="t1"]'); row.click(); assert.ok(row.classList.contains('open')); row.click(); assert.ok(!row.classList.contains('open'));
+  row.querySelector('.tl-prow-det').click(); assert.ok(row.classList.contains('open')); row.querySelector('.refresh-btn').click(); assert.ok(row.classList.contains('open'));   // a click on a button inside the row does not toggle it
+  $('.tabs-top [data-tl-tab="ideas"]').click(); assert.strictEqual($('#section-trackrecord').getAttribute('data-tl-tab'), 'ideas'); assert.ok($('.tabs-top [data-tl-tab="ideas"]').classList.contains('on') && !$('.tabs-top [data-tl-tab="positions"]').classList.contains('on'));
+  T.tradesList = [T.trades[3]]; M.renderTradeLogPanel(); $('[data-tl-status="closed"]').click(); assert.ok(body().textContent.includes('Sold') && body().textContent.includes('Exit score'));
+  T.tradesList = [T.trades[0]]; M.renderTradeLogPanel(); assert.ok(body().textContent.includes('No closed trades.'));   // the Closed tab stays selected, and nothing in the list is closed
+  win.document.getElementById('section-trackrecord').remove(); M.init_tradelog_phone();
+}));
+test('Trade Log panel: sparse and extreme trades (no name, no price, unknown verdict, losses in crores, gains in lakhs) are shown without breaking the cards, table or phone summary', () => withPage(TLP_PAGE, async (win) => {
+  const tr = (id, extra) => Object.assign({ _id: id, status: 'open', buy: { date: '2026-10-01', price: 100, quantity: 10 }, sell: null }, extra);
+  const list = [tr(undefined, { buy: undefined }), tr('s2', { ticker: 'ZED', buy: { date: '2026-10-02', price: 100000, quantity: 200, snapshot: { score: 3, verdict: 'weird' } }, status: 'closed', sell: { date: '2026-10-09', price: 5, realizedReturnPct: -99, snapshot: { verdict: 'weird' } } }),
+    tr('s3', { ticker: 'WIN', buy: { date: '2026-10-03', price: 10, quantity: 100000, snapshot: { score: 9, verdict: 'weird' } }, status: 'closed', sell: { date: '2026-10-10', price: 15, realizedReturnPct: 50, holdingDays: 7 } }), tr('s4', { ticker: 'AAA', buy: { date: '2026-10-04', price: 100, quantity: 1e6 } }), tr('s5', { ticker: 'AAA', buy: { date: 'bad-date', price: 100, quantity: 2 } })];
+  const { T, M, body } = await tlpSetup(win, { tradesList: list, noSignalCol: true }), $ = (q) => win.document.querySelector(q);
+  M.init_tradelog_phone(); M.renderTradeLogPanel();
+  assert.strictEqual(win.document.querySelectorAll('.tl-card').length, 5); assert.ok(body().textContent.includes('weird: ') && body().textContent.includes('avg (2 trades)'));   // an unknown verdict is shown as it is
+  assert.ok(body().textContent.includes('—'));
+  $('[data-tl-status="closed"]').click(); const closedText = body().querySelector('.tl-phone').textContent;
+  assert.ok(closedText.includes('Win rate') && closedText.includes('1 of 2') && closedText.includes('Avg held') && closedText.includes('Cr') && closedText.includes('−'));
+  $('[data-tl-status="open"]').click(); const openText = body().querySelector('.tl-phone').textContent; assert.ok(openText.includes('Invested') && openText.includes('Cr'));
+  M.tlSetView('table'); for(const c of ['name', 'buyDate', 'status', 'entry', 'data', 'ret', 'held', 'exit', 'call']){ M.tlSortBy(c); M.tlSortBy(c); }
+  assert.strictEqual(body().querySelectorAll('.help-table tbody tr').length, 5);
+  T.tradesList = [tr('s6', { ticker: 'NOPX', buy: { date: '2026-10-04', price: 0, quantity: 0 } })]; M.renderTradeLogPanel(); $('[data-tl-status="open"]').click(); assert.ok(body().querySelector('.tl-phone').textContent.includes('Invested'));
+  T.tradesList = [tr('s7', { ticker: 'AAA', buy: { date: '2026-10-04', price: 200, quantity: 5 } })]; M.renderTradeLogPanel(); assert.ok(body().querySelector('.tl-phone').textContent.includes('−'));   // a loss against the live price
+  T.tradesList = [tr('s8', { ticker: 'AAA', buy: { date: '2026-10-04', price: 100, quantity: 5000 } }), tr('s9', { ticker: 'NOPE' })]; M.renderTradeLogPanel(); assert.ok(body().querySelector('.tl-phone').textContent.includes('L'));   // 5 lakh invested
+}));
+test('Trade Log panel: today\'s call is recorded once a day for open trades with a price, earlier changes are listed, and a failure only shows in the log', () => withPage(TLP_PAGE, async (win) => {
+  const { T, M, body } = await tlpSetup(win, { signalDocs: [{ id: 't1', exists: true, data: () => ({ history: [{ d: 'a', call: 'review' }, { d: 'b', call: 'add' }, { d: 'c', call: 'trim' }], notes: [{ d: '20261101', text: 'note <b>' }, { d: '20261102', text: 'two' }] }) }, { id: 'zz', exists: false }] });
+  M.renderTradeLogPanel(); await new Promise((r) => setImmediate(r)); await new Promise((r) => setImmediate(r));
+  assert.deepStrictEqual(T.signalWrites.map((w) => w[0]).sort(), ['t1', 't2']);   // open trades with a price; the unmatched and the closed ones are skipped
+  assert.ok(T.signalWrites.find((w) => w[0] === 't1')[1].history.length === 4 && T.signalWrites.find((w) => w[0] === 't1')[1].notes.length === 2);
+  const h = body().innerHTML; assert.ok(h.includes('Earlier:') && h.includes('Trimming') && h.includes('Adding') && h.includes('Review') && h.includes('note &lt;b&gt;') && !h.includes('note <b>'));
+  const n = T.signalWrites.length; M.renderTradeLogPanel(); await new Promise((r) => setImmediate(r)); assert.strictEqual(T.signalWrites.length, n);   // loaded once
+}));
+test('Trade Log panel: a failed call save is logged and does not stop the panel', () => withPage(TLP_PAGE, async () => {
+  const { T, M } = await tlpSetup({ document }, { signalFails: true });
+  await quietErrors(async (seen) => { M.renderTradeLogPanel(); await new Promise((r) => setImmediate(r)); await new Promise((r) => setImmediate(r)); assert.ok(seen.some((m) => m.includes('Trade calls were not saved'))); });
+}));
+test('Trade Log helpers: holding days between two dates, and the return of a trade', async () => {
+  const { M } = await alone(() => tlpSetup({ document: { getElementById: () => null } }));
+  assert.strictEqual(M.holdingDaysBetween('2026-10-01', '2026-10-31'), 30); assert.strictEqual(M.holdingDaysBetween('2026-10-31', '2026-10-01'), 0); assert.strictEqual(M.holdingDaysBetween('nope', '2026-10-01'), null); assert.strictEqual(M.holdingDaysBetween('2026-10-01', 'nope'), null);
+  assert.ok(M.holdingDaysBetween('2026-10-01', null) > 30);
+});
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
