@@ -70,64 +70,73 @@ function analysisLbCell(colId, ctx){
   if(!col || !col.num) return html;
   return /^<td class="/.test(html) ? html.replace('<td class="', '<td class="num ') : html.replace('<td', '<td class="num"');
 }
-function analysisLbCellRaw(colId, ctx){
-  const { s, i, idx, r, mosLabel, mosClass, price, pinned, scoreLabel, techWCell, techMCell } = ctx;
-  switch(colId){
-    case 'score': return !scoreLabel ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge badge--tight b-${s.verdict}">${scoreLabel}</span></td>`;
-    case 'techScore': {
-      const ts = s.technical && typeof s.technical.score === 'number' ? s.technical.score : null;
-      return ts === null ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge badge--tight b-${scoreBand(ts).replace('fs-', '')}">${ts.toFixed(1)}</span></td>`;
-    }
-    case 'pin': return `<td class="pin-col"><button type="button" class="pin-btn${pinned ? ' pinned' : ''}" data-ticker="${escapeHtml(s.ticker)}" title="${pinned ? 'Unpin' : 'Pin to top'}">${pinned ? '★' : '☆'}</button></td>`;
-    case 'rank': return `<td class="analysis-lb-rank">${i + 1}</td>`;
-    case 'stock': return `<td><a class="stock-link" href="${escapeHtml(stockShareLink(s))}"><span class="analysis-lb-name">${escapeHtml(s.name)}</span></a>${eventMark(s)}<span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}</span></td>`;
-    case 'industry': {
-      const m = industryMedianW(s);
-      const chg = m === null ? '' : `<span class="ind-w ${m > 0 ? 'chg-up' : m < 0 ? 'chg-down' : ''}" title="Median weekly change of this industry">${m > 0 ? '+' : ''}${m.toFixed(1)}% W</span> `;
-      return `<td class="analysis-lb-industry">${chg}${escapeHtml(tickerIndustry(s))}</td>`;
-    }
-    case 'mos': return `<td class="analysis-lb-mos ${mosClass}" data-live="mos">${mosLabel}</td>`;
-    case 'researched': {
-      const d = stockResearchAgeDays(s);
-      if(d === null) return '<td class="analysis-lb-researched rs-none" title="Not researched yet">Never</td>';
-      const cls = d <= 30 ? 'rs-fresh' : (d <= 90 ? 'rs-aging' : 'rs-old');
-      const label = d === 0 ? 'Today' : (d === 1 ? '1 day ago' : `${d} days ago`);
-      return `<td class="analysis-lb-researched ${cls}" title="Research saved ${escapeHtml(String(stockResearchAsof(s)))}">${label}</td>`;
-    }
-    case 'triggered': {
-      const sym = tickerSymbol(s);
-      const t = getResearchTriggers().get(sym);
-      const d = daysSinceDate(t);
-      // Research saved more recently than the last trigger (for example by Live Data Refresh, which does not stamp a trigger) counts as done then.
-      const savedDays = stockResearchAgeDays(s);
-      if(savedDays !== null && (d === null || savedDays < d)){
-        const savedLabel = savedDays === 0 ? 'Today' : (savedDays === 1 ? '1 day ago' : `${savedDays} days ago`);
-        return `<td class="analysis-lb-researched rs-fresh" title="Research saved ${escapeHtml(String(stockResearchAsof(s)))}">${savedLabel}</td>`;
-      }
-      if(d === null) return '<td class="analysis-lb-researched rs-none" title="Research has not been triggered from this page yet"></td>';
-      const kind = getResearchTriggerKinds().get(sym) || '';
-      if(kind !== 'full' && !priceLoaded.has(pcTickerKey(s))) analysisQueuePriceLoad(s);   // fetch time comes from priceHistory (lazy)
-      // Triggered, but the work it asked for has not been saved since: probably still pending.
-      const pending = (kind !== 'full' && !priceLoaded.has(pcTickerKey(s))) ? false : !researchTriggerDone(s, t, kind);
-      const label = d === 0 ? 'Today' : (d === 1 ? '1 day ago' : `${d} days ago`);
-      const when = new Date(t); const whenTxt = isNaN(when.getTime()) ? String(t) : when.toLocaleString();
-      const what = kind === 'price' ? 'price history only' : 'research';
-      return `<td class="analysis-lb-researched ${pending ? 'rs-aging' : 'rs-fresh'}" title="${escapeHtml(what)} triggered ${escapeHtml(whenTxt)}${pending ? ' - nothing saved since' : ' - saved afterwards'}">${label}${kind === 'price' ? ' &middot; price only' : ''}${pending ? ' &middot; awaiting save' : ''}</td>`;
-    }
-    case 'idea': return ideaCellHtml(s);
-    case 'news': return newsCellHtml(s);
-    case 'weekRsi': return `<td>${rsiText(r.weekRsi)}</td>`;
-    case 'monthRsi': return `<td>${rsiText(r.monthRsi)}</td>`;
-    case 'techW': return `<td>${techWCell}</td>`;
-    case 'techM': return `<td>${techMCell}</td>`;
-    case 'dayMacdBars': { const n = dayMacdBarsOf(s); return `<td>${n === null ? '' : n}</td>`; }
-    case 'weekChg': return `<td data-live="weekChg">${pctChangeSpan(r.weekPctChange)}</td>`;
-    case 'monthChg': return `<td data-live="monthChg">${pctChangeSpan(r.monthPctChange)}</td>`;
-    case 'price': return `<td data-live="price">${price}</td>`;
-    case 'screener': return `<td><a href="${screenerUrl(s)}" target="_blank" rel="noopener noreferrer" class="analysis-lb-link">Screener ↗</a></td>`;
-    case 'tv': return `<td><a href="${tvUrlFor(s)}" target="_blank" rel="noopener noreferrer" class="analysis-lb-link">TV ↗</a></td>`;
-    default: return '<td></td>';
+function lbTechScoreCell({ s }){
+  const ts = s.technical && typeof s.technical.score === 'number' ? s.technical.score : null;
+  return ts === null ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge badge--tight b-${scoreBand(ts).replace('fs-', '')}">${ts.toFixed(1)}</span></td>`;
+}
+function lbIndustryCell({ s }){
+  const m = industryMedianW(s);
+  const chg = m === null ? '' : `<span class="ind-w ${m > 0 ? 'chg-up' : m < 0 ? 'chg-down' : ''}" title="Median weekly change of this industry">${m > 0 ? '+' : ''}${m.toFixed(1)}% W</span> `;
+  return `<td class="analysis-lb-industry">${chg}${escapeHtml(tickerIndustry(s))}</td>`;
+}
+function lbResearchedCell({ s }){
+  const d = stockResearchAgeDays(s);
+  if(d === null) return '<td class="analysis-lb-researched rs-none" title="Not researched yet">Never</td>';
+  const cls = d <= 30 ? 'rs-fresh' : (d <= 90 ? 'rs-aging' : 'rs-old');
+  const label = d === 0 ? 'Today' : (d === 1 ? '1 day ago' : `${d} days ago`);
+  return `<td class="analysis-lb-researched ${cls}" title="Research saved ${escapeHtml(String(stockResearchAsof(s)))}">${label}</td>`;
+}
+function lbTriggeredCell({ s }){
+  const sym = tickerSymbol(s);
+  const t = getResearchTriggers().get(sym);
+  const d = daysSinceDate(t);
+  // Research saved more recently than the last trigger (for example by Live Data Refresh, which does not stamp a trigger) counts as done then.
+  const savedDays = stockResearchAgeDays(s);
+  if(savedDays !== null && (d === null || savedDays < d)){
+    const savedLabel = savedDays === 0 ? 'Today' : (savedDays === 1 ? '1 day ago' : `${savedDays} days ago`);
+    return `<td class="analysis-lb-researched rs-fresh" title="Research saved ${escapeHtml(String(stockResearchAsof(s)))}">${savedLabel}</td>`;
   }
+  if(d === null) return '<td class="analysis-lb-researched rs-none" title="Research has not been triggered from this page yet"></td>';
+  const kind = getResearchTriggerKinds().get(sym) || '';
+  if(kind !== 'full' && !priceLoaded.has(pcTickerKey(s))) analysisQueuePriceLoad(s);   // fetch time comes from priceHistory (lazy)
+  // Triggered, but the work it asked for has not been saved since: probably still pending.
+  const pending = (kind !== 'full' && !priceLoaded.has(pcTickerKey(s))) ? false : !researchTriggerDone(s, t, kind);
+  const label = d === 0 ? 'Today' : (d === 1 ? '1 day ago' : `${d} days ago`);
+  const when = new Date(t); const whenTxt = isNaN(when.getTime()) ? String(t) : when.toLocaleString();
+  const what = kind === 'price' ? 'price history only' : 'research';
+  return `<td class="analysis-lb-researched ${pending ? 'rs-aging' : 'rs-fresh'}" title="${escapeHtml(what)} triggered ${escapeHtml(whenTxt)}${pending ? ' - nothing saved since' : ' - saved afterwards'}">${label}${kind === 'price' ? ' &middot; price only' : ''}${pending ? ' &middot; awaiting save' : ''}</td>`;
+}
+function lbDayMacdBarsCell({ s }){
+  const n = dayMacdBarsOf(s); return `<td>${n === null ? '' : n}</td>`;
+}
+// One small function per column; each gets the row's context and returns the cell.
+/** @type {Map<string, (ctx: any) => string>} */
+const LB_CELLS = new Map([
+  ['score', ({ s, scoreLabel }) => !scoreLabel ? '<td class="analysis-lb-score"></td>' : `<td class="analysis-lb-score"><span class="badge badge--tight b-${s.verdict}">${scoreLabel}</span></td>`],
+  ['techScore', lbTechScoreCell],
+  ['pin', ({ s, pinned }) => `<td class="pin-col"><button type="button" class="pin-btn${pinned ? ' pinned' : ''}" data-ticker="${escapeHtml(s.ticker)}" title="${pinned ? 'Unpin' : 'Pin to top'}">${pinned ? '★' : '☆'}</button></td>`],
+  ['rank', ({ i }) => `<td class="analysis-lb-rank">${i + 1}</td>`],
+  ['stock', ({ s }) => `<td><a class="stock-link" href="${escapeHtml(stockShareLink(s))}"><span class="analysis-lb-name">${escapeHtml(s.name)}</span></a>${eventMark(s)}<span class="analysis-lb-ticker">${escapeHtml(tickerSymbol(s))}</span></td>`],
+  ['industry', lbIndustryCell],
+  ['mos', ({ mosLabel, mosClass }) => `<td class="analysis-lb-mos ${mosClass}" data-live="mos">${mosLabel}</td>`],
+  ['researched', lbResearchedCell],
+  ['triggered', lbTriggeredCell],
+  ['idea', ({ s }) => ideaCellHtml(s)],
+  ['news', ({ s }) => newsCellHtml(s)],
+  ['weekRsi', ({ r }) => `<td>${rsiText(r.weekRsi)}</td>`],
+  ['monthRsi', ({ r }) => `<td>${rsiText(r.monthRsi)}</td>`],
+  ['techW', ({ techWCell }) => `<td>${techWCell}</td>`],
+  ['techM', ({ techMCell }) => `<td>${techMCell}</td>`],
+  ['dayMacdBars', lbDayMacdBarsCell],
+  ['weekChg', ({ r }) => `<td data-live="weekChg">${pctChangeSpan(r.weekPctChange)}</td>`],
+  ['monthChg', ({ r }) => `<td data-live="monthChg">${pctChangeSpan(r.monthPctChange)}</td>`],
+  ['price', ({ price }) => `<td data-live="price">${price}</td>`],
+  ['screener', ({ s }) => `<td><a href="${screenerUrl(s)}" target="_blank" rel="noopener noreferrer" class="analysis-lb-link">Screener ↗</a></td>`],
+  ['tv', ({ s }) => `<td><a href="${tvUrlFor(s)}" target="_blank" rel="noopener noreferrer" class="analysis-lb-link">TV ↗</a></td>`]
+]);
+function analysisLbCellRaw(colId, ctx){
+  const cell = LB_CELLS.get(colId);
+  return cell ? cell(ctx) : '<td></td>';
 }
 // v1.321: the Buy / Sell column: the call as a tag (a stock you hold shows its Trade Log call) and the rank in the strategy, from the saved Process result.
 const IDEA_BADGE = { 'Buy': 'b-buy', 'Add more': 'b-buy', 'Wait': 'b-hold', 'Hold': 'b-hold', 'Review': 'b-mbuy', 'Trim': 'b-avoid', 'Avoid': 'b-avoid' };
