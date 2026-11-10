@@ -2843,7 +2843,7 @@ async function loadAllStubbed(file, extra, keep, more){
   const src = fs.readFileSync(path.join(root, file), 'utf8'), stubs = {};
   for(const m of src.matchAll(/^import \{([^}]*)\} from '([^']+)';/gm)){
     if(keep.includes(m[2])) continue;
-    stubs[m[2]] = m[1].split(',').map((n) => n.trim().split(' as ')[0]).concat(m[2] === '../tv/connector.js' ? ['tvIsFatal'] : [], (more || {})[m[2]] || []).map((n) => TV_VALUES.has(n) ? `export const ${n} = globalThis.__T.${n};` : `export const ${n} = globalThis.__TVFN('${n}');`).join('\n');
+    stubs[m[2]] = [...new Set(m[1].split(',').map((n) => n.trim().split(' as ')[0]).concat(m[2] === '../tv/connector.js' ? ['tvIsFatal'] : [], (more || {})[m[2]] || []))].map((n) => TV_VALUES.has(n) ? `export const ${n} = globalThis.__T.${n};` : `export const ${n} = globalThis.__TVFN('${n}');`).join('\n');
   }
   return loadWithStubs(file, extra, stubs);
 }
@@ -5542,6 +5542,53 @@ test('live prices: a stock with no known symbol is looked up first, unreadable b
 }));
 test('live prices: a page without a search box has no button', () => liveRun({}, async ({ win, M, btn }) => {
   win.document.querySelector('.topbar-search').remove(); M.init_live_ticker(); assert.strictEqual(btn(), null);
+}));
+
+// ---- Stock events refresh (src/news/stockevents.js): TradingView dividend and results dates saved into news/events
+const evRun = async (over, list) => {
+  const realNow = Date.now; Date.now = () => new Date('2026-11-10T10:00:00+05:30').getTime();
+  try {
+    const sec = (d) => Math.floor(new Date(d + 'T00:00:00+05:30').getTime() / 1000), saved = [], changes = [], calls = [];
+    const T = globalThis.__T = Object.assign({ mcp: true, calls, saved, db: null, cached: { A: 'NSE:AAA', B: 'BSE:BBB', C: 'NSE:CCC' }, resolved: [], fatal: false,
+      dbCapabilityPromise: null, tvMcp: async () => T.mcp, tvIstDate: (x) => new Date((x + 19800) * 1000).toISOString().slice(0, 10), tvErrorText: (e) => e.message, tvIsFatal: (e) => /fatal/.test(e.message),
+      isinSymbolCached: (s) => T.cached[s.name], resolveIsinSymbols: async (l) => { T.resolved.push(l.length); if(T.resolveFails) throw new Error(T.resolveFails); }, tickerSymbol: (s) => s.name + 'T',
+      tvCall: async (tool, a) => { calls.push(tool); if(tool === 'mcp-tv-get-dividends-calendar') return { data: [{ symbol: 'NSE:AAA', dividend_ex_date_upcoming: '2026-11-20', dividend_amount_upcoming: 5 }, { symbol: 'BSE:OTHER', dividend_ex_date_upcoming: '2026-11-21' }, null, { symbol: 7 }] };
+        if(T.batchFails) throw new Error(T.batchFails); return { data: { 'NSE:AAA': { earnings_release_next_date: sec('2026-12-01') }, 'BSE:BBB': { earnings_release_next_date: sec('2027-06-01') }, 'NSE:CCC': { earnings_release_next_date: 0 } } }; } }, over || {});
+    T.dbCapabilityPromise = T.db === undefined ? null : T.db;
+    const M = await loadAllStubbed('src/news/stockevents.js', '', ['./model.js']);
+    const stocks = list || [{ name: 'A' }, { name: 'B' }, { name: 'C' }];
+    await M.refreshStockEvents(stocks, () => changes.push(M.getEventsRun().state));
+    return { T, run: M.getEventsRun(), changes, M, stocks };
+  } finally { Date.now = realNow; }
+};
+const evDb = (existing) => { const log = []; return { log, doc: (p) => ({ get: async () => ({ exists: !!existing, data: () => existing }), update: async (u) => { log.push(['update', u]); }, set: async (u) => { log.push(['set', u]); } }) }; };
+test('stock events refresh: dividend and results dates in the next 90 days are matched to the stocks and saved beside the existing items', () => alone(async () => {
+  const db = evDb({ items: [{ ticker: 'KEEP', type: 'board', date: '2026-12-05', text: 'Board meeting' }], tvAt: 'x' });
+  const { run, changes, T } = await evRun({ db });
+  assert.strictEqual(run.state, 'done'); assert.deepStrictEqual(changes.slice(0, 3), ['running', 'running', 'running']);
+  assert.ok(run.msg.includes('Checked 3 of 3 stocks: 1 dividend date and 1 results date in the next 90 days'));   // the 2027 date is outside the window; 0 is no date
+  assert.ok(!run.msg.includes('skipped') && !run.msg.includes('failed'));
+  const [kind, upd] = db.log[0]; assert.strictEqual(kind, 'update');
+  assert.deepStrictEqual(upd.items.map((x) => x.ticker + ':' + x.type).sort(), ['AT:dividend', 'AT:results', 'KEEP:board']);
+  assert.ok(T.calls.includes('mcp-tv-get-symbol-data-batch'));
+}));
+test('stock events refresh: a first save creates the record, missing symbols are looked up and skipped, a failed results call is counted and a full dividend page is noted', () => alone(async () => {
+  const db = evDb(null);
+  const { run, T } = await evRun({ db, cached: { A: 'NSE:AAA' }, batchFails: 'timeout' });
+  assert.strictEqual(db.log[0][0], 'set');
+  assert.ok(run.msg.includes('Checked 1 of 3 stocks') && run.msg.includes('2 skipped (no TradingView symbol yet)') && run.msg.includes('1 results call failed') && !run.msg.includes('limit'));
+  assert.deepStrictEqual(T.resolved, [0, 2]);   // the saved list is loaded, then the two missing stocks are searched
+  const many = await evRun({ db: evDb(null), tvCall: async (tool) => (tool === 'mcp-tv-get-dividends-calendar' ? { data: Array.from({ length: 200 }, () => null) } : { data: {} }) });
+  assert.ok(many.run.msg.includes('200 dividends (its limit)') && many.run.msg.includes('0 dividend dates and 0 results dates'));
+  const one = await evRun({ db: evDb(null), cached: { A: 'NSE:AAA' } }, [{ name: 'A' }]); assert.ok(one.run.msg.includes('1 dividend date and'));
+}));
+test('stock events refresh: it stops with a plain message when the connector, the database or any symbol is missing, or a fatal error occurs', () => alone(async () => {
+  assert.strictEqual((await evRun({ mcp: false, db: evDb(null) })).run.msg, 'The TradingView connector is not available in this view.');
+  assert.strictEqual((await evRun({ db: null })).run.msg, 'The database is not available in this view.');
+  assert.ok((await evRun({ db: evDb(null), cached: {} })).run.msg.includes('None of these stocks has a TradingView symbol yet'));
+  assert.strictEqual((await evRun({ db: evDb(null), cached: {}, resolveFails: 'search broke' })).run.state, 'error');   // a plain failure to resolve is ignored: still no symbols
+  assert.ok((await evRun({ db: evDb(null), cached: {}, resolveFails: 'fatal login' })).run.msg.includes('fatal login'));
+  assert.ok((await evRun({ db: evDb(null), batchFails: 'fatal login' })).run.msg.includes('fatal login'));   // a fatal results error aborts instead of counting
 }));
 
 (async () => {
