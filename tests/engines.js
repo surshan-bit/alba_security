@@ -4080,6 +4080,168 @@ test('watchlist picker: a page without the picker is left alone', () => wlPage(a
   (await wlLoad()).renderWlPicker();
 }, ''));
 
+// ---- Strategies section (src/strategies/section.js): the three panels of the page, and every click, key and change the section reacts to
+TV_VALUES.add('kit'); TV_VALUES.add('appSections');
+const SECTION_EXPORTS = 'export { mainHtml, kitBarHtml, selected, folds, syncSelected }; export const __filters = () => stratFiltersOpen; export const __select = () => selectMode;';
+const secEscape = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+const secStrategy = (over) => Object.assign({ id: 's1', name: 'Quality <b>', note: 'a note', published: true, goal: { target: 5, days: 30 }, learned: '', rules: ['A1', 'A2', 'blank'] }, over);
+// Loads the module with every import stood in for (the shared event helpers load for real); the test's own calls are in T.calls.
+const secSetup = async (over) => {
+  const T = globalThis.__T = { calls: [], shown: [], renders: 0, stocks: [{ ticker: 'A1' }, { ticker: 'A2' }, { ticker: 'A3' }], strategies: [], appSections: { strategies: 'SECTION' }, sel: secStrategy(), confirm: true,
+    kit: { defineScope: (name, o) => T.calls.push(['scope', name, o.label, o.stocks().length]), barHtml: (n) => '<bar ' + n + '>', selbarSlot: (n) => '<slot ' + n + '>', useExternalSelection: (n, fn) => { T.external = fn; }, selectionChanged: () => T.calls.push(['selectionChanged']) },
+    escapeHtml: secEscape, tickerSymbol: (s) => s.ticker, pcTickerKey: (s) => 'k' + s.ticker, qualifyingStocks: (u, rules) => u.filter((s) => rules.includes(s.ticker)), ruleReady: (r) => r !== 'blank',
+    selectedStrategy: () => T.sel, orderedPicks: (x) => x, resultsHtml: (m, sel) => '<res ' + m.length + ' sel=' + sel.size + '>', whyDatalist: () => '<dl>', whyHtml: (q, r) => '<why ' + q + ' ' + r.length + '>', trackPanelHtml: () => '<track>', rulesEditorHtml: () => '<rules>',
+    sheetFrame: (x) => '<sheet>' + x + '</sheet>', getStrategiesStatus: () => 'saved', filtersOpenSaved: () => false, dropMenuHtml: () => '<menu>', cleanGoal: (g) => ({ target: g.target + 0, days: g.days + 0 }),
+    keepScroll: (el, fn) => { T.renders++; T.drawn = fn; }, setHtml: (el, html) => { T.shown.push([el.id, html]); }, askConfirm: async (text, ok) => { T.calls.push(['confirm', text, ok]); return T.confirm; }, openStockInline: (...a) => T.calls.push(['open', ...a]) };
+  for(const n of ['addStrategy', 'restoreStarters', 'saveStrategies', 'resetResultsRows', 'showMoreResults', 'renderTrackPanel']) T[n] = () => T.calls.push([n]);
+  for(const n of ['deleteStrategy', 'duplicateStrategy', 'selectStrategy', 'sortResultsBy', 'rememberFiltersOpen', 'forgetLearned']) T[n] = (...a) => T.calls.push([n, ...a.map((x) => (x && x.id) || x)]);
+  for(const n of ['wireRulesEditor', 'wireLearnPanel', 'wireTrackPanel']) T[n] = (sec, get, cb) => T.calls.push([n, typeof get, typeof cb]);
+  Object.assign(T, over || {});
+  const M = await loadAllStubbed('src/strategies/section.js', SECTION_EXPORTS + ' export { init_strategies_section as __init };', ['../core/evt.js'], {});
+  return { T, M };
+};
+const secPage = (html, fn, media) => withPage(html, async (win) => {
+  const had = { window: globalThis.window };
+  win.matchMedia = media || (() => ({ matches: false, addEventListener(){} })); globalThis.window = win;
+  try { await fn(win); } finally { if(had.window === undefined) delete globalThis.window; else globalThis.window = had.window; }
+});
+
+test('strategies section: with no strategy it asks for one, otherwise it draws the phone bar, setup, picks, track and why panels in that order', () => secPage('', async () => {
+  const { T, M } = await secSetup();
+  assert.strictEqual(M.mainHtml(null), '<div class="strat-empty">Create a strategy to get started.</div>');
+  const html = M.mainHtml(T.sel), at = (s) => html.indexOf(s);
+  assert.ok(at('strat-phonebar') >= 0 && at('strat-phonebar') < at('Strategy setup') && at('Strategy setup') < at('stratCount') && at('stratCount') < at('<track>') && at('<track>') < at('Why is a stock in or out?'), 'panel order');
+  assert.ok(html.includes('value="Quality &lt;b>"') && html.includes('Published') && html.includes('gain at least 5% within 30 days') && html.includes('3 rules'));   // a hostile name stays text
+  assert.ok(html.includes('Showing <b id="stratCount">2</b> of 3 stocks') && html.includes('1 rule not applied yet') && html.includes('<res 2 sel=0>') && html.includes('<bar strat>') && html.includes('<slot strat>') && html.includes('<why  3>'));
+  assert.deepStrictEqual(T.calls, [['scope', 'strat', 'picks', 2]]);   // the refresh bar is told which picks it works through
+  assert.ok(html.includes('\n    <div class="analysis-panel strat-panel">\n      <div class="strat-result-head') && html.includes('</div>\n    <track>\n    <div class="analysis-panel strat-panel">'));
+}));
+
+test('strategies section: the panels follow the strategy: unpublished, one rule, nothing qualifying, a note on why it was learned, filters open', () => secPage('', async () => {
+  const { T, M } = await secSetup({ filtersOpenSaved: () => true, getStrategiesStatus: () => 'failed' });
+  const html = M.mainHtml(secStrategy({ published: false, rules: ['ZZ'], learned: 'Learned <i>', goal: { target: 8, days: 14 } }));
+  assert.ok(html.includes('Unpublished') && html.includes('1 rule<') && !html.includes('not applied yet') && html.includes('Showing <b id="stratCount">0</b>') && html.includes(' disabled ') && !html.includes('filters-collapsed'));
+  assert.ok(html.includes('<div class="strat-learned">Learned &lt;i></div>') && html.includes('Could not save to your account'));
+  assert.ok(M.mainHtml(secStrategy({ rules: ['A1'] })).includes('filters-collapsed') === false && T.calls.length === 2);
+}));
+
+const SECTION_DOM = `<section id="section-strategies" class="active"><div id="stratList"><div data-strat-pick="s2" id="pickCard"><b id="pickInner">x</b></div><button id="stratNew"></button><button id="stratRestore"></button></div>
+  <div id="stratMain"><button data-strat-phone="setup" id="phSetup" aria-pressed="false"></button><button data-strat-phone="track" id="phTrack"></button><button data-strat-phone="select" id="phSelect"></button><button data-strat-phone="other" id="phOther"></button>
+  <details class="strat-fold" data-fold="setup" open><summary id="foldSum">s</summary><span id="inFold"></span></details><details class="strat-fold" data-fold="extra"><summary>t</summary></details><p id="outsideFold"></p>
+  <button data-strat-filters="1" id="filt"><span id="filtInner"></span></button><button id="stratPub"></button><button id="stratDup"></button><button id="stratDel"></button><button id="stratTrackBtn">Track these picks</button>
+  <input id="stratName" value="  New name "><input id="goalTarget" value="7"><input id="goalDays" value="21"><input id="stratNote" value=" a note "><input id="stratWhy" value="TCS"><input id="stratOther" value="x"><div id="stratWhyOut"></div>
+  <div id="stratResults"><table><thead><tr><th><input type="checkbox" class="strat-sel" data-sym="*" id="tickAll"></th><th data-sort-col="name" id="sortName">Name</th></tr></thead><tbody><tr class="strat-row" data-idx="3" id="row"><td><input type="checkbox" class="strat-sel" data-sym="A1" id="tickA1"></td><td id="cell">x</td></tr>
+  <tr class="strat-row" data-idx="4"><td><input type="checkbox" class="strat-sel" data-sym="A2" id="tickA2"></td></tr></tbody></table><button data-strat-more="1" id="more"></button></div></div></section>`;
+const secClick = (win, id, type) => win.document.getElementById(id).dispatchEvent(new win.Event(type || 'click', { bubbles: true }));
+const secSettle = () => new Promise((r) => setTimeout(r, 0));
+
+test('strategies section: the list, the picks table and the strategy buttons act on the right strategy and redraw', () => secPage(SECTION_DOM, async (win) => {
+  const { T, M } = await secSetup();
+  M.__init();
+  const calls = () => { const c = T.calls.splice(0); return c.filter((x) => !String(x[0]).startsWith('wire')); };
+  T.calls.length = 0;
+  secClick(win, 'pickInner'); assert.deepStrictEqual(calls(), [['selectStrategy', 's2'], ['resetResultsRows']]); assert.strictEqual(T.renders, 1);
+  secClick(win, 'stratNew'); assert.deepStrictEqual(calls(), [['addStrategy']]);
+  secClick(win, 'stratRestore'); assert.deepStrictEqual(calls(), [['restoreStarters']]); assert.strictEqual(T.renders, 3);
+  secClick(win, 'more'); assert.deepStrictEqual(calls().map((c) => c[0]), ['showMoreResults']);   // the table is drawn again from the stocks that qualify
+  assert.deepStrictEqual(T.shown.pop(), ['stratResults', '<res 2 sel=0>']);
+  secClick(win, 'sortName'); assert.deepStrictEqual(calls(), [['sortResultsBy', 'name']]);
+  secClick(win, 'stratPub'); assert.strictEqual(T.sel.published, false); assert.deepStrictEqual(calls(), [['saveStrategies']]);
+  secClick(win, 'stratDup'); assert.deepStrictEqual(calls(), [['duplicateStrategy', 's1']]);
+  secClick(win, 'stratDel'); await secSettle(); assert.deepStrictEqual(calls(), [['confirm', 'Delete the strategy "Quality <b>"?', 'Delete'], ['deleteStrategy', 's1']]);
+  T.confirm = false; secClick(win, 'stratDel'); await secSettle(); assert.deepStrictEqual(calls(), [['confirm', 'Delete the strategy "Quality <b>"?', 'Delete']]);   // not confirmed: nothing is deleted
+  T.sel = null; T.renders = 0;
+  for(const id of ['more', 'sortName', 'stratPub', 'stratDup', 'stratDel']) secClick(win, id);
+  assert.deepStrictEqual([calls(), T.renders], [[], 0]);   // with no strategy these buttons do nothing
+}));
+
+test('strategies section: ticking a row, the "all" box and the clear button keep the ticked picks, the Track label and the refresh selection in step', () => secPage(SECTION_DOM, async (win) => {
+  const { T, M } = await secSetup({ trackLabel: undefined });
+  M.__init();
+  const doc = win.document, box = (id) => doc.getElementById(id), label = () => box('stratTrackBtn').textContent;
+  T.calls.length = 0;
+  box('tickA1').click();
+  assert.deepStrictEqual([...M.selected], ['A1']); assert.strictEqual(label(), 'Track 1 ticked pick'); assert.deepStrictEqual(T.calls, [['selectionChanged']]);
+  box('tickA1').click(); assert.strictEqual(M.selected.size, 0); assert.strictEqual(label(), 'Track these picks');
+  box('tickAll').click();   // every pick that qualifies, not only the rows on screen
+  assert.deepStrictEqual([...M.selected].sort(), ['A1', 'A2']); assert.strictEqual(label(), 'Track 2 ticked picks'); assert.ok(box('tickA2').checked && box('tickA1').checked);
+  box('tickAll').click(); assert.strictEqual(M.selected.size, 0); assert.ok(!box('tickA2').checked);
+  T.sel = null; box('tickAll').click(); assert.strictEqual(M.selected.size, 2); box('tickAll').click(); assert.strictEqual(M.selected.size, 0);   // no strategy: the boxes on screen still follow the head box
+  T.sel = secStrategy(); box('tickA2').click(); assert.deepStrictEqual([...M.selected], ['A2']);
+  doc.dispatchEvent(new win.CustomEvent('alba-rk-clear', { detail: { name: 'other' } })); assert.strictEqual(M.selected.size, 1);   // another list's clear button
+  doc.dispatchEvent(new win.CustomEvent('alba-rk-clear')); assert.strictEqual(M.selected.size, 1);
+  doc.dispatchEvent(new win.CustomEvent('alba-rk-clear', { detail: { name: 'strat' } }));
+  assert.ok(M.selected.size === 0 && !box('tickA2').checked && label() === 'Track these picks');
+  M.selected.add('A1'); assert.deepStrictEqual([...T.external()], ['kA1']);   // the refresh bar reads the ticked picks through this
+  T.sel = null; M.selected.add('A2'); doc.dispatchEvent(new win.CustomEvent('alba-rk-clear', { detail: { name: 'strat' } })); assert.strictEqual(M.selected.size, 0);
+}));
+
+test('strategies section: the phone buttons, the filters button and the folds open and close their blocks and remember it', () => secPage(SECTION_DOM, async (win) => {
+  const { T, M } = await secSetup();
+  M.__init();
+  const doc = win.document, fold = doc.querySelector('details[data-fold="setup"]');
+  T.calls.length = 0; T.renders = 0;
+  secClick(win, 'phSetup'); assert.deepStrictEqual([fold.open, doc.getElementById('phSetup').getAttribute('aria-pressed')], [false, 'false']);
+  secClick(win, 'phSetup'); assert.deepStrictEqual([fold.open, doc.getElementById('phSetup').getAttribute('aria-pressed')], [true, 'true']);
+  fold.remove(); secClick(win, 'phSetup');   // the block is not on the page: nothing to do
+  secClick(win, 'phTrack'); assert.deepStrictEqual([M.__filters(), T.calls, T.renders], [true, [['rememberFiltersOpen', 'sFiltersOpen', true]], 1]);
+  T.calls.length = 0; secClick(win, 'filtInner'); assert.deepStrictEqual([M.__filters(), T.calls, T.renders], [false, [['rememberFiltersOpen', 'sFiltersOpen', false]], 2]);
+  secClick(win, 'phSelect'); assert.deepStrictEqual([M.__select(), doc.getElementById('stratResults').classList.contains('selecting'), doc.getElementById('phSelect').getAttribute('aria-pressed')], [true, true, 'true']);
+  secClick(win, 'phSelect'); assert.strictEqual(M.__select(), false);
+  secClick(win, 'phOther'); assert.strictEqual(T.renders, 2);   // a button this version does not know
+}));
+
+test('strategies section: an open or closed block is remembered, and the section redraws when strategies reload, the status changes or the phone layout flips', () => {
+  let flip;
+  return secPage(SECTION_DOM, async (win) => {
+    const { T, M } = await secSetup();
+    M.__init();
+    const doc = win.document, extra = doc.querySelector('details[data-fold="extra"]'), setup = doc.querySelector('details[data-fold="setup"]');
+    extra.open = true; extra.dispatchEvent(new win.Event('toggle')); assert.deepStrictEqual([...M.folds].sort(), ['extra']);
+    setup.open = true; setup.dispatchEvent(new win.Event('toggle')); assert.deepStrictEqual([...M.folds].sort(), ['extra', 'setup']);
+    extra.open = false; extra.dispatchEvent(new win.Event('toggle')); assert.deepStrictEqual([...M.folds], ['setup']);
+    doc.getElementById('outsideFold').dispatchEvent(new win.Event('toggle', { bubbles: true })); assert.deepStrictEqual([...M.folds], ['setup']);   // not inside a block
+    T.renders = 0;
+    win.dispatchEvent(new win.Event('alba-strategies-reloaded')); assert.strictEqual(T.renders, 1);
+    doc.getElementById('section-strategies').classList.remove('active');
+    win.dispatchEvent(new win.Event('alba-strategies-reloaded')); flip(); assert.strictEqual(T.renders, 1);   // hidden: nothing to redraw
+    doc.getElementById('section-strategies').classList.add('active'); flip(); assert.strictEqual(T.renders, 2);
+  }, () => ({ matches: false, addEventListener: (type, fn) => { flip = fn; } }));
+});
+
+test('strategies section: pressing Enter on a row, or clicking it, opens that stock; other keys and clicks elsewhere do not', () => secPage(SECTION_DOM, async (win) => {
+  const { T, M } = await secSetup();
+  M.__init(); T.calls.length = 0;
+  const key = (id, k) => win.document.getElementById(id).dispatchEvent(new win.KeyboardEvent('keydown', { key: k, bubbles: true }));
+  key('cell', 'Enter'); assert.deepStrictEqual(T.calls, [['open', 'SECTION', 'Strategies', 3]]);
+  key('cell', 'a'); key('outsideFold', 'Enter'); assert.strictEqual(T.calls.length, 1);
+  secClick(win, 'cell'); assert.deepStrictEqual(T.calls[1], ['open', 'SECTION', 'Strategies', 3]);
+  secClick(win, 'outsideFold'); assert.strictEqual(T.calls.length, 2);
+}));
+
+test('strategies section: leaving a text box saves it: the name, goal, note and the stock to explain, each on the selected strategy only', () => secPage(SECTION_DOM, async (win) => {
+  const { T, M } = await secSetup();
+  M.__init(); T.calls.length = 0; T.renders = 0;
+  const out = () => T.shown.filter((x) => x[0] === 'stratWhyOut').pop()[1];
+  secClick(win, 'stratName', 'change'); assert.deepStrictEqual([T.sel.name, T.calls, T.renders], ['New name', [['saveStrategies']], 1]);
+  win.document.getElementById('stratName').value = '   '; T.calls.length = 0; secClick(win, 'stratName', 'change'); assert.strictEqual(T.sel.name, 'Untitled strategy');
+  T.calls.length = 0; secClick(win, 'goalTarget', 'change'); assert.deepStrictEqual([T.sel.goal, T.calls], [{ target: 7, days: 21 }, [['forgetLearned', 's1'], ['saveStrategies']]]);
+  T.calls.length = 0; secClick(win, 'goalDays', 'change'); assert.deepStrictEqual(T.calls, [['forgetLearned', 's1'], ['saveStrategies']]);
+  T.calls.length = 0; T.renders = 0; secClick(win, 'stratNote', 'change'); assert.deepStrictEqual([T.sel.note, T.calls, T.renders], ['a note', [['saveStrategies']], 0]);   // a note does not redraw
+  secClick(win, 'stratWhy', 'change'); assert.strictEqual(out(), '<why TCS 3>');
+  T.calls.length = 0; secClick(win, 'stratOther', 'change'); assert.deepStrictEqual(T.calls, []);   // a box it does not know
+  T.sel = null; for(const id of ['stratName', 'goalTarget', 'stratNote', 'stratWhy']) secClick(win, id, 'change');
+  assert.deepStrictEqual(T.calls, []);
+  assert.strictEqual(out(), '<why TCS 3>');
+}));
+
+test('strategies section: wiring leaves a page without the section alone, and hands the section to the rules, learn and track panels', () => secPage('', async (win) => {
+  const { T, M } = await secSetup();
+  M.__init(); assert.deepStrictEqual(T.calls, []);
+  win.document.body.innerHTML = '<section id="section-strategies"></section>';
+  M.__init(); assert.deepStrictEqual(T.calls, [['wireRulesEditor', 'function', 'function'], ['wireLearnPanel', 'function', 'function'], ['wireTrackPanel', 'function', 'function']]);
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
