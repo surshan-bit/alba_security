@@ -95,33 +95,54 @@ function moveLine(r){ const f = r.facts; return 'Price: last week ' + sign(f.wee
 function highLine(r){ const d = -r.facts.fromHigh; return d < 1 ? 'Near its 52-week high' : fixedOrNull(d, 0) + '% below its 52-week high'; }
 function valueLine(mos){ return mos != null && mos > 0 ? 'Priced ' + fixedOrNull(mos, 0) + '% below its fair value' : null; }
 
+// An open trade is judged by its own signal: add more, hold, trim or review.
+function heldCall(trade, f, base){
+  const sig = tradeSignal(f);
+  const call = sig.call === 'add' ? 'buy' : sig.call === 'hold' ? 'hold' : 'sell';
+  const label = { add: 'Add more', hold: 'Hold', trim: 'Trim', review: 'Review' }[sig.call];
+  return { ...base, call, label, held: true, reasons: sig.reasons };
+}
+// Why a stock whose weekly and monthly trends are not both up is in neither list (or has no history to judge).
+function noPickReasons(r){
+  if(!r) return ['no weekly price history yet (53 weeks are needed), so the next two weeks cannot be judged'];
+  if(!r.trend) return ['No MACD figures saved yet, so its trend is unknown (import the data)', moveLine(r)];
+  return [r.trend === 'down' ? 'The trend is down, so it is in neither list' : 'Weekly and monthly trends disagree, so it is in neither list', moveLine(r)];
+}
+// The notes that go with a pick (an early or short-history stock is less certain).
+function pickNotes(r, o, weeklyOnlyTrend){
+  if(r.trend === 'early') o.notes.unshift('Early-trend pick: the weekly trend is up but the monthly trend has not turned yet, so it is less confirmed than an Upward stock');
+  if(weeklyOnlyTrend) o.notes.unshift('Trend uses the weekly MACD only (no monthly figure yet)');
+  if(r.short) o.notes.unshift('Short history: only ' + r.weeks + ' weeks of prices, so the score is less certain');
+}
+// A stock with both trends up (or early): Buy in the top of the ranking unless something holds it back, Avoid in the bottom, otherwise Wait.
+function pickCall(r, o){
+  const reasons = [];
+  if(r.pct >= 100 - BUY_TOP){
+    if(!o.blocks.length) return { call: 'buy', reasons };
+    o.blocks.forEach(b => reasons.push('held back: ' + b));
+  } else if(r.pct <= AVOID_BOTTOM) return { call: 'sell', reasons };
+  return { call: 'hold', reasons };
+}
+// The call and reasons for a stock that is not held. Returns { call, reasons }.
+function openCall(r, o, mos, weeklyOnlyTrend){
+  if(!r || !r.trend || r.trend === 'mixed' || r.trend === 'down') return { call: 'hold', reasons: noPickReasons(r) };
+  pickNotes(r, o, weeklyOnlyTrend);
+  const { call, reasons } = pickCall(r, o);
+  reasons.unshift(rankLine(r), recordLine(r));
+  const v = valueLine(mos); if(v) reasons.push(v);
+  reasons.push(moveLine(r), highLine(r));
+  if(r.thin && !o.blocks.some(b => /thin trading/.test(b))) reasons.push('Trades thinly, so treat the score with care');
+  return { call, reasons };
+}
+
 // The call for one stock. `trade` is the open trade in it, or null; `read` is nextWeekRead's reading for the stock (null without enough weekly history).
 function ideaCall(stock, trade, read, today){
   const f = factsFor(trade || {}, stock);
   const mos = marginOfSafety(f.intrinsic, f.price);
   const r = read || null, o = risksOf(stock, today, f, mos);
   const base = { short: !!(r && r.short), blocked: o.blocks.length > 0, month: r ? r.facts.month : null, half: r ? r.facts.half : null, weeklyOnly: weeklyOnly(stock), trend: r ? r.trend || null : null, base: r ? r.base : null, mos, cap: o.cap, resultsIn: o.resultsIn, p: r ? r.p : null, pct: r ? r.pct : null, topPct: r ? r.topPct : null, up: r ? r.up : null, beat: r ? r.beat : null };
-  if(trade){
-    const sig = tradeSignal(f);
-    const call = sig.call === 'add' ? 'buy' : sig.call === 'hold' ? 'hold' : 'sell';
-    const label = { add: 'Add more', hold: 'Hold', trim: 'Trim', review: 'Review' }[sig.call];
-    return { ...base, call, label, held: true, reasons: sig.reasons };
-  }
-  const reasons = [];
-  let call = 'hold';
-  if(!r) reasons.push('no weekly price history yet (53 weeks are needed), so the next two weeks cannot be judged');
-  else if(!r.trend || r.trend === 'mixed' || r.trend === 'down') reasons.push(r.trend ? (r.trend === 'down' ? 'The trend is down, so it is in neither list' : 'Weekly and monthly trends disagree, so it is in neither list') : 'No MACD figures saved yet, so its trend is unknown (import the data)', moveLine(r));
-  else {
-    if(r.trend === 'early') o.notes.unshift('Early-trend pick: the weekly trend is up but the monthly trend has not turned yet, so it is less confirmed than an Upward stock');
-    if(base.weeklyOnly) o.notes.unshift('Trend uses the weekly MACD only (no monthly figure yet)');
-    if(r.short) o.notes.unshift('Short history: only ' + r.weeks + ' weeks of prices, so the score is less certain');
-    if(r.pct >= 100 - BUY_TOP) { if(o.blocks.length) o.blocks.forEach(b => reasons.push('held back: ' + b)); else call = 'buy'; }
-    else if(r.pct <= AVOID_BOTTOM) call = 'sell';
-    reasons.unshift(rankLine(r), recordLine(r));
-    const v = valueLine(mos); if(v) reasons.push(v);
-    reasons.push(moveLine(r), highLine(r));
-    if(r.thin && !o.blocks.some(b => /thin trading/.test(b))) reasons.push('Trades thinly, so treat the score with care');
-  }
+  if(trade) return heldCall(trade, f, base);
+  const { call, reasons } = openCall(r, o, mos, base.weeklyOnly);
   if(call !== 'sell') o.notes.forEach(x => reasons.push(x));
   return { ...base, call, label: { buy: 'Buy', hold: 'Wait', sell: 'Avoid' }[call], held: false, reasons };
 }
