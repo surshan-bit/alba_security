@@ -4412,6 +4412,15 @@ test('fundamental refresh: it cannot start without the database, Claude or the T
   fundSetup({}); const F4 = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS); globalThis.__F.tvCall = async () => { for(const c of globalThis.__F.aborts.values()) c.abort(); return { data: { ok: 1 } }; };
   await assert.rejects(F4.ldRunFundamental(richStock()), (e) => e && e.code === 'cancelled'); assert.strictEqual(globalThis.__F.aborts.size, 0);   // the stop switch is removed afterwards
 }));
+test('fundamental refresh: a factor-card call that fails is listed with its name and the other steps carry on; Stop during it ends the run', () => alone(async () => {
+  fundSetup({ tvCall: richTv, ask: async (prompt) => { if(/factor cards/.test(prompt)) throw new Error('cards boom'); return richAsk([])(prompt); } });
+  const F = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS);
+  const text = await F.ldRunFundamental(richStock());
+  assert.ok(/Not done: .*Traditional Analysis \(cards boom\).*Buffett-Style Analysis \(cards boom\)/.test(text), text);
+  fundSetup({ tvCall: richTv, ask: async (prompt) => { if(/factor cards/.test(prompt)) throw Object.assign(new Error('stopped'), { code: 'cancelled' }); return richAsk([])(prompt); } });
+  const F2 = await loadWithStubs('src/livedata/fundamental.js', '', FUND_STUBS);
+  await assert.rejects(F2.ldRunFundamental(richStock()), (e) => e && e.code === 'cancelled');
+}));
 const BATCH_STUBS = {
   '../core/util.js': 'export const sleep = () => new Promise((r) => setImmediate(r)), tickerSymbol = (s) => s.t;',
   '../analysis/section.js': 'export const refreshAnalysisSoon = () => { globalThis.__B.log.push("analysis"); };',
