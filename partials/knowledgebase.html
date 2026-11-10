@@ -268,7 +268,8 @@
       </ul>
             <h3>v1.370 &middot; 2026-11-10</h3>
             <ul>
-              <li><strong>Cleaner inside (nothing looks different, nothing is scored differently):</strong> the first step of Refresh all stocks, the full price history for stocks that have none, was taken apart into small, tested steps: working out who needs a download, giving each stock its bars a couple at a time, noting which ones failed and stopping when TradingView refuses every call. The order, the progress line and the list of stocks to skip next time are exactly as before; this was checked by running the old and the new code side by side on five cases.</li>
+              <li><strong>Cleaner inside (nothing looks different, nothing is scored differently):</strong> the last of the long, deeply nested and many-parameter pieces of code were taken apart into small, tested steps, in one release. This covers the first step of Refresh all stocks (full price history), the Explorer table and its heat map, the industry page and its charts, the Analysis section, the Industry Peers and Fundamental Score panels, the Global &amp; Macro panel, the Trade Log (its form, panel and the call shown for each stock), the live price sweep, the other-device view of a running refresh, Refresh Technical Info, Refresh stock events, the data freshness bars, the notification bell, the top bar search and the saved preferences. Every screen reads, sorts and saves exactly as before; where the old and new code could be compared on the same inputs they gave the same results.</li>
+              <li>Each of these parts now has automated checks, including checks that names and notes from outside are shown as text and never run as page code. The share of the code covered by those checks rose from about 59% to about 73% of lines.</li>
             </ul>
             <h3>v1.369 &middot; 2026-11-10</h3>
             <ul>
