@@ -266,6 +266,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.374 &middot; 2026-11-11</h3>
+            <ul>
+              <li><strong>Page stylesheets slimmed down:</strong> the rules written for single pages went from 83 to 65. Each rule was taken out in a real browser across every screen, open state and width; the 15 that changed nothing were deleted (some were left over from earlier clean-ups), and the Data Refresh page&rsquo;s own button rules were folded into the shared button rules. A comparison of every element on every screen before and after found no other difference.</li>
+              <li><strong>Two small visible changes:</strong> the filled (primary) buttons on the Data Refresh page now look switched off when they are disabled on a wide screen, as the design always intended (a page rule had been drawing them like enabled buttons); and the Browse button on a phone is a little narrower, matching the other buttons.</li>
+            </ul>
             <h3>v1.373 &middot; 2026-11-10</h3>
             <ul>
               <li><strong>Accessibility, checked by a program for the first time:</strong> every screen and open state (menus, the notification panel, search suggestions, a stock page, the Trade Log forms, an opened industry) is now scanned with axe-core at phone, tablet and desktop widths, and the keyboard is walked through each screen to confirm that every control shows where focus is. The first scan found 7,326 problems in 8 kinds; all are fixed, and the scan now runs with the other checks so none can come back.</li>
