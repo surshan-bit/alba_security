@@ -6305,6 +6305,19 @@ test('News page, Stock events: upcoming and recent events follow the chosen stra
   M.view.when = 'upcoming'; M.view.tab = 'macro';
 }));
 
+// ---- Stock page (src/detail/render.js): the page title is the one level-1 heading
+test('stock page: the stock name is the page\'s level-1 heading and is written as text', () => withPage('<div id="detail"></div>', async (win) => {
+  const S = [{ name: 'Acme <img src=x onerror=1>', ticker: 'AAA · NSE', liquidity: { marketCap: 5000 } }];
+  globalThis.__T = { stocks: S, detailEl: win.document.getElementById('detail'), escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), screenerUrl: () => 'https://www.screener.in/company/AAA/', isPinned: () => false, capClass: () => 'large', CAP_NAME: { large: 'Large cap' },
+    setHtml: (el, h) => { el.innerHTML = h; }, keepScroll: (el, fn) => fn(), LINK_ICON: '' };
+  TV_VALUES.add('CAP_NAME'); TV_VALUES.add('LINK_ICON');
+  const M = await loadAllStubbed('src/detail/render.js', '', []);
+  M.renderDetail(0);
+  const h1s = win.document.querySelectorAll('#detail h1'); assert.strictEqual(h1s.length, 1);
+  assert.ok(h1s[0].classList.contains('detail-name') && h1s[0].textContent === 'Acme <img src=x onerror=1>' && !win.document.querySelector('#detail img') && win.document.querySelector('.dc-tag').textContent === 'Large cap');
+  assert.strictEqual(M.getShownIndex(), 0);
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
