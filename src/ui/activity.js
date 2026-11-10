@@ -127,21 +127,28 @@ function activityDropWhere(test){
 }
 function setNoticeDismissHandler(fn){ onDismiss = fn; }
 
+// Takes notices off the list and tells the dismiss handler.
+function dismissNotices(gone){
+  render(); if(onDismiss) onDismiss(gone);
+}
+// A button in the panel: Clear all, View (opens the section), Stop (a running refresh) or Close (one notice).
+function onActivityClick(e){
+  const btn = closestEl(e, '[data-act]');
+  if(!btn) return;
+  const item = btn.closest('.activity-item'), act = btn.dataset.act;
+  if(act === 'clearall'){ const gone = notices; notices = []; dismissNotices(gone); return; }
+  if(!item) return;
+  const { id, section } = /** @type {HTMLElement} */ (item).dataset;
+  if(act === 'view'){ openSection(section); setOpen(false); return; }
+  if(act === 'stop'){ const r = running.get(id); if(r && r.onStop) r.onStop(); return; }
+  if(act === 'close'){ const gone = notices.filter(n => n.id === id); notices = notices.filter(n => n.id !== id); dismissNotices(gone); }
+}
+
 function init_ui_activity(){
   const bell = byId('activityBell'), panel = byId('activityPanel');
   if(!bell || !panel) return;
   bell.addEventListener('click', () => setOpen(!panelOpen));
-  panel.addEventListener('click', (e) => {
-    const btn = closestEl(e, '[data-act]');
-    if(!btn) return;
-    const item = btn.closest('.activity-item'), act = btn.dataset.act;
-    if(act === 'clearall'){ const gone = notices; notices = []; render(); if(onDismiss) onDismiss(gone); return; }
-    if(!item) return;
-    const id = /** @type {HTMLElement} */ (item).dataset.id;
-    if(act === 'view'){ openSection(/** @type {HTMLElement} */ (item).dataset.section); setOpen(false); }
-    else if(act === 'stop'){ const r = running.get(id); if(r && r.onStop) r.onStop(); }
-    else if(act === 'close'){ const gone = notices.filter(n => n.id === id); notices = notices.filter(n => n.id !== id); render(); if(onDismiss) onDismiss(gone); }
-  });
+  panel.addEventListener('click', onActivityClick);
   document.addEventListener('mousedown', (e) => { if(panelOpen && !closestEl(e, '#activityWrap')) setOpen(false); });
   // Esc closes the panel first (capture phase, and marked handled so "Back to ..." does not also act on it).
   document.addEventListener('keydown', (e) => {
