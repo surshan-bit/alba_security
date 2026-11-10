@@ -195,65 +195,72 @@ async function tlRemove(id){
   catch(e){ console.error('Failed to remove trade', e); tellUser('Could not remove the trade. Please try again.'); }
 }
 
-function init_tradelog_form(){
+const REMOVE_CONFIRM_MS = 4000;
+// The Add / Sell form: Cancel, Save and the sell form's Close position button.
+function onFormClick(e){
+  const b = closestEl(e, 'button'); if(!b) return;
+  if(b.id === 'tlCancel'){ tlCloseForm(); return; }
+  if(b.id === 'tlSave'){ tlSaveBuy(); return; }
+  if(b.id !== 'tlSellSave') return;
+  const f = b.closest('[data-tl-id]'); if(f) tlSaveSell(f.getAttribute('data-tl-id'));
+}
+// Typing in the stock box forgets the picked stock when the text no longer matches it, and refreshes the suggestions.
+function onStockInput(e){
+  if(targetEl(e).id !== 'tlStock') return;
+  if(tlSel && targetEl(e).value !== tlLabel(tlSel)) tlSel = null;
+  tlShowSugg();
+}
+// Arrow keys move through the suggestions, Enter picks one, Escape closes the list.
+function onStockKey(e){
+  if(targetEl(e).id !== 'tlStock') return;
+  const el = document.getElementById('tlSuggest');
+  if(!el || !el.classList.contains('show')) return;
+  if(e.key === 'Escape'){ tlHideSugg(); return; }
+  if(e.key === 'ArrowDown'){ e.preventDefault(); tlSetActive((tlActive + 1) % tlItems.length); return; }
+  if(e.key === 'ArrowUp'){ e.preventDefault(); tlSetActive((tlActive - 1 + tlItems.length) % tlItems.length); return; }
+  if(e.key === 'Enter' && tlActive >= 0){ e.preventDefault(); tlPick(tlItems[tlActive]); }
+}
+function wireFormHost(host){
+  host.addEventListener('click', onFormClick);
+  host.addEventListener('input', onStockInput);
+  host.addEventListener('focusin', (e) => { if(targetEl(e).id === 'tlStock') tlShowSugg(); });
+  host.addEventListener('focusout', (e) => { if(targetEl(e).id === 'tlStock') setTimeout(tlHideSugg, 120); });
+  host.addEventListener('keydown', onStockKey);
+  host.addEventListener('mousedown', (e) => {
+    const it = closestEl(e, '.sg-item'); if(!it) return;
+    e.preventDefault(); tlPick(tlItems[Number(it.dataset.i)]);
+  });
+}
+// Remove asks twice: the first press arms the button for a few seconds, the second removes the trade.
+function onRemovePress(b){
+  if(b.classList.contains('armed')){ tlRemove(b.getAttribute('data-tl-remove')); return; }
+  b.classList.add('armed'); b.textContent = 'Confirm remove?';
+  setTimeout(() => { if(b.isConnected){ b.classList.remove('armed'); b.textContent = 'Remove'; } }, REMOVE_CONFIRM_MS);
+}
+// A click in the trade table: a stock link, a column header, Sell or Remove.
+function onPanelClick(e){
+  const a = /** @type {Element} */ (e.target).closest('a[data-tl-open]');
+  if(a){
+    e.preventDefault();
+    const s = stockByTickerSymbolAny.get(a.getAttribute('data-tl-open')), idx = s ? stocks.indexOf(s) : -1;
+    if(idx >= 0) openStockInline(appSections.trackrecord, 'Trade Log', idx);
+    return;
+  }
+  const sh = closestEl(e, '[data-sort-col]');
+  if(sh){ tlSortBy(sh.dataset.sortCol || ''); return; }
+  const b = closestEl(e, 'button'); if(!b) return;
+  if(b.hasAttribute('data-tl-sell')) tlOpenSellForm(b.getAttribute('data-tl-sell'));
+  else if(b.hasAttribute('data-tl-remove')) onRemovePress(b);
+}
 
-(function(){
+function init_tradelog_form(){
   const addBtn = document.getElementById('tradeAddBtn');
   if(addBtn) addBtn.addEventListener('click', tlOpenAddForm);
   document.querySelectorAll('.tl-view-btn').forEach(b => b.addEventListener('click', () => tlSetView(b.getAttribute('data-tl-view'))));
   const host = document.getElementById('tradeFormHost');
-  if(host){
-    host.addEventListener('click', (e) => {
-      const b = closestEl(e, 'button'); if(!b) return;
-      if(b.id === 'tlCancel') tlCloseForm();
-      else if(b.id === 'tlSave') tlSaveBuy();
-      else if(b.id === 'tlSellSave'){ const f = b.closest('[data-tl-id]'); if(f) tlSaveSell(f.getAttribute('data-tl-id')); }
-    });
-    host.addEventListener('input', (e) => {
-      if(targetEl(e).id !== 'tlStock') return;
-      if(tlSel && targetEl(e).value !== tlLabel(tlSel)) tlSel = null;
-      tlShowSugg();
-    });
-    host.addEventListener('focusin', (e) => { if(targetEl(e).id === 'tlStock') tlShowSugg(); });
-    host.addEventListener('focusout', (e) => { if(targetEl(e).id === 'tlStock') setTimeout(tlHideSugg, 120); });
-    host.addEventListener('keydown', (e) => {
-      if(targetEl(e).id !== 'tlStock') return;
-      const el = document.getElementById('tlSuggest');
-      if(!el || !el.classList.contains('show')) return;
-      if(e.key === 'ArrowDown'){ e.preventDefault(); tlSetActive((tlActive + 1) % tlItems.length); }
-      else if(e.key === 'ArrowUp'){ e.preventDefault(); tlSetActive((tlActive - 1 + tlItems.length) % tlItems.length); }
-      else if(e.key === 'Enter' && tlActive >= 0){ e.preventDefault(); tlPick(tlItems[tlActive]); }
-      else if(e.key === 'Escape'){ tlHideSugg(); }
-    });
-    host.addEventListener('mousedown', (e) => {
-      const it = closestEl(e, '.sg-item'); if(!it) return;
-      e.preventDefault(); tlPick(tlItems[Number(it.dataset.i)]);
-    });
-  }
+  if(host) wireFormHost(host);
   const panel = document.getElementById('tradeLogPanelBody');
-  if(panel){
-    panel.addEventListener('click', (e) => {
-      const a = /** @type {Element} */ (e.target).closest('a[data-tl-open]');
-      if(a){
-        e.preventDefault();
-        const s = stockByTickerSymbolAny.get(a.getAttribute('data-tl-open')), idx = s ? stocks.indexOf(s) : -1;
-        if(idx >= 0) openStockInline(appSections.trackrecord, 'Trade Log', idx);
-        return;
-      }
-      const sh = closestEl(e, '[data-sort-col]');
-      if(sh){ tlSortBy(sh.dataset.sortCol || ''); return; }
-      const b = closestEl(e, 'button'); if(!b) return;
-      if(b.hasAttribute('data-tl-sell')) tlOpenSellForm(b.getAttribute('data-tl-sell'));
-      else if(b.hasAttribute('data-tl-remove')){
-        if(b.classList.contains('armed')){ tlRemove(b.getAttribute('data-tl-remove')); }
-        else {
-          b.classList.add('armed'); b.textContent = 'Confirm remove?';
-          setTimeout(() => { if(b.isConnected){ b.classList.remove('armed'); b.textContent = 'Remove'; } }, 4000);
-        }
-      }
-    });
-  }
-})();
+  if(panel) panel.addEventListener('click', onPanelClick);
 }
 
 export { init_tradelog_form };

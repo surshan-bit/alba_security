@@ -5642,6 +5642,97 @@ test('rules editor: Undo only works for the strategy it was made in, and with no
   T.noStrategy = false; T.st.rules.push({ field: 'mos', op: '>=', value: 3 }); root.querySelector('.sr-undo-btn').click(); assert.strictEqual(st.rules.length, 3);
 }));
 
+// ---- Trade Log forms (src/tradelog/form.js): add, sell and remove a trade, the stock suggestions and the table clicks
+const TL_PAGE = '<button id="tradeAddBtn">Add</button><button class="tl-view-btn" data-tl-view="open">Open</button><div id="tradeFormHost"></div><div id="tradeLogPanelBody"><a data-tl-open="AAA" href="#">A</a><span data-sort-col="ret">r</span><button data-tl-sell="t1">Sell</button><button data-tl-remove="t1">Remove</button><button>plain</button></div>';
+const tlSetup = async (win, over) => {
+  const A = { name: 'Acme <b>', ticker: 'AAA · NSE', valuation: { currentPrice: 50, intrinsicValue: 80 }, score: 7, verdict: 'buy' }, B = { name: 'Beta', ticker: 'BBB' };
+  const saved = [], removed = [], T = globalThis.__T = Object.assign({ stocks: [A, B], stockByTickerSymbolAny: new Map([['AAA', A]]), appSections: { trackrecord: 'sec' }, trades: {}, dbOk: true, saveFails: false, saved, removed, opened: [], views: [], sorts: [], told: [], msgs: [],
+    getTrade: (id) => T.trades[id], getTradeDb: () => (T.dbOk ? {} : null), tickerSymbol: (s) => String(s.ticker).split('·')[0].trim(), escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), formatDate: (d) => d,
+    marginOfSafety: (iv, p) => (iv && p ? Math.round((iv / p - 1) * 100) : null), fundamentalCompleteness: () => ({ complete: 3, total: 4 }), technicalCompleteness: () => ({ complete: 1, total: 2 }), buildSuggestions: (q) => T.stocks.filter((s) => s.name.toLowerCase().includes(q)),
+    sgMark: (t) => T.escapeHtml(t), holdingDaysBetween: () => 12, tlSetView: (v) => T.views.push(v), tlSortBy: (c) => T.sorts.push(c), tellUser: (m) => T.told.push(m), openStockInline: (...a) => T.opened.push(a), setHtml: (el, h) => { el.innerHTML = h; },
+    tradeCol: () => ({ doc: (id) => ({ set: async (r) => { if(T.saveFails) throw new Error('db'); saved.push([id, r]); }, delete: async () => { if(T.saveFails) throw new Error('db'); removed.push(id); } }) }) }, over || {});
+  return { T, A, B, M: await loadAllStubbed('src/tradelog/form.js', '', ['../core/evt.js']) };
+};
+const tlKey = (win, el, key) => el.dispatchEvent(new win.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+test('trade log form: the stock box suggests stocks as text, keys move through them, and saving a buy checks every field before storing the trade with a snapshot', () => kcPage(TL_PAGE, async (win) => {
+  const { T, A, M } = await tlSetup(win), doc = win.document, $ = (s) => doc.querySelector(s), type = (v) => { $('#tlStock').value = v; $('#tlStock').dispatchEvent(new win.Event('input', { bubbles: true })); };
+  win.HTMLElement.prototype.scrollIntoView = function(){};
+  const timers = [], realTimeout = globalThis.setTimeout; globalThis.setTimeout = (f, ms) => { timers.push(ms); return 1; };   // moving focus schedules the list to close; nothing may run after the test
+  try { await (async () => {
+  M.init_tradelog_form(); $('#tradeAddBtn').click(); assert.ok($('#tlStock') && doc.activeElement === $('#tlStock'));
+  $('#tradeFormHost').dispatchEvent(new win.Event('click')); $('#tlStock').dispatchEvent(new win.Event('focusin', { bubbles: true }));
+  type('a'); assert.ok($('#tlSuggest').classList.contains('show') && !$('#tlSuggest').querySelector('b') && $('#tlSuggest .sg-item'));   // names are text
+  tlKey(win, $('#tlStock'), 'ArrowDown'); assert.ok($('#tlSuggest .sg-item').classList.contains('active'));
+  tlKey(win, $('#tlStock'), 'ArrowUp'); tlKey(win, $('#tlStock'), 'ArrowDown');
+  tlKey(win, $('#tlStock'), 'x'); tlKey(win, $('#tlStock'), 'Escape'); assert.ok(!$('#tlSuggest').classList.contains('show'));
+  type('a'); tlKey(win, $('#tlStock'), 'Enter'); assert.ok($('#tlSuggest').classList.contains('show'));   // nothing chosen yet: Enter does nothing
+  tlKey(win, $('#tlStock'), 'ArrowDown'); tlKey(win, $('#tlStock'), 'Enter');
+  assert.deepStrictEqual([$('#tlStock').value, $('#tlPrice').value, doc.activeElement === $('#tlPrice')], ['Acme <b> (AAA)', '50', true]);
+  type('Acme <b> (AAA)'); assert.ok(!$('#tlSuggest').classList.contains('show'));   // the picked stock's own label asks nothing
+  type('zzz'); assert.ok(!$('#tlSuggest').classList.contains('show')); type('');
+  $('#tlSuggest').dispatchEvent(new win.Event('mousedown', { bubbles: true })); type('a'); $('#tlSuggest .sg-item').dispatchEvent(new win.Event('mousedown', { bubbles: true, cancelable: true })); assert.strictEqual($('#tlStock').value, 'Acme <b> (AAA)');
+  const msg = () => $('#tlMsg').textContent, save = () => { $('#tlSave').click(); return new Promise((r) => setImmediate(r)); };
+  $('#tlStock').value = 'nobody'; await save(); assert.strictEqual(msg(), 'Pick a stock from the suggestions.');
+  $('#tlStock').value = 'Acme <b> (AAA)'; $('#tlDate').value = ''; await save(); assert.strictEqual(msg(), 'Enter the buy date.');
+  $('#tlDate').value = '2026-11-03'; $('#tlPrice').value = '0'; await save(); assert.strictEqual(msg(), 'Enter a buy price above 0.');
+  $('#tlPrice').value = '50'; $('#tlQty').value = ''; await save(); assert.strictEqual(msg(), 'Enter a quantity of at least 1.');
+  $('#tlQty').value = '10'; T.trades['AAA-2026-11-03'] = {}; await save(); assert.ok(msg().includes('already exists'));
+  delete T.trades['AAA-2026-11-03']; T.dbOk = false; await save(); assert.ok(msg().includes('not reachable')); T.dbOk = true;
+  T.saveFails = true; await quietErrors(async () => { await save(); }); assert.ok(msg().includes('Could not save the trade') && !$('#tlSave').disabled); T.saveFails = false;
+  await save(); assert.strictEqual($('#tradeFormHost').textContent, '');   // the form closes
+  const [id, rec] = T.saved[0]; assert.strictEqual(id, 'AAA-2026-11-03'); assert.deepStrictEqual([rec.ticker, rec.status, rec.buy.quantity, rec.buy.snapshot.marginOfSafetyPct, rec.buy.snapshot.verdict], ['AAA', 'open', 10, 60, 'buy']);
+  $('#tradeAddBtn').click(); $('#tlStock').value = 'Beta'; $('#tlDate').value = '2026-11-04'; $('#tlPrice').value = '9'; $('#tlQty').value = '1'; await save(); assert.strictEqual(T.saved[1][1].buy.snapshot.currentPriceAtSnapshot, null);   // typed in full without picking
+  $('#tradeAddBtn').click(); $('#tlCancel').click(); assert.strictEqual($('#tradeFormHost').textContent, '');
+  timers.length = 0; $('#tradeAddBtn').click(); $('#tlStock').dispatchEvent(new win.Event('focusout', { bubbles: true })); assert.ok(timers.includes(120));   // the list closes shortly after the box loses focus
+  })(); } finally { globalThis.setTimeout = realTimeout; }
+}));
+test('trade log form: selling a position checks the date and price, closes it with the return, and the table links, sorts, view buttons and two-step remove work', () => kcPage(TL_PAGE, async (win) => {
+  const buy = { date: '2026-10-01', price: 40, quantity: 5, snapshot: {} };
+  const { T, M } = await tlSetup(win, { trades: { t1: { _id: 't1', ticker: 'AAA', name: 'Acme', status: 'open', buy, sell: null } } }), doc = win.document, $ = (s) => { const n = doc.querySelector(s); if(!n) throw new Error('no ' + s); return n; };
+  win.HTMLElement.prototype.scrollIntoView = function(){};
+  M.init_tradelog_form(); const settle = () => new Promise((r) => setImmediate(r));
+  $('[data-tl-sell]').click(); assert.ok($('#tlSellDate') && $('#tlSellPrice').value === '50' && $('.tl-form-title').textContent.includes('Sell: Acme'));
+  const msg = () => $('#tlMsg').textContent, close = async () => { $('#tlSellSave').click(); await settle(); };
+  $('#tlSellDate').value = '2026-09-01'; await close(); assert.ok(msg().includes('on or after the buy date'));
+  $('#tlSellDate').value = '2026-11-03'; $('#tlSellPrice').value = ''; await close(); assert.ok(msg().includes('above 0'));
+  $('#tlSellPrice').value = '60'; T.saveFails = true; await quietErrors(async () => { await close(); }); assert.ok(msg().includes('Could not save the sale') && !$('#tlSellSave').disabled); T.saveFails = false;
+  await close(); const rec = T.saved[0][1]; assert.deepStrictEqual([rec.status, rec.sell.price, rec.sell.realizedReturnPct, rec.sell.holdingDays, rec._id, rec.sell.snapshot.verdict], ['closed', 60, 50, 12, undefined, 'buy']);
+  T.dbOk = false; $('[data-tl-sell]').click(); $('#tlSellSave').click(); await settle(); T.dbOk = true; $('#tlCancel').click();
+  $('[data-tl-remove]').click(); assert.ok($('[data-tl-remove]').classList.contains('armed') && $('[data-tl-remove]').textContent === 'Confirm remove?');
+  $('[data-tl-remove]').click(); await settle(); assert.deepStrictEqual(T.removed, ['t1']);
+  T.saveFails = true; $('[data-tl-remove]').click(); await quietErrors(async () => { await settle(); }); assert.deepStrictEqual(T.told, ['Could not remove the trade. Please try again.']); T.saveFails = false;
+  T.dbOk = false; $('[data-tl-remove]').click(); await settle(); T.dbOk = true;
+  $('[data-tl-open]').click(); assert.strictEqual(T.opened.length, 1); assert.deepStrictEqual(T.opened[0], ['sec', 'Trade Log', 0]);
+  $('[data-tl-open]').setAttribute('data-tl-open', 'ZZZ'); $('[data-tl-open]').click(); assert.strictEqual(T.opened.length, 1);
+  $('[data-sort-col]').click(); assert.deepStrictEqual(T.sorts, ['ret']); $('.tl-view-btn').click(); assert.deepStrictEqual(T.views, ['open']);
+  $('#tradeLogPanelBody button:not([data-tl-sell]):not([data-tl-remove])').click(); $('#tradeLogPanelBody').click();
+}));
+test('trade log form: edge cases of the stock box, a typed full label, a stock without a price, and a sell form for a trade whose stock is gone', () => kcPage(TL_PAGE, async (win) => {
+  const { T, A, M } = await tlSetup(win, { trades: { gone: { ticker: 'ZZZ', name: '', status: 'open', buy: { date: '2026-10-01', price: 40, quantity: 5 }, sell: null } } }), doc = win.document, $ = (q) => doc.querySelector(q);
+  win.HTMLElement.prototype.scrollIntoView = function(){}; A.valuation = {}; A.ticker = 'AAA · NSE · extra';
+  const timers = [], real = globalThis.setTimeout; globalThis.setTimeout = (f, ms) => { timers.push(ms); return 1; };
+  try {
+    M.init_tradelog_form(); $('#tradeAddBtn').click();
+    tlKey(win, $('#tlSave'), 'ArrowDown'); $('#tlSave').dispatchEvent(new win.Event('input', { bubbles: true })); $('#tlSave').dispatchEvent(new win.Event('focusin', { bubbles: true })); $('#tlSave').dispatchEvent(new win.Event('focusout', { bubbles: true }));   // other controls: ignored
+    tlKey(win, $('#tlStock'), 'ArrowDown'); assert.ok(!$('#tlSuggest').classList.contains('show'));   // list closed: keys do nothing
+    $('#tlStock').value = 'a'; $('#tlStock').dispatchEvent(new win.Event('input', { bubbles: true })); tlKey(win, $('#tlStock'), 'ArrowDown'); tlKey(win, $('#tlStock'), 'Enter');
+    assert.strictEqual($('#tlPrice').value, '');   // no price known for the picked stock
+    $('#tlStock').value = 'Acme <b> (AAA)'; $('#tlDate').value = '2026-11-03'; $('#tlPrice').value = '5'; $('#tlQty').value = '2';
+    $('#tlStock').dispatchEvent(new win.Event('input', { bubbles: true })); $('#tlSave').click(); await new Promise((r) => setImmediate(r)); assert.strictEqual(T.saved.length, 1);   // a full label typed by hand is found
+    $('#tradeFormHost').dispatchEvent(new win.Event('click', { bubbles: true }));
+    $('#tradeAddBtn').click(); $('#tlStock').value = '  '; $('#tlSave').click(); await new Promise((r) => setImmediate(r)); assert.ok($('#tlMsg').textContent.includes('Pick a stock'));
+    $('#tlSave').closest('.tl-form').insertAdjacentHTML('beforeend', '<button id="other">x</button>'); $('#other').click();
+    T.trades.nothing = null; $('[data-tl-sell]').setAttribute('data-tl-sell', 'nothing'); $('[data-tl-sell]').click();
+    $('[data-tl-sell]').setAttribute('data-tl-sell', 'gone'); $('[data-tl-sell]').click(); assert.ok($('#tlSellPrice').value === '' && $('.tl-form-title').textContent.includes('Sell: ZZZ'));
+    $('#tlSellPrice').value = '10'; $('#tlSellSave').click(); await new Promise((r) => setImmediate(r)); assert.strictEqual(T.saved.at(-1)[1].sell.snapshot, null);   // the stock is gone: no snapshot
+  } finally { globalThis.setTimeout = real; }
+}));
+test('trade log form: an armed Remove button resets itself after a few seconds', () => kcPage(TL_PAGE, async (win) => {
+  const { M } = await tlSetup(win), timers = [], real = globalThis.setTimeout; globalThis.setTimeout = (f, ms) => { timers.push([f, ms]); return 1; };
+  try { M.init_tradelog_form(); const b = win.document.querySelector('[data-tl-remove]'); b.click(); assert.ok(b.classList.contains('armed')); timers.find(([f, ms]) => ms === 4000)[0](); assert.ok(!b.classList.contains('armed') && b.textContent === 'Remove'); }
+  finally { globalThis.setTimeout = real; }
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
