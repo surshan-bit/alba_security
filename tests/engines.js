@@ -5591,6 +5591,57 @@ test('stock events refresh: it stops with a plain message when the connector, th
   assert.ok((await evRun({ db: evDb(null), batchFails: 'fatal login' })).run.msg.includes('fatal login'));   // a fatal results error aborts instead of counting
 }));
 
+// ---- Rules editor (src/strategies/editor.js): the table of rules of a strategy and what every control in it does
+for(const n of ['FIELDS', 'FIELD_BY_ID', 'OPS']) TV_VALUES.add(n);
+const EDITOR_PAGE = '<div id="root"></div>';
+const editorSetup = async (win, rules) => {
+  const FIELDS = [{ id: 'mos', group: 'Fundamental', label: 'MoS <b>', type: 'num', unit: ' %' }, { id: 'name', group: 'Basics', label: 'Name', type: 'text' }, { id: 'verdict', group: 'Fundamental', label: 'Verdict', type: 'enum', options: [['buy', 'Buy', 'good'], ['hold', 'Hold']], noneLabel: 'None' }];
+  const st = { name: 'S', rules, learned: 'old' }, T = globalThis.__T = { FIELDS, FIELD_BY_ID: new Map(FIELDS.map((f) => [f.id, f])), OPS: { num: [['>=', 'at least'], ['between', 'between']], text: [['contains', 'contains']], enum: [['in', 'is one of']] }, stocks: [{}, {}], saves: 0, changes: 0, st,
+    escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), knownField: (map, id) => map.get(id) || { type: 'num' }, isNum: (v) => typeof v === 'number' && isFinite(v),
+    defaultRule: (id) => (id === 'verdict' ? { field: id, op: 'in', value: [] } : id === 'name' ? { field: id, op: 'contains', value: '' } : { field: id, op: '>=', value: null }),
+    withOp: (r, op) => (op === 'between' ? { ...r, op, value: [typeof r.value === 'number' ? r.value : null, null] } : { ...r, op, value: typeof r.value === 'number' ? r.value : null }),
+    ruleReady: (r) => (Array.isArray(r.value) ? r.value.some((x) => x !== null) : r.value !== null && r.value !== ''), describeRule: (r) => r.field + ' ' + r.op, testRule: () => ({ pass: true }), qualifyingStocks: (list, rs) => list.slice(0, 1), saveStrategies: () => { T.saves++; } };
+  const M = await loadAllStubbed('src/strategies/editor.js', '', []), root = win.document.getElementById('root');
+  const draw = () => { root.innerHTML = M.rulesEditorHtml(st); }; draw();
+  M.wireRulesEditor(root, () => T.noStrategy ? null : st, () => { T.changes++; draw(); });
+  const change = (el, value) => { el.value = value; el.dispatchEvent(new win.Event('change', { bubbles: true })); };
+  return { T, st, root, draw, change, M, click: (sel) => root.querySelector(sel).click() };
+};
+test('rules editor: the table is drawn as text with the passing counts and a total, and a change of field, condition or value updates the rule and clears what was learned', () => withPage(EDITOR_PAGE, async (win) => {
+  const { T, st, root, change } = await editorSetup(win, [{ field: 'mos', op: '>=', value: 10 }, { field: 'name', op: 'contains', value: '<img onerror=x>' }, { field: 'verdict', op: 'in', value: ['buy'] }]);
+  assert.ok(!root.querySelector('img') && !root.querySelector('option b') && root.querySelector('.sr-total').textContent.includes('3 rules together: 1 stock pass'));
+  assert.strictEqual(root.querySelectorAll('.sr-row').length, 3);
+  change(root.querySelector('.sr-row[data-i="0"] .sr-v1'), '25'); assert.deepStrictEqual([st.rules[0].value, st.learned, T.saves, T.changes], [25, '', 1, 1]);
+  change(root.querySelector('.sr-row[data-i="0"] .sr-v1'), ' '); assert.strictEqual(st.rules[0].value, null);   // an empty box is no value
+  change(root.querySelector('.sr-row[data-i="0"] .sr-v1'), 'abc'); assert.strictEqual(st.rules[0].value, null);
+  change(root.querySelector('.sr-row[data-i="1"] .sr-v1'), 'bank'); assert.strictEqual(st.rules[1].value, 'bank');   // text stays text
+  change(root.querySelector('.sr-row[data-i="0"] .sr-op'), 'between'); assert.deepStrictEqual(st.rules[0], { field: 'mos', op: 'between', value: [null, null] });
+  change(root.querySelector('.sr-row[data-i="0"] .sr-v1'), '5'); change(root.querySelector('.sr-row[data-i="0"] .sr-v2'), '9'); assert.deepStrictEqual(st.rules[0].value, [5, 9]);
+  change(root.querySelector('.sr-row[data-i="2"] .sr-field'), 'mos'); assert.deepStrictEqual(st.rules[2], { field: 'mos', op: '>=', value: null });
+  assert.ok(root.querySelector('.sr-row[data-i="2"] .sr-incomplete'));
+  change(root.querySelector('.sr-add'), 'name'); assert.strictEqual(st.rules.length, 4);   // a new rule
+  change(root.querySelector('.sr-add'), ''); assert.strictEqual(st.rules.length, 4);
+  const before = T.changes; root.dispatchEvent(new win.Event('change', { bubbles: true })); assert.strictEqual(T.changes, before);   // not from a row: ignored
+}));
+test('rules editor: rules move with the arrows, are removed with an Undo line, and enum choices switch on and off', () => withPage(EDITOR_PAGE, async (win) => {
+  const { T, st, root, click, change } = await editorSetup(win, [{ field: 'mos', op: '>=', value: 1 }, { field: 'mos', op: '>=', value: 2 }, { field: 'verdict', op: 'in', value: [] }]);
+  win.document.body.append(root); const focused = () => win.document.activeElement.className;
+  click('.sr-row[data-i="0"] .sr-down'); assert.deepStrictEqual(st.rules.map((r) => r.value), [2, 1, []]); assert.ok(focused().includes('sr-down'));
+  click('.sr-row[data-i="1"] .sr-up'); assert.deepStrictEqual(st.rules.map((r) => r.value), [1, 2, []]);
+  click('.sr-row[data-i="2"] .sr-up'); click('.sr-row[data-i="1"] .sr-up');   // the verdict rule moves to the top
+  assert.strictEqual(st.rules[0].field, 'verdict'); const n = T.changes;
+  const first = root.querySelector('.sr-row[data-i="0"] .sr-up'); first.disabled = false; first.click(); assert.strictEqual(T.changes, n);   // nothing above the first
+  click('.sr-row[data-i="0"] .sr-opt[data-v="buy"]'); assert.deepStrictEqual(st.rules[0].value, ['buy']); click('.sr-row[data-i="0"] .sr-opt[data-v="buy"]'); assert.deepStrictEqual(st.rules[0].value, []);
+  click('.sr-row[data-i="1"] .sr-del'); assert.strictEqual(st.rules.length, 2); assert.ok(root.querySelector('.sr-undo').textContent.includes('Removed') && !root.querySelector('.sr-undo b'));
+  click('.sr-undo-btn'); assert.deepStrictEqual(st.rules.map((r) => r.value), [[], 1, 2]); assert.ok(!root.querySelector('.sr-undo'));
+}));
+test('rules editor: Undo only works for the strategy it was made in, and with no strategy selected the table does nothing', () => withPage(EDITOR_PAGE, async (win) => {
+  const { T, st, root, click } = await editorSetup(win, [{ field: 'mos', op: '>=', value: 1 }, { field: 'name', op: 'contains', value: '' }]);
+  click('.sr-row[data-i="1"] .sr-del'); assert.ok(root.querySelector('.sr-undo').textContent.includes('Name'));   // an unfinished rule is named by its field
+  T.noStrategy = true; const n = T.changes; click('.sr-undo-btn'); assert.strictEqual(T.changes, n);
+  T.noStrategy = false; T.st.rules.push({ field: 'mos', op: '>=', value: 3 }); root.querySelector('.sr-undo-btn').click(); assert.strictEqual(st.rules.length, 3);
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
