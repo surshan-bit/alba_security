@@ -4583,6 +4583,109 @@ test('fundamental csv preview: symbols come from the NSE code, else the BSE code
   assert.strictEqual(U.processFundamentalCsvText('ISIN Code\nINE1'), null);   // an ISIN alone is not enough to match on
 }));
 
+// ---- Strategy learning (src/strategies/indicators.js, samples.js, learn.js): indicators, weekly samples and the rule search, on made-up prices
+const lnSeries = (() => {
+  let seed = 12345; const rnd = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+  const DAY = 86400, T0 = Date.UTC(2018, 0, 1) / 1000;
+  return (nWeeks, drift) => {
+    const week = [], month = []; let p = 100 + rnd() * 50;
+    for(let i = 0; i < nWeeks; i++){
+      const o = p; p = Math.max(5, p * (1 + (rnd() - 0.5) * 0.08 + drift)); const h = Math.max(o, p) * (1 + rnd() * 0.03), l = Math.min(o, p) * (1 - rnd() * 0.03);
+      week.push([T0 + i * 7 * DAY, o, h, l, p, 1000]);
+      if(i % 4 === 0) month.push([T0 + i * 7 * DAY, o, h, l, p, 4000]);
+    }
+    return { week, month, T0 };
+  };
+})();
+test('strategy learning: a peek at the next bar equals the reading once that bar has come, both before and after 14 bars of history', () => {
+  const I = load('src/strategies/indicators.js'), c = lnSeries(120, 0).week.map((b) => b[4]), ind = I.buildIndicators(c);
+  for(let i = 0; i < 90; i++){
+    const pk = I.peek(ind, i, c[i + 1]), rd = I.readingAt(ind, i + 1);
+    assert.strictEqual(String(pk.rsi), String(rd.rsi)); assert.strictEqual(pk.macd, rd.macd);
+  }
+  assert.ok(Number.isNaN(I.peek(ind, 0, c[1]).rsi) && I.peek(ind, 0, c[1]).macd === -1);   // too few bars for either reading yet
+});
+test('strategy learning: weekly samples count the news of their week, and a stock with too little history adds none', () => {
+  const S = load('src/strategies/samples.js'), L = lnSeries(80, 0), set = S.newSampleSet();
+  assert.strictEqual(S.addStockSamples(set, 0, { week: L.week.slice(0, 20), month: [], H: 4, target: 5, news: null }), 0);   // under the minimum history
+  assert.strictEqual(S.addStockSamples(set, 0, { week: null, month: [], H: 4, target: 5, news: null }), 0);
+  const weekAt = (i) => L.week[i][0], news = { first: weekAt(40), list: [{ t: weekAt(50) + 86400, s: 'pos' }, { t: weekAt(50) + 2 * 86400, s: 'pos' }, { t: weekAt(50) + 3 * 86400, s: 'neg' }, { t: weekAt(50) + 4 * 86400, s: 'other' }, { t: weekAt(10), s: 'neg' }] };
+  const n = S.addStockSamples(set, 3, { week: L.week, month: L.month, H: 4, target: 5, news });
+  assert.ok(n > 40 && set.n === n);
+  const d = S.finishSampleSet(set), at = (k) => Array.from(d.t).indexOf(weekAt(k));
+  assert.deepStrictEqual([d.np[at(50)], d.nn[at(50)], d.cov[at(50)], d.cov[at(30)], d.tk[at(50)]], [2, 1, 1, 0, 3]);   // two positive, one negative in that week; covered after the record began
+  assert.ok(Number.isNaN(d.mr[0]) || d.mr[0] >= 0);
+  const noMonth = S.newSampleSet(); S.addStockSamples(noMonth, 0, { week: L.week, month: [], H: 4, target: 5, news: null });
+  assert.ok(Array.from(S.finishSampleSet(noMonth).mm).every((x) => x === -1));   // no monthly bars: no monthly reading
+});
+test('strategy learning: the rule search keeps what the older samples support, checks it on the newest, and gives up on too little history', () => {
+  const S = load('src/strategies/samples.js'), Ln = load('src/strategies/learn.js'), set = S.newSampleSet();
+  for(let k = 0; k < 14; k++){ const L = lnSeries(300 + k * 3, (k % 3 - 1) * 0.002); S.addStockSamples(set, k, { week: L.week, month: L.month, H: 4, target: 6, news: null }); }
+  const data = S.finishSampleSet(set);
+  assert.ok(data.n > 3000);
+  const res = Ln.learnRules(data, 4);
+  assert.ok(res && res.samples === data.n && res.minN >= 60 && res.suggestions.length > 0 && res.suggestions.length <= 5 && res.from < res.cut && res.cut < res.to);
+  for(const sg of res.suggestions){
+    assert.ok(sg.rules.length >= 1 && sg.rules.length <= 3 && new Set(sg.rules.map((r) => r.field)).size === sg.rules.length);   // one condition per field, at most three
+    assert.ok(sg.train.n >= res.minN && sg.train.stocks >= 8 && sg.train.low > res.baseTrain.rate && typeof sg.holds === 'boolean');
+  }
+  const order = res.suggestions.map((sg) => (sg.holds ? 1 : 0)); assert.deepStrictEqual(order, order.slice().sort((a, b) => b - a));   // rules that held up come first
+  const few = Ln.learnRules(data, 4, { beam: 2, maxAtoms: 1, top: 2 });
+  assert.ok(few.suggestions.length <= 2 && few.suggestions.every((sg) => sg.rules.length === 1));
+  assert.strictEqual(Ln.learnRules(null, 4), null); assert.strictEqual(Ln.learnRules({ n: 100 }, 4), null);   // too few samples
+  const flat = Object.assign({}, data, { t: new Float64Array(data.n).fill(1.7e9) });   // all at one moment: nothing is old enough to learn from nor new enough to check
+  assert.strictEqual(Ln.learnRules(flat, 4), null);
+});
+
+// ---- Tracked picks and Claude's practice ideas (src/strategies/tracking.js, practice.js)
+test('tracked picks: a pick is judged against its goal price from the live price and the weekly highs, and a new high is remembered', () => alone(async () => {
+  const T = await loadWithStubs('src/strategies/tracking.js', 'export { evaluatePick };', { '../core/util.js': 'export const tickerSymbol = (s) => s.ticker;', './news.js': 'export const newsCounts = () => null;', '../identity/session.js': 'export const getIdentityDb = () => null, getUid = () => null;' });
+  const run = { startedAt: '2026-10-01', days: 30, target: 10 }, start = Date.UTC(2026, 9, 1), DAYMS = 86400000, endMs = start + 30 * DAYMS;
+  const bar = (dayOffset, high, close) => [(start + dayOffset * DAYMS) / 1000, 100, high, 95, close, 1];
+  const ev = (pick, o) => T.evaluatePick(run, pick, Object.assign({ weekBars: undefined, curPrice: undefined, nowMs: start + 10 * DAYMS }, o));
+  let e = ev({ entry: 100 });
+  assert.deepStrictEqual([e.status, e.hitMs, e.now, e.retNow, e.retBest, e.changed], ['open', null, null, null, 0, false]);   // nothing known yet
+  const pick = { entry: 100 };
+  e = ev(pick, { curPrice: 105 });
+  assert.deepStrictEqual([e.status, e.now, Math.round(e.retNow), Math.round(e.retBest), e.changed, pick.peak, /^\d{4}-\d\d-\d\d$/.test(pick.peakAt)], ['open', 105, 5, 5, true, 105, true]);   // a new high is remembered
+  assert.strictEqual(ev(pick, { curPrice: 103 }).changed, false); assert.strictEqual(pick.peak, 105);   // a lower price changes nothing
+  e = ev({ entry: 100 }, { curPrice: 111 });
+  assert.ok(e.status === 'hit' && e.hitMs >= start && e.changed);   // the price itself is above the goal
+  e = ev({ entry: 100 }, { weekBars: [bar(2, 104, 103), bar(9, 112, 110), bar(16, 130, 125)] });   // the goal was reached in the second week; later bars do not move the hit
+  assert.deepStrictEqual([e.status, e.hitMs, e.now, Math.round(e.retBest)], ['hit', start + 9 * DAYMS, 125, 30]);
+  e = ev({ entry: 100 }, { weekBars: [bar(2, 104, 103), bar(40, 200, 190)] });   // a bar after the window ends is ignored
+  assert.deepStrictEqual([e.status, Math.round(e.retBest), e.now], ['open', 4, 190]);
+  e = ev({ entry: 100 }, { weekBars: [bar(-3, 150, 104)] });   // the entry week: only its close counts, not its high
+  assert.deepStrictEqual([e.status, e.now, Math.round(e.retBest)], ['open', 104, 4]);
+  e = ev({ entry: 100 }, { weekBars: [bar(2, 104, 0)], curPrice: 102 }); assert.deepStrictEqual([e.now, Math.round(e.retNow)], [102, 2]);   // the live price wins over a bar's close
+  e = ev({ entry: 100 }, { weekBars: [bar(2, 104, 0)] }); assert.deepStrictEqual([e.now, e.retNow], [null, null]);   // a bar with no close gives no latest price
+  e = ev({ entry: 100, peak: 115, peakAt: '2026-10-10' }); assert.deepStrictEqual([e.status, e.hitMs], ['hit', Date.UTC(2026, 9, 10)]);   // the saved high had reached the goal
+  e = ev({ entry: 100, peak: 115, peakAt: '2026-09-20' }); assert.strictEqual(e.hitMs, start);   // ... but never before the run began
+  e = ev({ entry: 100, peak: 115 }); assert.strictEqual(e.hitMs, start + 10 * DAYMS);   // ... and with no date, now
+  e = ev({ entry: 100 }, { nowMs: endMs }); assert.strictEqual(e.status, 'miss');   // the time is up and the goal was not reached
+  e = ev({ entry: 100 }, { nowMs: endMs - 1 }); assert.strictEqual(e.status, 'open');
+  e = ev({ entry: 100 }, { curPrice: -5, weekBars: [] }); assert.deepStrictEqual([e.now, e.changed], [null, false]);   // not a price
+}));
+test('practice ideas: only rules that fit their field are kept, an idea needs two of them, and the numbers are checked', () => alone(async () => {
+  globalThis.__PR = { stocks: [{ n: 1 }, { n: 2 }, { n: 3 }] };
+  const FIELDS = new Map([['rsi', { id: 'rsi', type: 'num' }], ['verdict', { id: 'verdict', type: 'enum', options: [['buy', 'Buy'], ['hold', 'Hold']] }], ['trend', { id: 'trend', type: 'enum', options: [['up', 'Up']], noneLabel: 'None' }],
+    ['name', { id: 'name', type: 'text' }], ['price', { id: 'price', type: 'num' }]]);
+  globalThis.__PR.fields = FIELDS;
+  const P = await loadWithStubs('src/strategies/practice.js', 'export { cleanSet };', { '../core/util.js': 'export const escapeHtml = (t) => String(t);', '../core/stocks.js': 'export const stocks = globalThis.__PR.stocks;',
+    '../livedata/claude.js': 'export const ldAskJson = async () => ({}), ldEnsureClaudeAccess = async () => {}, ldErrText = (e) => e.message;', '../livedata/claudegate.js': 'export const claudeStepOn = () => true;',
+    './fields.js': 'export const FIELDS = [...globalThis.__PR.fields.values()], FIELD_BY_ID = globalThis.__PR.fields;',
+    './rules.js': 'export const OPS = { num: [[">=", "at least"], ["<=", "at most"], [">", "above"], ["<", "below"], ["between", "between"]] }, describeRule = () => "", qualifyingStocks = (u, rules) => u.slice(0, rules.length);', './state.js': 'export const saveStrategies = () => {};' });
+  const set = P.cleanSet({ name: 'N'.repeat(80), why: 'W'.repeat(300), rules: [
+    { field: 'rsi', op: '>=', value: 50 }, { field: 'rsi', op: 'between', value: [30, 70] }, { field: 'verdict', op: 'in', value: ['buy', 'nonsense', 'buy'] }, { field: 'trend', value: ['none', 'up', 'down'] },
+    { field: 'rsi', op: '>=', value: 'high' }, { field: 'rsi', op: 'between', value: [1] }, { field: 'rsi', op: 'near', value: 3 }, { field: 'rsi', op: 'between', value: ['a', 'b'] }, { field: 'verdict', value: 'buy' }, { field: 'verdict', value: ['nonsense'] },
+    { field: 'name', op: 'contains', value: 'x' }, { field: 'price', op: '>=', value: 5 }, { field: 'unknown', op: '>=', value: 5 }, null, 'text'] });
+  assert.deepStrictEqual(set.rules, [{ field: 'rsi', op: '>=', value: 50 }, { field: 'rsi', op: 'between', value: [30, 70] }, { field: 'verdict', op: 'in', value: ['buy'] }, { field: 'trend', op: 'in', value: ['none', 'up'] }]);   // 'price' is not offered, 'none' is a choice for a field with a none label
+  assert.deepStrictEqual([set.name.length, set.why.length, set.now], [60, 240, 3]);
+  assert.strictEqual(P.cleanSet({ rules: [{ field: 'rsi', op: '>=', value: 50 }] }), null);   // one rule is not enough
+  assert.deepStrictEqual([P.cleanSet(null), P.cleanSet('x'), P.cleanSet({}), P.cleanSet({ rules: 'no' })], [null, null, null, null]);
+  const named = P.cleanSet({ rules: [{ field: 'rsi', op: '<', value: 20 }, { field: 'rsi', op: '>', value: 5 }] }); assert.deepStrictEqual([named.name, named.why], ['Approach', '']);
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

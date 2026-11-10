@@ -57,51 +57,64 @@ function filterIdx(data, idx, atom){
 }
 function quantile(arr, q){ const s = Float64Array.from(arr).sort(); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; }
 
-// data: finished sample set. H: weeks in the horizon. -> null when there is too little history.
-function learnRules(data, H, opts = {}){
-  const trainFrac = opts.trainFrac || 0.7, beam = opts.beam || 8, maxAtoms = opts.maxAtoms || 3, top = opts.top || 5;
-  if(!data || data.n < 400) return null;
+const MIN_SAMPLES = 400, MIN_TRAIN = 300, MIN_HOLD = 100;   // less history than this is too little to test rules on
+const MIN_STOCKS = 8;                                         // a candidate must have shown up in at least this many stocks
+
+// Splits the samples at the trainFrac point of the timeline: { tCut, train, hold } as sample indexes, or null when either side is too thin.
+function splitByTime(data, H, trainFrac){
   const tCut = quantile(data.t, trainFrac);
   const trainAll = [], holdAll = [];
   for(let i = 0; i < data.n; i++){
     if(data.t[i] + H * 7 * DAY <= tCut) trainAll.push(i);   // its outcome window ended before the cut, so no peeking
     else if(data.t[i] >= tCut) holdAll.push(i);
   }
-  if(trainAll.length < 300 || holdAll.length < 100) return null;
-  const train = Int32Array.from(trainAll), hold = Int32Array.from(holdAll);
-  const baseTrain = stats(data, train), baseHold = stats(data, hold);
-  const minN = Math.max(60, Math.round(0.003 * train.length));
-  const minStocks = 8;
+  if(trainAll.length < MIN_TRAIN || holdAll.length < MIN_HOLD) return null;
+  return { tCut, train: Int32Array.from(trainAll), hold: Int32Array.from(holdAll) };
+}
 
+// One more condition added to each of the best few combinations so far (the beam). Candidates worth ranking go to search.all.
+// search = { data, atoms, minN, beam, baseTrain, all }.
+function extendLevel(search, level){
+  const { data, atoms, minN, beam } = search;
+  level.sort((x, y) => y.st.low - x.st.low);
+  const parents = level.slice(0, beam), next = [];
+  for(const p of parents){
+    const used = new Set(p.atoms.map(a => a.rule.field));
+    for(const a of atoms){
+      if(used.has(a.rule.field)) continue;
+      const idx = filterIdx(data, p.idx, a);
+      if(idx.length < minN) continue;
+      const st = stats(data, idx, true);
+      if(st.low < p.st.low + 0.003) continue;   // adding the condition must clearly help
+      const node = { atoms: [...p.atoms, a], idx, st };
+      next.push(node); considerNode(search, node);
+    }
+  }
+  return next;
+}
+function considerNode({ all, minN, baseTrain }, node){
+  if(node.st.n >= minN && node.st.stocks >= MIN_STOCKS && node.st.low > baseTrain.rate) all.push(node);
+}
+
+// Searches the older samples for combinations of up to maxAtoms conditions; returns every candidate worth ranking.
+function searchCandidates(data, train, { beam, maxAtoms, minN, baseTrain }){
   const atoms = atomMenu().map(r => ({ rule: r, key: JSON.stringify(r), test: predicateFor(r) }));
-  const all = [];   // every candidate worth ranking
-  const consider = (node) => { if(node.st.n >= minN && node.st.stocks >= minStocks && node.st.low > baseTrain.rate) all.push(node); };
-
+  const search = { data, atoms, minN, beam, baseTrain, all: [] };
   let level = [];
   for(const a of atoms){
     const idx = filterIdx(data, train, a);
     const node = { atoms: [a], idx, st: stats(data, idx, true) };
-    if(node.st.n >= minN){ level.push(node); consider(node); }
+    if(node.st.n >= minN){ level.push(node); considerNode(search, node); }
   }
   for(let depth = 2; depth <= maxAtoms; depth++){
-    level.sort((x, y) => y.st.low - x.st.low);
-    const parents = level.slice(0, beam), next = [];
-    for(const p of parents){
-      const used = new Set(p.atoms.map(a => a.rule.field));
-      for(const a of atoms){
-        if(used.has(a.rule.field)) continue;
-        const idx = filterIdx(data, p.idx, a);
-        if(idx.length < minN) continue;
-        const st = stats(data, idx, true);
-        if(st.low < p.st.low + 0.003) continue;   // adding the condition must clearly help
-        const node = { atoms: [...p.atoms, a], idx, st };
-        next.push(node); consider(node);
-      }
-    }
-    level = next;
+    level = extendLevel(search, level);
     if(!level.length) break;
   }
-  // best first; drop a longer rule that is barely better than a shorter one already chosen
+  return search.all;
+}
+
+// Best first; drops a longer rule that is barely better than a shorter one already chosen.
+function chooseCandidates(all, top){
   all.sort((x, y) => y.st.low - x.st.low);
   const chosen = [];
   for(const node of all){
@@ -113,6 +126,11 @@ function learnRules(data, H, opts = {}){
     chosen.push(node);
     if(chosen.length >= top) break;
   }
+  return chosen;
+}
+
+// Checks each chosen rule on the newest samples, which the search never saw. Rules that held up come first.
+function checkOnHoldout(data, chosen, { hold, baseHold, minN }){
   const suggestions = chosen.map(node => {
     let idx = hold;
     for(const a of node.atoms) idx = filterIdx(data, idx, a);
@@ -121,8 +139,21 @@ function learnRules(data, H, opts = {}){
     return { rules, train: node.st, hold: holdSt, holds: holdSt.n >= Math.max(30, Math.round(minN / 3)) && holdSt.low > baseHold.rate };
   });
   suggestions.sort((a, b) => (b.holds ? 1 : 0) - (a.holds ? 1 : 0));   // stable: keeps the search ranking inside each group
+  return suggestions;
+}
+
+// data: finished sample set. H: weeks in the horizon. -> null when there is too little history.
+function learnRules(data, H, opts = {}){
+  const trainFrac = opts.trainFrac || 0.7, beam = opts.beam || 8, maxAtoms = opts.maxAtoms || 3, top = opts.top || 5;
+  if(!data || data.n < MIN_SAMPLES) return null;
+  const split = splitByTime(data, H, trainFrac);
+  if(!split) return null;
+  const { tCut, train, hold } = split;
+  const baseTrain = stats(data, train), baseHold = stats(data, hold);
+  const minN = Math.max(60, Math.round(0.003 * train.length));
+  const chosen = chooseCandidates(searchCandidates(data, train, { beam, maxAtoms, minN, baseTrain }), top);
   return {
-    baseTrain, baseHold, suggestions, minN,
+    baseTrain, baseHold, suggestions: checkOnHoldout(data, chosen, { hold, baseHold, minN }), minN,
     samples: data.n, from: data.t.reduce((a, b) => Math.min(a, b), Infinity), to: data.t.reduce((a, b) => Math.max(a, b), -Infinity), cut: tCut
   };
 }

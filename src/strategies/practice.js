@@ -31,24 +31,32 @@ Write each approach ONLY with these fields (use the ids exactly; 3 to 6 rules ea
 ${fieldGuide()}
 Reply with only a JSON array of 4 objects: {"name": short name of the approach, "why": one plain sentence on the idea behind it, "rules": [{"field": id, "op": operator, "value": number | [low, high] | [ids]}]}.`;
 }
+const finiteNum = (x) => (typeof x === 'number' && isFinite(x));
+
+// A choice rule with only the options the field offers; null when none are left.
+function cleanEnumRule(f, r){
+  if(!Array.isArray(r.value)) return null;
+  const ok = new Set(f.options.map(o => o[0])); if(f.noneLabel) ok.add('none');
+  const v = [...new Set(r.value.filter(x => ok.has(x)))];
+  return v.length ? { field: f.id, op: 'in', value: v } : null;
+}
+// A number rule with a known operator and numbers as its value; null otherwise.
+function cleanNumRule(f, r){
+  if(r.op === 'between' && Array.isArray(r.value) && finiteNum(r.value[0]) && finiteNum(r.value[1])) return { field: f.id, op: 'between', value: [r.value[0], r.value[1]] };
+  if(['>=', '<=', '>', '<'].includes(r.op) && OPS.num.some(o => o[0] === r.op) && finiteNum(r.value)) return { field: f.id, op: r.op, value: r.value };
+  return null;
+}
+// One rule of Claude's reply, kept only when it is valid for its field.
+function cleanRule(r){
+  const f = r && FIELD_BY_ID.get(r.field);
+  if(!f || SKIP.has(f.id)) return null;
+  if(f.type === 'enum') return cleanEnumRule(f, r);
+  return f.type === 'num' ? cleanNumRule(f, r) : null;
+}
 // Keep only rules that are valid for their field; an approach needs at least 2 valid rules.
 function cleanSet(raw){
   if(!raw || typeof raw !== 'object' || !Array.isArray(raw.rules)) return null;
-  const rules = [];
-  raw.rules.forEach(r => {
-    const f = r && FIELD_BY_ID.get(r.field);
-    if(!f || SKIP.has(f.id)) return;
-    if(f.type === 'enum'){
-      if(!Array.isArray(r.value)) return;
-      const ok = new Set(f.options.map(o => o[0])); if(f.noneLabel) ok.add('none');
-      const v = [...new Set(r.value.filter(x => ok.has(x)))];
-      if(v.length) rules.push({ field: f.id, op: 'in', value: v });
-    } else if(f.type === 'num'){
-      const num = (x) => (typeof x === 'number' && isFinite(x));
-      if(r.op === 'between' && Array.isArray(r.value) && num(r.value[0]) && num(r.value[1])) rules.push({ field: f.id, op: 'between', value: [r.value[0], r.value[1]] });
-      else if(['>=', '<=', '>', '<'].includes(r.op) && OPS.num.some(o => o[0] === r.op) && num(r.value)) rules.push({ field: f.id, op: r.op, value: r.value });
-    }
-  });
+  const rules = raw.rules.map(cleanRule).filter(Boolean);
   if(rules.length < 2) return null;
   return { name: String(raw.name || 'Approach').slice(0, 60), why: String(raw.why || '').slice(0, 240), rules, now: qualifyingStocks(stocks, rules).length };
 }
