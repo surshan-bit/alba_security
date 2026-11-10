@@ -99,11 +99,14 @@ function listHtml(sel){
   return dropMenuHtml({ btnHtml: btn, label: 'Choose a strategy, or create a new one', items, extraClass: 'dm-strat' });
 }
 
-function mainHtml(st){
-  if(!st) return `<div class="strat-empty">Create a strategy to get started.</div>`;
-  const matches = qualifyingStocks(stocks, st.rules);
-  const ignored = st.rules.length - readyRules(st).length;
-  return `${phoneBarHtml()}<div class="analysis-panel strat-panel">
+// The refresh kit's bar for the picks table; its scope (which stocks a refresh works through) is set when the bar is drawn.
+function kitBarHtml(st){
+  kit.defineScope('strat', { label: 'picks', source: 'strat', selName: 'strat', stocks: () => refreshList(st) });
+  return kit.barHtml('strat');
+}
+
+function setupPanelHtml(st){
+  return `<div class="analysis-panel strat-panel">
       <details class="strat-fold strat-group" data-fold="setup"${folds.has('setup') ? ' open' : ''}>
         <summary class="analysis-panel-title strat-sub"><span class="strat-fold-lbl">Strategy setup</span> <span class="strat-fold-sum"><span class="strat-fold-nm">${escapeHtml(st.name)} &middot; </span>${st.published ? 'Published' : 'Unpublished'} &middot; gain at least ${st.goal.target}% within ${st.goal.days} days &middot; ${st.rules.length} rule${st.rules.length === 1 ? '' : 's'}</span> <span class="strat-save-note" id="stratSaveNote" aria-live="polite">${saveNote()}</span></summary>
         <div class="strat-section"><div class="strat-section-title">Strategy</div>
@@ -127,23 +130,35 @@ function mainHtml(st){
         ${st.learned ? `<div class="strat-learned">${escapeHtml(st.learned)}</div>` : ''}
         <div id="stratRules">${rulesEditorHtml(st)}</div></div>
       </details>
-    </div>
-    <div class="analysis-panel strat-panel">
+    </div>`;
+}
+
+function resultsPanelHtml(st, matches){
+  const ignored = st.rules.length - readyRules(st).length;
+  return `<div class="analysis-panel strat-panel">
       <div class="strat-result-head strat-filters-panel${stratFiltersOpen ? '' : ' filters-collapsed'}">
         <button type="button" class="biz-filters-toggle" data-strat-filters="1" aria-expanded="${stratFiltersOpen}"><span class="ft-label" aria-label="Filters"></span><span class="ft-summary">Track and refresh</span><span class="ft-caret" aria-hidden="true">&#9662;</span></button>
         <div class="strat-result-title"><span class="strat-count" aria-label="Qualifying stocks"><span class="strat-showing">Showing <b id="stratCount">${matches.length}</b> of ${stocks.length} stocks</span>${ignored ? `<span class="strat-ign"><span class="strat-sep"> &middot; </span>${ignored} rule${ignored === 1 ? '' : 's'} not applied yet</span>` : ''}</span></div>
-        ${sheetFrame(`<div class="strat-total"><button type="button" class="strat-btn scope-strat-track-btn" id="stratTrackBtn"${matches.length ? '' : ' disabled'} title="Save the ticked picks (or all of today's list when none is ticked) with their prices and judge them against the goal later">${trackLabel(matches)}</button>${(kit.defineScope('strat', { label: 'picks', source: 'strat', selName: 'strat', stocks: () => refreshList(st) }), kit.barHtml('strat'))}</div>`)}
+        ${sheetFrame(`<div class="strat-total"><button type="button" class="strat-btn scope-strat-track-btn" id="stratTrackBtn"${matches.length ? '' : ' disabled'} title="Save the ticked picks (or all of today's list when none is ticked) with their prices and judge them against the goal later">${trackLabel(matches)}</button>${kitBarHtml(st)}</div>`)}
       </div>
       <div class="scope-strat-results" id="stratResults">${resultsHtml(matches, selected)}</div>
       ${kit.selbarSlot('strat')}
-    </div>
-    ${trackPanelHtml()}
-    <div class="analysis-panel strat-panel">
+    </div>`;
+}
+
+function whyPanelHtml(st){
+  return `<div class="analysis-panel strat-panel">
       <div class="analysis-panel-title">Why is a stock in or out?</div>
       <input type="text" id="stratWhy" class="strat-why-input" list="stratWhyList" value="${escapeHtml(whyQuery)}" placeholder="Type a stock symbol or name" aria-label="Stock to check" autocomplete="off">
       ${whyDatalist()}
       <div id="stratWhyOut">${whyHtml(whyQuery, st.rules)}</div>
     </div>`;
+}
+
+function mainHtml(st){
+  if(!st) return `<div class="strat-empty">Create a strategy to get started.</div>`;
+  const matches = qualifyingStocks(stocks, st.rules);
+  return [phoneBarHtml() + setupPanelHtml(st), resultsPanelHtml(st, matches), trackPanelHtml(), whyPanelHtml(st)].join('\n    ');
 }
 
 // Redraws only the picks table (a new sort or more rows), keeping the tick boxes.
@@ -166,84 +181,143 @@ function drawStrategiesSection(){
   syncSelectMode();
 }
 
+// The Track button counts the ticked picks of the strategy on screen.
+function paintTrackLabel(st){
+  const tb = document.getElementById('stratTrackBtn');
+  if(tb && st) tb.textContent = trackLabel(qualifyingStocks(stocks, st.rules));
+}
+
+// The refresh bar's "clear" button: untick everything.
+function onSelectionCleared(e){
+  const detail = /** @type {CustomEvent} */ (e).detail;
+  if(!detail || detail.name !== 'strat') return;
+  selected.clear();
+  document.querySelectorAll('.strat-sel').forEach(b => { /** @type {HTMLInputElement} */ (b).checked = false; });
+  paintTrackLabel(selectedStrategy());
+}
+
+const sectionActive = () => /** @type {HTMLElement} */ (document.getElementById('section-strategies')).classList.contains('active');
+
+function toggleFiltersOpen(){
+  stratFiltersOpen = !stratFiltersOpen;
+  rememberFiltersOpen('sFiltersOpen', stratFiltersOpen);
+  renderStrategiesSection();
+}
+
+// A button of the phone bar: Setup opens the setup block, Track opens the filters, Select shows the tick boxes.
+function onPhoneButton(sec, pb){
+  const what = pb.dataset.stratPhone;
+  if(what === 'setup'){
+    const d = /** @type {HTMLDetailsElement | null} */ (sec.querySelector('details[data-fold="setup"]'));
+    if(d){ d.open = !d.open; pb.setAttribute('aria-pressed', String(d.open)); }
+  }
+  else if(what === 'track') toggleFiltersOpen();
+  else if(what === 'select'){ selectMode = !selectMode; syncSelectMode(); }
+}
+
+// The "all" tick box in the table head ticks or unticks every pick, not only the rows on screen.
+function tickAll(tick, st){
+  const all = st ? qualifyingStocks(stocks, st.rules) : [], on = /** @type {HTMLInputElement} */ (tick).checked;
+  all.forEach(s => { if(on) selected.add(tickerSymbol(s)); else selected.delete(tickerSymbol(s)); });
+  document.querySelectorAll('.strat-sel').forEach(b => { /** @type {HTMLInputElement} */ (b).checked = on; });
+}
+
+function onTick(tick, st){
+  const sym = tick.dataset.sym;
+  if(sym === '*') tickAll(tick, st);
+  else if(/** @type {HTMLInputElement} */ (tick).checked) selected.add(sym);
+  else selected.delete(sym);
+  syncSelected();
+  paintTrackLabel(st);
+  kit.selectionChanged();
+}
+
+// The strategy list on the left: choose, create, restore the starters. True when the click was one of these.
+function onListClick(e){
+  const card = closestEl(e, '[data-strat-pick]');
+  if(card){ selectStrategy(card.dataset.stratPick); resetResultsRows(); renderStrategiesSection(); return true; }
+  if(closestEl(e, '#stratNew')){ addStrategy(); renderStrategiesSection(); return true; }
+  if(closestEl(e, '#stratRestore')){ restoreStarters(); renderStrategiesSection(); return true; }
+  return false;
+}
+
+// The picks table: more rows, a new sort, a tick box. True when the click was one of these.
+function onResultsClick(e, st){
+  if(closestEl(e, '[data-strat-more]') && st){ showMoreResults(); redrawResults(st); return true; }
+  const head = closestEl(e, '#stratResults [data-sort-col]');
+  if(head && st){ sortResultsBy(head.dataset.sortCol || ''); redrawResults(st); return true; }
+  const tick = closestEl(e, '.strat-sel');
+  if(!tick) return false;   // (a click on a tick box must not open the stock)
+  onTick(tick, st);
+  return true;
+}
+
+// The buttons of the selected strategy: publish, duplicate, delete. True when the click was one of these.
+function onStrategyButton(e, st){
+  if(!st) return false;
+  if(closestEl(e, '#stratPub')){ st.published = !st.published; saveStrategies(); renderStrategiesSection(); return true; }
+  if(closestEl(e, '#stratDup')){ duplicateStrategy(st); renderStrategiesSection(); return true; }
+  if(!closestEl(e, '#stratDel')) return false;
+  askConfirm(`Delete the strategy "${st.name}"?`, 'Delete').then((yes) => { if(yes){ deleteStrategy(st); renderStrategiesSection(); } });
+  return true;
+}
+
+function onSectionClick(sec, e){
+  const pb = closestEl(e, '[data-strat-phone]');
+  if(pb){ onPhoneButton(sec, pb); return; }
+  if(closestEl(e, '[data-strat-filters]')){ toggleFiltersOpen(); return; }
+  if(onListClick(e)) return;
+  const st = selectedStrategy();
+  if(onResultsClick(e, st) || onStrategyButton(e, st)) return;
+  const row = closestEl(e, '.strat-row');
+  if(row) openStockFromStrategies(Number(row.dataset.idx));
+}
+
+function onSectionKey(e){
+  if(e.key !== 'Enter') return;
+  const row = /** @type {Element} */ (e.target).closest && closestEl(e, '.strat-row');
+  if(row) openStockFromStrategies(Number(row.dataset.idx));
+}
+
+// Text boxes save when you leave them. The name also updates the list on the left.
+function renameStrategy(st, e){ st.name = targetEl(e).value.trim() || 'Untitled strategy'; saveStrategies(); renderStrategiesSection(); }
+function changeGoal(st){
+  st.goal = cleanGoal({ target: Number(/** @type {HTMLInputElement} */ (document.getElementById('goalTarget')).value), days: Number(/** @type {HTMLInputElement} */ (document.getElementById('goalDays')).value) });
+  forgetLearned(st.id); saveStrategies(); renderStrategiesSection();
+}
+function changeNote(st, e){ st.note = targetEl(e).value.trim(); saveStrategies(); }
+function changeWhy(st, e){
+  whyQuery = targetEl(e).value;
+  setHtml(document.getElementById('stratWhyOut'), whyHtml(whyQuery, st.rules));
+}
+const CHANGE_HANDLERS = new Map([['stratName', renameStrategy], ['goalTarget', changeGoal], ['goalDays', changeGoal], ['stratNote', changeNote], ['stratWhy', changeWhy]]);
+function onSectionChange(e){
+  const st = selectedStrategy(), handler = CHANGE_HANDLERS.get(targetEl(e).id);
+  if(st && handler) handler(st, e);
+}
+
+// A block opened or closed: remember it, so a redraw keeps it that way.
+function onFoldToggle(e){
+  const d = /** @type {Element} */ (e.target).closest && closestEl(e, 'details.strat-fold');
+  if(!d) return;
+  if(/** @type {HTMLDetailsElement} */ (d).open) folds.add(d.dataset.fold); else folds.delete(d.dataset.fold);
+}
+
 function init_strategies_section(){
   kit.useExternalSelection('strat', () => new Set(stocks.filter(s => selected.has(tickerSymbol(s))).map(pcTickerKey)));
-  document.addEventListener('alba-rk-clear', (e) => {
-    if(!/** @type {CustomEvent} */ (e).detail || /** @type {CustomEvent} */ (e).detail.name !== 'strat') return;
-    selected.clear();
-    document.querySelectorAll('.strat-sel').forEach(b => { /** @type {HTMLInputElement} */ (b).checked = false; });
-    const st = selectedStrategy(), tb = document.getElementById('stratTrackBtn');
-    if(tb && st) tb.textContent = trackLabel(qualifyingStocks(stocks, st.rules));
-  });
+  document.addEventListener('alba-rk-clear', onSelectionCleared);
   window.addEventListener('alba-strategies-status', onSaveStatus);
-  window.addEventListener('alba-strategies-reloaded', () => { if(/** @type {HTMLElement} */ (document.getElementById('section-strategies')).classList.contains('active')) renderStrategiesSection(); });
+  window.addEventListener('alba-strategies-reloaded', () => { if(sectionActive()) renderStrategiesSection(); });
   const sec = document.getElementById('section-strategies');
   if(!sec) return;
   wireRulesEditor(sec, selectedStrategy, renderStrategiesSection);
   wireLearnPanel(sec, selectedStrategy, renderStrategiesSection);
   wireTrackPanel(sec, selectedStrategy, syncSelected);
-  sec.addEventListener('toggle', (e) => {
-    const d = /** @type {Element} */ (e.target).closest && closestEl(e, 'details.strat-fold');
-    if(d){ if(/** @type {HTMLDetailsElement} */ (d).open) folds.add(d.dataset.fold); else folds.delete(d.dataset.fold); }
-  }, true);
+  sec.addEventListener('toggle', onFoldToggle, true);
   if(phoneQuery) phoneQuery.addEventListener('change', () => { if(sec.classList.contains('active')) renderStrategiesSection(); });
-  sec.addEventListener('click', (e) => {
-    const pb = closestEl(e, '[data-strat-phone]');
-    if(pb){
-      const what = pb.dataset.stratPhone;
-      if(what === 'setup'){ const d = /** @type {HTMLDetailsElement | null} */ (sec.querySelector('details[data-fold="setup"]')); if(d){ d.open = !d.open; pb.setAttribute('aria-pressed', String(d.open)); } }
-      else if(what === 'track'){ stratFiltersOpen = !stratFiltersOpen; rememberFiltersOpen('sFiltersOpen', stratFiltersOpen); renderStrategiesSection(); }
-      else if(what === 'select'){ selectMode = !selectMode; syncSelectMode(); }
-      return;
-    }
-    if(closestEl(e, '[data-strat-filters]')){ stratFiltersOpen = !stratFiltersOpen; rememberFiltersOpen('sFiltersOpen', stratFiltersOpen); renderStrategiesSection(); return; }
-    const card = closestEl(e, '[data-strat-pick]');
-    if(card){ selectStrategy(card.dataset.stratPick); resetResultsRows(); renderStrategiesSection(); return; }
-    if(closestEl(e, '#stratNew')){ addStrategy(); renderStrategiesSection(); return; }
-    if(closestEl(e, '#stratRestore')){ restoreStarters(); renderStrategiesSection(); return; }
-    const st = selectedStrategy();
-    if(closestEl(e, '[data-strat-more]') && st){ showMoreResults(); redrawResults(st); return; }
-    const head = closestEl(e, '#stratResults [data-sort-col]');
-    if(head && st){ sortResultsBy(head.dataset.sortCol || ''); redrawResults(st); return; }
-    const tick = closestEl(e, '.strat-sel');
-    if(tick){   // (a click on a tick box must not open the stock)
-      const sym = tick.dataset.sym;
-      if(sym === '*'){ const all = st ? qualifyingStocks(stocks, st.rules) : []; if(/** @type {HTMLInputElement} */ (tick).checked) all.forEach(s => selected.add(tickerSymbol(s))); else all.forEach(s => selected.delete(tickerSymbol(s))); document.querySelectorAll('.strat-sel').forEach(b => { /** @type {HTMLInputElement} */ (b).checked = /** @type {HTMLInputElement} */ (tick).checked; }); }
-      else if(/** @type {HTMLInputElement} */ (tick).checked) selected.add(sym); else selected.delete(sym);
-      syncSelected();
-      const tb = document.getElementById('stratTrackBtn');
-      if(tb && st) tb.textContent = trackLabel(qualifyingStocks(stocks, st.rules));
-      kit.selectionChanged();
-      return;
-    }
-    if(closestEl(e, '#stratPub') && st){ st.published = !st.published; saveStrategies(); renderStrategiesSection(); return; }
-    if(closestEl(e, '#stratDup') && st){ duplicateStrategy(st); renderStrategiesSection(); return; }
-    if(closestEl(e, '#stratDel') && st){
-      askConfirm(`Delete the strategy "${st.name}"?`, 'Delete').then((yes) => { if(yes){ deleteStrategy(st); renderStrategiesSection(); } });
-      return;
-    }
-    const row = closestEl(e, '.strat-row');
-    if(row) openStockFromStrategies(Number(row.dataset.idx));
-  });
-  sec.addEventListener('keydown', (e) => {
-    if(e.key !== 'Enter') return;
-    const row = /** @type {Element} */ (e.target).closest && closestEl(e, '.strat-row');
-    if(row) openStockFromStrategies(Number(row.dataset.idx));
-  });
-  // Text boxes save when you leave them. The name also updates the list on the left.
-  sec.addEventListener('change', (e) => {
-    const st = selectedStrategy();
-    if(targetEl(e).id === 'stratName' && st){ st.name = targetEl(e).value.trim() || 'Untitled strategy'; saveStrategies(); renderStrategiesSection(); }
-    else if((targetEl(e).id === 'goalTarget' || targetEl(e).id === 'goalDays') && st){
-      st.goal = cleanGoal({ target: Number(/** @type {HTMLInputElement} */ (document.getElementById('goalTarget')).value), days: Number(/** @type {HTMLInputElement} */ (document.getElementById('goalDays')).value) });
-      forgetLearned(st.id); saveStrategies(); renderStrategiesSection();
-    }
-    else if(targetEl(e).id === 'stratNote' && st){ st.note = targetEl(e).value.trim(); saveStrategies(); }
-    else if(targetEl(e).id === 'stratWhy' && st){
-      whyQuery = targetEl(e).value;
-      setHtml(document.getElementById('stratWhyOut'), whyHtml(whyQuery, st.rules));
-    }
-  });
+  sec.addEventListener('click', (e) => onSectionClick(sec, e));
+  sec.addEventListener('keydown', onSectionKey);
+  sec.addEventListener('change', onSectionChange);
 }
 
 export { init_strategies_section, renderStrategiesSection };
