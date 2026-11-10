@@ -3237,7 +3237,7 @@ test('refresh all stocks, bars step: placed stocks are saved in batches and scor
     lagOf: (k) => k === 'A' ? 9 : k === 'B' ? 7 : 0, saveFullBars: async (s) => s.name === 'A', saveRecentBars: async (db, list) => ({ saved: new Set(['A', 'B']), failed: new Set(['C']), chunksWritten: 1, records: 2 }),
     saveTechBlocks: async () => ({ computed: 2, chunksWritten: 1, records: 1, failed: 1 }) };
   const M = await loadTvRefresh(), onebyone = [];
-  const ctx = tvBarsCtx({ plan: { stale: stocks }, jobs: new Map([[A, 1], [B, 1], [C, 1], [D, 1]]), ready: new Map([[A, { s: A }], [B, { s: B }], [C, { s: C }]]), bars: async (left, key, track, workers, lean, prog) => { onebyone.push(left.map((s) => s.name), prog.total); return left.length; } });
+  const ctx = tvBarsCtx({ plan: { stale: stocks }, jobs: new Map([[A, 1], [B, 1], [C, 1], [D, 1]]), ready: new Map([[A, { s: A }], [B, { s: B }], [C, { s: C }]]), bars: async (left, { prog }) => { onebyone.push(left.map((s) => s.name), prog.total); return left.length; } });
   const run = tvRun(tvDb(), [], { ctx, batchLeft: { missing: 0 }, staleBefore: 4 });
   await M.rsBars(run);
   assert.deepStrictEqual(onebyone, [['D', 'C'], 2]);   // D was never placed; C could not be saved
