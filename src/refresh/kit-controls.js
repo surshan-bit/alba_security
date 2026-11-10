@@ -153,55 +153,77 @@ function openConfirm(anchor, spec, plan) {
 
 // ---------- events ----------
 let wired = false;
+const toolbarState = {};
+const sourceForSel = (name) => name === "analysis" ? "analysis" : name === "strat" ? "strat" : name === "biz" ? "biz-kit" : "detail";
+
+// Opens the menu at the button, or closes it when this button's menu is already open. html is only built when it opens.
+function toggleMenuAt(anchor, html, state) {
+  if (menuOpenAt(anchor)) closeMenu(false);
+  else openMenu(anchor, html(), state);
+}
+function runChoice(act) { const it = menuChoices[Number(act.dataset.rkI)]; closeMenu(false); if (it && it.run) it.run(); }
+function runFromMenu(act) {
+  const spec = specForScope(act.dataset.rkScope, act.dataset.rkKind, act.dataset.rkOnly === "1"), anchor = getMenuAnchor();
+  closeMenu(false);
+  if (spec) request(spec, anchor);
+}
+function runForStock(act) {
+  const s = stockByKey(act.dataset.rkKey), anchor = getMenuAnchor(); closeMenu(false);
+  if (s) request({ list: [s], kinds: kindsOf(act.dataset.rkKind), only: false, source: sourceForSel(act.dataset.rkSel), label: s.name }, anchor);
+}
+function runSelected(act) {
+  const name = act.dataset.rkSel, list = selectedStocks(name);
+  request({ list, kinds: kindsOf(act.dataset.rkKind), only: false, source: sourceForSel(name), label: list.length + " selected", selName: name, clearSel: true }, act);
+}
+function clearSelected(act) {
+  const name = act.dataset.rkSel;
+  if (isExternalSelection(name)) { document.dispatchEvent(new CustomEvent("alba-rk-clear", { detail: { name } })); } else selKeys(name).clear();
+  syncChecks();
+}
+function openToolbar(act) {
+  const name = act.dataset.rkTb, st = toolbarState[name] || (toolbarState[name] = { choice: "", only: false });
+  toggleMenuAt(act, () => toolbarMenuHtml(name, st), { type: "toolbar", name });
+}
+function runToolbar(act) {
+  const name = act.dataset.rkTb, st = toolbarState[name], cur = toolbarChoices(name).find((c) => c.id === st.choice);
+  const anchor = getMenuAnchor(); closeMenu(false);
+  if (cur) request({ list: cur.stocks().filter(Boolean), kinds: kindsOf(act.dataset.rkKind), only: !!st.only, source: sourceForSel(name), label: cur.label }, anchor);
+}
+function runConfirmed() { const spec = getMenuState() && getMenuState().pending; closeMenu(false); if (spec) request(spec, null); }
+function runScope(act) { const spec = specForScope(act.dataset.rkScope, act.dataset.rkKind, false); if (spec) request(spec, act); }
+
+// What each data-rk-act button does; each gets the button that was clicked.
+const CLICK_ACTIONS = new Map([
+  ["close", () => closeMenu(true)],
+  ["stop", () => ldBatchStop()],
+  ["run", runScope],
+  ["choice", (act) => toggleMenuAt(act, () => choiceMenuHtml(act.dataset.rkCid), { type: "choice" })],
+  ["choice-run", runChoice],
+  ["bar-menu", (act) => toggleMenuAt(act, () => barMenuHtml(act.dataset.rkScope), { type: "bar" })],
+  ["menu-run", runFromMenu],
+  ["row-run", runForStock],
+  ["sel-run", runSelected],
+  ["sel-clear", clearSelected],
+  ["toolbar", openToolbar],
+  ["tb-run", runToolbar],
+  ["confirm-run", runConfirmed]
+]);
 function onClick(e) {
   const t = e.target;
   if (!t || !t.closest) return;
   const row = t.closest(".rk-row-btn");
   if (row) {
     e.stopPropagation();                 // the refresh icon must not open the stock
-    if (menuOpenAt(row)) closeMenu(false);
-    else openMenu(row, rowMenuHtml(row.dataset.rkRow, row.dataset.rkSel), { type: "row" });
+    toggleMenuAt(row, () => rowMenuHtml(row.dataset.rkRow, row.dataset.rkSel), { type: "row" });
     return;
   }
   if (t.closest(".rk-cell")) { e.stopPropagation(); return; }   // nor must a click on the checkbox
   const act = t.closest("[data-rk-act]");
   if (!act) { if (menuIsOpen() && !t.closest(".rk-menu")) closeMenu(false); return; }
   e.stopPropagation();
-  const a = act.dataset.rkAct;
-  if (a === "close") { closeMenu(true); return; }
-  if (a === "stop") { ldBatchStop(); return; }
-  if (a === "run") { const spec = specForScope(act.dataset.rkScope, act.dataset.rkKind, false); if (spec) request(spec, act); return; }
-  if (a === "choice") { if (menuOpenAt(act)) { closeMenu(false); return; } openMenu(act, choiceMenuHtml(act.dataset.rkCid), { type: "choice" }); return; }
-  if (a === "choice-run") { const it = menuChoices[Number(act.dataset.rkI)]; closeMenu(false); if (it && it.run) it.run(); return; }
-  if (a === "bar-menu") { if (menuOpenAt(act)) { closeMenu(false); return; } openMenu(act, barMenuHtml(act.dataset.rkScope), { type: "bar" }); return; }
-  if (a === "menu-run") { const spec = specForScope(act.dataset.rkScope, act.dataset.rkKind, act.dataset.rkOnly === "1"); const anchor = getMenuAnchor(); closeMenu(false); if (spec) request(spec, anchor); return; }
-  if (a === "row-run") {
-    const s = stockByKey(act.dataset.rkKey), anchor = getMenuAnchor(); closeMenu(false);
-    if (s) request({ list: [s], kinds: kindsOf(act.dataset.rkKind), only: false, source: sourceForSel(act.dataset.rkSel), label: s.name }, anchor);
-    return;
-  }
-  if (a === "sel-run") {
-    const name = act.dataset.rkSel, list = selectedStocks(name);
-    request({ list, kinds: kindsOf(act.dataset.rkKind), only: false, source: sourceForSel(name), label: list.length + " selected", selName: name, clearSel: true }, act);
-    return;
-  }
-  if (a === "sel-clear") { const name = act.dataset.rkSel; if (isExternalSelection(name)) { document.dispatchEvent(new CustomEvent("alba-rk-clear", { detail: { name } })); } else selKeys(name).clear(); syncChecks(); return; }
-  if (a === "toolbar") {
-    if (menuOpenAt(act)) { closeMenu(false); return; }
-    const st = toolbarState[act.dataset.rkTb] || (toolbarState[act.dataset.rkTb] = { choice: "", only: false });
-    openMenu(act, toolbarMenuHtml(act.dataset.rkTb, st), { type: "toolbar", name: act.dataset.rkTb });
-    return;
-  }
-  if (a === "tb-run") {
-    const name = act.dataset.rkTb, st = toolbarState[name], cur = toolbarChoices(name).find((c) => c.id === st.choice);
-    const anchor = getMenuAnchor(); closeMenu(false);
-    if (cur) request({ list: cur.stocks().filter(Boolean), kinds: kindsOf(act.dataset.rkKind), only: !!st.only, source: sourceForSel(name), label: cur.label }, anchor);
-    return;
-  }
-  if (a === "confirm-run") { const spec = getMenuState() && getMenuState().pending; closeMenu(false); if (spec) request(spec, null); return; }
+  const handler = CLICK_ACTIONS.get(act.dataset.rkAct);
+  if (handler) handler(act);
 }
-const toolbarState = {};
-const sourceForSel = (name) => name === "analysis" ? "analysis" : name === "strat" ? "strat" : name === "biz" ? "biz-kit" : "detail";
 function onChange(e) {
   const t = e.target;
   if (!t || !t.closest) return;

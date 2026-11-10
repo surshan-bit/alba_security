@@ -4721,6 +4721,123 @@ test('practice ideas: only rules that fit their field are kept, an idea needs tw
   const named = P.cleanSet({ rules: [{ field: 'rsi', op: '<', value: 20 }, { field: 'rsi', op: '>', value: 5 }] }); assert.deepStrictEqual([named.name, named.why], ['Approach', '']);
 }));
 
+// ---- Refresh kit controls (src/refresh/kit-controls.js): the menus the Refresh buttons open and what each button in them does
+TV_VALUES.add('CHUNK'); TV_VALUES.add('KIND_LABEL');
+const kcSetup = async (html, over) => {
+  const S1 = { name: 'AAA' }, S2 = { name: 'BBB <i>' }, sel = {};
+  const T = globalThis.__T = { requests: [], stops: 0, hooks: null, S1, S2, list: [S1, S2], picked: [S1], cf: 1, ct: 0, ca: 1, CHUNK: 50, KIND_LABEL: { fund: 'Fundamental', tech: 'Technical', both: 'Both' },
+    escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), pcTickerKey: (s) => s.name, counts: (l) => ({ n: l.length, fund: T.cf, tech: T.ct, attn: T.ca }),
+    freshness: () => ({ fund: { age: 5 }, tech: { age: null }, why: ['new results'] }), ago: (n) => n + ' days ago', getScope: (id) => (id === 'nope' ? null : { label: 'Picks <b>', source: 'strat' }),
+    scopeStocks: () => T.list, sectionOf: () => 'strategies', selKeys: (n) => sel[n] || (sel[n] = new Set()), selectedStocks: () => T.picked, isExternalSelection: (n) => n === 'ext',
+    stockByKey: (k) => (k === 'K1' ? S1 : null), getToolbar: () => () => [{ id: 'a', label: 'All', stocks: () => [S1, S2, null] }, { id: 'b', label: 'Empty', stocks: () => [] }],
+    request: (...a) => T.requests.push(a), setQueueHooks: (h) => { T.hooks = h; }, busyIn: () => false, getActiveJob: () => null, queuedJobs: () => [], persistIfRunning: () => {}, flushQueue: () => {},
+    getLdBatch: () => null, ldBatchStop: () => { T.stops++; }, setHtml: (el, html) => { el.innerHTML = html; }, sel };
+  Object.assign(T, over || {});
+  const M = await loadAllStubbed('src/refresh/kit-controls.js', '', ['../core/evt.js', './kit-menu.js']);
+  M.installControls();
+  return { T, M };
+};
+const kcPage = (html, fn) => withPage(html, async (win) => {
+  const had = { w: globalThis.window, r: globalThis.requestAnimationFrame, c: globalThis.CustomEvent };
+  globalThis.window = win; globalThis.requestAnimationFrame = (f) => { f(); }; globalThis.CustomEvent = win.CustomEvent;
+  try { await fn(win); } finally {
+    if(had.w === undefined) delete globalThis.window; else globalThis.window = had.w;
+    if(had.r === undefined) delete globalThis.requestAnimationFrame; else globalThis.requestAnimationFrame = had.r;
+    globalThis.CustomEvent = had.c;
+  }
+});
+const kcClick = (win, el) => el.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+const KC_PAGE = '<div id="host"><button id="rowBtn" class="rk-row-btn" data-rk-row="K1" data-rk-sel="analysis">r</button><span class="rk-cell"><input type="checkbox" id="cell" class="rk-chk"></span>' +
+  '<button id="barBtn" data-rk-act="bar-menu" data-rk-scope="strat">bar</button><button id="runBtn" data-rk-act="run" data-rk-scope="strat" data-rk-kind="both">run</button><button id="badRun" data-rk-act="run" data-rk-scope="nope" data-rk-kind="fund">run</button>' +
+  '<button id="choiceBtn" data-rk-act="choice" data-rk-cid="c1">choice</button><button id="stopBtn" data-rk-act="stop">stop</button><button id="odd" data-rk-act="unknown">odd</button><p id="plain">text</p></div>';
+
+test('refresh kit: a stock\'s refresh icon opens its menu, a second click closes it, and neither opens the stock; the checkbox cell is left alone', () => kcPage(KC_PAGE, async (win) => {
+  const { T } = await kcSetup();
+  const doc = win.document, opened = []; doc.getElementById('host').addEventListener('click', () => opened.push(1));
+  kcClick(win, doc.getElementById('rowBtn'));
+  const menu = () => doc.querySelector('.rk-menu');
+  assert.ok(menu() && menu().textContent.includes('AAA') && menu().textContent.includes('researched 5 days ago · new results') && menu().textContent.includes('no price date'));
+  assert.deepStrictEqual(opened, []);   // the click went no further
+  kcClick(win, doc.getElementById('rowBtn')); assert.strictEqual(menu(), null);
+  kcClick(win, doc.getElementById('cell')); assert.deepStrictEqual(opened, []);
+  kcClick(win, doc.getElementById('rowBtn')); kcClick(win, doc.getElementById('plain')); assert.strictEqual(menu(), null);   // a click elsewhere closes it
+  kcClick(win, doc.getElementById('rowBtn')); kcClick(win, menu().querySelector('.rk-menu-head')); assert.ok(menu());   // ... but not a click inside it
+  kcClick(win, menu().querySelector('[data-rk-act="row-run"][data-rk-kind="both"]'));   // the Both item
+  assert.deepStrictEqual(T.requests.map((r) => [r[0].list.map((s) => s.name), r[0].kinds, r[0].only, r[0].source, r[0].label]), [[['AAA'], ['tech', 'fund'], false, 'analysis', 'AAA']]);
+  assert.strictEqual(menu(), null);
+  T.stockByKey = () => null; kcClick(win, doc.getElementById('rowBtn'));
+  kcClick(win, menu().querySelector('[data-rk-act="row-run"]')); assert.strictEqual(T.requests.length, 1);   // a stock that is gone is not refreshed
+  T.freshness = () => null; kcClick(win, doc.getElementById('rowBtn')); kcClick(win, doc.getElementById('rowBtn')); kcClick(win, doc.getElementById('rowBtn'));
+  assert.ok(menu().textContent.includes('Fundamental'));   // no freshness record: the items still draw
+}));
+
+test('refresh kit: the bar menu counts what needs a refresh, its items start the right refresh, and Run, Stop and an unknown button do what they say', () => kcPage(KC_PAGE, async (win) => {
+  const { T } = await kcSetup();
+  const doc = win.document, menu = () => doc.querySelector('.rk-menu');
+  kcClick(win, doc.getElementById('barBtn'));
+  assert.ok(menu().textContent.includes('Picks &lt;b>'.replace('&lt;', '<')) && menu().textContent.includes('2 stocks') && menu().textContent.includes('Fundamental: 1 of 2 needs refresh') && menu().textContent.includes('Technical up to date') && menu().textContent.includes('1 with new results, news or a big price move.'));
+  const items = [...menu().querySelectorAll('[data-rk-act="menu-run"]')];
+  assert.deepStrictEqual(items.map((b) => [b.dataset.rkKind, b.dataset.rkOnly, b.disabled]), [['fund', '0', false], ['tech', '0', false], ['both', '0', false], ['fund', '1', false], ['tech', '1', true], ['both', '1', false]]);   // nothing needs a Technical refresh
+  kcClick(win, items[3]);   // only what needs Fundamental
+  assert.deepStrictEqual([T.requests[0][0].only, T.requests[0][0].kinds, T.requests[0][0].source, T.requests[0][0].label, T.requests[0][0].selName, T.requests[0][1] === doc.getElementById('barBtn')], [true, ['fund'], 'strat', 'Picks <b>', null, true]);
+  kcClick(win, doc.getElementById('barBtn')); kcClick(win, doc.getElementById('barBtn')); assert.strictEqual(menu(), null);   // the bar button opens and closes its menu
+  T.list = []; T.cf = 0; kcClick(win, doc.getElementById('barBtn')); assert.ok(menu().textContent.includes('0 stocks'));
+  kcClick(win, doc.getElementById('plain'));
+  T.list = [T.S1]; kcClick(win, doc.getElementById('barBtn')); assert.ok(menu().textContent.includes('1 stock') && !menu().textContent.includes('1 stocks'));
+  kcClick(win, doc.getElementById('runBtn'));   // Run: straight away, no menu
+  assert.deepStrictEqual([T.requests[1][0].kinds, T.requests[1][0].only, T.requests[1][1] === doc.getElementById('runBtn')], [['tech', 'fund'], false, true]);
+  kcClick(win, doc.getElementById('badRun')); assert.strictEqual(T.requests.length, 2);   // a scope that no longer exists
+  kcClick(win, doc.getElementById('stopBtn')); assert.strictEqual(T.stops, 1);
+  kcClick(win, doc.getElementById('odd')); assert.strictEqual(T.requests.length, 2);
+  kcClick(win, doc.getElementById('plain'));   // close what is open
+  kcClick(win, doc.getElementById('barBtn')); kcClick(win, [...menu().querySelectorAll('[data-rk-act="menu-run"]')][0]); assert.ok(!menu());
+}));
+
+test('refresh kit: a choice menu lists its items and runs the one picked, and a choice that cannot be built opens nothing useful', () => kcPage(KC_PAGE, async (win) => {
+  const { T, M } = await kcSetup();
+  const doc = win.document, menu = () => doc.querySelector('.rk-menu'), ran = [];
+  M.defineChoices('c1', () => ({ head: 'Which <one>', note: 'A note', items: [{ label: 'First', small: 'sm <1>', run: () => ran.push('first') }, { label: 'Second', off: true, run: () => ran.push('second') }, { label: 'Third' }] }));
+  kcClick(win, doc.getElementById('choiceBtn'));
+  assert.ok(menu().textContent.includes('Which <one>') && menu().textContent.includes('A note') && menu().textContent.includes('sm <1>') && !menu().innerHTML.includes('<one>'));   // text stays text
+  assert.deepStrictEqual([...menu().querySelectorAll('button')].map((b) => b.disabled), [false, true, false]);
+  kcClick(win, menu().querySelector('[data-rk-i="0"]')); assert.deepStrictEqual(ran, ['first']); assert.strictEqual(menu(), null);
+  kcClick(win, doc.getElementById('choiceBtn')); kcClick(win, menu().querySelector('[data-rk-i="2"]')); assert.deepStrictEqual(ran, ['first']);   // an item with nothing to run
+  kcClick(win, doc.getElementById('choiceBtn')); kcClick(win, doc.getElementById('choiceBtn')); assert.strictEqual(menu(), null);   // second click closes
+  M.defineChoices('c1', () => { throw new Error('gone'); });
+  kcClick(win, doc.getElementById('choiceBtn')); assert.strictEqual(menu().textContent, '');
+  kcClick(win, doc.getElementById('choiceBtn'));
+}));
+
+const KC_TOOLS = '<button id="tbBtn" data-rk-act="toolbar" data-rk-tb="biz">tb</button><button id="selRun" data-rk-act="sel-run" data-rk-kind="fund" data-rk-sel="strat">go</button><button id="clearInt" data-rk-act="sel-clear" data-rk-sel="strat">c</button>' +
+  '<button id="clearExt" data-rk-act="sel-clear" data-rk-sel="ext">c</button><input type="checkbox" class="rk-chk" data-rk-sel="strat" data-rk-key="AAA" checked><input type="checkbox" class="rk-chk-all" data-rk-scope="strat" data-rk-sel="strat">';
+test('refresh kit: the toolbar menu runs the chosen group, a selection is refreshed or cleared (a page-owned one through its event), and a confirmation starts what was planned', () => kcPage(KC_TOOLS, async (win) => {
+  const { T } = await kcSetup();
+  const doc = win.document, menu = () => doc.querySelector('.rk-menu');
+  kcClick(win, doc.getElementById('tbBtn'));
+  assert.ok(menu().textContent.includes('Refresh stocks') && menu().textContent.includes('All') && menu().textContent.includes('Fundamental: 1 of 2 needs refresh'));
+  kcClick(win, menu().querySelector('[data-rk-act="tb-run"][data-rk-kind="tech"]'));
+  assert.deepStrictEqual(T.requests.map((r) => [r[0].list.map((s) => s.name), r[0].kinds, r[0].only, r[0].source, r[0].label]), [[['AAA', 'BBB <i>'], ['tech'], false, 'biz-kit', 'All']]);   // the empty slot is dropped
+  kcClick(win, doc.getElementById('tbBtn')); kcClick(win, doc.getElementById('tbBtn')); assert.strictEqual(menu(), null);
+  kcClick(win, doc.getElementById('selRun'));
+  assert.deepStrictEqual([T.requests[1][0].label, T.requests[1][0].selName, T.requests[1][0].clearSel, T.requests[1][0].source, T.requests[1][1] === doc.getElementById('selRun')], ['1 selected', 'strat', true, 'strat', true]);
+  T.sel.strat = new Set(['x']); kcClick(win, doc.getElementById('clearInt')); assert.strictEqual(T.sel.strat.size, 0);
+  const cleared = []; doc.addEventListener('alba-rk-clear', (e) => cleared.push(e.detail.name)); kcClick(win, doc.getElementById('clearExt')); assert.deepStrictEqual(cleared, ['ext']);
+  T.getToolbar = () => () => [{ id: 'b', label: 'Empty', stocks: () => [] }];   // nothing in any group: the run buttons are off and a run does nothing
+  kcClick(win, doc.getElementById('tbBtn'));
+  assert.ok(menu().textContent.includes('Nothing to refresh in this choice.') && menu().querySelector('[data-rk-act="tb-run"]').disabled);
+  menu().querySelector('[data-rk-act="tb-run"]').disabled = false; kcClick(win, menu().querySelector('[data-rk-act="tb-run"]')); assert.deepStrictEqual([T.requests.length, T.requests[2][0].list], [3, []]);   // the button is off, so this never happens on screen; the request would have no stocks
+  T.getToolbar = () => { throw new Error('x'); }; kcClick(win, doc.getElementById('tbBtn'));   // a toolbar that fails offers nothing
+  // the queue asks for a confirmation; Start runs the plan, Cancel drops it
+  const spec = { list: [T.S1], kinds: ['fund'], only: false, source: 'strat', label: 'x' };
+  T.hooks.openConfirm(doc.getElementById('tbBtn'), spec, [{ kind: 'fund', list: [1, 2, 3] }, { kind: 'tech', list: [1] }]);
+  assert.ok(menu().textContent.includes('Fundamental: 3 stocks') && menu().textContent.includes('Technical: 1 stocks') && menu().textContent.includes('batches of 50') && menu().textContent.includes('Claude usage'));
+  kcClick(win, menu().querySelector('[data-rk-act="confirm-run"]'));
+  assert.deepStrictEqual([T.requests[3][0].confirmed, T.requests[3][0].label, T.requests[3][1]], [true, 'x', null]);
+  T.hooks.openConfirm(null, spec, [{ kind: 'tech', list: [1] }]); assert.ok(!menu().textContent.includes('Claude usage'));
+  kcClick(win, menu().querySelector('[data-rk-act="close"]')); assert.strictEqual(menu(), null);
+  kcClick(win, doc.getElementById('plain') || doc.body);
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
