@@ -4,6 +4,6 @@
   "inlineStyleAttrs": 0,
   "inlineStyleScriptWrites": 0,
   "functionsOver40Lines": 23,
-  "functionsOver4Params": 13,
+  "functionsOver4Params": 2,
   "functionsNestedOver3": 13
 }

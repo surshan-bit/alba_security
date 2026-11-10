@@ -24,7 +24,7 @@ import { setHtml } from '../core/safehtml.js';
 // (see the `size === 0 ||` checks in the filter predicates), so clicking every specific option one-by-one back to
 // zero is equivalent to clicking "All" — the UI doesn't force that collapse, it's just how the
 // filter predicate reads an empty set either way.
-function wireMultiselectFilterGroup(btns, dataAttr, getSet, setSet, onChange){
+function wireMultiselectFilterGroup(btns, dataAttr, { getSet, setSet, onChange }){
   btns.forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const val = btn.dataset[dataAttr];
@@ -122,14 +122,15 @@ const MOS_BUTTONS = [
   ['red', 'avoid', 'Red', 'MoS &lt; -25%']
 ];
 
-function filterButton(attr, value, active, dot, label, count, title){
+/** @param {string} attr @param {string} value @param {{ active: boolean, dot: string, label: string, count: any, title?: string }} opts */
+function filterButton(attr, value, { active, dot, label, count, title }){
   return `<button class="filter-btn${active ? ' active' : ''}" data-${attr}="${value}"${title ? ` title="${title}"` : ''}><span class="filter-dot filter-dot--${dot}"></span>${label}<span class="filter-n">${count}</span></button>`;
 }
 
 // One filter group: an "All" button (active when nothing is chosen) followed by the choices.
-function filterGroup(id, heading, attr, chosen, choices, facetCount){
-  const buttons = [filterButton(attr, 'all', chosen.length === 0, 'text', 'All', facetCount(attr, 'all'))]
-    .concat(choices.map(([value, dot, label, title]) => filterButton(attr, value, chosen.includes(value), dot, label, facetCount(attr, value), title)));
+function filterGroup(id, heading, { attr, chosen, choices, facetCount }){
+  const buttons = [filterButton(attr, 'all', { active: chosen.length === 0, dot: 'text', label: 'All', count: facetCount(attr, 'all') })]
+    .concat(choices.map(([value, dot, label, title]) => filterButton(attr, value, { active: chosen.includes(value), dot, label, count: facetCount(attr, value), title })));
   return `<div class="filter-group" id="${id}">
         <h2>${heading}</h2>
         <div class="filter-group-row">
@@ -143,8 +144,8 @@ function reboundGroup(facetCount){
   return `<div class="filter-group" id="analysisReboundFilter">
         <h2>Weekly Move</h2>
         <div class="filter-group-row">
-          ${filterButton('arebound', 'all', !analysisFilters.rebound, 'text', 'All', facetCount('arebound', 'all'))}
-          ${filterButton('arebound', 'on', analysisFilters.rebound, 'buy', 'Rebound', facetCount('arebound', 'on'), 'Down last week, up this week')}
+          ${filterButton('arebound', 'all', { active: !analysisFilters.rebound, dot: 'text', label: 'All', count: facetCount('arebound', 'all') })}
+          ${filterButton('arebound', 'on', { active: analysisFilters.rebound, dot: 'buy', label: 'Rebound', count: facetCount('arebound', 'on'), title: 'Down last week, up this week' })}
         </div>
       </div>`;
 }
@@ -162,8 +163,8 @@ function strategyGroup(){
     strategies.forEach(x => { if(/** @type {Set<any>} */ (sets.get(x.id)).has(s)) counts.set(x.id, /** @type {number} */ (counts.get(x.id)) + 1); });
   });
   const hiddenNoteHtml = hiddenNote();
-  const buttons = [filterButton('astrat', 'all', !chosen, 'text', 'All', all, 'Do not narrow Analysis by a strategy')]
-    .concat(strategies.map(x => filterButton('astrat', escapeHtml(x.id), x.id === chosen, 'accent', `<span class="filter-label">${escapeHtml(x.name)}</span>`, counts.get(x.id), 'Only stocks that qualify for this strategy today')));
+  const buttons = [filterButton('astrat', 'all', { active: !chosen, dot: 'text', label: 'All', count: all, title: 'Do not narrow Analysis by a strategy' })]
+    .concat(strategies.map(x => filterButton('astrat', escapeHtml(x.id), { active: x.id === chosen, dot: 'accent', label: `<span class="filter-label">${escapeHtml(x.name)}</span>`, count: counts.get(x.id), title: 'Only stocks that qualify for this strategy today' })));
   return `<div class="filter-group scope-analysis-strategy-filter" id="analysisStrategyFilter">
         <h2>Strategy</h2>
         <div class="filter-group-row">
@@ -189,8 +190,8 @@ function ideasGroup(){
   const note = !chosen.length ? '' : source.snap
     ? `<p class="filter-note" id="analysisIdeasNote">From &ldquo;${escapeHtml(source.name)}&rdquo;, processed ${escapeHtml(ideasWhen(source.snap))}. Process again in the Trade Log to update the list.</p>`
     : `<p class="filter-note" id="analysisIdeasNote">No Buy / Sell result is saved yet${analysisFilters.strategyId && source.name ? ' for &ldquo;' + escapeHtml(source.name) + '&rdquo;' : ''}. Open the Trade Log, choose a strategy and press Process.</p>`;
-  const buttons = [filterButton('aideas', 'all', !chosen.length, 'text', 'All', c.all, 'Do not narrow Analysis by the Buy / Sell ideas')]
-    .concat(IDEAS_BUTTONS.map(([v, dot, label, title]) => filterButton('aideas', v, chosen.includes(v), dot, label, c[v], title)));
+  const buttons = [filterButton('aideas', 'all', { active: !chosen.length, dot: 'text', label: 'All', count: c.all, title: 'Do not narrow Analysis by the Buy / Sell ideas' })]
+    .concat(IDEAS_BUTTONS.map(([v, dot, label, title]) => filterButton('aideas', v, { active: chosen.includes(v), dot, label, count: c[v], title })));
   return `<div class="filter-group" id="analysisIdeasFilter">
         <h2>Buy / Sell ideas</h2>
         <div class="filter-group-row">
@@ -239,11 +240,11 @@ function analysisFiltersHtml(){
       ${sheetFrame(`      <div class="filter-groups" id="analysisFilterGroups">
       ${strategyGroup()}
       ${ideasGroup()}
-      ${filterGroup('analysisVerdictFilters', 'Fundamental Score', 'averdict', analysisFilters.verdicts, VERDICT_BUTTONS, facetCount)}
-      ${filterGroup('analysisMosFilters', 'MoS Rating', 'amos', analysisFilters.mosRatings, MOS_BUTTONS, facetCount)}
-      ${filterGroup('analysisTechWFilters', 'W Tech Rating', 'atechw', analysisFilters.techW, TECH_BUTTONS, facetCount)}
+      ${filterGroup('analysisVerdictFilters', 'Fundamental Score', { attr: 'averdict', chosen: analysisFilters.verdicts, choices: VERDICT_BUTTONS, facetCount })}
+      ${filterGroup('analysisMosFilters', 'MoS Rating', { attr: 'amos', chosen: analysisFilters.mosRatings, choices: MOS_BUTTONS, facetCount })}
+      ${filterGroup('analysisTechWFilters', 'W Tech Rating', { attr: 'atechw', chosen: analysisFilters.techW, choices: TECH_BUTTONS, facetCount })}
       ${reboundGroup(facetCount)}
-      ${filterGroup('analysisTechMFilters', 'M Tech Rating', 'atechm', analysisFilters.techM, TECH_BUTTONS, facetCount)}
+      ${filterGroup('analysisTechMFilters', 'M Tech Rating', { attr: 'atechm', chosen: analysisFilters.techM, choices: TECH_BUTTONS, facetCount })}
       </div>
 `)}
     </div>
@@ -308,10 +309,10 @@ function renderAnalysisFilterPanel(rerender){
   }));
   GROUPS.forEach(([id, attr, list]) => {
     const btns = Array.from(document.querySelectorAll('#' + id + ' .filter-btn'));
-    wireMultiselectFilterGroup(btns, attr, () => new Set(analysisFilters[list]), (s) => { analysisFilters[list] = Array.from(s); }, () => {
+    wireMultiselectFilterGroup(btns, attr, { getSet: () => new Set(analysisFilters[list]), setSet: (s) => { analysisFilters[list] = Array.from(s); }, onChange: () => {
       saveAnalysisFilters(analysisFilters);
       rerender();
-    });
+    } });
   });
 }
 

@@ -161,7 +161,7 @@ function queuedKeys(kind) {
   queue.filter((j) => j.kind === kind).forEach((j) => j.keys.forEach((k) => set.add(k)));
   return set;
 }
-function enqueueJob(kind, list, source, label, force) {
+function enqueueJob(kind, list, { source, label, force }) {
   const already = queuedKeys(kind);
   const keys = [];
   for (const s of list) { const k = pcTickerKey(s); if (!already.has(k) && !keys.includes(k)) keys.push(k); }
@@ -249,7 +249,7 @@ function request(spec, anchor) {
   const big = plan.find((p) => p.list.length > CONFIRM_OVER[p.kind]);
   if (big && !spec.confirmed) { hooks.openConfirm(anchor, spec, plan); return; }
   let added = 0;
-  for (const p of plan) added += enqueueJob(p.kind, p.list, spec.source, spec.label, spec.only);
+  for (const p of plan) added += enqueueJob(p.kind, p.list, { source: spec.source, label: spec.label, force: spec.only });
   if (!added) notice({ tone: "ok", title: "Already queued", text: "These stocks are already waiting in the refresh queue or being refreshed.", section: "" });
   if (spec.selName && spec.clearSel && !isExternalSelection(spec.selName)) { selKeys(spec.selName).clear(); hooks.syncChecks(); }
   repaint();

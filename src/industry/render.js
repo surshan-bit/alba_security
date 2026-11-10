@@ -113,7 +113,7 @@ const CHARTS = [
 ];
 const LANE = 14;
 
-function drawChart(panel, c, series, byBar, lanes, state){
+function drawChart(panel, c, { series, byBar, lanes, state }){
   const W = panel.querySelector('.pc-chart').clientWidth || 320, evH = lanes.length ? lanes.length * LANE + 4 : 0;
   const H = 220 + evH, padL = 6, padR = 44, padT = 10, padB = 22 + evH;
   const n = Math.min(series.length, c.ranges[state.range][1]), off = series.length - n, b = series.slice(off);
@@ -146,11 +146,11 @@ function drawChart(panel, c, series, byBar, lanes, state){
   state.geo = { W, padL, step, X, off, n, b };
 }
 
-function bindChart(panel, c, series, events, state){
+function bindChart(panel, c, { series, events, state }){
   const shown = new Set(EVENT_GROUPS.filter(g => g.id !== 'trade' && g.id !== 'res' && events.some(e => e.group === g.id)).map(g => g.id));
   const lanes = () => EVENT_GROUPS.filter(g => shown.has(g.id));
   let byBar = new Map();
-  const redraw = () => { byBar = eventsByBar(events, series, c.span, shown); drawChart(panel, c, series, byBar, lanes(), state); };
+  const redraw = () => { byBar = eventsByBar(events, series, c.span, shown); drawChart(panel, c, { series, byBar, lanes: lanes(), state }); };
   panel.querySelectorAll('.pc-pill').forEach(btn => /** @type {HTMLElement} */ (btn).onclick = () => {
     state.range = +/** @type {HTMLElement} */ /** @type {string} */ ((btn).dataset.i);
     panel.querySelectorAll('.pc-pill').forEach(x => x.setAttribute('aria-pressed', String(x === btn)));
@@ -196,7 +196,7 @@ function initCharts(members, events){
       setHtml(panel, `<div class="pc-ph"><div class="pc-ptitle">${c.title}<small>${series.length} bars</small></div><div class="pc-psum"><span class="${last[1] >= 0 ? 'chg-up' : 'chg-down'}">${sign(last[1], 2)}% latest</span></div><div class="pc-pills" role="group" aria-label="${c.title} range">${c.ranges.map((r, i) => `<button type="button" class="pc-pill" data-i="${i}" aria-pressed="${i === c.def}">${r[0]}</button>`).join('')}</div></div>
         <div class="pc-chart"><svg role="img" aria-label="${c.title} average % change chart"></svg><div class="pc-tip"></div></div>`);
       root.appendChild(panel);
-      ctl.push(bindChart(panel, c, series, events, { range: c.def, geo: null }));
+      ctl.push(bindChart(panel, c, { series, events, state: { range: c.def, geo: null } }));
     });
     let rz; const ro = new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { if(root.isConnected) ctl.forEach(x => x.redraw()); }, 80); });
     ro.observe(root);

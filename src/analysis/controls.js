@@ -16,7 +16,7 @@ function toggleGroup(label, attr, current, ids){
       </div>`;
 }
 
-function rangeSlider(label, labelId, labelText, idPrefix, min, max, lo, hi, minAria, maxAria){
+function rangeSlider(label, { labelId, labelText, idPrefix, min, max, lo, hi, minAria, maxAria }){
   return `<div class="analysis-filter">
         <div class="analysis-filter-label">${label}: <span id="${labelId}">${labelText}</span></div>
         <div class="range-slider">
@@ -33,9 +33,9 @@ function analysisControlsHtml(mosBoundLo, mosBoundHi){
   const mosCurLo = f.mosLo === null ? mosBoundLo : mosClamp(f.mosLo);
   const mosCurHi = f.mosHi === null ? mosBoundHi : mosClamp(f.mosHi);
   return `<div class="analysis-filters">
-      ${rangeSlider('W RSI range', 'weekRsiRangeLabel', `${f.weekMin}&ndash;${f.weekMax}`, 'weekRsi', 0, 100, f.weekMin, f.weekMax, 'W RSI minimum', 'W RSI maximum')}
-      ${rangeSlider('M RSI range', 'monthRsiRangeLabel', `${f.monthMin}&ndash;${f.monthMax}`, 'monthRsi', 0, 100, f.monthMin, f.monthMax, 'M RSI minimum', 'M RSI maximum')}
-      ${rangeSlider('MoS range', 'mosRangeLabel', '', 'mos', mosBoundLo, mosBoundHi, mosCurLo, mosCurHi, 'Margin of Safety minimum', 'Margin of Safety maximum')}
+      ${rangeSlider('W RSI range', { labelId: 'weekRsiRangeLabel', labelText: `${f.weekMin}&ndash;${f.weekMax}`, idPrefix: 'weekRsi', min: 0, max: 100, lo: f.weekMin, hi: f.weekMax, minAria: 'W RSI minimum', maxAria: 'W RSI maximum' })}
+      ${rangeSlider('M RSI range', { labelId: 'monthRsiRangeLabel', labelText: `${f.monthMin}&ndash;${f.monthMax}`, idPrefix: 'monthRsi', min: 0, max: 100, lo: f.monthMin, hi: f.monthMax, minAria: 'M RSI minimum', maxAria: 'M RSI maximum' })}
+      ${rangeSlider('MoS range', { labelId: 'mosRangeLabel', labelText: '', idPrefix: 'mos', min: mosBoundLo, max: mosBoundHi, lo: mosCurLo, hi: mosCurHi, minAria: 'Margin of Safety minimum', maxAria: 'Margin of Safety maximum' })}
       <div class="analysis-toggles">
       ${toggleGroup('X-axis:', 'axis-value', f.xAxis, { week: 'xAxisWeekBtn', month: 'xAxisMonthBtn' })}
       ${toggleGroup('Y-axis:', 'axis-value', f.yAxis, { week: 'yAxisWeekBtn', month: 'yAxisMonthBtn' })}

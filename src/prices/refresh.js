@@ -56,10 +56,10 @@ async function refreshOneStock(s, db, lean){
   }
   const lw = W[W.length - 1][4], lm = M[M.length - 1][4];
   if(needW && needM && Math.abs(lw - lm) > 0.003 * Math.abs(lm)) note += ' (last weekly and monthly closes differ by more than 0.3 %)';
-  await persistBars(s, db, sym, W, M, { delta: !!delta, needW, needM, note });
+  await persistBars(s, db, sym, { W, M }, { delta: !!delta, needW, needM, note });
 }
 // Writes a stock's own priceHistory documents (only the kinds that changed when `o.delta`) and returns the save time. A full write (not a delta) replaces both.
-async function writeBarDocs(s, db, sym, W, M, o){
+async function writeBarDocs(s, db, sym, { W, M }, o){
   const key = pcTickerKey(s), have = priceHistoryByTicker[key];
   const [exch, tick] = sym.split(':');
   const base = sanitizeDocId(exch + '_' + tick);
@@ -78,17 +78,17 @@ async function writeBarDocs(s, db, sym, W, M, o){
 async function saveFullBars(s, W, M){
   const key = pcTickerKey(s), db = await dbCapabilityPromise;
   if(!db) return false;
-  try { await writeBarDocs(s, db, await tvResolveSymbol(s), W, M, { delta: false }); return true; }
+  try { await writeBarDocs(s, db, await tvResolveSymbol(s), { W, M }, { delta: false }); return true; }
   catch(e){ console.error('Could not compact the bars of ' + key, e); return false; }
 }
 // Saves one stock's bars (only the kinds that changed when `o.delta`), then its technical score. Shared by the one-stock fetch above and the batch update.
-async function persistBars(s, db, sym, W, M, o){
+async function persistBars(s, db, sym, { W, M }, o){
   const { delta, needW, needM } = o;
   let note = o.note || '';
   const key = pcTickerKey(s);
   const set = (m, stage) => priceJobSet(key, 'running', m, stage);
   set('saving bars…', 'bars');
-  const iso = await writeBarDocs(s, db, sym, W, M, { delta, needW, needM });
+  const iso = await writeBarDocs(s, db, sym, { W, M }, { delta, needW, needM });
   priceApply(key, { '1W': W, '1M': M }, sym, iso);
   let techMsg = '';
   const pv = s.pillars && typeof s.pillars.val === 'number' ? s.pillars.val : null;

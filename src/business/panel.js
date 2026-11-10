@@ -178,10 +178,10 @@ function breadth(r){
 // Strategy choice as buttons, like the Analysis filter: "All" (no strategy) or one of your strategies, each with how many stocks qualify today.
 function strategyGroupHtml(){
   const chosen = chosenStrategy();
-  const btn = (value, label, n, active, dot, title) => '<button type="button" class="filter-btn' + (active ? ' active' : '') + '" data-biz-strat="' + escapeHtml(value) + '" title="' + title + '"><span class="filter-dot filter-dot--' + dot + '"></span>' + label + '<span class="filter-n">' + n + '</span></button>';
-  const list = [btn('', 'All', stocks.length, !chosen, 'text', 'Do not highlight by a strategy')].concat(publishedStrategies().map(x => {
+  const btn = (value, label, { n, active, dot, title }) => '<button type="button" class="filter-btn' + (active ? ' active' : '') + '" data-biz-strat="' + escapeHtml(value) + '" title="' + title + '"><span class="filter-dot filter-dot--' + dot + '"></span>' + label + '<span class="filter-n">' + n + '</span></button>';
+  const list = [btn('', 'All', { n: stocks.length, active: !chosen, dot: 'text', title: 'Do not highlight by a strategy' })].concat(publishedStrategies().map(x => {
     const set = strategyStockSet(x.id);
-    return btn(x.id, '<span class="filter-label">' + escapeHtml(x.name) + '</span>', set ? set.size : 0, x.id === chosen, 'accent', 'Highlight the stocks that qualify for this strategy today');
+    return btn(x.id, '<span class="filter-label">' + escapeHtml(x.name) + '</span>', { n: set ? set.size : 0, active: x.id === chosen, dot: 'accent', title: 'Highlight the stocks that qualify for this strategy today' });
   }));
   const rb = '<div class="filter-group"><h2>Weekly Move</h2><div class="filter-group-row"><button type="button" class="filter-btn' + (rebound ? ' active' : '') + '" data-biz-rebound="1" aria-pressed="' + rebound + '" title="Down last week, up this week"><span class="filter-dot filter-dot--buy"></span>Rebound<span class="filter-n">' + stocks.filter(isRebound).length + '</span></button></div></div>';
   return '<div class="filters analysis-filters-panel biz-strategy-panel"><div class="filter-group"><h2>Strategy</h2><div class="filter-group-row">' + list.join('') + '</div></div>' + rb + '</div>';
@@ -203,9 +203,9 @@ function render(){
 }
 // The heat map: beside the filters it is as wide as the page leaves room for; in full screen it takes the whole window, with a height that fits it.
 function heatMap(rows, p, el){
-  if(!bizFull) return heatmapHtml(rows, period, Math.max(300, (embed ? ((el.closest('#analysisPanelBody') || el).clientWidth || el.clientWidth) : el.clientWidth - 280)), heatSize);
+  if(!bizFull) return heatmapHtml(rows, period, { width: Math.max(300, (embed ? ((el.closest('#analysisPanelBody') || el).clientWidth || el.clientWidth) : el.clientWidth - 280)), size: heatSize });
   const w = Math.max(300, window.innerWidth - 40), ratio = Math.min(.95, Math.max(.45, (window.innerHeight - 140) / w));
-  return heatmapHtml(rows, period, w, heatSize, ratio);
+  return heatmapHtml(rows, period, { width: w, size: heatSize, hRatio: ratio });
 }
 function draw(el){
   document.body.classList.toggle('biz-full-open', bizFull);

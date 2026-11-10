@@ -1914,7 +1914,7 @@ test('trade call: history keeps one point a day and lists when the call changed'
 test('heat map: tiles carry their place, strength and tone as data-css and classes, never an inline style', async () => {
   const { heatmapHtml } = await import('../src/business/heatmap.js');
   const rows = [{ name: 'Banks', count: 9, mean: 4 }, { name: 'Steel', count: 5, mean: -6 }, { name: 'Gaps', count: 2, mean: null }];
-  const html = heatmapHtml(rows, '1M', 1000, 'chg', .5);
+  const html = heatmapHtml(rows, '1M', { width: 1000, size: 'chg', hRatio: .5 });
   assert.ok(!/\sstyle=/.test(html), 'no style attribute');
   assert.ok(html.includes('<div class="hm-wrap" data-css="--ratio:1000/500">'));
   const tile = name => html.match(new RegExp('<button[^>]*data-biz-heat="' + name + '"[^>]*>'))[0];
@@ -1924,7 +1924,7 @@ test('heat map: tiles carry their place, strength and tone as data-css and class
 });
 test('heat map: a stronger move mixes more colour, capped at 90%, and count sizing still tones every tile', async () => {
   const { heatmapHtml } = await import('../src/business/heatmap.js');
-  const mix = (mean) => Number(heatmapHtml([{ name: 'A', count: 3, mean }], '1M', 1000, 'count').match(/--mix:(\d+)%/)[1]);
+  const mix = (mean) => Number(heatmapHtml([{ name: 'A', count: 3, mean }], '1M', { width: 1000, size: 'count' }).match(/--mix:(\d+)%/)[1]);
   assert.strictEqual(mix(0), 18);
   assert.strictEqual(mix(5), 54);
   assert.strictEqual(mix(500), 90);
@@ -1932,7 +1932,7 @@ test('heat map: a stronger move mixes more colour, capped at 90%, and count sizi
 });
 test('heat map: a hostile industry name is escaped in the title and the attribute', async () => {
   const { heatmapHtml } = await import('../src/business/heatmap.js');
-  const html = heatmapHtml([{ name: '<img src=x onerror=alert(1)>', count: 4, mean: 2 }], '1W', 1000, 'chg');
+  const html = heatmapHtml([{ name: '<img src=x onerror=alert(1)>', count: 4, mean: 2 }], '1W', { width: 1000, size: 'chg' });
   assert.ok(!html.includes('<img'), 'the name never becomes markup');
   assert.ok(html.includes('&lt;img'));
 });

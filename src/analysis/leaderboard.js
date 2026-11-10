@@ -49,7 +49,7 @@ const ICONS = {
 const iconSvg = (name) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 // The text label is hidden on a wide screen (the icon and its tooltip say it) and shown when the buttons sit in the phone filter sheet.
 const iconBtnInner = (name, text) => `${iconSvg(name)}<span class="analysis-btn-label">${text}</span>`;
-const iconBtn = (id, name, text, tip, state) => `<button type="button" class="analysis-icon-btn" id="${id}" title="${tip}" aria-label="${tip}"${state}>${iconBtnInner(name, text)}</button>`;
+const iconBtn = (id, name, text, { tip, state }) => `<button type="button" class="analysis-icon-btn" id="${id}" title="${tip}" aria-label="${tip}"${state}>${iconBtnInner(name, text)}</button>`;
 function leaderboardHtml(chartBlock, viewHtml){
   const headerColOrder = analysisColumnOrder(), kit = getRefreshKit();
   return `<div class="analysis-leaderboard${lbFull ? ' lb-full' : ''}">
@@ -57,9 +57,9 @@ function leaderboardHtml(chartBlock, viewHtml){
         ${viewHtml}
         <div class="rk-headline"><p class="upload-hint biz-showing biz-showing--flush"><span id="analysisLeaderboardCount" class="analysis-count"></span></p>${(defineAnalysisScope(), '')}</div>
         <div class="analysis-actions">
-          ${iconBtn('analysisColumnsBtn', 'columns', 'Columns', 'Columns: choose and reorder the grid columns', ` aria-pressed="${getAnalysisColumnsPanelOpen()}"`)}
-          ${iconBtn('analysisChartToggle', 'chart', 'Show chart', 'Show chart', ' aria-expanded="false"')}
-          ${iconBtn('analysisFullscreenBtn', lbFull ? 'shrink' : 'expand', fullscreenLabel(lbFull), fullscreenLabel(lbFull) + ' (Esc to leave)', ` data-analysis-full aria-pressed="${lbFull}"`)}
+          ${iconBtn('analysisColumnsBtn', 'columns', 'Columns', { tip: 'Columns: choose and reorder the grid columns', state: ` aria-pressed="${getAnalysisColumnsPanelOpen()}"` })}
+          ${iconBtn('analysisChartToggle', 'chart', 'Show chart', { tip: 'Show chart', state: ' aria-expanded="false"' })}
+          ${iconBtn('analysisFullscreenBtn', lbFull ? 'shrink' : 'expand', fullscreenLabel(lbFull), { tip: fullscreenLabel(lbFull) + ' (Esc to leave)', state: ` data-analysis-full aria-pressed="${lbFull}"` })}
           ${kit ? kit.barHtml('analysis') : ''}
         </div>
       </div>
