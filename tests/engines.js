@@ -4942,6 +4942,88 @@ test('Claude controls: a master switch and one switch per step, steps are off wh
   win.document.body.innerHTML = ''; C.init_ui_claudecontrols();   // a page without the panel
 }));
 
+// ---- Fundamental factor card (src/detail/fundcell.js): the metric rows, the extra figures, the governance flags and the written research
+TV_VALUES.add('FUND_METRIC_LABEL'); TV_VALUES.add('PERCENTILE_METRIC_KEYS');
+const fcSetup = async (over) => {
+  const T = globalThis.__T = { FUND_METRIC_LABEL: { ROE: 'Return on equity' }, PERCENTILE_METRIC_KEYS: new Set(['Rank']), escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'),
+    hasSource: (f) => !!(f.research && f.research.sources && f.research.sources.length), scoreBand: () => 'fs-hold', fundMissingMetrics: (f) => f.missing || [], fundMetricDisplay: (k, v) => 'D' + v,
+    fundMetricNum: (f, k) => (f.nums || {})[k] ?? null, fundNoteExtra: (n) => n || '', fundBusinessSummary: () => '', isProxyFactor: (f) => !!f.proxy, metricDotHtml: (f, k, v) => '<i class="dot-' + k + '"></i>', toneDotHtml: (t) => '<i class="tone-' + t + '"></i>',
+    dropRepeats: (list, seen) => (list || []).filter((x) => !seen.includes(x)), pointsView: (f) => ({ nums: new Map([['ROE', [1, 2]]]), pts: f.pts || [], facts: f.facts || [] }) };
+  Object.assign(T, over || {});
+  return { T, M: await loadAllStubbed('src/detail/fundcell.js', '', []) };
+};
+test('factor card: metric rows show a dot, a label and a value, the extra figures are tidied and escaped, and governance red flags appear when the numbers cross their lines', () => alone(async () => {
+  const { M } = await fcSetup();
+  const f = { key: 'gov', name: 'Governance <b>', weight: 2, score: 1.234, metrics: [['ROE', '12%'], ['PE', 'n/a'], ['Rank', '90']], missing: ['PE', 'ROCE'], nums: { 'Promoter pledge': 30, 'Promoter holding change': -2.5, 'FII change 3yr': -4, 'DII change 3yr': -3.5 },
+    facts: [{ label: 'Price to book (TradingView)', value: '13.9496814684338 x', tone: 'pos', n: [3], note: 'a <note>' }, { label: 'Odd "label"', value: 5, tone: 'weird' }] };
+  const html = M.renderFundFactorCell(f, true);
+  assert.ok(html.includes('fund-cell-wide') && html.includes('1.23<span class="fund-cell-max">/2</span>') && html.includes('data-css="--w:62%"') && html.includes('Governance <b>'));   // the score bar is a share of the weight
+  assert.ok(html.includes('<span class="data-chip " data-n="1 2"><i class="dot-ROE"></i><span class="chip-label">Return on equity:</span><b class="chip-val">D12%</b></span>'));   // a metric linked to points 1 and 2
+  assert.ok(html.includes('chip-na') && html.includes('<span class="chip-label">PE:</span>') && html.includes('chip-long'));
+  assert.ok(html.includes('chip-new') && html.includes('data-n="3"') && html.includes('tone-pos') && html.includes('tone-neu') && html.includes('Price to book:</span>') && html.includes('13.95 x') && html.includes('a &lt;note>') && html.includes('Odd &quot;label&quot;:'));
+  assert.ok(html.includes('High promoter pledge (30.0%)') && html.includes('Promoters reduced their stake by 2.5%') && html.includes('FII holding down 4.0%') && html.includes('DII holding down 3.5%'));
+  assert.ok(html.includes('incomplete-tag') && html.includes('PE, ROCE'));
+  const calm = M.renderFundFactorCell({ key: 'gov', name: 'G', weight: 2, score: 1, metrics: [], nums: { 'Promoter pledge': 12 } }, false);
+  assert.ok(calm.includes('Elevated promoter pledge (12.0%)') && !calm.includes('fund-cell-wide') && !calm.includes('fund-flag fs-avoid'));
+  assert.ok(!M.renderFundFactorCell({ key: 'gov', name: 'G', weight: 2, score: 1, metrics: [], nums: { 'Promoter pledge': 5, 'Promoter holding change': -1, 'FII change 3yr': -1 } }, false).includes('fund-flag'));
+  assert.ok(!M.renderFundFactorCell({ key: 'fin', name: 'F', weight: 2, score: 1, metrics: [], nums: { 'Promoter pledge': 90 } }, false).includes('fund-flag'));   // flags are only for governance
+}));
+test('factor card: written research shows its points, strengths and watch-outs once, sources not already linked, and a warning when it is old; an excluded factor says so', () => alone(async () => {
+  const { M } = await fcSetup();
+  const old = new Date(Date.now() - 200 * 86400000).toISOString().slice(0, 10);
+  const f = { key: 'moat', name: 'Moat', weight: 2, score: 1, metrics: [], proxy: true, research: { asof: old, summary: 'Short <summary>', positives: ['Strong brand', 'Repeat'], negatives: ['Debt'], sources: [{ title: 'Linked', url: 'https://a.test/1' }, { title: 'Other <x>', url: 'https://b.test/2' }, 'plain source', { title: 'No link', url: 'javascript:alert(1)' }, null] },
+    pts: [{ text: 'A point', n: 1, url: 'https://a.test/1' }, { text: 'Another' }] };
+  const withPts = M.renderFundFactorCell(f, false);
+  assert.ok(withPts.includes('fund-cell-proxy') && withPts.includes('fr-tagged') && withPts.includes('data-n="1"') && withPts.includes('A point') && withPts.includes('Strong brand') && withPts.includes('fr-pos') && withPts.includes('fr-neg') && withPts.includes('Research is 200 days old'));
+  assert.ok(withPts.includes('Sources:') && withPts.includes('href="https://b.test/2"') && withPts.includes('Other &lt;x>') && !withPts.includes('>Linked ↗') && withPts.includes('plain source') && !withPts.includes('href="javascript:') && withPts.includes('No link'));   // a source already linked on a point is not repeated; a script link is not a link
+  const noPts = M.renderFundFactorCell(Object.assign({}, f, { pts: [], research: { asof: 'not a date', summary: 'Short <summary>', positives: ['Strong brand'], negatives: ['Debt'], sources: [{ title: 'S', url: 'https://s.test' }] } }), false);
+  assert.ok(noPts.includes('fund-research-summary') && noPts.includes('Short &lt;summary>') && noPts.includes('fund-research-list pos') && noPts.includes('fund-research-list neg') && !noPts.includes('days old'));   // no points: the plain lists
+  assert.ok(M.fundCellHasPoints(f) && !M.fundCellHasPoints({ key: 'fin' }) && !M.fundCellHasPoints({ research: { sources: [] }, pts: [] }) && M.fundCellHasPoints({ research: {}, pts: [{ text: 'x' }] }));
+  const excluded = M.renderFundFactorCell({ key: 'moat', name: 'Moat', weight: 2, score: 0, metrics: [], excluded: 'no data' }, false);
+  assert.ok(excluded.includes('Not scored') && excluded.includes('Left out of the score: no data. Run Refresh Fundamental Info') && !excluded.includes('fund-cell-bar'));
+  const na = M.renderFundFactorCell({ key: 'fin', name: 'Fin', weight: 2, score: 0, metrics: [], excluded: 'a bank', na: 'bank' }, false);
+  assert.ok(na.includes('Left out of the score: a bank'));
+}));
+
+// ---- Refresh queue (src/refresh/kit-queue.js): what a press of a Refresh button puts in the queue
+TV_VALUES.add('LD_BATCH_MAX');
+test('refresh queue: a request becomes one job per kind, stocks already waiting are skipped, big lists ask first and too-big ones are refused', () => withPage('', async () => {
+  const realInterval = globalThis.setInterval, realTimeout = globalThis.setTimeout;
+  globalThis.setInterval = () => 0; globalThis.setTimeout = (f, ms, ...a) => (ms > 100 ? 0 : realTimeout(f, ms, ...a));   // no heartbeat or delayed save left running after the test
+  try { await kqBody(); } finally { globalThis.setInterval = realInterval; globalThis.setTimeout = realTimeout; }
+  async function kqBody(){
+  const notices = [], kept = new Set();
+  const T = globalThis.__T = { LD_BATCH_MAX: { fund: 50, tech: 80 }, dbCapabilityPromise: Promise.resolve(null), notices, confirms: [], syncs: 0,
+    getLdBatch: () => ({ running: true }), sleep: () => new Promise(() => {}), pcTickerKey: (s) => s.name, needs: (kind, s) => kind === 'fund' ? !s.fundDone : !s.techDone, priorityOrder: (kind, l) => l.slice().reverse(),
+    userRef: () => null, sectionOf: (src) => 'sec-' + src, activityNotify: (n) => notices.push(n), registerBusy: () => {}, selKeys: () => kept, isExternalSelection: (n) => n === 'ext',
+    stockByKey: (k) => ({ name: k }), activityRun: () => {}, activityEnd: () => {}, activityDropWhere: () => {}, setNoticeDismissHandler: () => {}, tvMcp: async () => null, ldBatchStart: async () => {}, ldBatchStop: () => {} };
+  const Q = await loadAllStubbed('src/refresh/kit-queue.js', '', []);
+  Q.setQueueHooks({ openConfirm: (anchor, spec, plan) => T.confirms.push([anchor, spec.label, plan.map((p) => [p.kind, p.list.length])]), syncChecks: () => { T.syncs++; } });
+  const stocks = (n, pre = 'S') => Array.from({ length: n }, (_, i) => ({ name: pre + i }));
+  const spec = (over) => Object.assign({ list: stocks(3), kinds: ['tech', 'fund'], only: false, source: 'strat', label: 'Picks' }, over);
+  Q.request(spec(), null);
+  assert.deepStrictEqual(Q.queuedJobs().map((j) => [j.kind, j.keys, j.source, j.label, j.force, j.total, j.done]), [['tech', ['S0', 'S1', 'S2'], 'strat', 'Picks', false, 3, 0], ['fund', ['S0', 'S1', 'S2'], 'strat', 'Picks', false, 3, 0]]);
+  Q.request(spec({ list: [{ name: 'S1' }, { name: 'S9' }, { name: 'S9' }] }), null);   // S1 is already queued; S9 is new (once)
+  assert.deepStrictEqual(Q.queuedJobs().slice(2).map((j) => [j.kind, j.keys]), [['tech', ['S9']], ['fund', ['S9']]]);
+  Q.request(spec(), null); assert.ok(notices.some((n) => n.title === 'Already queued'));   // everything is waiting already
+  notices.length = 0;
+  Q.request(spec({ list: stocks(2, 'N'), kinds: ['fund'], only: true }), null);   // "only those that need it": Fundamental jobs are forced
+  assert.deepStrictEqual(Q.queuedJobs().slice(4).map((j) => [j.kind, j.keys, j.force]), [['fund', ['N1', 'N0'], true]]);   // most important first
+  Q.request(spec({ list: stocks(2, 'D').map((s) => Object.assign(s, { techDone: true })), kinds: ['tech'], only: true }), null);
+  assert.ok(notices.some((n) => n.title === 'Nothing to refresh') && Q.queuedJobs().length === 5);
+  notices.length = 0;
+  Q.request(spec({ list: stocks(1001, 'T'), kinds: ['tech'] }), null);
+  assert.ok(notices.some((n) => n.title === 'Too many stocks for one refresh' && /1001/.test(n.text)) && Q.queuedJobs().length === 5);
+  const anchor = {};
+  Q.request(spec({ list: stocks(51, 'F'), kinds: ['fund'], label: 'Big' }), anchor);   // over 50 Fundamental stocks: ask first
+  assert.deepStrictEqual(T.confirms, [[anchor, 'Big', [['fund', 51]]]]); assert.strictEqual(Q.queuedJobs().length, 5);
+  Q.request(spec({ list: stocks(51, 'F'), kinds: ['fund'], label: 'Big', confirmed: true, selName: 'strat', clearSel: true }), anchor);   // confirmed: it queues, and the ticks are cleared
+  assert.deepStrictEqual([Q.queuedJobs().length, T.syncs], [6, 1]);
+  kept.add('x'); Q.request(spec({ list: stocks(1, 'E'), kinds: ['tech'], selName: 'ext', clearSel: true }), null); assert.ok(kept.has('x'));   // a page-owned selection is cleared by the page
+  Q.request(spec({ list: stocks(1, 'G'), kinds: ['tech'] }), null); assert.ok(Q.busyIn('sec-strat') && !Q.busyIn('other') && !Q.busyIn(''));
+  }
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
