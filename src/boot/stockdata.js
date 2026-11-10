@@ -10,6 +10,7 @@ import { debugHandle } from './handoff.js';
 import { bootMessage, hideBootMessage, showUpdateBanner } from './status.js';
 
 const DATA_DB = 'albaStockCache', DATA_STORE = 'kv';
+const CHUNK_WORKERS = 6;   // chunks fetched at the same time
 
 async function cacheGet(version){
   const idb = await openKvDb(DATA_DB, DATA_STORE); if(!idb) return null;
@@ -46,45 +47,82 @@ async function fetchChunk(db, id){
   throw lastErr;
 }
 
+// The artifact database, or null when this view has none.
+const openDb = async () => (typeof claude !== 'undefined' && claude && typeof claude.use === 'function') ? await claude.use('db').catch(() => null) : null;
+
+async function readMeta(db){
+  const ms = await db.doc('stockMeta/main').get();
+  const meta = ms && ms.exists ? ms.data() : null;
+  if(!meta || !Array.isArray(meta.chunks)) throw new Error('stock index not found in the database');
+  return meta;
+}
+
+// Fetches every chunk, a few at a time, and returns the stocks in chunk order.
+async function fetchAllChunks(db, meta){
+  const parts = new Array(meta.chunks.length);
+  let next = 0, done = 0;
+  const worker = async () => {
+    while(next < meta.chunks.length){
+      const i = next++;
+      parts[i] = await fetchChunk(db, meta.chunks[i]);
+      done++;
+      bootMessage('Loading stock data… ' + Math.round(done / meta.chunks.length * 100) + '%');
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CHUNK_WORKERS, meta.chunks.length) }, worker));
+  const list = [].concat(...parts);
+  if(list.length !== meta.count) throw new Error('expected ' + meta.count + ' stocks but received ' + list.length);
+  return list;
+}
+
+// The copy cached in this browser when it is the current version, otherwise every chunk (which is then cached).
+async function loadList(db, meta, info){
+  const cached = await cacheGet(meta.version);
+  if(cached && cached.length === meta.count){ info.cache = true; return cached; }
+  const list = await fetchAllChunks(db, meta);
+  cachePut(meta.version, list);
+  return list;
+}
+
+// Reads the index and the list. Never throws: a failure comes back as its reason.
+async function tryLoad(db, info){
+  try {
+    bootMessage('Loading stock data…');
+    const meta = await readMeta(db);
+    info.version = meta.version;
+    return { list: await loadList(db, meta, info), meta, failure: '' };
+  } catch(e){
+    return { list: null, meta: null, failure: (e && (e.message || e.code)) || String(e) };
+  }
+}
+
+// Records how this view loaded, but only when it differs from the last record (never on every load).
+async function recordLoad(db, info){
+  try {
+    const ref = db.doc('diagnostics/stockLoad');
+    const cur = await ref.get();
+    const c = cur && cur.exists ? cur.data() : null;
+    if(c && c.source === info.source && c.version === info.version && c.count === info.count) return;
+    await ref.set({ source: info.source, version: info.version, count: info.count, cache: info.cache, ms: info.ms, failure: info.failure || null, at: new Date().toISOString() });
+  } catch(e){ /* diagnostics are optional */ }
+}
+
+// Shows the "data updated - reload" banner when the index moves to another version.
+function watchForNewVersion(db, info){
+  try {
+    db.doc('stockMeta/main').onSnapshot((snap) => {
+      const d = snap && snap.exists ? snap.data() : null;
+      if(d && info.version != null && d.version !== info.version) showUpdateBanner();
+    }, () => {});
+  } catch(e){ /* the update banner is optional */ }
+}
+
 // Resolves with the stock list; on failure shows the reason on the cover (with a Retry button) and rejects.
 async function loadStocks(){
   const t0 = performance.now();
   const info = { source: 'database', cache: false, version: null, count: 0, ms: 0 };
-  const db = (typeof claude !== 'undefined' && claude && typeof claude.use === 'function') ? await claude.use('db').catch(() => null) : null;
-  let list = null, meta = null, failure = '';
-  if(db){
-    try {
-      bootMessage('Loading stock data…');
-      const ms = await db.doc('stockMeta/main').get();
-      meta = ms && ms.exists ? ms.data() : null;
-      if(!meta || !Array.isArray(meta.chunks)) throw new Error('stock index not found in the database');
-      info.version = meta.version;
-      list = await cacheGet(meta.version);
-      if(list && list.length === meta.count){ info.cache = true; }
-      else {
-        list = null;
-        const parts = new Array(meta.chunks.length);
-        let next = 0, done = 0;
-        const worker = async () => {
-          while(next < meta.chunks.length){
-            const i = next++;
-            parts[i] = await fetchChunk(db, meta.chunks[i]);
-            done++;
-            bootMessage('Loading stock data… ' + Math.round(done / meta.chunks.length * 100) + '%');
-          }
-        };
-        await Promise.all(Array.from({ length: Math.min(6, meta.chunks.length) }, worker));
-        list = [].concat(...parts);
-        if(list.length !== meta.count) throw new Error('expected ' + meta.count + ' stocks but received ' + list.length);
-        cachePut(meta.version, list);
-      }
-    } catch(e){
-      failure = (e && (e.message || e.code)) || String(e);
-      list = null;
-    }
-  } else {
-    failure = 'the database is not available in this view';
-  }
+  const db = await openDb();
+  const { list, meta, failure } = db ? await tryLoad(db, info) : { list: null, meta: null, failure: 'the database is not available in this view' };
   if(!list){
     bootMessage('Could not load the stock data: ' + failure + '.', true);
     throw new Error('stock data unavailable: ' + failure);
@@ -92,27 +130,8 @@ async function loadStocks(){
   info.count = list.length; info.ms = Math.round(performance.now() - t0);
   hideBootMessage();
   debugHandle().loadInfo = info;
-  if(db){
-    // Record how this view loaded, but only when it differs from the last record (never on every load).
-    (async () => {
-      try {
-        const ref = db.doc('diagnostics/stockLoad');
-        const cur = await ref.get();
-        const c = cur && cur.exists ? cur.data() : null;
-        if(!c || c.source !== info.source || c.version !== info.version || c.count !== info.count){
-          await ref.set({ source: info.source, version: info.version, count: info.count, cache: info.cache, ms: info.ms, failure: info.failure || null, at: new Date().toISOString() });
-        }
-      } catch(e){ /* diagnostics are optional */ }
-    })();
-    if(meta){
-      try {
-        db.doc('stockMeta/main').onSnapshot((snap) => {
-          const d = snap && snap.exists ? snap.data() : null;
-          if(d && info.version != null && d.version !== info.version) showUpdateBanner();
-        }, () => {});
-      } catch(e){ /* the update banner is optional */ }
-    }
-  }
+  if(db) recordLoad(db, info);
+  if(db && meta) watchForNewVersion(db, info);
   return list;
 }
 

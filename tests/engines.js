@@ -4327,6 +4327,84 @@ test('refresh news: briefings or a reading that cannot be written are a note eac
     '3 quotes saved. Calendar updated: 2 events. The briefings were not updated (TV down). Reading updated.');
 })));
 
+// ---- Stock data loader (src/boot/stockdata.js): the index, the browser copy, the chunks, the notes it leaves and the update banner
+const SD_STUBS = {
+  '../core/idbkv.js': 'export const openKvDb = async () => globalThis.__SD.idb;',
+  './handoff.js': 'export const debugHandle = () => globalThis.__SD.handle;',
+  './status.js': 'export const bootMessage = (...a) => globalThis.__SD.messages.push(a), hideBootMessage = () => { globalThis.__SD.hidden++; }, showUpdateBanner = () => { globalThis.__SD.banners++; };'
+};
+// A browser copy: a key-value store where a read answers on the next tick, like IndexedDB does.
+const sdIdb = (store) => ({ transaction: () => { const tx = {}; return Object.assign(tx, { objectStore: () => ({
+  get: (k) => { const q = {}; setTimeout(() => { q.result = store[k]; q.onsuccess(); }); return q; },
+  clear: () => { for(const k of Object.keys(store)) delete store[k]; },
+  put: (v, k) => { store[k] = v; setTimeout(() => tx.oncomplete()); } }) }); } });
+// A made-up database: the index, the chunks (an Error value makes that chunk fail), the diagnostics record and the live index listener.
+const sdSetup = (over) => {
+  const o = Object.assign({ meta: { version: 5, count: 3, chunks: ['c1', 'c2'] }, chunks: { c1: [{ t: 'A' }, { t: 'B' }], c2: [{ t: 'C' }] }, diag: null, store: {}, diagFails: false, listenFails: false }, over || {});
+  const sd = globalThis.__SD = { messages: [], hidden: 0, banners: 0, handle: {}, idb: sdIdb(o.store), sets: [], fetched: [], snap: null };
+  const doc = (path) => ({
+    get: async () => {
+      if(path === 'stockMeta/main') return o.meta ? { exists: true, data: () => o.meta } : { exists: false };
+      if(path === 'diagnostics/stockLoad') return o.diag ? { exists: true, data: () => o.diag } : { exists: false };
+      sd.fetched.push(path); const v = o.chunks[path.split('/')[1]];
+      return v instanceof Error ? (() => { throw v; })() : v ? { exists: true, data: () => ({ stocks: v }) } : { exists: false };
+    },
+    set: async (d) => { if(o.diagFails) throw new Error('no room'); sd.sets.push([path, d]); },
+    onSnapshot: (ok) => { if(o.listenFails) throw new Error('no listener'); sd.snap = ok; } });
+  globalThis.claude = { use: async () => ({ doc }) };
+  return { sd, o };
+};
+const sdLoad = () => loadWithStubs('src/boot/stockdata.js', '', SD_STUBS);
+const sdTick = () => new Promise((r) => setTimeout(r, 20));
+const sdRestore = async (fn) => { const had = globalThis.claude; try { await fn(); } finally { if(had === undefined) delete globalThis.claude; else globalThis.claude = had; } };
+
+test('stock data: with no browser copy every chunk is fetched in order with progress, kept for next time, and the load is recorded and watched', () => alone(() => sdRestore(async () => {
+  const { sd, o } = sdSetup();
+  const M = await sdLoad();
+  const list = await M.loadStocks(); await sdTick();
+  assert.deepStrictEqual(list.map((x) => x.t), ['A', 'B', 'C']);
+  assert.deepStrictEqual(sd.messages, [['Loading stock data…'], ['Loading stock data… 50%'], ['Loading stock data… 100%']]);
+  assert.strictEqual(sd.hidden, 1);
+  assert.deepStrictEqual([sd.handle.loadInfo.source, sd.handle.loadInfo.cache, sd.handle.loadInfo.version, sd.handle.loadInfo.count], ['database', false, 5, 3]);
+  assert.deepStrictEqual(JSON.parse(o.store.v5).map((x) => x.t), ['A', 'B', 'C']);   // the copy for the next start
+  assert.deepStrictEqual(sd.sets.map((x) => [x[0], x[1].version, x[1].count, x[1].cache, x[1].failure]), [['diagnostics/stockLoad', 5, 3, false, null]]);
+  assert.ok(typeof sd.snap === 'function');
+  sd.snap({ exists: true, data: () => ({ version: 5 }) }); sd.snap({ exists: false }); sd.snap(null); assert.strictEqual(sd.banners, 0);   // same version, or nothing there: no banner
+  sd.snap({ exists: true, data: () => ({ version: 6 }) }); assert.strictEqual(sd.banners, 1);   // someone published new data
+})));
+
+test('stock data: a browser copy of the current version is used without fetching, a copy of another size is not, and an unchanged record is not written again', () => alone(() => sdRestore(async () => {
+  const cached = [{ t: 'X' }, { t: 'Y' }, { t: 'Z' }];
+  let x = sdSetup({ store: { v5: JSON.stringify(cached) }, diag: { source: 'database', version: 5, count: 3 } });
+  let list = await (await sdLoad()).loadStocks(); await sdTick();
+  assert.deepStrictEqual([list.map((s) => s.t), x.sd.fetched, x.sd.handle.loadInfo.cache, x.sd.sets, x.sd.messages], [['X', 'Y', 'Z'], [], true, [], [['Loading stock data…']]]);
+  x = sdSetup({ store: { v5: JSON.stringify(cached.slice(0, 2)) }, diag: { source: 'database', version: 4, count: 3 } });   // the copy is short: fetch again
+  list = await (await sdLoad()).loadStocks(); await sdTick();
+  assert.deepStrictEqual([list.map((s) => s.t), x.sd.fetched, x.sd.sets.length], [['A', 'B', 'C'], ['stockData/c1', 'stockData/c2'], 1]);   // the old record differs: written
+  x = sdSetup({ store: { v5: 'not json' } });   // a damaged copy is ignored
+  list = await (await sdLoad()).loadStocks(); assert.strictEqual(list.length, 3);
+  x = sdSetup({ diagFails: true, listenFails: true });   // diagnostics and the banner are optional
+  list = await (await sdLoad()).loadStocks(); await sdTick(); assert.strictEqual(list.length, 3);
+})));
+
+test('stock data: no database, no index, a short list or a missing chunk each stop the start with that reason on the cover', () => alone(() => sdRestore(async () => {
+  const fail = async (over, reason) => {
+    const { sd } = sdSetup(over);
+    await assert.rejects((await sdLoad()).loadStocks(), (e) => e.message === 'stock data unavailable: ' + reason);
+    assert.deepStrictEqual(sd.messages[sd.messages.length - 1], ['Could not load the stock data: ' + reason + '.', true]); assert.strictEqual(sd.hidden, 0);
+  };
+  const { sd } = sdSetup(); delete globalThis.claude;
+  await assert.rejects((await sdLoad()).loadStocks(), /stock data unavailable: the database is not available in this view/);
+  assert.deepStrictEqual(sd.messages, [['Could not load the stock data: the database is not available in this view.', true]]);
+  globalThis.claude = { use: async () => { throw new Error('x'); } };
+  await assert.rejects((await sdLoad()).loadStocks(), /database is not available/);
+  await fail({ meta: null }, 'stock index not found in the database');
+  await fail({ meta: { version: 1, count: 1 } }, 'stock index not found in the database');
+  await fail({ meta: { version: 5, count: 4, chunks: ['c1', 'c2'] } }, 'expected 4 stocks but received 3');
+  await fail({ chunks: { c1: [{ t: 'A' }], c2: Object.assign(new Error('x'), { message: '', code: 'permission-denied' }) } }, 'permission-denied');
+  await fail({ chunks: { c1: [{ t: 'A' }] } }, 'chunk c2 is missing');   // tried twice, with a pause between
+})));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
