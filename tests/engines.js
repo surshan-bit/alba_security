@@ -5462,6 +5462,88 @@ test('preferences: a change is mirrored in the browser and saved to the signed-i
   } finally { global.localStorage = old; global.setTimeout = realSet; global.clearTimeout = realClear; }
 }));
 
+// ---- Live prices (src/live/ticker.js): the button, the market hours, which stocks are watched and how a quote moves a row
+for(const n of ['stockByTickerSymbolAny', 'priceSymbolByTicker', 'ldSymOk']) TV_VALUES.add(n);
+const LIVE_PAGE = '<div class="topbar"><input class="topbar-search"></div><div id="detail"><div class="detail-ticker"></div></div><section class="app-section active"><table><tbody>' +
+  [0, 1, 2].map((i) => '<tr data-idx="' + i + '"><td data-live="mos"></td><td data-live="price"></td><td data-live="weekChg"></td><td data-live="monthChg"></td></tr>').join('') + '</tbody></table></section><section id="section-trackrecord"></section>';
+const liveRun = (over, fn) => kcPage(LIVE_PAGE, async (win) => {
+  const RealDate = Date, FIXED = new RealDate('2026-11-10T10:00:00+05:30').getTime();   // a Tuesday, market open
+  class FixedDate extends RealDate { constructor(...a){ if(a.length) super(...a); else super(FIXED); } static now(){ return FIXED; } }
+  Object.defineProperty(win.HTMLElement.prototype, 'offsetParent', { configurable: true, get(){ return this.hasAttribute('hidden') ? null : this.ownerDocument.body; } });
+  Object.defineProperty(win.document, 'hidden', { configurable: true, get(){ return !!win.__tabHidden; } });
+  const S = [0, 1, 2].map((i) => ({ name: 'S' + i, ticker: 'S' + i, valuation: { currentPrice: 100 }, technical: i < 2 ? { raw: { weekPctChange: 0, monthPctChange: 0 } } : undefined }));
+  const T = globalThis.__T = Object.assign({ stocks: S, stockByTickerSymbolAny: new Map([['S1', S[1]], ['S9', null]]), detailEl: win.document.getElementById('detail'), priceSymbolByTicker: {}, ldSymOk: new Map([['S0', { sym: 'NSE:S0' }], ['S1', { sym: 'NSE:S1' }], ['S2', { sym: 'NSE:S2' }]]),
+    trades: [], timers: [], quotes: { S0: 110, S1: 120, S2: 130 }, calls: [], shown: 1, mcp: true, batch: null, painted: 0, idle: [],
+    allTrades: () => T.trades, pcTickerKey: (s) => s.name, getShownIndex: () => T.shown, getLdBatch: () => T.batch, tvMcp: async () => T.mcp, redrawWhenIdle: (id) => T.idle.push(id), renderTradeLogPanel: () => {},
+    periodStartSec: () => 1000, tvCall: async (tool, a) => { T.calls.push(a.interval); return { bars: { t: [100, 200, 5000], c: [50, 80, 99] } }; }, pctChangeSpan: (v) => '<i>' + v + '</i>',
+    ldQuote: async (sym) => { const p = T.quotes[sym.split(':')[1]]; if(p instanceof Error) throw p; return { price: p }; }, ldVerifiedSymbol: async (s) => ({ price: T.quotes[s.name] }),
+    analysisRowContext: (s, i, idx) => ({ mosLabel: '12%', mosClass: 'mos-up', price: String(s.valuation.currentPrice), r: s.technical ? s.technical.raw : {} }), setHtml: (el, h) => { el.innerHTML = h; } }, over);
+  const timers = []; const real = { st: globalThis.setTimeout, ct: globalThis.clearTimeout, D: globalThis.Date, doc: globalThis.document };
+  globalThis.setTimeout = (f, ms) => { timers.push([f, ms]); return timers.length; }; globalThis.clearTimeout = () => {}; globalThis.Date = FixedDate; globalThis.document = win.document;
+  try {
+    const M = await loadAllStubbed('src/live/ticker.js', '', []);
+    await fn({ win, T, S, M, timers, btn: () => win.document.querySelector('.live-toggle'), settle: async () => { for(let i = 0; i < 12; i++) await new Promise((r) => setImmediate(r)); } });
+  } finally { Object.assign(globalThis, { setTimeout: real.st, clearTimeout: real.ct, Date: real.D }); if(real.doc === undefined) delete globalThis.document; else globalThis.document = real.doc; }
+});
+test('live prices: the button starts off, turns on to move the prices and weekly and monthly changes of the rows on screen, and flags what changed', () => liveRun({}, async ({ win, T, S, M, timers, btn, settle }) => {
+  M.init_live_ticker(); assert.strictEqual(btn().textContent, 'Live off'); assert.strictEqual(btn().getAttribute('aria-pressed'), 'false');
+  btn().click(); await settle();
+  assert.deepStrictEqual([btn().textContent, btn().getAttribute('aria-pressed'), btn().dataset.short], ['● Live', 'true', 'Live']);
+  assert.deepStrictEqual(S.map((s) => s.valuation.currentPrice), [110, 120, 130]);
+  assert.deepStrictEqual([S[0].technical.raw.weekPctChange, S[0].technical.raw.monthPctChange], [37.5, 37.5]);   // 110 against the last close before the week (80)
+  assert.ok(win.document.querySelector('tr[data-idx="0"] [data-live="price"]').classList.contains('live-flash') && win.document.querySelector('tr[data-idx="0"] [data-live="weekChg"]').innerHTML === '<i>37.5</i>');
+  assert.ok(win.document.querySelector('.detail-ticker .live-px').textContent.includes('120 live'));   // the open stock page shows its live price
+  assert.strictEqual(T.calls.length, 4);   // the reference closes are read once per stock and period
+  btn().click(); assert.strictEqual(btn().textContent, 'Live off'); btn().click(); await settle(); assert.strictEqual(T.calls.length, 4);   // kept
+  assert.ok(btn().title.includes('refresh every 20 seconds'));
+  assert.ok(timers.some(([f, ms]) => ms === 20000));   // the next sweep is scheduled
+}));
+test('live prices: no price, a thrown quote, a missing connector or a batch in progress leave the rows alone; repeated misses pause the button', () => liveRun({}, async ({ win, T, S, M, timers, btn, settle }) => {
+  M.init_live_ticker(); T.quotes = { S0: null, S1: new Error('x'), S2: undefined };
+  for(let i = 0; i < 3; i++){ btn().click(); btn().click(); btn().click(); await settle(); }
+  assert.deepStrictEqual(S.map((s) => s.valuation.currentPrice), [100, 100, 100]);
+  assert.strictEqual(btn().dataset.short === 'Paused' || btn().dataset.short === 'Live' || btn().dataset.short === 'Live off', true);
+  T.mcp = false; btn().click(); await settle(); T.mcp = true; T.batch = { running: true }; btn().click(); btn().click(); await settle(); assert.strictEqual(T.calls.length, 0);
+}));
+test('live prices: the Trade Log adds open positions, a long list is swept oldest first, and outside market hours the button says closed', () => liveRun({}, async ({ win, T, S, M, timers, btn, settle }) => {
+  M.init_live_ticker();
+  win.document.getElementById('section-trackrecord').textContent = 'open'; T.trades = [{ ticker: 'S1', status: 'open' }, { ticker: 'S1', status: 'open' }, { ticker: 'S0', status: 'closed', sell: 1 }, { ticker: 'S9', status: 'open' }];
+  btn().click(); await settle(); assert.ok(T.idle.includes('tradelog'));
+  win.document.getElementById('detail').setAttribute('hidden', ''); btn().click(); btn().click(); await settle();
+  const rowsHtml = Array.from({ length: 60 }, (_, i) => '<tr data-idx="' + (i + 3) + '"><td data-live="price"></td></tr>').join('');
+  win.document.querySelector('tbody').insertAdjacentHTML('beforeend', rowsHtml); for(let i = 3; i < 63; i++){ S.push({ name: 'S' + i, ticker: 'S' + i, valuation: {} }); T.quotes['S' + i] = 5; T.ldSymOk.set('S' + i, { sym: 'NSE:S' + i }); }
+  btn().click(); btn().click(); await settle(); assert.ok(S.filter((s) => s.valuation.currentPrice === 5).length <= 50);
+  win.document.dispatchEvent(new win.Event('visibilitychange')); win.document.dispatchEvent(new win.Event('click')); for(const [f, ms] of timers.splice(0)) if(ms === 1500 || ms === 4000) f();
+  await settle();
+}));
+test('live prices: outside market hours or with the tab hidden the button says closed and nothing is asked', () => liveRun({}, async ({ win, T, M, timers, btn, settle }) => {
+  const Real = Date, Sat = new Real('2026-11-14T10:00:00+05:30').getTime();
+  globalThis.Date = class extends Real { constructor(...a){ if(a.length) super(...a); else super(Sat); } static now(){ return Sat; } };
+  M.init_live_ticker(); btn().click(); await settle(); assert.deepStrictEqual([btn().textContent, btn().dataset.short, T.calls.length], ['Market closed', 'Closed', 0]); assert.ok(btn().title.includes('weekdays 9:15'));
+}));
+test('live prices: a stock with no known symbol is looked up first, unreadable bars keep the shown change, repeated misses pause then back off, and a hidden tab waits', () => liveRun({}, async ({ win, T, S, M, timers, btn, settle }) => {
+  M.init_live_ticker();
+  T.ldSymOk.clear(); T.priceSymbolByTicker.S1 = 'NSE:S1X'; delete S[2].valuation;
+  T.tvCall = async (tool, a) => { T.calls.push(a.symbol); if(a.symbol === 'NSE:S1X') throw new Error('no bars'); return { bars: { t: [1], c: [] } }; };
+  T.ldQuote = async (sym) => ({ price: 140 }); T.ldVerifiedSymbol = async (s) => ({ price: 150 });
+  win.__tabHidden = true; btn().click(); await settle(); assert.strictEqual(S[0].valuation.currentPrice, 100);   // a hidden tab asks for nothing
+  win.__tabHidden = false; btn().click(); btn().click(); await settle();
+  assert.deepStrictEqual(S.map((s) => s.valuation.currentPrice), [150, 150, 150]);   // no symbol known yet: the verified lookup answers
+  T.ldSymOk.set('S0', { sym: 'NSE:S0' }); T.ldSymOk.set('S1', { sym: 'NSE:S1' });
+  btn().click(); btn().click(); await settle(); assert.ok(T.calls.includes('NSE:S1X') && S[1].technical.raw.weekPctChange === 0);   // the bars could not be read: the shown figures stay
+  T.shown = 7; btn().click(); btn().click(); await settle(); assert.ok(win.document.querySelector('.detail-ticker .live-px'));   // no stock on the stock page: its chip is left alone
+  T.shown = 0; T.quotes = {}; T.ldQuote = async () => ({ price: null }); T.ldVerifiedSymbol = async () => ({ price: null });
+  for(let i = 0; i < 4; i++){ win.document.dispatchEvent(new win.Event('visibilitychange')); await settle(); }   // the tab coming back looks again, without resetting the count of misses
+  assert.strictEqual(btn().textContent, 'Live paused'); assert.strictEqual(btn().dataset.short, 'Paused'); assert.ok(btn().title.includes('trying again every 2 minutes'));
+  await timers.find(([f, ms]) => ms === 20000)[0](); assert.ok(timers.some(([f, ms]) => ms === 120000));   // the next sweep, after the misses, waits two minutes
+  T.shown = 1; S[1].valuation.currentPrice = 1; T.ldQuote = async () => ({ price: 9 }); T.ldVerifiedSymbol = async () => ({ price: 9 }); btn().click(); btn().click(); await settle();
+  S.push({ name: 'S3', ticker: 'S3', valuation: {} }); win.document.querySelector('.detail-ticker').innerHTML = '<span class="live-px">old</span>'; T.shown = 3; T.ldVerifiedSymbol = async () => ({ price: null }); btn().click(); btn().click(); await settle();
+  assert.strictEqual(win.document.querySelector('.detail-ticker .live-px'), null);   // a stock never priced live shows no chip
+}));
+test('live prices: a page without a search box has no button', () => liveRun({}, async ({ win, M, btn }) => {
+  win.document.querySelector('.topbar-search').remove(); M.init_live_ticker(); assert.strictEqual(btn(), null);
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
