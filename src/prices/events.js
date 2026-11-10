@@ -27,20 +27,21 @@ function eventTime(d){
 // Every dated event known for a stock: { t, d, k, group, glyph, text, src, url }, oldest first.
 function stockChartEvents(s){
   const out = [];
-  const add = (k, d, text, src, url, sentiment) => {
+  /** @param {string} k @param {string} d @param {string} text @param {{ src?: string, url?: string, sentiment?: string }} [extra] */
+  const add = (k, d, text, { src, url, sentiment } = {}) => {
     const t = eventTime(d);
     if(t === null || !text) return;
     out.push({ t, d: String(d).slice(0, 10), k, group: GROUP_OF[k], glyph: GLYPH_OF[k] || '', text: String(text), src: src || '', url: url || '', s: cleanSentiment(sentiment) });
   };
-  (Array.isArray(s.__events) ? s.__events : []).forEach(e => { if(e && GROUP_OF[e.k]) add(e.k, e.d, e.t, e.src, e.url, e.s); });
+  (Array.isArray(s.__events) ? s.__events : []).forEach(e => { if(e && GROUP_OF[e.k]) add(e.k, e.d, e.t, { src: e.src, url: e.url, sentiment: e.s }); });
   const sym = tickerSymbol(s);
   allTrades().forEach(tr => {
     if(!tr || tr.ticker !== sym) return;
-    if(tr.buy && tr.buy.date) add('buy', tr.buy.date, 'Bought' + (tr.buy.quantity != null ? ' ' + tr.buy.quantity : '') + (tr.buy.price != null ? ' at ₹' + tr.buy.price : ''), 'Trade Log', '');
-    if(tr.status === 'closed' && tr.sell && tr.sell.date) add('sell', tr.sell.date, 'Sold' + (tr.sell.price != null ? ' at ₹' + tr.sell.price : ''), 'Trade Log', '');
+    if(tr.buy && tr.buy.date) add('buy', tr.buy.date, 'Bought' + (tr.buy.quantity != null ? ' ' + tr.buy.quantity : '') + (tr.buy.price != null ? ' at ₹' + tr.buy.price : ''), { src: 'Trade Log', url: '' });
+    if(tr.status === 'closed' && tr.sell && tr.sell.date) add('sell', tr.sell.date, 'Sold' + (tr.sell.price != null ? ' at ₹' + tr.sell.price : ''), { src: 'Trade Log', url: '' });
   });
   const ra = stockResearchAsof(s);
-  if(ra) add('res', ra, 'Research saved', 'Refresh Fundamental Info', '');
+  if(ra) add('res', ra, 'Research saved', { src: 'Refresh Fundamental Info', url: '' });
   return out.sort((a, b) => a.t - b.t);
 }
 

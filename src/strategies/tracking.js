@@ -79,30 +79,41 @@ function makeRun(strategy, matches){
     target: strategy.goal.target, days: strategy.goal.days, rules: JSON.parse(JSON.stringify(strategy.rules)), picks };
 }
 
+// The live price: it is the latest price, and a new high raises pick.peak (the run then needs saving). ev = { best, hitMs, last, changed }.
+function applyLivePrice(ev, pick, curPrice){
+  if(!(typeof curPrice === 'number' && curPrice > 0)) return;
+  ev.last = curPrice;
+  if(curPrice > (pick.peak || 0)){ pick.peak = curPrice; pick.peakAt = todayIso(); ev.changed = true; }
+  ev.best = Math.max(ev.best, curPrice);
+}
+
+// The weekly bars inside the run's window: the best high, and when the goal price was first reached. win = { startMs, endMs, goalPrice }.
+function applyWeekBars(ev, weekBars, win){
+  if(!(weekBars && weekBars.length)) return;
+  for(const b of weekBars){
+    const ms = b[0] * 1000;
+    if(ms > win.endMs) break;
+    if(ms <= win.startMs) continue;
+    ev.best = Math.max(ev.best, b[2]);
+    if(ev.hitMs === null && b[2] >= win.goalPrice) ev.hitMs = ms;
+  }
+  const tail = weekBars[weekBars.length - 1];
+  if(ev.last === null && tail[4] > 0) ev.last = tail[4];
+  if(tail[0] * 1000 <= win.startMs) ev.best = Math.max(ev.best, tail[4]);   // the entry week: its close only
+}
+
+// prices = { weekBars, curPrice, nowMs }
 // -> { status: 'hit' | 'open' | 'miss', hitMs, now, retNow, retBest }. May raise pick.peak (the run then needs saving).
-function evaluatePick(run, pick, weekBars, curPrice, nowMs){
+function evaluatePick(run, pick, { weekBars, curPrice, nowMs }){
   const startMs = isoToMs(run.startedAt), endMs = startMs + run.days * DAY_MS;
   const goalPrice = pick.entry * (1 + run.target / 100);
-  let best = Math.max(pick.entry, pick.peak || 0), hitMs = null, last = null;
-  let changed = false;
-  if(typeof curPrice === 'number' && curPrice > 0){
-    last = curPrice;
-    if(curPrice > (pick.peak || 0)){ pick.peak = curPrice; pick.peakAt = todayIso(); changed = true; }
-    best = Math.max(best, curPrice);
-  }
-  if(weekBars && weekBars.length){
-    for(const b of weekBars){
-      const ms = b[0] * 1000;
-      if(ms > endMs) break;
-      if(ms > startMs){ best = Math.max(best, b[2]); if(hitMs === null && b[2] >= goalPrice) hitMs = ms; }
-    }
-    const tail = weekBars[weekBars.length - 1];
-    if(last === null && tail[4] > 0) last = tail[4];
-    if(tail[0] * 1000 <= startMs) best = Math.max(best, tail[4]);   // the entry week: its close only
-  }
-  if(hitMs === null && best >= goalPrice) hitMs = pick.peak >= goalPrice && pick.peakAt ? Math.max(startMs, isoToMs(pick.peakAt)) : nowMs;
+  const ev = { best: Math.max(pick.entry, pick.peak || 0), hitMs: null, last: null, changed: false };
+  applyLivePrice(ev, pick, curPrice);
+  applyWeekBars(ev, weekBars, { startMs, endMs, goalPrice });
+  let hitMs = ev.hitMs;
+  if(hitMs === null && ev.best >= goalPrice) hitMs = pick.peak >= goalPrice && pick.peakAt ? Math.max(startMs, isoToMs(pick.peakAt)) : nowMs;
   const status = hitMs !== null ? 'hit' : (nowMs >= endMs ? 'miss' : 'open');
-  return { status, hitMs, now: last, retNow: last ? (last / pick.entry - 1) * 100 : null, retBest: (best / pick.entry - 1) * 100, changed };
+  return { status, hitMs, now: ev.last, retNow: ev.last ? (ev.last / pick.entry - 1) * 100 : null, retBest: (ev.best / pick.entry - 1) * 100, changed: ev.changed };
 }
 
 // priceSet: Map(symbol -> {w}); stockBySym: Map(symbol -> stock).
@@ -112,7 +123,7 @@ function evaluateRun(run, priceSet, stockBySym, nowMs){
   const items = run.picks.map(pick => {
     const s = stockBySym.get(pick.sym);
     const price = s && s.valuation ? s.valuation.currentPrice : null;
-    const ev = evaluatePick(run, pick, (priceSet.get(pick.sym) || {}).w, price, nowMs);
+    const ev = evaluatePick(run, pick, { weekBars: (priceSet.get(pick.sym) || {}).w, curPrice: price, nowMs });
     if(ev.changed) changed = true;
     return { pick, ev };
   });

@@ -49,7 +49,7 @@ const ICONS = {
 const iconSvg = (name) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 // The text label is hidden on a wide screen (the icon and its tooltip say it) and shown when the buttons sit in the phone filter sheet.
 const iconBtnInner = (name, text) => `${iconSvg(name)}<span class="analysis-btn-label">${text}</span>`;
-const iconBtn = (id, name, text, tip, state) => `<button type="button" class="analysis-icon-btn" id="${id}" title="${tip}" aria-label="${tip}"${state}>${iconBtnInner(name, text)}</button>`;
+const iconBtn = (id, name, text, { tip, state }) => `<button type="button" class="analysis-icon-btn" id="${id}" title="${tip}" aria-label="${tip}"${state}>${iconBtnInner(name, text)}</button>`;
 function leaderboardHtml(chartBlock, viewHtml){
   const headerColOrder = analysisColumnOrder(), kit = getRefreshKit();
   return `<div class="analysis-leaderboard${lbFull ? ' lb-full' : ''}">
@@ -57,9 +57,9 @@ function leaderboardHtml(chartBlock, viewHtml){
         ${viewHtml}
         <div class="rk-headline"><p class="upload-hint biz-showing biz-showing--flush"><span id="analysisLeaderboardCount" class="analysis-count"></span></p>${(defineAnalysisScope(), '')}</div>
         <div class="analysis-actions">
-          ${iconBtn('analysisColumnsBtn', 'columns', 'Columns', 'Columns: choose and reorder the grid columns', ` aria-pressed="${getAnalysisColumnsPanelOpen()}"`)}
-          ${iconBtn('analysisChartToggle', 'chart', 'Show chart', 'Show chart', ' aria-expanded="false"')}
-          ${iconBtn('analysisFullscreenBtn', lbFull ? 'shrink' : 'expand', fullscreenLabel(lbFull), fullscreenLabel(lbFull) + ' (Esc to leave)', ` data-analysis-full aria-pressed="${lbFull}"`)}
+          ${iconBtn('analysisColumnsBtn', 'columns', 'Columns', { tip: 'Columns: choose and reorder the grid columns', state: ` aria-pressed="${getAnalysisColumnsPanelOpen()}"` })}
+          ${iconBtn('analysisChartToggle', 'chart', 'Show chart', { tip: 'Show chart', state: ' aria-expanded="false"' })}
+          ${iconBtn('analysisFullscreenBtn', lbFull ? 'shrink' : 'expand', fullscreenLabel(lbFull), { tip: fullscreenLabel(lbFull) + ' (Esc to leave)', state: ` data-analysis-full aria-pressed="${lbFull}"` })}
           ${kit ? kit.barHtml('analysis') : ''}
         </div>
       </div>
@@ -180,50 +180,59 @@ function wireRefreshControls(){
 
 // Reordering by drag and drop: grab a row by its handle and drop it where it belongs; the arrow keys move a focused handle one step.
 // The rows shuffle while dragging and the new order is saved once, on release.
+const columnRows = (list) => Array.from(list.querySelectorAll('.analysis-column-row'));
+
+// Saves the order the rows are in now (when it changed), redraws, and puts the focus back on the moved row's handle.
+function commitColumnOrder(list, rerender, focusCol){
+  const order = columnRows(list).map(r => /** @type {HTMLElement} */ (r).dataset.col);
+  if(order.join() === analysisColumnOrder().join()) return;
+  analysisFilters.columnOrder = order;
+  saveAnalysisFilters(analysisFilters);
+  rerender();
+  const g = focusCol && document.querySelector('.analysis-col-grip[data-col="' + focusCol + '"]');
+  if(g) /** @type {HTMLElement} */ (g).focus();
+}
+
+// While dragging: the page scrolls near its top and bottom edge, and the row moves before the first row whose middle is below the pointer.
+function dragRowTo(list, row, y){
+  if(y < 70) window.scrollBy(0, -14); else if(y > window.innerHeight - 70) window.scrollBy(0, 14);
+  const next = columnRows(list).filter(r => r !== row).find(r => { const b = r.getBoundingClientRect(); return y < b.top + b.height / 2; });
+  if(next){ if(row.nextElementSibling !== next) list.insertBefore(row, next); }
+  else if(list.lastElementChild !== row) list.appendChild(row);
+}
+
+function onColumnGrab(list, e, rerender){
+  const grip = closestEl(e, '.analysis-col-grip');
+  if(!grip || (/** @type {MouseEvent} */ (e).button != null && /** @type {MouseEvent} */ (e).button !== 0)) return;
+  const row = /** @type {HTMLElement} */ (grip.closest('.analysis-column-row'));
+  e.preventDefault();
+  row.classList.add('dragging');
+  const move = (ev) => dragRowTo(list, row, ev.clientY);
+  const end = () => {
+    document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', end); document.removeEventListener('pointercancel', end);
+    row.classList.remove('dragging');
+    commitColumnOrder(list, rerender, row.dataset.col);
+  };
+  // listened for on the document: moving the row in the list would drop a pointer capture held by its handle
+  document.addEventListener('pointermove', move); document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+}
+
+function onColumnKey(list, e, rerender){
+  const grip = closestEl(e, '.analysis-col-grip');
+  if(!grip || (/** @type {KeyboardEvent} */ (e).key !== 'ArrowUp' && /** @type {KeyboardEvent} */ (e).key !== 'ArrowDown')) return;
+  e.preventDefault();
+  const row = /** @type {HTMLElement} */ (grip.closest('.analysis-column-row')), up = /** @type {KeyboardEvent} */ (e).key === 'ArrowUp';
+  const other = up ? row.previousElementSibling : row.nextElementSibling;
+  if(!other) return;
+  if(up) list.insertBefore(row, other); else list.insertBefore(other, row);
+  commitColumnOrder(list, rerender, row.dataset.col);
+}
+
 function wireColumnDrag(rerender){
   const list = document.querySelector('.analysis-columns-list');
   if(!list) return;
-  const rowsOf = () => Array.from(list.querySelectorAll('.analysis-column-row'));
-  const commit = (focusCol) => {
-    const order = rowsOf().map(r => /** @type {HTMLElement} */ (r).dataset.col);
-    if(order.join() === analysisColumnOrder().join()) return;
-    analysisFilters.columnOrder = order;
-    saveAnalysisFilters(analysisFilters);
-    rerender();
-    const g = focusCol && document.querySelector('.analysis-col-grip[data-col="' + focusCol + '"]');
-    if(g) /** @type {HTMLElement} */ (g).focus();
-  };
-  list.addEventListener('pointerdown', (e) => {
-    const grip = closestEl(e, '.analysis-col-grip');
-    if(!grip || (/** @type {MouseEvent} */ (e).button != null && /** @type {MouseEvent} */ (e).button !== 0)) return;
-    const row = grip.closest('.analysis-column-row');
-    e.preventDefault();
-    /** @type {Element} */ (row).classList.add('dragging');
-    const move = (ev) => {
-      const y = ev.clientY;
-      if(y < 70) window.scrollBy(0, -14); else if(y > window.innerHeight - 70) window.scrollBy(0, 14);
-      const next = rowsOf().filter(r => r !== row).find(r => { const b = r.getBoundingClientRect(); return y < b.top + b.height / 2; });
-      if(next){ if(/** @type {Element} */ (row).nextElementSibling !== next) list.insertBefore(/** @type {Element} */ (row), next); }
-      else if(list.lastElementChild !== row) list.appendChild(/** @type {Element} */ (row));
-    };
-    const end = () => {
-      document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', end); document.removeEventListener('pointercancel', end);
-      /** @type {Element} */ (row).classList.remove('dragging');
-      commit(/** @type {HTMLElement} */ (row).dataset.col);
-    };
-    // listened for on the document: moving the row in the list would drop a pointer capture held by its handle
-    document.addEventListener('pointermove', move); document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
-  });
-  list.addEventListener('keydown', (e) => {
-    const grip = closestEl(e, '.analysis-col-grip');
-    if(!grip || (/** @type {KeyboardEvent} */ (e).key !== 'ArrowUp' && /** @type {KeyboardEvent} */ (e).key !== 'ArrowDown')) return;
-    e.preventDefault();
-    const row = grip.closest('.analysis-column-row'), up = /** @type {KeyboardEvent} */ (e).key === 'ArrowUp';
-    const other = up ? /** @type {Element} */ (row).previousElementSibling : /** @type {Element} */ (row).nextElementSibling;
-    if(!other) return;
-    if(up) list.insertBefore(/** @type {Element} */ (row), other); else list.insertBefore(other, /** @type {Element} */ (row));
-    commit(/** @type {HTMLElement} */ (row).dataset.col);
-  });
+  list.addEventListener('pointerdown', (e) => onColumnGrab(list, e, rerender));
+  list.addEventListener('keydown', (e) => onColumnKey(list, e, rerender));
 }
 
 // Column panel: a move or reset changes the table's column SET (header included), so it redraws the whole section.

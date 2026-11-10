@@ -12,7 +12,7 @@ const safeUrl = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : '
 const todayIst = () => new Date(Date.now() + 19800000).toISOString().slice(0, 10);
 
 // One line per event, like the News page: the kind of event, then its text (a link to the source when there is one; the whole text is the tooltip).
-function row(type, text, src, url, sentiment){
+function row(type, text, { src, url, sentiment }){
   const nt = dateNote(text || ''), t = nt || (text ? 'Expected date' : src || ''), u = safeUrl(url);
   const textHtml = u ? `<a class="news-link" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(t || 'Source')}</a>` : escapeHtml(t);
   const tag = sentiment && SENTIMENT[sentiment] && SENTIMENT[sentiment][1] ? `<span class="news-tag news-${SENTIMENT[sentiment][1]}">${SENTIMENT[sentiment][0]}</span>` : '';
@@ -22,7 +22,7 @@ function row(type, text, src, url, sentiment){
 function grouped(items){
   const days = [];
   items.forEach(x => { const last = days[days.length - 1]; if(last && last.d === x.d) last.rows.push(x); else days.push({ d: x.d, rows: [x] }); });
-  return days.map(g => `<div class="day-head"><b>${escapeHtml(shortDate(g.d))}</b><span>${g.rows.length}</span></div>` + g.rows.map(x => row(x.type, x.text, x.src, x.url, x.s)).join('')).join('');
+  return days.map(g => `<div class="day-head"><b>${escapeHtml(shortDate(g.d))}</b><span>${g.rows.length}</span></div>` + g.rows.map(x => row(x.type, x.text, { src: x.src, url: x.url, sentiment: x.s })).join('')).join('');
 }
 
 function renderEventsPanel(s){

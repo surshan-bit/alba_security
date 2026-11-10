@@ -38,7 +38,7 @@ function liquidityOf(row, today){
 // What to save for one stock from its TradingView row: { valuation?, liquidity?, technical?, kept? }, or { reason } when nothing can be saved.
 // `keepAgainst` is the saved technical block to protect: a completed-weeks block from the last 3 days is kept (only the price moves);
 // pass null to skip that check (the merge below does it against the stock's own saved update).
-function snapshotUpdate(s, row, today, sym, keepAgainst){
+function snapshotUpdate(s, row, { today, sym, keepAgainst }){
   const px = row && typeof row.close === 'number' && row.close > 0 ? row.close : null;
   if(px == null) return { reason: 'TradingView returned no price' };
   const out = { valuation: { currentPrice: px, asof: today, source: 'TradingView (' + sym + ')' } };
@@ -86,7 +86,7 @@ function withCrossState(snapBlock, saved){
 // Everything in `real` that the snapshot does not cover (Global factors, notes, price history flags) is kept as it is.
 function mergedDoc(s, real, snap){
   if(!snap) return real;
-  const u = snapshotUpdate(s, unpackValues(snap.row.c), snap.asof, snap.row.y, null);
+  const u = snapshotUpdate(s, unpackValues(snap.row.c), { today: snap.asof, sym: snap.row.y, keepAgainst: null });
   if(u.reason) return real;
   const out = Object.assign({}, real || {});
   out.snapAsof = snap.asof;   // the day TradingView last confirmed this stock; the Data Refresh age bars count it even when the stock kept its completed-weeks score

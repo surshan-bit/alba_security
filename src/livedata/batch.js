@@ -37,53 +37,60 @@ function batchStoppingText(){
   return 'Stopping: finishing ' + activeNames() + ' (a bar download already under way cannot be cut short), then the remaining stock(s) will not run.';
 }
 
+// What a card shows for one kind on one screen: the running progress, the last result kept for that screen, or nothing.
+function cardState(P, kind, running, mine){
+  if(mine && ldBatch.kind === kind){
+    const first = ldBatch.active.size ? ldBatch.active.keys().next().value : '', j = first ? ldGet(first, kind) : null;
+    const pct = batchPct();
+      return { state: 'running', pct, text: ldBatch.stop ? batchStoppingText() : pct + '% · ' + ldBatch.done + ' of ' + ldBatch.total + ' done · ' + activeNames() + (j ? ' · ' + j.msg : '') + (ldBatch.workers > 1 ? ' (' + ldBatch.workers + ' at a time)' : '') + '' };
+  }
+  return running && !mine ? null : (ldBatchLast[P] || {})[kind] || null;
+}
+// While the panel is closed, a running or failed refresh still shows at the end of its heading.
+function paintChip(P, state){
+  const chip = document.getElementById(P + 'LdChip');
+  if(!chip) return;
+  const all = [state.fund, state.tech];
+  const run = all.find(x => x && x.state === 'running'), bad = all.find(x => x && x.state === 'error');
+  chip.textContent = run ? 'Refreshing… ' + run.pct + '%' : bad ? 'Last refresh failed' : '';
+  chip.classList.toggle('is-error', !run && !!bad);
+}
+// One kind's card: the button, the progress bar, the Stop button and the status line.
+function paintCard(P, kind, x, flags){
+  const { running, mine } = flags, card = document.getElementById(P + 'Card-' + kind);
+  if(!card) return;
+  const btn = /** @type {HTMLButtonElement} */ (card.querySelector('.refresh-btn'));
+  const bar = document.getElementById(P + 'Bar-' + kind), fill = document.getElementById(P + 'Fill-' + kind);
+  const st = document.getElementById(P + 'Status-' + kind), stop = document.getElementById(P + 'Stop-' + kind);
+  if(btn){
+    btn.disabled = running || card.dataset.off === '1';
+    btn.title = card.dataset.title || '';
+    btn.textContent = mine && ldBatch.kind === kind ? 'Refreshing…' : (card.dataset.label || LD_LABEL[kind]);
+  }
+  if(bar){ bar.hidden = !x; bar.setAttribute('aria-valuenow', String(x ? x.pct : 0)); }
+  if(fill){
+    fill.style.setProperty('--w', (x ? x.pct : 0) + '%');
+    fill.classList.toggle('is-ok', !!x && x.state === 'ok');
+    fill.classList.toggle('is-error', !!x && x.state === 'error');
+  }
+  if(stop){
+    const r = !!x && x.state === 'running';
+    stop.hidden = !r; /** @type {HTMLButtonElement} */ (stop).disabled = !!(r && ldBatch.stop); stop.textContent = r && ldBatch.stop ? 'Stopping…' : 'Stop';
+  }
+  if(st){
+    st.textContent = x ? x.text : running && !mine ? 'A refresh started from ' + otherScreen(P) + ' is running.' : (card.dataset.idle || '');
+    st.classList.toggle('is-error', !!x && x.state === 'error');
+  }
+}
 // Draws one screen's Live Data Refresh panel (P = 'analysis' or 'strat'): the same buttons, bars and result lines
 // as the stock page shows for one stock.
 function paintLivePanel(P){
   const running = !!(ldBatch && ldBatch.running);
   const mine = running && ldBatch.source === P;
   const state = {};
-  for(const kind of ['fund', 'tech']){
-    if(mine && ldBatch.kind === kind){
-      const first = ldBatch.active.size ? ldBatch.active.keys().next().value : '', j = first ? ldGet(first, kind) : null;
-      const pct = batchPct();
-      state[kind] = { state: 'running', pct, text: ldBatch.stop ? batchStoppingText() : pct + '% · ' + ldBatch.done + ' of ' + ldBatch.total + ' done · ' + activeNames() + (j ? ' · ' + j.msg : '') + (ldBatch.workers > 1 ? ' (' + ldBatch.workers + ' at a time)' : '') + '' };
-    } else state[kind] = running && !mine ? null : (ldBatchLast[P] || {})[kind] || null;
-  }
-  // While the panel is closed, a running or failed refresh still shows at the end of its heading.
-  const chip = document.getElementById(P + 'LdChip');
-  if(chip){
-    const all = [state.fund, state.tech];
-    const run = all.find(x => x && x.state === 'running'), bad = all.find(x => x && x.state === 'error');
-    chip.textContent = run ? 'Refreshing… ' + run.pct + '%' : bad ? 'Last refresh failed' : '';
-    chip.classList.toggle('is-error', !run && !!bad);
-  }
-  for(const kind of ['fund', 'tech']){
-    const x = state[kind], card = document.getElementById(P + 'Card-' + kind);
-    if(!card) continue;
-    const btn = /** @type {HTMLButtonElement} */ (card.querySelector('.refresh-btn'));
-    const bar = document.getElementById(P + 'Bar-' + kind), fill = document.getElementById(P + 'Fill-' + kind);
-    const st = document.getElementById(P + 'Status-' + kind), stop = document.getElementById(P + 'Stop-' + kind);
-    if(btn){
-      btn.disabled = running || card.dataset.off === '1';
-      btn.title = card.dataset.title || '';
-      btn.textContent = mine && ldBatch.kind === kind ? 'Refreshing…' : (card.dataset.label || LD_LABEL[kind]);
-    }
-    if(bar){ bar.hidden = !x; bar.setAttribute('aria-valuenow', String(x ? x.pct : 0)); }
-    if(fill){
-      fill.style.setProperty('--w', (x ? x.pct : 0) + '%');
-      fill.classList.toggle('is-ok', !!x && x.state === 'ok');
-      fill.classList.toggle('is-error', !!x && x.state === 'error');
-    }
-    if(stop){
-      const r = !!x && x.state === 'running';
-      stop.hidden = !r; /** @type {HTMLButtonElement} */ (stop).disabled = !!(r && ldBatch.stop); stop.textContent = r && ldBatch.stop ? 'Stopping…' : 'Stop';
-    }
-    if(st){
-      st.textContent = x ? x.text : running && !mine ? 'A refresh started from ' + otherScreen(P) + ' is running.' : (card.dataset.idle || '');
-      st.classList.toggle('is-error', !!x && x.state === 'error');
-    }
-  }
+  for(const kind of ['fund', 'tech']) state[kind] = cardState(P, kind, running, mine);
+  paintChip(P, state);
+  for(const kind of ['fund', 'tech']) paintCard(P, kind, state[kind], { running, mine });
   const perm = document.getElementById(P + 'Perm');
   if(perm) perm.hidden = !(state.fund && state.fund.state === 'error' && state.fund.perm);
 }
@@ -114,6 +121,48 @@ function ldBatchStop(){
 }
 // Tells the screen that started a run (the Explorer's industries) that data was saved, so it can redraw, e.g. its "Research done" column.
 function batchStockSaved(){ if(ldBatch) document.dispatchEvent(new window.CustomEvent('alba-batch-done', { detail: { source: ldBatch.source } })); }
+// After a failure the extra workers stand down and the rest runs one at a time; a permission or usage error halts the whole run.
+const HALTING_ERROR = /usage limit|not allowed|not available for this account|sign in again/i;
+// One stock's result: a failure is listed, slows the run down, and may halt it.
+function noteStockResult(sym, j, run){
+  if(!(j && j.state === 'error')) return;
+  ldBatch.failed.push(sym + ' (' + String(j.msg).slice(0, 90) + ')');
+  ldBatch.slow = true;
+  if(j.perm || HALTING_ERROR.test(j.msg)){
+    run.halted = true; ldBatch.note = 'Stopped early: ' + String(j.msg).slice(0, 100) + '.'; ldBatch.perm = !!j.perm;
+  }
+}
+// One worker: takes the next stock of the list until none is left, the run is stopped or it is halted. `run` = { list, kind, source, next, halted }.
+async function batchWorker(w, run){
+  const { list, kind, source } = run;
+  while(!ldBatch.stop && !run.halted && run.next < list.length){
+    if(w > 0 && ldBatch.slow) return;   // after a failure the extra workers stand down: the rest runs one at a time
+    const i = run.next++, s = list[i], key = pcTickerKey(s), sym = tickerSymbol(s);
+    if(ldRunning(key)){ ldBatch.failed.push(sym + ' (already refreshing)'); ldBatch.done++; continue; }
+    ldBatch.active.set(key, sym);
+    await ldStart(s, kind);
+    ldBatch.active.delete(key);
+    const j = ldGet(key, kind);
+    if(j && j.state === 'error' && ldBatch.stop && /Stopped/.test(j.msg)){ ldBatch.done++; continue; }
+    noteStockResult(sym, j, run);
+    ldBatch.done++;
+    if(source !== 'strat') setTimeout(batchStockSaved, 1200);   // the saved numbers reach the stock list a moment after the save
+    ldBatchPaint();
+  }
+}
+// Keeps the result in that screen's card for this kind, so later redraws and a run of the other kind do not wipe it, then tells the viewer on whatever screen they are on; the notice stays until they close it.
+function recordFinished(kind){
+  const failed = ldBatch.failed.length > 0;
+  (ldBatchLast[ldBatch.source] = ldBatchLast[ldBatch.source] || { fund: null, tech: null })[kind] = { state: failed ? 'error' : 'ok', pct: batchPct(), text: !failed && ldBatch.note === 'Finished.' ? 'Done: ' + batchTail() : ldBatch.note + ' ' + batchTail(), perm: ldBatch.perm };
+  const refreshed = ldBatch.total - ldBatch.failed.length - ldBatch.skipped, clean = ldBatch.note === 'Finished.';
+  activityEnd('batch');
+  const kit = getRefreshKit();
+  if(!(kit && kit.batchNotice())) activityNotify({
+    tone: failed ? (refreshed > 0 ? 'warn' : 'error') : clean ? 'ok' : 'warn',
+    title: KIND_NAME[kind] + ' refresh ' + (ldBatch.stop ? 'stopped' : clean ? 'finished' : 'ended early'),
+    text: (clean ? '' : ldBatch.note + ' ') + batchTail(), section: sectionOf(ldBatch.source)
+  });
+}
 // `stocksToRun`: the stocks to refresh. `source`: the panel that started it.
 async function ldBatchStart(kind, list, source = 'strat'){
   if(ldBatch && ldBatch.running) return;
@@ -123,48 +172,13 @@ async function ldBatchStart(kind, list, source = 'strat'){
   ldBatch = { kind, source, total: list.length, done: 0, active: new Map(), workers, slow: false, running: true, stop: false, failed: [], skipped: 0, note: '', perm: false };
   ldBatchPaint();
   if(kind === 'fund' && claudeAnyOn()) await ldEnsureClaudeAccess();   // one permission dialog up front, not one per stock
-  let next = 0, halted = false;
-  const worker = async (w) => {
-    while(!ldBatch.stop && !halted && next < list.length){
-      if(w > 0 && ldBatch.slow) return;   // after a failure the extra workers stand down: the rest runs one at a time
-      const i = next++, s = list[i], key = pcTickerKey(s), sym = tickerSymbol(s);
-      if(ldRunning(key)){ ldBatch.failed.push(sym + ' (already refreshing)'); ldBatch.done++; continue; }
-      ldBatch.active.set(key, sym);
-      await ldStart(s, kind);
-      ldBatch.active.delete(key);
-      const j = ldGet(key, kind);
-      if(j && j.state === 'error'){
-        if(ldBatch.stop && /Stopped/.test(j.msg)){ ldBatch.done++; continue; }
-        ldBatch.failed.push(sym + ' (' + String(j.msg).slice(0, 90) + ')');
-        ldBatch.slow = true;
-        if(j.perm || /usage limit|not allowed|not available for this account|sign in again/i.test(j.msg)){
-          halted = true; ldBatch.note = 'Stopped early: ' + String(j.msg).slice(0, 100) + '.'; ldBatch.perm = !!j.perm;
-        }
-      }
-      ldBatch.done++;
-      if(source !== 'strat') setTimeout(batchStockSaved, 1200);   // the saved numbers reach the stock list a moment after the save
-      ldBatchPaint();
-    }
-  };
-  await Promise.all(Array.from({ length: workers }, (_, w) => worker(w)));
+  const run = { list, kind, source, next: 0, halted: false };
+  await Promise.all(Array.from({ length: workers }, (_, w) => batchWorker(w, run)));
   ldBatch.skipped = list.length - ldBatch.done;
   if(ldBatch.stop && !ldBatch.note) ldBatch.note = 'Stopped.';
   ldBatch.running = false; ldBatch.active.clear();
   if(!ldBatch.note) ldBatch.note = 'Finished.';
-  {
-    // Keep the result in that screen's card for this kind, so later redraws and a run of the other kind do not wipe it.
-    const failed = ldBatch.failed.length > 0;
-    (ldBatchLast[ldBatch.source] = ldBatchLast[ldBatch.source] || { fund: null, tech: null })[kind] = { state: failed ? 'error' : 'ok', pct: batchPct(), text: !failed && ldBatch.note === 'Finished.' ? 'Done: ' + batchTail() : ldBatch.note + ' ' + batchTail(), perm: ldBatch.perm };
-    // Tell the viewer on whatever screen they are on; the notice stays until they close it.
-    const refreshed = ldBatch.total - ldBatch.failed.length - ldBatch.skipped, clean = ldBatch.note === 'Finished.';
-    activityEnd('batch');
-    const kit = getRefreshKit();
-    if(!(kit && kit.batchNotice())) activityNotify({
-      tone: failed ? (refreshed > 0 ? 'warn' : 'error') : clean ? 'ok' : 'warn',
-      title: KIND_NAME[kind] + ' refresh ' + (ldBatch.stop ? 'stopped' : clean ? 'finished' : 'ended early'),
-      text: (clean ? '' : ldBatch.note + ' ') + batchTail(), section: sectionOf(ldBatch.source)
-    });
-  }
+  recordFinished(kind);
   try { refreshAnalysisSoon(); } catch(e){ /* the leaderboard repaints on its next render */ }
   // the refreshed numbers reach the stock list through the live subscription, a moment after the last save, so redraw twice
   const redraw = () => { try { const sec = document.getElementById('section-strategies'); if(sec && sec.classList.contains('active') && !(ldBatch && ldBatch.running)) redrawWhenIdle('strategies', () => renderLoadedPart('strategies')); } catch(e){ /* repaints when opened again */ } };

@@ -41,6 +41,10 @@ const SKIP_RETRY_DAYS = 14;       // a stock whose history download failed is no
 const FULL_WORKERS = 2;           // stocks whose full history is downloaded at the same time (a big download each)
 const BAR_WORKERS = 4;            // stocks given just their new bars at the same time, one TradingView call each
 const COMPACT_MAX = 100;          // stocks per run whose own price documents are rewritten in full (see prices/recent.js)
+const BARS_FAIL_LIMIT = 8;          // bar downloads that may fail in a row before the stage stops
+const DAY_MS = 86400000;
+const TECH2_SAVE_TRIES = 2;       // tries to save one Technical Score 2 record
+const TECH2_RETRY_PAUSE_MS = 1500;
 // Test hook: the browser tests switch the history stages off (the made-up database has no history for any stock, so every run would download all of it).
 const skipHistory = () => !!debugHandle().skipHistoryStage;
 const STEPS = [{ key: 'prepare', label: 'Prepare the stock list', w: 5 }, { key: 'fill', label: 'Full history for stocks that have none', w: 30 },
@@ -128,9 +132,68 @@ async function rsPrepare(run){
   Object.assign(run, { stored, prevRows, todo });
 }
 
+// What the history step works on: the plan, the order of importance (tracked picks first), and the stocks to download now (those that failed
+// recently are left out). `tried` is the saved list of recent failures, updated as the downloads go.
+async function fillPlan(run){
+  await ensureAllPriceBars();
+  const plan = planHistory(stocks, s => priceHistoryByTicker[pcTickerKey(s)], Date.now() / 1000);
+  const tracked = new Set();
+  try { (await loadRuns()).forEach(r => (r.picks || []).forEach(p => { const s = stockByTickerSymbol.get(p.sym); if(s) tracked.add(s); })); } catch(e){ console.error('Could not read tracked picks', e); }
+  const byImportance = list => list.filter(s => tracked.has(s)).concat(priorityOrder('tech', list.filter(s => !tracked.has(s))));
+  let tried = {};
+  try { const tr = await run.db.doc('stockMeta/histFillTried').get(); if(tr && tr.exists) tried = Object.assign({}, tr.data() || {}); } catch(e){ /* the list only spares stocks that failed recently */ }
+  const recent = id => tried[id] && Date.now() - (Date.parse(tried[id]) || 0) < SKIP_RETRY_DAYS * DAY_MS;
+  const noneList = byImportance(plan.none).filter(s => !recent(sanitizeDocId(tickerSymbol(s))));
+  return { plan, byImportance, noneList, tried };
+}
+
+// Stocks one bar behind need no call of their own: the snapshot call (stage 2) also asks for their current and previous weekly and monthly bar
+// (50 stocks per call). The jobs say which stocks that applies to; stage 2 fills `ready` with the bars it could place with certainty, and the
+// rest (longer gap, adjusted prices, no answer) are left for the one-by-one fetch.
+function staleJobs(plan, nowS){
+  const jobs = new Map();
+  for(const s of plan.stale){
+    const h = priceHistoryByTicker[pcTickerKey(s)], sym = snapshotSymbol(s);
+    if(h && h['1W'] && h['1W'].length && h['1M'] && h['1M'].length && sym) jobs.set(s, { h, needW: h['1W'][h['1W'].length - 1][0] < weekStartS(nowS) - TOLERANCE, needM: h['1M'][h['1M'].length - 1][0] < monthStartS(nowS) - TOLERANCE });
+  }
+  return jobs;
+}
+
+// Counts the outcome of one stock's bar job; stops the stage when TradingView refuses every call or fails many in a row.
+// st = { ctx, tried, failRun }: ctx.abort is set when no point trying the rest (quota used up, not connected, or many failures in a row).
+function settleBar(st, s, track){
+  const { ctx, tried } = st, j = priceJobs.get(pcTickerKey(s)), id = sanitizeDocId(tickerSymbol(s));
+  if(j && j.state === 'ok'){ st.failRun = 0; if(track) delete tried[id]; return true; }
+  ctx.failedBars.push({ sym: tickerSymbol(s), name: s.name, reason: 'price bars: ' + ((j && j.msg) || 'did not finish') });
+  const refused = /quota|exhausted|not available in this view|not connected|reconnected|not allowed/i.test((j && j.msg) || '');
+  if(track && !refused) tried[id] = new Date().toISOString();   // a refusal (quota, no connection) says nothing about the stock, so it is tried again next run
+  if(refused || ++st.failRun >= BARS_FAIL_LIMIT) ctx.abort = (j && j.msg) || 'price bars failed ' + BARS_FAIL_LIMIT + ' times in a row';
+  return false;
+}
+
+// Runs `task` over the list with `workers` stocks at a time; prog = { done, total } feeds the progress line. Returns how many tasks said yes.
+async function runPool(ctx, list, { key, workers, prog, task, stockOf = x => x }){
+  let next = 0, ok = 0;
+  const worker = async () => {
+    while(next < list.length && !stopAsked && !ctx.abort){
+      const s = list[next++];
+      if(await task(s)) ok++;
+      prog.done++;
+      fiSet(key, 'running', num(prog.done) + ' of ' + num(prog.total) + ' · ' + tickerSymbol(stockOf(s)), prog.done / prog.total);
+    }
+  };
+  await Promise.all(Array.from({ length: workers }, worker));
+  return ok;
+}
+
+// Gives every stock in the list its bars, `workers` at a time; returns how many finished. Options: key (progress step), track (remember failures),
+// workers, lean (only the new bars), prog (a shared progress count).
+function refreshBars(st, list, { key, track, workers, lean, prog }){
+  return runPool(st.ctx, list, { key, workers, prog: prog || { done: 0, total: list.length }, task: async s => { await refreshOneNow(s, lean); return settleBar(st, s, track); } });
+}
+
 // 1. Full history for stocks that have none (a few calls, so it always fits in the daily quota).
 async function rsFillHistory(run){
-  // ---- 1. full history for stocks that have none (a few calls, so it always fits in the daily quota) ----
   /** @type {any} */
   let ctx = null;
   /** @type {Record<string, number>} */
@@ -139,57 +202,14 @@ async function rsFillHistory(run){
   else {
     run.histRan = true;
     fiSet('fill', 'running', 'Looking at the saved bars…', 0.1);
-    await ensureAllPriceBars();
-    const plan = planHistory(stocks, s => priceHistoryByTicker[pcTickerKey(s)], Date.now() / 1000);
+    const { plan, byImportance, noneList, tried } = await fillPlan(run);
     run.noneBefore = plan.none.length; run.staleBefore = plan.stale.length;
-    const tracked = new Set();
-    try { (await loadRuns()).forEach(r => (r.picks || []).forEach(p => { const s = stockByTickerSymbol.get(p.sym); if(s) tracked.add(s); })); } catch(e){ console.error('Could not read tracked picks', e); }
-    const byImportance = list => list.filter(s => tracked.has(s)).concat(priorityOrder('tech', list.filter(s => !tracked.has(s))));
-    let tried = {};
-    try { const tr = await run.db.doc('stockMeta/histFillTried').get(); if(tr && tr.exists) tried = Object.assign({}, tr.data() || {}); } catch(e){ /* the list only spares stocks that failed recently */ }
-    const recent = id => tried[id] && Date.now() - (Date.parse(tried[id]) || 0) < SKIP_RETRY_DAYS * 86400000;
-    const noneList = byImportance(plan.none).filter(s => !recent(sanitizeDocId(tickerSymbol(s))));
-    const failedBars = [];
-    ctx = { plan, byImportance, failedBars, abort: '' };   // abort: set when TradingView refuses every call (quota used up, not connected) or fails many in a row: no point trying the rest
-    let barsFailRun = 0;
-    // Counts the outcome of one stock's bar job; stops the stage when TradingView refuses every call or fails many in a row.
-    const settle = (s, track) => {
-      const j = priceJobs.get(pcTickerKey(s)), id = sanitizeDocId(tickerSymbol(s));
-      if(j && j.state === 'ok'){ barsFailRun = 0; if(track) delete tried[id]; return true; }
-      failedBars.push({ sym: tickerSymbol(s), name: s.name, reason: 'price bars: ' + ((j && j.msg) || 'did not finish') });
-      const refused = /quota|exhausted|not available in this view|not connected|reconnected|not allowed/i.test((j && j.msg) || '');
-      if(track && !refused) tried[id] = new Date().toISOString();   // a refusal (quota, no connection) says nothing about the stock, so it is tried again next run
-      if(refused || ++barsFailRun >= 8) ctx.abort = (j && j.msg) || 'price bars failed 8 times in a row';
-      return false;
-    };
-    // Runs `task` over the list with `workers` stocks at a time; prog = { done, total } feeds the progress line.
-    const pool = async (list, key, workers, prog, task, stockOf = x => x) => {
-      let next = 0, ok = 0;
-      const worker = async () => {
-        while(next < list.length && !stopAsked && !ctx.abort){
-          const s = list[next++];
-          if(await task(s)) ok++;
-          prog.done++;
-          fiSet(key, 'running', num(prog.done) + ' of ' + num(prog.total) + ' · ' + tickerSymbol(stockOf(s)), prog.done / prog.total);
-        }
-      };
-      await Promise.all(Array.from({ length: workers }, worker));
-      return ok;
-    };
-    const bars = (list, key, track, workers, lean, prog) => pool(list, key, workers, prog || { done: 0, total: list.length }, async s => { await refreshOneNow(s, lean); return settle(s, track); });
-    // Stocks one bar behind need no call of their own: the snapshot call (stage 2) also asks for their current and previous weekly and monthly bar
-    // (50 stocks per call). `jobs` says which stocks that applies to; stage 2 fills `ready` with the bars it could place with certainty, and the
-    // rest (longer gap, adjusted prices, no answer) are left for the one-by-one fetch.
     const nowS = Date.now() / 1000;
-    ctx.jobs = new Map(); ctx.ready = new Map(); ctx.nowS = nowS;
-    for(const s of plan.stale){
-      const h = priceHistoryByTicker[pcTickerKey(s)], sym = snapshotSymbol(s);
-      if(h && h['1W'] && h['1W'].length && h['1M'] && h['1M'].length && sym) ctx.jobs.set(s, { h, needW: h['1W'][h['1W'].length - 1][0] < weekStartS(nowS) - TOLERANCE, needM: h['1M'][h['1M'].length - 1][0] < monthStartS(nowS) - TOLERANCE });
-    }
+    ctx = { plan, byImportance, failedBars: [], abort: '', jobs: staleJobs(plan, nowS), ready: new Map(), nowS };
     batchLeft.noSymbol = plan.stale.length - ctx.jobs.size;   // no saved bars or no TradingView symbol: not eligible
-    ctx.pool = pool; ctx.settle = settle;
-    ctx.bars = bars;
-    if(noneList.length) run.filled = await bars(noneList, 'fill', true, FULL_WORKERS);
+    const st = { ctx, tried, failRun: 0 };
+    ctx.bars = (list, opts) => refreshBars(st, list, opts);
+    if(noneList.length) run.filled = await ctx.bars(noneList, { key: 'fill', track: true, workers: FULL_WORKERS });
     if(noneList.length){ try { await run.db.doc('stockMeta/histFillTried').set(tried); } catch(e){ console.error('Could not save the skipped list', e); } }
     fiSet('fill', 'done', run.noneBefore ? num(run.filled) + ' of ' + num(run.noneBefore) + ' downloaded' : 'none needed');
     if(stopAsked) run.stopped = true;
@@ -324,7 +344,7 @@ async function saveFreshBars(run){
   await scoreSavedBars(run, savedList);
   if(stopAsked || ctx.abort || !left.length) return;
   fiSet('update', 'running', 'The rest one by one…', 0.95);
-  run.barsUpdated += await ctx.bars(left, 'update', false, BAR_WORKERS, true, { done: 0, total: left.length });
+  run.barsUpdated += await ctx.bars(left, { key: 'update', track: false, workers: BAR_WORKERS, lean: true, prog: { done: 0, total: left.length } });
   fiSet('update', 'done', num(run.batchSaved) + ' in batches, ' + num(left.length) + ' one by one');
 }
 
@@ -379,24 +399,38 @@ async function rsDaily(run){
   } catch(e){ console.error('The daily MACD could not be read', e); run.dailyResult = { name: strategy.name, problem: 'it could not be read' }; }
 }
 
+// The Technical Score 2 records already saved (id -> record); empty when they cannot be read.
+async function savedTech2(run){
+  const old = new Map();
+  try { const snap = await run.db.collection('techScore2').get(); snap.docs.forEach(d => { if(d.exists) old.set(d.id, d.data()); }); } catch(e){ console.error('Could not read the saved Tech 2 scores', e); }
+  return old;
+}
+
+// Saves one Technical Score 2 record, trying twice. True when it was saved.
+async function saveTech2Record(run, id, doc){
+  for(let attempt = 0; attempt < TECH2_SAVE_TRIES; attempt++){
+    try { await run.db.doc('techScore2/' + id).set(doc); return true; } catch(e){ if(attempt === 0) await sleep(TECH2_RETRY_PAUSE_MS); else console.error('Could not save Tech 2 ' + id, e); }
+  }
+  return false;
+}
+
+// Saves the records that changed since the last run and counts the rows saved and failed.
+async function saveTech2(run, chunks){
+  const oldT2 = await savedTech2(run);
+  for(const { id, doc } of chunks){
+    const old = oldT2.get(id);
+    if(old && old.asof === run.today && sameValue(old.rows, doc.rows)){ run.tech2Saved += doc.rows.length; continue; }
+    if(await saveTech2Record(run, id, doc)) run.tech2Saved += doc.rows.length; else run.tech2Failed += doc.rows.length;
+  }
+}
+
 // Technical Score 2, from the saved weekly bars (a few records).
 async function rsTech2(run){
   // ---- Technical Score 2: from the saved weekly bars, a few records ----
   if(run.histRan && !run.stopped){
     fiSet('verify', 'running', 'Calculating Technical Score 2…', 0.5);
     try {
-      const chunks = buildTech2Chunks(stocks, s => (priceHistoryByTicker[pcTickerKey(s)] || {})['1W'], run.today);
-      const oldT2 = new Map();
-      try { const snap = await run.db.collection('techScore2').get(); snap.docs.forEach(d => { if(d.exists) oldT2.set(d.id, d.data()); }); } catch(e){ console.error('Could not read the saved Tech 2 scores', e); }
-      for(const { id, doc } of chunks){
-        const old = oldT2.get(id);
-        if(old && old.asof === run.today && sameValue(old.rows, doc.rows)){ run.tech2Saved += doc.rows.length; continue; }
-        let saved = false;
-        for(let attempt = 0; attempt < 2 && !saved; attempt++){
-          try { await run.db.doc('techScore2/' + id).set(doc); saved = true; } catch(e){ if(attempt === 0) await sleep(1500); else console.error('Could not save Tech 2 ' + id, e); }
-        }
-        if(saved) run.tech2Saved += doc.rows.length; else run.tech2Failed += doc.rows.length;
-      }
+      await saveTech2(run, buildTech2Chunks(stocks, s => (priceHistoryByTicker[pcTickerKey(s)] || {})['1W'], run.today));
     } catch(e){ console.error('Technical Score 2 failed', e); run.tech2Failed = -1; }
   }
   fiSet('verify', 'done', '');
@@ -454,7 +488,7 @@ async function runSnapshot(){
     run.runError = tvErrorText(e);
     fiShowResult('err', [{ text: 'Stopped: ' + tvErrorText(e), cls: 'fi-line fi-line-strong' }, { text: num(run.updated) + ' stocks were saved before this.', cls: 'fi-line fi-line-muted' }], true);
   } finally {
-    await saveRunLog(db, 'snapshot', run.startedAt, run.t0, { planned: run.planned, batches: run.batchSecs.length, saved: run.updated, unchanged: run.unchanged, scored: run.scored, kept: run.kept, skipped: run.skipped.length, stopped: run.stopped, error: run.runError || null, chunks: run.chunksSaved, retried: run.retried, answeredAgain: run.answeredAgain, carried: run.carried, noSymbol: run.noSymbol.length, filled: run.filled, barsUpdated: run.barsUpdated, batchSaved: run.batchSaved, chunkWrites: run.chunkWrites, compacted: run.compacted, techBlocksSaved: run.techBlocksSaved, historyFailed: run.histFailed, noHistoryLeft: run.histRan ? run.noHistoryLeft : null, v: 5, tech2: run.tech2Saved, tvWaitSecs: Math.round(run.tvWaitMs / 100) / 10, saveSecs: Math.round(run.saveMs / 100) / 10, batchSecs: run.batchSecs });
+    await saveRunLog(db, 'snapshot', { startedAt: run.startedAt, t0: run.t0 }, { planned: run.planned, batches: run.batchSecs.length, saved: run.updated, unchanged: run.unchanged, scored: run.scored, kept: run.kept, skipped: run.skipped.length, stopped: run.stopped, error: run.runError || null, chunks: run.chunksSaved, retried: run.retried, answeredAgain: run.answeredAgain, carried: run.carried, noSymbol: run.noSymbol.length, filled: run.filled, barsUpdated: run.barsUpdated, batchSaved: run.batchSaved, chunkWrites: run.chunkWrites, compacted: run.compacted, techBlocksSaved: run.techBlocksSaved, historyFailed: run.histFailed, noHistoryLeft: run.histRan ? run.noHistoryLeft : null, v: 5, tech2: run.tech2Saved, tvWaitSecs: Math.round(run.tvWaitMs / 100) / 10, saveSecs: Math.round(run.saveMs / 100) / 10, batchSecs: run.batchSecs });
     end();
     paintLastRuns(db);
   }

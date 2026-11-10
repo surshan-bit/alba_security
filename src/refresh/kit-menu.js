@@ -39,7 +39,8 @@ function refillMenu(html) {
   if (!menuEl) return;
   setHtml(menuEl, html); placeMenu();
 }
-const item = (act, attrs, label, small, off) => '<button type="button" role="menuitem" class="rk-item" data-rk-act="' + act + '" ' + attrs + (off ? " disabled" : "") + ">" + label + (small ? "<small>" + small + "</small>" : "") + "</button>";
+/** @param {string} act @param {string} attrs @param {string} label @param {{ small?: string, off?: boolean }} [opts] */
+const item = (act, attrs, label, { small, off } = {}) => '<button type="button" role="menuitem" class="rk-item" data-rk-act="' + act + '" ' + attrs + (off ? " disabled" : "") + ">" + label + (small ? "<small>" + small + "</small>" : "") + "</button>";
 const menuIsOpen = () => !!menuEl;
 const menuOpenAt = (anchor) => !!menuEl && menuAnchor === anchor;
 const getMenuAnchor = () => menuAnchor;

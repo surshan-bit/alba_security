@@ -32,26 +32,12 @@ function renderFundGrid(factors){
   return `<div class="fund-grid">${factors.map((f, i) => renderFundFactorCell(f, wide[i])).join('')}</div>`;
 }
 
-function renderFundamentals(s){
-  setFundRenderStock(s);
-  const m = s.fundamentals;
-  if(!m){
-    return `<div class="fund-panel scope-jump-fund" id="jump-fund"><div class="fund-panel-title">${panelIcon('fund')}Fundamental Score</div><div class="tech-empty">The fundamentals breakdown hasn't been added for this stock yet.</div></div>`;
-  }
-  const sb = m.scoringBreakdown;
-  const hasCategories = sb && m.factors.some(f => f.category && FUND_CATEGORY_META[f.category]);
-
-  let body;
-  if(hasCategories){
-    const catOrder = ['Traditional','Buffett','Valuation'];
-    const grouped = catOrder
-      .map(cat => ({ cat, meta: FUND_CATEGORY_META[cat], factors: m.factors.filter(f => f.category === cat) }))
-      .filter(g => g.factors.length);
-    const uncategorized = m.factors.filter(f => !f.category || !FUND_CATEGORY_META[f.category]);
-    body = grouped.map(g => {
-      const subscore = sb[g.meta.subscoreKey], hasSub = typeof subscore === 'number';
-      const band = hasSub ? scoreBand(subscore) : 'fs-pending';
-      return `
+const FUND_CATEGORY_ORDER = ['Traditional', 'Buffett', 'Valuation'];
+// One category's block: its title, its sub-score with a bar (or "Not scored"), and its factor cards.
+function fundSubsectionHtml(g, sb){
+  const subscore = sb[g.meta.subscoreKey], hasSub = typeof subscore === 'number';
+  const band = hasSub ? scoreBand(subscore) : 'fs-pending';
+  return `
         <div class="fund-subsection" data-cat="${g.cat}">
           <div class="fund-subsection-head">
             <div class="fund-subsection-title">${g.meta.label}</div>
@@ -61,11 +47,24 @@ function renderFundamentals(s){
           ${renderFundGrid(g.factors)}
         </div>
       `;
-    }).join('') + (uncategorized.length ? `${renderFundGrid(uncategorized)}` : '');
-  } else {
-    body = `${renderFundGrid(m.factors)}`;
-  }
+}
+// The factor cards: grouped under Traditional / Buffett / Valuation when the stock has a scoring breakdown, otherwise one grid.
+function fundBodyHtml(m){
+  const sb = m.scoringBreakdown;
+  if(!(sb && m.factors.some(f => f.category && FUND_CATEGORY_META[f.category]))) return renderFundGrid(m.factors);
+  const grouped = FUND_CATEGORY_ORDER
+    .map(cat => ({ cat, meta: FUND_CATEGORY_META[cat], factors: m.factors.filter(f => f.category === cat) }))
+    .filter(g => g.factors.length);
+  const uncategorized = m.factors.filter(f => !f.category || !FUND_CATEGORY_META[f.category]);
+  return grouped.map(g => fundSubsectionHtml(g, sb)).join('') + (uncategorized.length ? renderFundGrid(uncategorized) : '');
+}
 
+function renderFundamentals(s){
+  setFundRenderStock(s);
+  const m = s.fundamentals;
+  if(!m){
+    return `<div class="fund-panel scope-jump-fund" id="jump-fund"><div class="fund-panel-title">${panelIcon('fund')}Fundamental Score</div><div class="tech-empty">The fundamentals breakdown hasn't been added for this stock yet.</div></div>`;
+  }
   return `
     <div class="fund-panel scope-jump-fund" id="jump-fund">
       <div class="fund-panel-head">
@@ -77,7 +76,7 @@ function renderFundamentals(s){
         </div>
       </div>
       ${renderFundOverallSummary(s)}
-      ${body}
+      ${fundBodyHtml(m)}
     </div>
   `;
 }

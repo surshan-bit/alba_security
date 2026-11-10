@@ -19,6 +19,27 @@ const LIMITS = {
 const GOOD = new Set(['buy', 'mbuy']), WEAK = new Set(['hold', 'avoid']);
 const CALLS = { hold: 'Hold', trim: 'Consider trimming', add: 'Consider adding', review: 'Review' };
 
+// Reasons the case for the position itself looks weaker. x = { f, gain, mos, drop, limits }.
+function reviewReasons({ f, gain, mos, drop, limits }){
+  const review = [];
+  if(f.verdict && WEAK.has(f.verdict)) review.push('The verdict is now ' + (f.verdict === 'avoid' ? 'Avoid' : 'Hold') + ', below the level you bought at.');
+  if(drop != null && drop >= limits.scoreDropReview) review.push('The Fundamental score fell ' + fixedOrNull(drop, 2) + ' since you bought (' + fixedOrNull(f.entryScore, 2) + ' to ' + fixedOrNull(f.score, 2) + ').');
+  if(gain != null && gain <= limits.lossReview) review.push('The price is ' + fixedOrNull(-gain) + '% below your buy price.');
+  if(mos != null && mos < 0) review.push('The price is above the fair value estimate (margin of safety ' + fixedOrNull(mos) + '%).');
+  return review;
+}
+
+// Reasons to take some profit: a good gain with a stretched price or a thin cushion.
+function trimReasons({ f, gain, mos, limits }){
+  const trim = [];
+  const stretched = f.rsiWeek != null && f.rsiWeek >= limits.rsiStretchedWeek;
+  const warm = f.rsiWeek != null && f.rsiMonth != null && f.rsiWeek >= limits.rsiWarmWeek && f.rsiMonth >= limits.rsiWarmMonth;
+  if(gain != null && gain >= limits.gainTrim && (stretched || warm)) trim.push('Weekly RSI is ' + fixedOrNull(f.rsiWeek) + (f.rsiMonth != null ? ' and monthly RSI ' + fixedOrNull(f.rsiMonth) : '') + ', which is stretched, and you are up ' + fixedOrNull(gain) + '%.');
+  if(gain != null && gain >= limits.gainBig) trim.push('You are up ' + fixedOrNull(gain) + '%, a large gain to protect.');
+  if(mos != null && mos < limits.mosThin && gain != null && gain >= limits.mosThinGain) trim.push('The margin of safety is down to ' + fixedOrNull(mos) + '% and you are up ' + fixedOrNull(gain) + '%.');
+  return trim;
+}
+
 // facts: { buyPrice, price, entryScore, score, verdict, intrinsic, techScore, rsiWeek, rsiMonth }; any of them may be null.
 function tradeSignal(facts, limits = LIMITS){
   const f = facts || {};
@@ -29,20 +50,11 @@ function tradeSignal(facts, limits = LIMITS){
   const out = (call) => ({ call, label: CALLS[call], reasons, gain, mos });
 
   // Review: the case for the position itself looks weaker.
-  const review = [];
-  if(f.verdict && WEAK.has(f.verdict)) review.push('The verdict is now ' + (f.verdict === 'avoid' ? 'Avoid' : 'Hold') + ', below the level you bought at.');
-  if(drop != null && drop >= limits.scoreDropReview) review.push('The Fundamental score fell ' + fixedOrNull(drop, 2) + ' since you bought (' + fixedOrNull(f.entryScore, 2) + ' to ' + fixedOrNull(f.score, 2) + ').');
-  if(gain != null && gain <= limits.lossReview) review.push('The price is ' + fixedOrNull(-gain) + '% below your buy price.');
-  if(mos != null && mos < 0) review.push('The price is above the fair value estimate (margin of safety ' + fixedOrNull(mos) + '%).');
+  const review = reviewReasons({ f, gain, mos, drop, limits });
   if(review.length){ reasons.push(...review); return out('review'); }
 
   // Trim: a good gain with a stretched price or a thin cushion.
-  const trim = [];
-  const stretched = f.rsiWeek != null && f.rsiWeek >= limits.rsiStretchedWeek;
-  const warm = f.rsiWeek != null && f.rsiMonth != null && f.rsiWeek >= limits.rsiWarmWeek && f.rsiMonth >= limits.rsiWarmMonth;
-  if(gain != null && gain >= limits.gainTrim && (stretched || warm)) trim.push('Weekly RSI is ' + fixedOrNull(f.rsiWeek) + (f.rsiMonth != null ? ' and monthly RSI ' + fixedOrNull(f.rsiMonth) : '') + ', which is stretched, and you are up ' + fixedOrNull(gain) + '%.');
-  if(gain != null && gain >= limits.gainBig) trim.push('You are up ' + fixedOrNull(gain) + '%, a large gain to protect.');
-  if(mos != null && mos < limits.mosThin && gain != null && gain >= limits.mosThinGain) trim.push('The margin of safety is down to ' + fixedOrNull(mos) + '% and you are up ' + fixedOrNull(gain) + '%.');
+  const trim = trimReasons({ f, gain, mos, limits });
   if(trim.length){
     reasons.push(...trim);
     if(mos != null) reasons.push('Margin of safety is ' + fixedOrNull(mos) + '%.');

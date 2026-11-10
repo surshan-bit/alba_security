@@ -11,10 +11,38 @@ const MIN_WEEKS = 40;
 function newSampleSet(){
   return { wr: [], mr: [], wp: [], mp: [], wm: [], mm: [], hit: [], t: [], tk: [], np: [], nn: [], cov: [], n: 0 };
 }
-// week / month: bars [t, o, h, l, c, v] in time order. H = weeks in the horizon. target = percent.
+// The highest high in the H weeks after week i.
+function reachedTop(week, i, H){
+  let top = 0;
+  for(let j = i + 1; j <= i + H; j++) if(week[j][2] > top) top = week[j][2];
+  return top;
+}
+// The month in progress at a week's end = the last monthly bar that started on or before it. kk only moves forward.
+function monthAt(month, kk, weekEnd){
+  while(kk + 1 < month.length && month[kk + 1][0] <= weekEnd) kk++;
+  return kk;
+}
+// The monthly RSI and MACD the week's close would give, and the move since the month's start; blanks before there are two monthly bars.
+function monthReading(mInd, mc, kk, price){
+  if(!mInd || kk < 1) return { mr: NaN, mm: -1, mp: NaN };
+  const r = peek(mInd, kk - 1, price);
+  return { mr: r.rsi, mm: r.macd, mp: (price / mc[kk - 1] - 1) * 100 };
+}
+// The positive and negative news items of the week ending at weekEnd.
+function weekNews(news, weekEnd){
+  let np = 0, nn = 0;
+  if(!news) return { np, nn };
+  for(const e of news.list){
+    if(!(e.t > weekEnd - 7 * DAY && e.t <= weekEnd)) continue;
+    if(e.s === 'pos') np++; else if(e.s === 'neg') nn++;
+  }
+  return { np, nn };
+}
+
+// stock = { week, month, H, target, news }. week / month: bars [t, o, h, l, c, v] in time order. H = weeks in the horizon. target = percent.
 // news: optional { first, list: [{ t, s }] } (see news.js). A sample records the positive / negative news of that week and
 // whether the news record already existed then (before its first item, "no news" is just "not recorded").
-function addStockSamples(set, tkIdx, week, month, H, target, news){
+function addStockSamples(set, tkIdx, { week, month, H, target, news }){
   if(!week || week.length < MIN_WEEKS + H + 1) return 0;
   const wc = week.map(b => b[4]);
   const wInd = buildIndicators(wc);
@@ -27,22 +55,13 @@ function addStockSamples(set, tkIdx, week, month, H, target, news){
     if(wRead.macd < 0 && !(wRead.rsi >= 0)) continue;
     const entry = week[i + 1][1];
     if(!(entry > 0)) continue;
-    let top = 0;
-    for(let j = i + 1; j <= i + H; j++) if(week[j][2] > top) top = week[j][2];
-    // month in progress at this week's end = the last monthly bar that started on or before it
     const weekEnd = week[i][0] + 5 * DAY;
-    if(mInd) while(kk + 1 < month.length && month[kk + 1][0] <= weekEnd) kk++;
-    let mr = NaN, mm = -1, mp = NaN;
-    if(mInd && kk >= 1){
-      const r = peek(mInd, kk - 1, wc[i]);
-      mr = r.rsi; mm = r.macd; mp = (wc[i] / mc[kk - 1] - 1) * 100;
-    }
+    if(mInd) kk = monthAt(month, kk, weekEnd);
+    const m = monthReading(mInd, mc, kk, wc[i]), n = weekNews(news, weekEnd);
     set.wr.push(wRead.rsi); set.wm.push(wRead.macd); set.wp.push((wc[i] / wc[i - 1] - 1) * 100);
-    set.mr.push(mr); set.mm.push(mm); set.mp.push(mp);
-    let np = 0, nn = 0;
-    if(news) news.list.forEach(e => { if(e.t > weekEnd - 7 * DAY && e.t <= weekEnd){ if(e.s === 'pos') np++; else if(e.s === 'neg') nn++; } });
-    set.np.push(np); set.nn.push(nn); set.cov.push(news && week[i][0] >= news.first ? 1 : 0);
-    set.hit.push(top >= entry * mult ? 1 : 0);
+    set.mr.push(m.mr); set.mm.push(m.mm); set.mp.push(m.mp);
+    set.np.push(n.np); set.nn.push(n.nn); set.cov.push(news && week[i][0] >= news.first ? 1 : 0);
+    set.hit.push(reachedTop(week, i, H) >= entry * mult ? 1 : 0);
     set.t.push(week[i][0]); set.tk.push(tkIdx);
     added++;
   }

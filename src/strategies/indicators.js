@@ -31,21 +31,25 @@ function readingAt(ind, i){
     macd: i + 1 >= MIN_MACD_BARS ? macdCode(ind.macd[i], ind.sig[i]) : -1
   };
 }
+const RSI_PERIOD = 14;
+
+// The RSI if one more bar followed bar i and closed at `price`.
+function peekRsi(ind, i, price){
+  if(i >= RSI_PERIOD){
+    const d = price - ind.c[i];
+    return rsiOf((ind.ag[i] * 13 + Math.max(d, 0)) / RSI_PERIOD, (ind.al[i] * 13 + Math.max(-d, 0)) / RSI_PERIOD);
+  }
+  // exactly 14 bars before it: seed the average from the first 14 changes
+  let g = 0, l = 0;
+  for(let k = 1; k <= RSI_PERIOD; k++){ const d = (k <= i ? ind.c[k] : price) - ind.c[k - 1]; if(d > 0) g += d; else l -= d; }
+  return rsiOf(g / RSI_PERIOD, l / RSI_PERIOD);
+}
 // Reading if one more bar followed bar i and closed at `price`.
 function peek(ind, i, price){
   const j = i + 1;
   const e12 = price * K12 + ind.e12[i] * (1 - K12), e26 = price * K26 + ind.e26[i] * (1 - K26);
   const level = e12 - e26, signal = level * K9 + ind.sig[i] * (1 - K9);
-  let rsi = NaN;
-  if(j + 1 >= MIN_RSI_BARS){
-    if(i >= 14){ const d = price - ind.c[i]; rsi = rsiOf((ind.ag[i] * 13 + Math.max(d, 0)) / 14, (ind.al[i] * 13 + Math.max(-d, 0)) / 14); }
-    else {   // exactly 14 bars before it: seed the average from the first 14 changes
-      let g = 0, l = 0;
-      for(let k = 1; k <= 14; k++){ const d = (k <= i ? ind.c[k] : price) - ind.c[k - 1]; if(d > 0) g += d; else l -= d; }
-      rsi = rsiOf(g / 14, l / 14);
-    }
-  }
-  return { rsi, macd: j + 1 >= MIN_MACD_BARS ? macdCode(level, signal) : -1 };
+  return { rsi: j + 1 >= MIN_RSI_BARS ? peekRsi(ind, i, price) : NaN, macd: j + 1 >= MIN_MACD_BARS ? macdCode(level, signal) : -1 };
 }
 
 export { MACD_STATES, buildIndicators, peek, readingAt };

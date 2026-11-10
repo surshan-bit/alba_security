@@ -117,6 +117,42 @@ function paintButton(){
   btn.title = !enabled ? 'Turn live prices on' : !open ? 'Live prices run on weekdays 9:15 to 15:30 (India time). Click to turn off.' : fails >= 3 ? 'TradingView did not answer; trying again every 2 minutes. Click to turn off.' : 'Prices of the stocks on screen refresh every 20 seconds (' + lastCount + ' watched' + (lastAt ? ', last ' + new Date(lastAt).toLocaleTimeString('en-IN', { hour12: false }) : '') + '). Nothing is saved. Click to turn off.';
 }
 
+const PERIOD_FIELDS = [['W', 'weekPctChange', 'week'], ['M', 'monthPctChange', 'month']];
+// W% CHG and M% CHG follow the live price too. They are kept on the stock's technical readings, so sorting, filters and every grid agree with
+// what is shown; a stock without technical readings has none to move. A figure TradingView did not return leaves the saved one in place.
+async function movePeriodChanges(s, key, px, changed){
+  const raw = s.technical && s.technical.raw;
+  if(!raw) return;
+  const sym = priceSymbolByTicker[key] || (ldSymOk.get(key) || {}).sym;
+  for(const [kind, field, flag] of PERIOD_FIELDS){
+    let ref = null;
+    try { ref = await periodRefOf(kind, key, sym); } catch(e){ /* keeps the shown figure */ }
+    if(ref == null) continue;
+    const v = Math.round((px / ref - 1) * 10000) / 100;
+    changed[flag] = raw[field] !== v; raw[field] = v;
+  }
+}
+// One stock's live look: true when a price came back and the rows on screen were repainted.
+async function liveUpdate(idx){
+  const s = stocks[idx], px = (await quoteOf(s)).price;
+  if(px == null) return false;
+  const key = pcTickerKey(s), before = s.valuation && s.valuation.currentPrice;
+  livePrice.set(key, px); lastLook.set(idx, Date.now()); s.liveAt = Date.now();
+  if(!s.valuation) s.valuation = {};
+  s.valuation.currentPrice = px;
+  const changed = { price: before !== px, week: false, month: false };
+  await movePeriodChanges(s, key, px, changed);
+  document.querySelectorAll('.app-section.active tr[data-idx="' + idx + '"]').forEach(tr => paintRow(tr, s, idx, changed));
+  return true;
+}
+// One of the parallel workers: takes the next stock of `list` until none is left, counting answers in `tally`.
+async function liveWorker(list, next, tally){
+  while(next.i < list.length){
+    const idx = list[next.i++];
+    try { if(await liveUpdate(idx)) tally.ok++; else tally.bad++; } catch(e){ tally.bad++; }
+  }
+}
+
 async function tick(){
   if(busy) return;
   paintButton();
@@ -127,37 +163,10 @@ async function tick(){
   lastCount = list.length;
   if(!list.length || !(await tvMcp())) return;
   busy = true;
-  let ok = 0, bad = 0, i = 0;
-  const worker = async () => {
-    while(i < list.length){
-      const idx = list[i++], s = stocks[idx];
-      try {
-        const q = await quoteOf(s), px = q.price;
-        if(px == null){ bad++; continue; }
-        const key = pcTickerKey(s), before = s.valuation && s.valuation.currentPrice;
-        livePrice.set(key, px); lastLook.set(idx, Date.now()); s.liveAt = Date.now();
-        if(!s.valuation) s.valuation = {};
-        s.valuation.currentPrice = px;
-        // W% CHG and M% CHG follow the live price too. They are kept on the stock's technical readings, so sorting, filters and
-        // every grid agree with what is shown; a stock without technical readings has none to move. A figure TradingView did
-        // not return leaves the saved one in place.
-        const raw = s.technical && s.technical.raw, changed = { price: before !== px, week: false, month: false };
-        if(raw){
-          const sym = priceSymbolByTicker[key] || (ldSymOk.get(key) || {}).sym;
-          for(const [kind, field, flag] of [['W', 'weekPctChange', 'week'], ['M', 'monthPctChange', 'month']]){
-            let ref = null;
-            try { ref = await periodRefOf(kind, key, sym); } catch(e){ /* keeps the shown figure */ }
-            if(ref != null){ const v = Math.round((px / ref - 1) * 10000) / 100; changed[flag] = raw[field] !== v; raw[field] = v; }
-          }
-        }
-        document.querySelectorAll('.app-section.active tr[data-idx="' + idx + '"]').forEach(tr => paintRow(tr, s, idx, changed));
-        ok++;
-      } catch(e){ bad++; }
-    }
-  };
-  try { await Promise.all(Array.from({ length: Math.min(PARALLEL, list.length) }, worker)); }
+  const tally = { ok: 0, bad: 0 }, next = { i: 0 };
+  try { await Promise.all(Array.from({ length: Math.min(PARALLEL, list.length) }, () => liveWorker(list, next, tally))); }
   finally { busy = false; }
-  if(ok){ fails = 0; lastAt = Date.now(); paintDetail(); if(tradeLogOpen()) redrawWhenIdle('tradelog', renderTradeLogPanel); } else if(bad) fails++;
+  if(tally.ok){ fails = 0; lastAt = Date.now(); paintDetail(); if(tradeLogOpen()) redrawWhenIdle('tradelog', renderTradeLogPanel); } else if(tally.bad) fails++;
   paintButton();
 }
 

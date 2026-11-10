@@ -1600,9 +1600,9 @@ test('trade call: history keeps one point a day and lists when the call changed'
   });
   test('live snapshot: the saving side protects a recent completed-weeks block and reports missing prices', () => {
     const keep = { technical: { asof: '2026-10-14', basis: { week: '2026-10-09', month: '2026-09-01' } } };
-    assert.strictEqual(L.snapshotUpdate(stock, tv, '2026-10-14', 'NSE:ABC', keep.technical).kept, true);
-    assert.ok(L.snapshotUpdate(stock, tv, '2026-10-14', 'NSE:ABC', null).technical);
-    assert.ok(L.snapshotUpdate(stock, {}, '2026-10-14', 'NSE:ABC', null).reason);
+    assert.strictEqual(L.snapshotUpdate(stock, tv, { today: '2026-10-14', sym: 'NSE:ABC', keepAgainst: keep.technical }).kept, true);
+    assert.ok(L.snapshotUpdate(stock, tv, { today: '2026-10-14', sym: 'NSE:ABC', keepAgainst: null }).technical);
+    assert.ok(L.snapshotUpdate(stock, {}, { today: '2026-10-14', sym: 'NSE:ABC', keepAgainst: null }).reason);
   });
 }
 
@@ -1914,7 +1914,7 @@ test('trade call: history keeps one point a day and lists when the call changed'
 test('heat map: tiles carry their place, strength and tone as data-css and classes, never an inline style', async () => {
   const { heatmapHtml } = await import('../src/business/heatmap.js');
   const rows = [{ name: 'Banks', count: 9, mean: 4 }, { name: 'Steel', count: 5, mean: -6 }, { name: 'Gaps', count: 2, mean: null }];
-  const html = heatmapHtml(rows, '1M', 1000, 'chg', .5);
+  const html = heatmapHtml(rows, '1M', { width: 1000, size: 'chg', hRatio: .5 });
   assert.ok(!/\sstyle=/.test(html), 'no style attribute');
   assert.ok(html.includes('<div class="hm-wrap" data-css="--ratio:1000/500">'));
   const tile = name => html.match(new RegExp('<button[^>]*data-biz-heat="' + name + '"[^>]*>'))[0];
@@ -1924,7 +1924,7 @@ test('heat map: tiles carry their place, strength and tone as data-css and class
 });
 test('heat map: a stronger move mixes more colour, capped at 90%, and count sizing still tones every tile', async () => {
   const { heatmapHtml } = await import('../src/business/heatmap.js');
-  const mix = (mean) => Number(heatmapHtml([{ name: 'A', count: 3, mean }], '1M', 1000, 'count').match(/--mix:(\d+)%/)[1]);
+  const mix = (mean) => Number(heatmapHtml([{ name: 'A', count: 3, mean }], '1M', { width: 1000, size: 'count' }).match(/--mix:(\d+)%/)[1]);
   assert.strictEqual(mix(0), 18);
   assert.strictEqual(mix(5), 54);
   assert.strictEqual(mix(500), 90);
@@ -1932,7 +1932,7 @@ test('heat map: a stronger move mixes more colour, capped at 90%, and count sizi
 });
 test('heat map: a hostile industry name is escaped in the title and the attribute', async () => {
   const { heatmapHtml } = await import('../src/business/heatmap.js');
-  const html = heatmapHtml([{ name: '<img src=x onerror=alert(1)>', count: 4, mean: 2 }], '1W', 1000, 'chg');
+  const html = heatmapHtml([{ name: '<img src=x onerror=alert(1)>', count: 4, mean: 2 }], '1W', { width: 1000, size: 'chg' });
   assert.ok(!html.includes('<img'), 'the name never becomes markup');
   assert.ok(html.includes('&lt;img'));
 });
@@ -2260,7 +2260,7 @@ test('refresh menu: it opens under its button (or above it, or in the middle wit
   try {
     assert.deepStrictEqual([M.menuIsOpen(), M.menuQuery('x'), M.menuQueryAll('x')], [false, null, []]);
     M.closeMenu(true); M.refillMenu('<p>nothing open</p>');
-    assert.strictEqual(M.item('go', 'data-x="1"', 'Go', 'small text', true).includes('disabled'), true);
+    assert.strictEqual(M.item('go', 'data-x="1"', 'Go', { small: 'small text', off: true }).includes('disabled'), true);
     assert.strictEqual(M.item('go', '', 'Go').includes('<small>'), false);
     M.openMenu(anchor, '<button class="rk-btn" type="button">One</button><input id="i">', { kind: 'fund' });
     assert.deepStrictEqual(place(), [1, '50px', '106px'], 'under the button, left edges aligned');
@@ -2843,11 +2843,11 @@ async function loadAllStubbed(file, extra, keep, more){
   const src = fs.readFileSync(path.join(root, file), 'utf8'), stubs = {};
   for(const m of src.matchAll(/^import \{([^}]*)\} from '([^']+)';/gm)){
     if(keep.includes(m[2])) continue;
-    stubs[m[2]] = m[1].split(',').map((n) => n.trim().split(' as ')[0]).concat(m[2] === '../tv/connector.js' ? ['tvIsFatal'] : [], (more || {})[m[2]] || []).map((n) => TV_VALUES.has(n) ? `export const ${n} = globalThis.__T.${n};` : `export const ${n} = globalThis.__TVFN('${n}');`).join('\n');
+    stubs[m[2]] = [...new Set(m[1].split(',').map((n) => n.trim().split(' as ')[0]).concat(m[2] === '../tv/connector.js' ? ['tvIsFatal'] : [], (more || {})[m[2]] || []))].map((n) => TV_VALUES.has(n) ? `export const ${n} = globalThis.__T.${n};` : `export const ${n} = globalThis.__TVFN('${n}');`).join('\n');
   }
-  return loadWithStubs(file, extra, stubs);
+  return loadWithStubs(file, extra, Object.assign(stubs, (more || {}).__modules || {}));   // `more.__modules`: stand-ins for modules loaded with import(), which have no import line to read
 }
-const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { noteLivePrices, paintHint, rsBars, rsCross, rsDaily, rsFixSymbols, rsReport, rsSnapshot, rsTech2, runSnapshot, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
+const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { noteLivePrices, paintHint, rsBars, rsCross, rsDaily, rsFillHistory, rsFixSymbols, rsReport, rsSnapshot, rsTech2, runSnapshot, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
   ['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js', './finalchunk.js']);
 const tvStock = (name) => ({ name, ticker: name, pillars: { val: 0.5 } });
 const tvRun = (db, names, over) => Object.assign({ db, today: '2026-11-04', stored: new Map(), prevRows: new Map(), todo: names.map((n) => ({ s: tvStock(n), sym: 'N:' + n })), ctx: null, batchLeft: {}, updated: 0, unchanged: 0, reusedFinal: 0, scored: 0, kept: 0, chunksSaved: 0,
@@ -3112,7 +3112,7 @@ test('refresh all stocks: a whole run goes through its steps in order, the weekl
   try {
     const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks, priceHistoryByTicker: { A: { '1W': bars, '1M': bars } }, pcTickerKey: (s) => s.name, COMPACT_LAG: 1, pillars: 1, getFiRunning: () => false, getFiOwner: () => true, getFiDb: () => db,
       tvMcp: async () => true, tvIstDate: () => '2026-11-04', debugHandle: () => ({}), loadRuns: async () => [], priorityOrder: (k, l) => l, isinSymbolCached: (s) => 'N:' + s.name, isinOf: () => 'INE1', buildTech2Chunks: () => [], fiShowResult: (...a) => shown.push(a),
-      tvCall: async (tool, args) => (args.symbols ? tvAnswer(args.symbols) : { data: {} }), ensureAllPriceBars: async () => { steps.push('bars loaded'); }, saveRunLog: async (d, kind, at, t0, rec) => { steps.push('log ' + rec.saved); },
+      tvCall: async (tool, args) => (args.symbols ? tvAnswer(args.symbols) : { data: {} }), ensureAllPriceBars: async () => { steps.push('bars loaded'); }, saveRunLog: async (d, kind, times, rec) => { steps.push('log ' + rec.saved); },
       saveCrossStates: async (d, items) => { steps.push('cross ' + JSON.stringify(items)); return { read: 1, changed: 1, chunksWritten: 0, failed: 0 }; } };
     const db = { collection: () => ({ get: async () => ({ docs: [] }) }), doc: () => ({ get: async () => ({ exists: false }), set: async () => {} }) };
     const M = await loadTvRefresh();
@@ -3237,7 +3237,7 @@ test('refresh all stocks, bars step: placed stocks are saved in batches and scor
     lagOf: (k) => k === 'A' ? 9 : k === 'B' ? 7 : 0, saveFullBars: async (s) => s.name === 'A', saveRecentBars: async (db, list) => ({ saved: new Set(['A', 'B']), failed: new Set(['C']), chunksWritten: 1, records: 2 }),
     saveTechBlocks: async () => ({ computed: 2, chunksWritten: 1, records: 1, failed: 1 }) };
   const M = await loadTvRefresh(), onebyone = [];
-  const ctx = tvBarsCtx({ plan: { stale: stocks }, jobs: new Map([[A, 1], [B, 1], [C, 1], [D, 1]]), ready: new Map([[A, { s: A }], [B, { s: B }], [C, { s: C }]]), bars: async (left, key, track, workers, lean, prog) => { onebyone.push(left.map((s) => s.name), prog.total); return left.length; } });
+  const ctx = tvBarsCtx({ plan: { stale: stocks }, jobs: new Map([[A, 1], [B, 1], [C, 1], [D, 1]]), ready: new Map([[A, { s: A }], [B, { s: B }], [C, { s: C }]]), bars: async (left, { prog }) => { onebyone.push(left.map((s) => s.name), prog.total); return left.length; } });
   const run = tvRun(tvDb(), [], { ctx, batchLeft: { missing: 0 }, staleBefore: 4 });
   await M.rsBars(run);
   assert.deepStrictEqual(onebyone, [['D', 'C'], 2]);   // D was never placed; C could not be saved
@@ -4405,6 +4405,1729 @@ test('stock data: no database, no index, a short list or a missing chunk each st
   await fail({ chunks: { c1: [{ t: 'A' }] } }, 'chunk c2 is missing');   // tried twice, with a pause between
 })));
 
+// ---- Refresh all stocks, history step (src/refresh/tvrefresh.js, rsFillHistory): who gets a full download, in what order, and when the step stops
+TV_VALUES.add('priceJobs'); TV_VALUES.add('stockByTickerSymbol'); TV_VALUES.add('priceLoaded');
+const fillSetup = (names, over) => {
+  const jobs = new Map(), written = [], docs = {}, fails = {};
+  const db = { doc: (p) => ({ get: async () => { if(fails.get) throw new Error('db down'); return docs[p] ? { exists: true, data: () => docs[p] } : { exists: false }; },
+    set: async (d) => { if(fails.set) throw new Error('db down'); written.push([p, JSON.parse(JSON.stringify(d))]); } }) };
+  const stocks = names.map(tvStock);
+  const T = globalThis.__T = { log: [], refreshed: [], fiSet: (...a) => T.log.push(a.slice(0, 3).join('|')), stocks, priceHistoryByTicker: {}, pcTickerKey: (s) => s.name, priceJobs: jobs, stockByTickerSymbol: new Map(),
+    debugHandle: () => ({}), ensureAllPriceBars: async () => {}, loadRuns: async () => [], priorityOrder: (k, l) => l, isinSymbolCached: (s) => 'N:' + s.name, COMPACT_LAG: 1,
+    refreshOneNow: async (s, lean) => { T.refreshed.push(s.name + (lean ? '*' : '')); if(T.outcome) T.outcome(s, jobs); } };
+  Object.assign(T, over || {});
+  return { T, db, jobs, written, docs, stocks, fails };
+};
+const okJob = (s, jobs) => jobs.set(s.name, { state: 'ok' });
+const OLD_BARS = [[1000, 1, 1, 1, 1, 1]];
+
+test('history step: stocks with no history are downloaded tracked picks first, those that failed recently are left out, and a failure is remembered for next time', () => alone(async () => {
+  const x = fillSetup(['S1', 'S2', 'S3', 'S4']);
+  x.docs['stockMeta/histFillTried'] = { S4: new Date().toISOString(), S2: '2020-01-01T00:00:00.000Z' };
+  x.T.loadRuns = async () => [{ picks: [{ sym: 'N:S3' }, { sym: 'N:gone' }] }, {}];
+  x.T.stockByTickerSymbol = new Map([['N:S3', x.stocks[2]]]);
+  x.T.outcome = (s, jobs) => { if(s.name === 'S1') jobs.set('S1', { state: 'error', msg: 'boom' }); else okJob(s, jobs); };
+  const M = await loadTvRefresh(), run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  assert.deepStrictEqual(x.T.refreshed, ['S3', 'S1', 'S2']);   // S3 is tracked; S4 failed lately; S2's old failure is long ago, so it is tried again
+  assert.deepStrictEqual([run.noneBefore, run.staleBefore, run.filled, !!run.stopped, run.histRan], [4, 0, 2, false, true]);
+  assert.deepStrictEqual(run.ctx.failedBars, [{ sym: 'S1', name: 'S1', reason: 'price bars: boom' }]);
+  assert.strictEqual(x.written.length, 1); assert.strictEqual(x.written[0][0], 'stockMeta/histFillTried');
+  assert.deepStrictEqual(Object.keys(x.written[0][1]).sort(), ['S1', 'S4']);   // S1 failed now; S4 stays; S2 and S3 came through
+  assert.ok(Date.now() - Date.parse(x.written[0][1].S1) < 60000);
+  assert.ok(x.T.log.includes('fill|done|2 of 4 downloaded') && x.T.log.includes('fill|running|Looking at the saved bars…'));
+  assert.ok(x.T.log.includes('fill|running|1 of 3 · S3') && x.T.log.includes('fill|running|3 of 3 · S2'));
+}));
+
+test('history step: a refused call (quota, no connection) stops the step without blaming the stocks; many failures in a row stop it too', () => alone(async () => {
+  let x = fillSetup(['S1', 'S2', 'S3']);
+  x.T.outcome = (s, jobs) => jobs.set(s.name, { state: 'error', msg: 'The daily quota is used up' });
+  let M = await loadTvRefresh(), run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  assert.deepStrictEqual([run.stopped, run.runError, run.filled, x.T.refreshed.length], [true, 'The daily quota is used up', 0, 2]);   // two at a time: the third is never started
+  assert.deepStrictEqual(x.written, [['stockMeta/histFillTried', {}]]);   // a refusal says nothing about the stock: not remembered
+  x = fillSetup(Array.from({ length: 12 }, (_, i) => 'F' + i));   // no job comes back at all
+  M = await loadTvRefresh(); run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  assert.deepStrictEqual([run.stopped, run.runError], [true, 'price bars failed 8 times in a row']);
+  assert.ok(run.ctx.failedBars.length >= 8 && run.ctx.failedBars.length < 12 && run.ctx.failedBars[0].reason === 'price bars: did not finish');
+  assert.ok(Object.keys(x.written[0][1]).length >= 8);   // each of those failures is remembered
+  x = fillSetup(['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9']);   // a success in between resets the count
+  x.T.outcome = (s, jobs) => { if(['S4', 'S8'].includes(s.name)) okJob(s, jobs); };
+  M = await loadTvRefresh(); run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  assert.deepStrictEqual([!!run.stopped, run.runError, run.filled, x.T.refreshed.length], [false, undefined, 2, 9]);
+}));
+
+test('history step: stocks one bar behind get a batch job only when they have saved bars and a symbol, and the bar refresh reports progress for the list it is given', () => alone(async () => {
+  const now = Math.floor(Date.now() / 1000), cur = [[now, 1, 1, 1, 1, 1]];
+  const x = fillSetup(['S1', 'S2', 'S3', 'S4']);
+  x.T.priceHistoryByTicker = { S1: { '1W': OLD_BARS, '1M': OLD_BARS }, S2: { '1W': OLD_BARS, '1M': OLD_BARS }, S3: { '1W': cur, '1M': cur }, S4: { '1W': OLD_BARS, '1M': [] } };
+  x.T.isinSymbolCached = (s) => s.name === 'S2' ? null : 'N:' + s.name;   // S2 has no TradingView symbol, S4 no monthly bars
+  x.T.outcome = okJob;
+  const M = await loadTvRefresh(), run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  const ctx = run.ctx;
+  assert.deepStrictEqual([run.noneBefore, run.staleBefore, run.batchLeft.noSymbol, x.written.length, x.T.refreshed.length], [0, 3, 2, 0, 0]);   // nothing to download in full: nothing written, nothing refreshed
+  assert.deepStrictEqual([...ctx.jobs.keys()].map((s) => s.name), ['S1']);
+  assert.deepStrictEqual([ctx.jobs.get(x.stocks[0]).needW, ctx.jobs.get(x.stocks[0]).needM, ctx.ready.size, typeof ctx.nowS, ctx.abort], [true, true, 0, 'number', '']);
+  assert.ok(x.T.log.includes('fill|done|none needed'));
+  x.T.log.length = 0;
+  assert.strictEqual(await ctx.bars([x.stocks[0], x.stocks[1]], { key: 'update', track: false, workers: 2, lean: true, prog: { done: 0, total: 2 } }), 2);
+  assert.deepStrictEqual(x.T.refreshed.sort(), ['S1*', 'S2*']);   // lean: only the new bars
+  assert.ok(x.T.log.includes('update|running|1 of 2 · S1') && x.T.log.includes('update|running|2 of 2 · S2'));
+  x.T.log.length = 0;
+  assert.strictEqual(await ctx.bars([x.stocks[2]], { key: 'update', track: false, workers: 1 }), 1);   // no shared count: it counts its own list
+  assert.ok(x.T.log.includes('update|running|1 of 1 · S3'));
+}));
+
+test('history step: it is skipped when Stop was pressed or the history stage is switched off, and Stop during it ends it after the stock in hand', () => alone(async () => {
+  let x = fillSetup(['S1']), M = await loadTvRefresh(), run = tvRun(x.db, []);
+  M.__stop(true); await M.rsFillHistory(run); M.__stop(false);
+  assert.deepStrictEqual([run.stopped, run.ctx, run.histRan, x.T.log], [true, null, undefined, ['fill|done|skipped']]);
+  x = fillSetup(['S1'], { debugHandle: () => ({ skipHistoryStage: true }) }); M = await loadTvRefresh(); run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  assert.deepStrictEqual([!!run.stopped, run.ctx, x.T.log, x.T.refreshed], [false, null, ['fill|done|skipped'], []]);
+  x = fillSetup(['S1', 'S2', 'S3', 'S4', 'S5']); M = await loadTvRefresh(); run = tvRun(x.db, []);
+  x.T.outcome = (s, jobs) => { okJob(s, jobs); M.__stop(true); };
+  await M.rsFillHistory(run); M.__stop(false);
+  assert.deepStrictEqual([run.stopped, run.filled, x.T.refreshed.length], [true, 1, 1]);   // the stock in hand finishes, no other starts
+}));
+
+test('history step: a database that cannot be read or written does not stop the downloads', () => alone(async () => {
+  await quietErrors(async (seen) => {
+    const x = fillSetup(['S1', 'S2']); x.fails.get = true; x.fails.set = true;
+    x.T.loadRuns = async () => { throw new Error('no runs'); };
+    x.T.outcome = okJob;
+    const M = await loadTvRefresh(), run = tvRun(x.db, []);
+    await M.rsFillHistory(run);
+    assert.deepStrictEqual([run.filled, x.T.refreshed.length], [2, 2]);
+    assert.deepStrictEqual(seen, ['Could not read tracked picks', 'Could not save the skipped list']);
+  });
+}));
+
+// ---- Analysis chart geometry (src/analysis/geometry.js)
+const GEO_STUBS = { '../list/metrics.js': 'export const mosPct = (s) => (typeof s.mos === "number" ? s.mos : -Infinity);', './state.js': 'export const analysisFilters = globalThis.__AF;' };
+const geoLoad = (file) => loadWithStubs(file || 'src/analysis/geometry.js', '', GEO_STUBS);
+test('analysis chart geometry: the size follows the space, the scales clamp, dots grow with Margin of Safety and the MoS slider bounds follow the data', () => alone(async () => {
+  globalThis.__AF = { xAxis: 'week', yAxis: 'month' };
+  const G = await geoLoad();
+  const geo = (w, list) => G.chartGeometry({ clientWidth: w }, list || []);
+  assert.deepStrictEqual([geo(0).W, geo(0).H, geo(300).W, geo(300).H, geo(1000).W, geo(1000).H, geo(5000).W, geo(5000).H], [780, 420, 640, 420, 1000, 420, 1700, 620]);
+  assert.strictEqual(G.chartGeometry({}, []).W, 780);   // a host with no width yet
+  const g = geo(1000);
+  assert.deepStrictEqual([g.xFor(0), g.xFor(100), g.xFor(-20), g.xFor(500), g.yFor(0), g.yFor(100)], [56, 976, 56, 976, 366, 24]);   // 0-100 only, outside values are held at the edge
+  const stocks = [{ mos: -10 }, { mos: 30 }, { mos: 70 }, {}];   // the last has no MoS
+  const d = geo(1000, stocks);
+  assert.deepStrictEqual([d.radiusForMos(-10), d.radiusForMos(-Infinity), d.radiusForMos(70), d.radiusForMos(500), d.radiusForMos(-500)], [4, 4, 13, 13, 4]);
+  assert.ok(d.radiusForMos(30) > 4 && d.radiusForMos(30) < 13);
+  assert.deepStrictEqual([d.mosBoundLo, d.mosBoundHi], [-10, 70]);
+  assert.deepStrictEqual([geo(1000, [{ mos: 5 }]).radiusForMos(5), geo(1000, [{ mos: 5 }]).mosBoundLo, geo(1000, [{ mos: 5 }]).mosBoundHi, geo(1000).mosBoundHi], [4, 5, 6, 1]);   // one value or none: a flat range still gets a slider
+  assert.strictEqual((d.gridSvg.match(/analysis-grid-line/g) || []).length, 12);
+  assert.ok(d.gridSvg.includes('text-anchor="middle">60</text>') && d.gridSvg.includes('text-anchor="end">0</text>'));
+  assert.ok(d.quadrantLabels.includes('Monthly strong, Weekly pullback') && d.quadrantLabels.includes('Weekly bounce, Monthly weak') && d.axisLabels.includes('W RSI (14)') && d.axisLabels.includes('M RSI (14)'));
+  globalThis.__AF.xAxis = 'month'; globalThis.__AF.yAxis = 'week';   // the axes can be swapped
+  const swapped = geo(1000);
+  assert.ok(swapped.quadrantLabels.includes('Weekly strong, Monthly pullback') && swapped.axisLabels.indexOf('M RSI (14)') < swapped.axisLabels.indexOf('W RSI (14)'));
+  assert.ok(d.axisBox.includes('class="analysis-axis-line"') && d.quadrantLines.includes('analysis-quadrant-line'));
+  assert.deepStrictEqual([G.valueFor({ technical: { raw: { weekRsi: 61, monthRsi: 70 } } }, 'month'), G.valueFor({ technical: { raw: { weekRsi: 61, monthRsi: 70 } } }, 'week')], [70, 61]);
+}));
+test('analysis chart geometry: the stocks in range follow the RSI and MoS filters, and a blank reading passes only a range left at 0-100', () => alone(async () => {
+  globalThis.__AF = { weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, mosLo: null, mosHi: null };
+  const G = await geoLoad();
+  const st = (n, w, m, mos) => ({ n, mos, technical: { raw: { weekRsi: w, monthRsi: m } } });
+  const list = [st('a', 50, 50, 10), st('b', 20, 80, 40), st('c', null, 60, 5), st('d', 70, null, -Infinity), { n: 'e' }];
+  const names = () => G.stocksInRange(list).map((s) => s.n).join('');
+  assert.strictEqual(names(), 'abcde');   // everything while the ranges are open
+  globalThis.__AF.weekMin = 30; assert.strictEqual(names(), 'ad');   // c and e have no weekly reading but the weekly range is narrowed
+  Object.assign(globalThis.__AF, { weekMin: 0, monthMax: 60 }); assert.strictEqual(names(), 'ac');
+  Object.assign(globalThis.__AF, { monthMax: 100, mosLo: 8 }); assert.strictEqual(names(), 'ab');   // MoS: a missing MoS is out
+  Object.assign(globalThis.__AF, { mosLo: null, mosHi: 20 }); assert.strictEqual(names(), 'ac');
+}));
+
+// ---- Stock suggestions (src/ui/suggest.js)
+test('stock suggestions: the symbol is matched first, then the name, a word of the name, any part, then the industry; ties go to the higher score; eight at most', () => alone(async () => {
+  const list = [{ name: 'Tata Motors', ticker: 'TATAMOTORS · Auto', score: 5 }, { name: 'Alpha Tata Co', ticker: 'ALPHA · Retail', score: 9 }, { name: 'Zeta Auto Parts', ticker: 'ZETA · Auto', score: 3 },
+    { name: 'Tatanagar & Sons', ticker: 'TNS · Steel', score: 8 }, { name: 'Metatata Holdings', ticker: 'EHL · Property', score: 7 }, { name: 'Other', ticker: 'OTH · Tata Trading', score: 2 }, { ticker: 'NONAME', score: 1 }, { name: 'No ticker', score: 1 }];
+  globalThis.__SG = [];
+  const S = await loadWithStubs('src/ui/suggest.js', '', { '../core/stocks.js': 'export const stocks = globalThis.__SG;', '../core/util.js': 'export const escapeHtml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");' });
+  globalThis.__SG.push(...list);
+  assert.deepStrictEqual(S.buildSuggestions('tata').map((s) => s.name), ['Tata Motors', 'Tatanagar & Sons', 'Alpha Tata Co', 'Metatata Holdings', 'Other']);   // 'tata': symbol prefix, name prefix, a word of the name, contained in the name, industry
+  assert.deepStrictEqual(S.buildSuggestions('auto').map((s) => s.name), ['Zeta Auto Parts', 'Tata Motors']);   // 'Auto' is a word of one name and only the industry of the other
+  assert.deepStrictEqual(S.buildSuggestions('zzz'), []);
+  assert.deepStrictEqual(S.buildSuggestions('noname').map((s) => s.ticker), ['NONAME']);   // a stock without a name or a ticker part still works
+  globalThis.__SG.length = 0; globalThis.__SG.push(...Array.from({ length: 12 }, (_, i) => ({ name: 'Stock ' + i, ticker: 'S' + i + ' · X', score: i })));
+  assert.deepStrictEqual(S.buildSuggestions('s').map((s) => s.score), [11, 10, 9, 8, 7, 6, 5, 4]);   // eight at most, best score first among equals
+  assert.strictEqual(S.sgMark('Tata <b>Motors', 'tata'), '<mark>Tata</mark> &lt;b>Motors');   // the match is marked, hostile text stays text
+  assert.strictEqual(S.sgMark('Plain', 'zz'), 'Plain');
+}));
+
+// ---- Fundamental CSV preview (src/import/csv-upload.js): which stocks the file holds, which are new and which are not in it
+test('fundamental csv preview: symbols come from the NSE code, else the BSE code; new and missing stocks are counted; a bad file says why', () => withPage('<div id="fundamentalUploadResult"></div>', async (win) => {
+  globalThis.__CU = { stocks: [{ ticker: 'AAA · Auto' }, { ticker: 'bbb · Steel' }, { ticker: 'CCC · Oil' }], html: [] };
+  const U = await loadWithStubs('src/import/csv-upload.js', 'export { processFundamentalCsvText };', {
+    '../core/stocks.js': 'export const stocks = globalThis.__CU.stocks;', '../core/util.js': 'export const escapeHtml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");',
+    './upload-history.js': 'export const recordFundamentalCsvUpload = () => {};', '../core/safehtml.js': 'export const setHtml = (el, html) => { globalThis.__CU.html.push(html); };' });
+  const last = () => globalThis.__CU.html[globalThis.__CU.html.length - 1];
+  const csv = 'Name,NSE Code,BSE Code,ISIN Code\nA,aaa,500001,INE1\nNew via BSE,,0500325,INE2\nWord BSE,,ABC12,INE3\nNo codes,,,INE4\n,  ,  ,\nDup,AAA,,INE5\n';
+  assert.deepStrictEqual(U.processFundamentalCsvText(csv), { rowCount: 4, newCount: 2, droppedCount: 2 });   // AAA, 500325 (no leading zero), ABC12, AAA again
+  assert.ok(last().includes('<b>4</b>In file') && last().includes('<b>2</b>Already scored') && last().includes('<b>2</b>New') && last().includes('<b>2</b>Not in file') && last().includes('New: 500325, ABC12'));
+  const many = 'NSE Code\n' + Array.from({ length: 15 }, (_, i) => 'N' + i).join('\n');
+  assert.deepStrictEqual(U.processFundamentalCsvText(many), { rowCount: 15, newCount: 15, droppedCount: 3 });
+  assert.ok(last().includes('N0, N1, N2, N3, N4, N5, N6, N7, N8, N9, N10, N11 … +3'));   // twelve are listed, the rest counted
+  assert.deepStrictEqual(U.processFundamentalCsvText('NSE Code\nAAA\nBBB\nCCC'), { rowCount: 3, newCount: 0, droppedCount: 0 });
+  assert.ok(!last().includes('New:'));   // nothing new: no line for it
+  assert.strictEqual(U.processFundamentalCsvText('NSE Code'), null); assert.ok(last().includes('No data rows found'));
+  assert.strictEqual(U.processFundamentalCsvText('Name,Sector\nA,B'), null); assert.ok(last().includes('Could not find an "NSE Code", "BSE Code" or "ISIN Code" column'));
+  assert.strictEqual(U.processFundamentalCsvText('NSE Code,ISIN Code\n,INE1\n  ,'), null); assert.ok(last().includes('no rows had an NSE or BSE code'));
+  assert.strictEqual(U.processFundamentalCsvText('ISIN Code\nINE1'), null);   // an ISIN alone is not enough to match on
+}));
+
+// ---- Strategy learning (src/strategies/indicators.js, samples.js, learn.js): indicators, weekly samples and the rule search, on made-up prices
+const lnSeries = (() => {
+  let seed = 12345; const rnd = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+  const DAY = 86400, T0 = Date.UTC(2018, 0, 1) / 1000;
+  return (nWeeks, drift) => {
+    const week = [], month = []; let p = 100 + rnd() * 50;
+    for(let i = 0; i < nWeeks; i++){
+      const o = p; p = Math.max(5, p * (1 + (rnd() - 0.5) * 0.08 + drift)); const h = Math.max(o, p) * (1 + rnd() * 0.03), l = Math.min(o, p) * (1 - rnd() * 0.03);
+      week.push([T0 + i * 7 * DAY, o, h, l, p, 1000]);
+      if(i % 4 === 0) month.push([T0 + i * 7 * DAY, o, h, l, p, 4000]);
+    }
+    return { week, month, T0 };
+  };
+})();
+test('strategy learning: a peek at the next bar equals the reading once that bar has come, both before and after 14 bars of history', () => {
+  const I = load('src/strategies/indicators.js'), c = lnSeries(120, 0).week.map((b) => b[4]), ind = I.buildIndicators(c);
+  for(let i = 0; i < 90; i++){
+    const pk = I.peek(ind, i, c[i + 1]), rd = I.readingAt(ind, i + 1);
+    assert.strictEqual(String(pk.rsi), String(rd.rsi)); assert.strictEqual(pk.macd, rd.macd);
+  }
+  assert.ok(Number.isNaN(I.peek(ind, 0, c[1]).rsi) && I.peek(ind, 0, c[1]).macd === -1);   // too few bars for either reading yet
+});
+test('strategy learning: weekly samples count the news of their week, and a stock with too little history adds none', () => {
+  const S = load('src/strategies/samples.js'), L = lnSeries(80, 0), set = S.newSampleSet();
+  assert.strictEqual(S.addStockSamples(set, 0, { week: L.week.slice(0, 20), month: [], H: 4, target: 5, news: null }), 0);   // under the minimum history
+  assert.strictEqual(S.addStockSamples(set, 0, { week: null, month: [], H: 4, target: 5, news: null }), 0);
+  const weekAt = (i) => L.week[i][0], news = { first: weekAt(40), list: [{ t: weekAt(50) + 86400, s: 'pos' }, { t: weekAt(50) + 2 * 86400, s: 'pos' }, { t: weekAt(50) + 3 * 86400, s: 'neg' }, { t: weekAt(50) + 4 * 86400, s: 'other' }, { t: weekAt(10), s: 'neg' }] };
+  const n = S.addStockSamples(set, 3, { week: L.week, month: L.month, H: 4, target: 5, news });
+  assert.ok(n > 40 && set.n === n);
+  const d = S.finishSampleSet(set), at = (k) => Array.from(d.t).indexOf(weekAt(k));
+  assert.deepStrictEqual([d.np[at(50)], d.nn[at(50)], d.cov[at(50)], d.cov[at(30)], d.tk[at(50)]], [2, 1, 1, 0, 3]);   // two positive, one negative in that week; covered after the record began
+  assert.ok(Number.isNaN(d.mr[0]) || d.mr[0] >= 0);
+  const noMonth = S.newSampleSet(); S.addStockSamples(noMonth, 0, { week: L.week, month: [], H: 4, target: 5, news: null });
+  assert.ok(Array.from(S.finishSampleSet(noMonth).mm).every((x) => x === -1));   // no monthly bars: no monthly reading
+});
+test('strategy learning: the rule search keeps what the older samples support, checks it on the newest, and gives up on too little history', () => {
+  const S = load('src/strategies/samples.js'), Ln = load('src/strategies/learn.js'), set = S.newSampleSet();
+  for(let k = 0; k < 14; k++){ const L = lnSeries(300 + k * 3, (k % 3 - 1) * 0.002); S.addStockSamples(set, k, { week: L.week, month: L.month, H: 4, target: 6, news: null }); }
+  const data = S.finishSampleSet(set);
+  assert.ok(data.n > 3000);
+  const res = Ln.learnRules(data, 4);
+  assert.ok(res && res.samples === data.n && res.minN >= 60 && res.suggestions.length > 0 && res.suggestions.length <= 5 && res.from < res.cut && res.cut < res.to);
+  for(const sg of res.suggestions){
+    assert.ok(sg.rules.length >= 1 && sg.rules.length <= 3 && new Set(sg.rules.map((r) => r.field)).size === sg.rules.length);   // one condition per field, at most three
+    assert.ok(sg.train.n >= res.minN && sg.train.stocks >= 8 && sg.train.low > res.baseTrain.rate && typeof sg.holds === 'boolean');
+  }
+  const order = res.suggestions.map((sg) => (sg.holds ? 1 : 0)); assert.deepStrictEqual(order, order.slice().sort((a, b) => b - a));   // rules that held up come first
+  const few = Ln.learnRules(data, 4, { beam: 2, maxAtoms: 1, top: 2 });
+  assert.ok(few.suggestions.length <= 2 && few.suggestions.every((sg) => sg.rules.length === 1));
+  assert.strictEqual(Ln.learnRules(null, 4), null); assert.strictEqual(Ln.learnRules({ n: 100 }, 4), null);   // too few samples
+  const flat = Object.assign({}, data, { t: new Float64Array(data.n).fill(1.7e9) });   // all at one moment: nothing is old enough to learn from nor new enough to check
+  assert.strictEqual(Ln.learnRules(flat, 4), null);
+});
+
+// ---- Tracked picks and Claude's practice ideas (src/strategies/tracking.js, practice.js)
+test('tracked picks: a pick is judged against its goal price from the live price and the weekly highs, and a new high is remembered', () => alone(async () => {
+  const T = await loadWithStubs('src/strategies/tracking.js', 'export { evaluatePick };', { '../core/util.js': 'export const tickerSymbol = (s) => s.ticker;', './news.js': 'export const newsCounts = () => null;', '../identity/session.js': 'export const getIdentityDb = () => null, getUid = () => null;' });
+  const run = { startedAt: '2026-10-01', days: 30, target: 10 }, start = Date.UTC(2026, 9, 1), DAYMS = 86400000, endMs = start + 30 * DAYMS;
+  const bar = (dayOffset, high, close) => [(start + dayOffset * DAYMS) / 1000, 100, high, 95, close, 1];
+  const ev = (pick, o) => T.evaluatePick(run, pick, Object.assign({ weekBars: undefined, curPrice: undefined, nowMs: start + 10 * DAYMS }, o));
+  let e = ev({ entry: 100 });
+  assert.deepStrictEqual([e.status, e.hitMs, e.now, e.retNow, e.retBest, e.changed], ['open', null, null, null, 0, false]);   // nothing known yet
+  const pick = { entry: 100 };
+  e = ev(pick, { curPrice: 105 });
+  assert.deepStrictEqual([e.status, e.now, Math.round(e.retNow), Math.round(e.retBest), e.changed, pick.peak, /^\d{4}-\d\d-\d\d$/.test(pick.peakAt)], ['open', 105, 5, 5, true, 105, true]);   // a new high is remembered
+  assert.strictEqual(ev(pick, { curPrice: 103 }).changed, false); assert.strictEqual(pick.peak, 105);   // a lower price changes nothing
+  e = ev({ entry: 100 }, { curPrice: 111 });
+  assert.ok(e.status === 'hit' && e.hitMs >= start && e.changed);   // the price itself is above the goal
+  e = ev({ entry: 100 }, { weekBars: [bar(2, 104, 103), bar(9, 112, 110), bar(16, 130, 125)] });   // the goal was reached in the second week; later bars do not move the hit
+  assert.deepStrictEqual([e.status, e.hitMs, e.now, Math.round(e.retBest)], ['hit', start + 9 * DAYMS, 125, 30]);
+  e = ev({ entry: 100 }, { weekBars: [bar(2, 104, 103), bar(40, 200, 190)] });   // a bar after the window ends is ignored
+  assert.deepStrictEqual([e.status, Math.round(e.retBest), e.now], ['open', 4, 190]);
+  e = ev({ entry: 100 }, { weekBars: [bar(-3, 150, 104)] });   // the entry week: only its close counts, not its high
+  assert.deepStrictEqual([e.status, e.now, Math.round(e.retBest)], ['open', 104, 4]);
+  e = ev({ entry: 100 }, { weekBars: [bar(2, 104, 0)], curPrice: 102 }); assert.deepStrictEqual([e.now, Math.round(e.retNow)], [102, 2]);   // the live price wins over a bar's close
+  e = ev({ entry: 100 }, { weekBars: [bar(2, 104, 0)] }); assert.deepStrictEqual([e.now, e.retNow], [null, null]);   // a bar with no close gives no latest price
+  e = ev({ entry: 100, peak: 115, peakAt: '2026-10-10' }); assert.deepStrictEqual([e.status, e.hitMs], ['hit', Date.UTC(2026, 9, 10)]);   // the saved high had reached the goal
+  e = ev({ entry: 100, peak: 115, peakAt: '2026-09-20' }); assert.strictEqual(e.hitMs, start);   // ... but never before the run began
+  e = ev({ entry: 100, peak: 115 }); assert.strictEqual(e.hitMs, start + 10 * DAYMS);   // ... and with no date, now
+  e = ev({ entry: 100 }, { nowMs: endMs }); assert.strictEqual(e.status, 'miss');   // the time is up and the goal was not reached
+  e = ev({ entry: 100 }, { nowMs: endMs - 1 }); assert.strictEqual(e.status, 'open');
+  e = ev({ entry: 100 }, { curPrice: -5, weekBars: [] }); assert.deepStrictEqual([e.now, e.changed], [null, false]);   // not a price
+  // a whole run: each pick is judged on its stock's live price and its weekly bars
+  const stockBySym = new Map([['A', { valuation: { currentPrice: 115 } }], ['B', { valuation: { currentPrice: 102 } }], ['C', {}]]);
+  const picks = () => ['A', 'B', 'C', 'D'].map((sym) => ({ sym, entry: 100 }));
+  const priceSet = new Map([['D', { w: [bar(9, 125, 120)] }]]);
+  const r = T.evaluateRun(Object.assign({}, run, { picks: picks() }), priceSet, stockBySym, start + 20 * DAYMS);
+  assert.deepStrictEqual([r.counts, r.rate, r.finished, r.changed, typeof r.medianDays], [{ hit: 2, open: 2, miss: 0 }, 0.5, false, true, 'number']);
+  const over = T.evaluateRun(Object.assign({}, run, { picks: picks() }), priceSet, stockBySym, endMs + DAYMS);
+  assert.deepStrictEqual([over.counts, over.finished, over.endMs], [{ hit: 2, open: 0, miss: 2 }, true, endMs]);
+  const none = T.evaluateRun(Object.assign({}, run, { picks: [] }), new Map(), new Map(), start);
+  assert.deepStrictEqual([none.rate, none.medianDays, none.counts.hit], [null, null, 0]);
+}));
+
+test('suggest rules from past prices: every stock with weekly bars becomes samples, the rules are searched and kept per strategy, and thin or broken history says why', () => withPage('', async () => {
+  const L = lnSeries;
+  globalThis.__LP = { prices: new Map(), bySym: new Map() };
+  const stub = (n) => `export const ${n} = (...a) => globalThis.__LP.${n} ? globalThis.__LP.${n}(...a) : undefined;`;
+  const P = await loadWithStubs('src/strategies/learnpanel.js', 'export { runLearn, results };', {
+    '../core/util.js': 'export const escapeHtml = (t) => String(t);', '../core/stocks.js': 'export const stockByTickerSymbol = globalThis.__LP.bySym, stocks = [];',
+    './goal.js': 'export const horizonWeeks = () => 4, goalText = () => "goal";', './pricedata.js': 'export const loadPriceSet = async () => globalThis.__LP.prices;',
+    './news.js': 'export const newsTimeline = (s) => s.timeline;', './fields.js': 'export const FIELD_BY_ID = new Map();', './rules.js': 'export const describeRule = () => "", qualifyingStocks = () => [1, 2];',
+    './state.js': 'export const saveStrategies = () => {};', './practice.js': 'export const HORIZONS = { short: { label: "Short" }, medium: { label: "Medium" }, long: { label: "Long" } }, applyPractice = () => {}, hasPractice = () => false, practiceHtml = () => "", runPractice = () => {};',
+    '../core/safehtml.js': 'export const setHtml = () => {};' });
+  const st = { id: 's1', goal: { target: 6, days: 28 } };
+  for(let k = 0; k < 14; k++){ const x = L(300 + k * 3, (k % 3 - 1) * 0.002); globalThis.__LP.prices.set('S' + k, { w: x.week, m: x.month }); }
+  globalThis.__LP.bySym.set('S1', { timeline: { first: 0, list: [{ t: 1, s: 'pos' }] } });   // one stock has a news record
+  await P.runLearn(st, () => st);
+  const done = P.results.get('s1');
+  assert.ok(done.res && done.nStocks === 14 && done.key === '6/28' && done.res.suggestions.every((sg) => sg.nowCount === 2) && done.news);
+  globalThis.__LP.prices = new Map([['S0', { w: [], m: [] }]]);   // nothing to read
+  await P.runLearn(st, () => st); assert.ok(/No weekly price history is stored yet/.test(P.results.get('s1').error));
+  globalThis.__LP.prices = new Map([['S0', { w: lnSeries(120, 0).week, m: [] }]]);   // too little to test rules on
+  await P.runLearn(st, () => st); assert.ok(/not enough price history/.test(P.results.get('s1').error));
+  globalThis.__LP.prices = null;   // the price store fails
+  await quietErrors(async () => { await P.runLearn(st, () => st); });
+  assert.ok(/Could not learn rules: /.test(P.results.get('s1').error));
+}));
+test('practice ideas: only rules that fit their field are kept, an idea needs two of them, and the numbers are checked', () => alone(async () => {
+  globalThis.__PR = { stocks: [{ n: 1 }, { n: 2 }, { n: 3 }] };
+  const FIELDS = new Map([['rsi', { id: 'rsi', type: 'num' }], ['verdict', { id: 'verdict', type: 'enum', options: [['buy', 'Buy'], ['hold', 'Hold']] }], ['trend', { id: 'trend', type: 'enum', options: [['up', 'Up']], noneLabel: 'None' }],
+    ['name', { id: 'name', type: 'text' }], ['price', { id: 'price', type: 'num' }]]);
+  globalThis.__PR.fields = FIELDS;
+  const P = await loadWithStubs('src/strategies/practice.js', 'export { cleanSet };', { '../core/util.js': 'export const escapeHtml = (t) => String(t);', '../core/stocks.js': 'export const stocks = globalThis.__PR.stocks;',
+    '../livedata/claude.js': 'export const ldAskJson = async () => ({}), ldEnsureClaudeAccess = async () => {}, ldErrText = (e) => e.message;', '../livedata/claudegate.js': 'export const claudeStepOn = () => true;',
+    './fields.js': 'export const FIELDS = [...globalThis.__PR.fields.values()], FIELD_BY_ID = globalThis.__PR.fields;',
+    './rules.js': 'export const OPS = { num: [[">=", "at least"], ["<=", "at most"], [">", "above"], ["<", "below"], ["between", "between"]] }, describeRule = () => "", qualifyingStocks = (u, rules) => u.slice(0, rules.length);', './state.js': 'export const saveStrategies = () => {};' });
+  const set = P.cleanSet({ name: 'N'.repeat(80), why: 'W'.repeat(300), rules: [
+    { field: 'rsi', op: '>=', value: 50 }, { field: 'rsi', op: 'between', value: [30, 70] }, { field: 'verdict', op: 'in', value: ['buy', 'nonsense', 'buy'] }, { field: 'trend', value: ['none', 'up', 'down'] },
+    { field: 'rsi', op: '>=', value: 'high' }, { field: 'rsi', op: 'between', value: [1] }, { field: 'rsi', op: 'near', value: 3 }, { field: 'rsi', op: 'between', value: ['a', 'b'] }, { field: 'verdict', value: 'buy' }, { field: 'verdict', value: ['nonsense'] },
+    { field: 'name', op: 'contains', value: 'x' }, { field: 'price', op: '>=', value: 5 }, { field: 'unknown', op: '>=', value: 5 }, null, 'text'] });
+  assert.deepStrictEqual(set.rules, [{ field: 'rsi', op: '>=', value: 50 }, { field: 'rsi', op: 'between', value: [30, 70] }, { field: 'verdict', op: 'in', value: ['buy'] }, { field: 'trend', op: 'in', value: ['none', 'up'] }]);   // 'price' is not offered, 'none' is a choice for a field with a none label
+  assert.deepStrictEqual([set.name.length, set.why.length, set.now], [60, 240, 3]);
+  assert.strictEqual(P.cleanSet({ rules: [{ field: 'rsi', op: '>=', value: 50 }] }), null);   // one rule is not enough
+  assert.deepStrictEqual([P.cleanSet(null), P.cleanSet('x'), P.cleanSet({}), P.cleanSet({ rules: 'no' })], [null, null, null, null]);
+  const named = P.cleanSet({ rules: [{ field: 'rsi', op: '<', value: 20 }, { field: 'rsi', op: '>', value: 5 }] }); assert.deepStrictEqual([named.name, named.why], ['Approach', '']);
+}));
+
+// ---- Refresh kit controls (src/refresh/kit-controls.js): the menus the Refresh buttons open and what each button in them does
+TV_VALUES.add('CHUNK'); TV_VALUES.add('KIND_LABEL');
+const kcSetup = async (html, over) => {
+  const S1 = { name: 'AAA' }, S2 = { name: 'BBB <i>' }, sel = {};
+  const T = globalThis.__T = { requests: [], stops: 0, hooks: null, S1, S2, list: [S1, S2], picked: [S1], cf: 1, ct: 0, ca: 1, CHUNK: 50, KIND_LABEL: { fund: 'Fundamental', tech: 'Technical', both: 'Both' },
+    escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), pcTickerKey: (s) => s.name, counts: (l) => ({ n: l.length, fund: T.cf, tech: T.ct, attn: T.ca }),
+    freshness: () => ({ fund: { age: 5 }, tech: { age: null }, why: ['new results'] }), ago: (n) => n + ' days ago', getScope: (id) => (id === 'nope' ? null : { label: 'Picks <b>', source: 'strat' }),
+    scopeStocks: () => T.list, sectionOf: () => 'strategies', selKeys: (n) => sel[n] || (sel[n] = new Set()), selectedStocks: () => T.picked, isExternalSelection: (n) => n === 'ext',
+    stockByKey: (k) => (k === 'K1' ? S1 : null), getToolbar: () => () => [{ id: 'a', label: 'All', stocks: () => [S1, S2, null] }, { id: 'b', label: 'Empty', stocks: () => [] }],
+    request: (...a) => T.requests.push(a), setQueueHooks: (h) => { T.hooks = h; }, busyIn: () => false, getActiveJob: () => null, queuedJobs: () => [], persistIfRunning: () => {}, flushQueue: () => {},
+    getLdBatch: () => null, ldBatchStop: () => { T.stops++; }, setHtml: (el, html) => { el.innerHTML = html; }, sel };
+  Object.assign(T, over || {});
+  const M = await loadAllStubbed('src/refresh/kit-controls.js', '', ['../core/evt.js', './kit-menu.js']);
+  M.installControls();
+  return { T, M };
+};
+const kcPage = (html, fn) => withPage(html, async (win) => {
+  const had = { w: globalThis.window, r: globalThis.requestAnimationFrame, c: globalThis.CustomEvent };
+  globalThis.window = win; globalThis.requestAnimationFrame = (f) => { f(); }; globalThis.CustomEvent = win.CustomEvent;
+  try { await fn(win); } finally {
+    if(had.w === undefined) delete globalThis.window; else globalThis.window = had.w;
+    if(had.r === undefined) delete globalThis.requestAnimationFrame; else globalThis.requestAnimationFrame = had.r;
+    globalThis.CustomEvent = had.c;
+  }
+});
+const kcClick = (win, el) => el.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+const KC_PAGE = '<div id="host"><button id="rowBtn" class="rk-row-btn" data-rk-row="K1" data-rk-sel="analysis">r</button><span class="rk-cell"><input type="checkbox" id="cell" class="rk-chk"></span>' +
+  '<button id="barBtn" data-rk-act="bar-menu" data-rk-scope="strat">bar</button><button id="runBtn" data-rk-act="run" data-rk-scope="strat" data-rk-kind="both">run</button><button id="badRun" data-rk-act="run" data-rk-scope="nope" data-rk-kind="fund">run</button>' +
+  '<button id="choiceBtn" data-rk-act="choice" data-rk-cid="c1">choice</button><button id="stopBtn" data-rk-act="stop">stop</button><button id="odd" data-rk-act="unknown">odd</button><p id="plain">text</p></div>';
+
+test('refresh kit: a stock\'s refresh icon opens its menu, a second click closes it, and neither opens the stock; the checkbox cell is left alone', () => kcPage(KC_PAGE, async (win) => {
+  const { T } = await kcSetup();
+  const doc = win.document, opened = []; doc.getElementById('host').addEventListener('click', () => opened.push(1));
+  kcClick(win, doc.getElementById('rowBtn'));
+  const menu = () => doc.querySelector('.rk-menu');
+  assert.ok(menu() && menu().textContent.includes('AAA') && menu().textContent.includes('researched 5 days ago · new results') && menu().textContent.includes('no price date'));
+  assert.deepStrictEqual(opened, []);   // the click went no further
+  kcClick(win, doc.getElementById('rowBtn')); assert.strictEqual(menu(), null);
+  kcClick(win, doc.getElementById('cell')); assert.deepStrictEqual(opened, []);
+  kcClick(win, doc.getElementById('rowBtn')); kcClick(win, doc.getElementById('plain')); assert.strictEqual(menu(), null);   // a click elsewhere closes it
+  kcClick(win, doc.getElementById('rowBtn')); kcClick(win, menu().querySelector('.rk-menu-head')); assert.ok(menu());   // ... but not a click inside it
+  kcClick(win, menu().querySelector('[data-rk-act="row-run"][data-rk-kind="both"]'));   // the Both item
+  assert.deepStrictEqual(T.requests.map((r) => [r[0].list.map((s) => s.name), r[0].kinds, r[0].only, r[0].source, r[0].label]), [[['AAA'], ['tech', 'fund'], false, 'analysis', 'AAA']]);
+  assert.strictEqual(menu(), null);
+  T.stockByKey = () => null; kcClick(win, doc.getElementById('rowBtn'));
+  kcClick(win, menu().querySelector('[data-rk-act="row-run"]')); assert.strictEqual(T.requests.length, 1);   // a stock that is gone is not refreshed
+  T.freshness = () => null; kcClick(win, doc.getElementById('rowBtn')); kcClick(win, doc.getElementById('rowBtn')); kcClick(win, doc.getElementById('rowBtn'));
+  assert.ok(menu().textContent.includes('Fundamental'));   // no freshness record: the items still draw
+}));
+
+test('refresh kit: the bar menu counts what needs a refresh, its items start the right refresh, and Run, Stop and an unknown button do what they say', () => kcPage(KC_PAGE, async (win) => {
+  const { T } = await kcSetup();
+  const doc = win.document, menu = () => doc.querySelector('.rk-menu');
+  kcClick(win, doc.getElementById('barBtn'));
+  assert.ok(menu().textContent.includes('Picks &lt;b>'.replace('&lt;', '<')) && menu().textContent.includes('2 stocks') && menu().textContent.includes('Fundamental: 1 of 2 needs refresh') && menu().textContent.includes('Technical up to date') && menu().textContent.includes('1 with new results, news or a big price move.'));
+  const items = [...menu().querySelectorAll('[data-rk-act="menu-run"]')];
+  assert.deepStrictEqual(items.map((b) => [b.dataset.rkKind, b.dataset.rkOnly, b.disabled]), [['fund', '0', false], ['tech', '0', false], ['both', '0', false], ['fund', '1', false], ['tech', '1', true], ['both', '1', false]]);   // nothing needs a Technical refresh
+  kcClick(win, items[3]);   // only what needs Fundamental
+  assert.deepStrictEqual([T.requests[0][0].only, T.requests[0][0].kinds, T.requests[0][0].source, T.requests[0][0].label, T.requests[0][0].selName, T.requests[0][1] === doc.getElementById('barBtn')], [true, ['fund'], 'strat', 'Picks <b>', null, true]);
+  kcClick(win, doc.getElementById('barBtn')); kcClick(win, doc.getElementById('barBtn')); assert.strictEqual(menu(), null);   // the bar button opens and closes its menu
+  T.list = []; T.cf = 0; kcClick(win, doc.getElementById('barBtn')); assert.ok(menu().textContent.includes('0 stocks'));
+  kcClick(win, doc.getElementById('plain'));
+  T.list = [T.S1]; kcClick(win, doc.getElementById('barBtn')); assert.ok(menu().textContent.includes('1 stock') && !menu().textContent.includes('1 stocks'));
+  kcClick(win, doc.getElementById('runBtn'));   // Run: straight away, no menu
+  assert.deepStrictEqual([T.requests[1][0].kinds, T.requests[1][0].only, T.requests[1][1] === doc.getElementById('runBtn')], [['tech', 'fund'], false, true]);
+  kcClick(win, doc.getElementById('badRun')); assert.strictEqual(T.requests.length, 2);   // a scope that no longer exists
+  kcClick(win, doc.getElementById('stopBtn')); assert.strictEqual(T.stops, 1);
+  kcClick(win, doc.getElementById('odd')); assert.strictEqual(T.requests.length, 2);
+  kcClick(win, doc.getElementById('plain'));   // close what is open
+  kcClick(win, doc.getElementById('barBtn')); kcClick(win, [...menu().querySelectorAll('[data-rk-act="menu-run"]')][0]); assert.ok(!menu());
+}));
+
+test('refresh kit: a choice menu lists its items and runs the one picked, and a choice that cannot be built opens nothing useful', () => kcPage(KC_PAGE, async (win) => {
+  const { T, M } = await kcSetup();
+  const doc = win.document, menu = () => doc.querySelector('.rk-menu'), ran = [];
+  M.defineChoices('c1', () => ({ head: 'Which <one>', note: 'A note', items: [{ label: 'First', small: 'sm <1>', run: () => ran.push('first') }, { label: 'Second', off: true, run: () => ran.push('second') }, { label: 'Third' }] }));
+  kcClick(win, doc.getElementById('choiceBtn'));
+  assert.ok(menu().textContent.includes('Which <one>') && menu().textContent.includes('A note') && menu().textContent.includes('sm <1>') && !menu().innerHTML.includes('<one>'));   // text stays text
+  assert.deepStrictEqual([...menu().querySelectorAll('button')].map((b) => b.disabled), [false, true, false]);
+  kcClick(win, menu().querySelector('[data-rk-i="0"]')); assert.deepStrictEqual(ran, ['first']); assert.strictEqual(menu(), null);
+  kcClick(win, doc.getElementById('choiceBtn')); kcClick(win, menu().querySelector('[data-rk-i="2"]')); assert.deepStrictEqual(ran, ['first']);   // an item with nothing to run
+  kcClick(win, doc.getElementById('choiceBtn')); kcClick(win, doc.getElementById('choiceBtn')); assert.strictEqual(menu(), null);   // second click closes
+  M.defineChoices('c1', () => { throw new Error('gone'); });
+  kcClick(win, doc.getElementById('choiceBtn')); assert.strictEqual(menu().textContent, '');
+  kcClick(win, doc.getElementById('choiceBtn'));
+}));
+
+const KC_TOOLS = '<button id="tbBtn" data-rk-act="toolbar" data-rk-tb="biz">tb</button><button id="selRun" data-rk-act="sel-run" data-rk-kind="fund" data-rk-sel="strat">go</button><button id="clearInt" data-rk-act="sel-clear" data-rk-sel="strat">c</button>' +
+  '<button id="clearExt" data-rk-act="sel-clear" data-rk-sel="ext">c</button><input type="checkbox" class="rk-chk" data-rk-sel="strat" data-rk-key="AAA" checked><input type="checkbox" class="rk-chk-all" data-rk-scope="strat" data-rk-sel="strat">';
+test('refresh kit: the toolbar menu runs the chosen group, a selection is refreshed or cleared (a page-owned one through its event), and a confirmation starts what was planned', () => kcPage(KC_TOOLS, async (win) => {
+  const { T } = await kcSetup();
+  const doc = win.document, menu = () => doc.querySelector('.rk-menu');
+  kcClick(win, doc.getElementById('tbBtn'));
+  assert.ok(menu().textContent.includes('Refresh stocks') && menu().textContent.includes('All') && menu().textContent.includes('Fundamental: 1 of 2 needs refresh'));
+  kcClick(win, menu().querySelector('[data-rk-act="tb-run"][data-rk-kind="tech"]'));
+  assert.deepStrictEqual(T.requests.map((r) => [r[0].list.map((s) => s.name), r[0].kinds, r[0].only, r[0].source, r[0].label]), [[['AAA', 'BBB <i>'], ['tech'], false, 'biz-kit', 'All']]);   // the empty slot is dropped
+  kcClick(win, doc.getElementById('tbBtn')); kcClick(win, doc.getElementById('tbBtn')); assert.strictEqual(menu(), null);
+  kcClick(win, doc.getElementById('selRun'));
+  assert.deepStrictEqual([T.requests[1][0].label, T.requests[1][0].selName, T.requests[1][0].clearSel, T.requests[1][0].source, T.requests[1][1] === doc.getElementById('selRun')], ['1 selected', 'strat', true, 'strat', true]);
+  T.sel.strat = new Set(['x']); kcClick(win, doc.getElementById('clearInt')); assert.strictEqual(T.sel.strat.size, 0);
+  const cleared = []; doc.addEventListener('alba-rk-clear', (e) => cleared.push(e.detail.name)); kcClick(win, doc.getElementById('clearExt')); assert.deepStrictEqual(cleared, ['ext']);
+  T.getToolbar = () => () => [{ id: 'b', label: 'Empty', stocks: () => [] }];   // nothing in any group: the run buttons are off and a run does nothing
+  kcClick(win, doc.getElementById('tbBtn'));
+  assert.ok(menu().textContent.includes('Nothing to refresh in this choice.') && menu().querySelector('[data-rk-act="tb-run"]').disabled);
+  menu().querySelector('[data-rk-act="tb-run"]').disabled = false; kcClick(win, menu().querySelector('[data-rk-act="tb-run"]')); assert.deepStrictEqual([T.requests.length, T.requests[2][0].list], [3, []]);   // the button is off, so this never happens on screen; the request would have no stocks
+  T.getToolbar = () => { throw new Error('x'); }; kcClick(win, doc.getElementById('tbBtn'));   // a toolbar that fails offers nothing
+  // the queue asks for a confirmation; Start runs the plan, Cancel drops it
+  const spec = { list: [T.S1], kinds: ['fund'], only: false, source: 'strat', label: 'x' };
+  T.hooks.openConfirm(doc.getElementById('tbBtn'), spec, [{ kind: 'fund', list: [1, 2, 3] }, { kind: 'tech', list: [1] }]);
+  assert.ok(menu().textContent.includes('Fundamental: 3 stocks') && menu().textContent.includes('Technical: 1 stocks') && menu().textContent.includes('batches of 50') && menu().textContent.includes('Claude usage'));
+  kcClick(win, menu().querySelector('[data-rk-act="confirm-run"]'));
+  assert.deepStrictEqual([T.requests[3][0].confirmed, T.requests[3][0].label, T.requests[3][1]], [true, 'x', null]);
+  T.hooks.openConfirm(null, spec, [{ kind: 'tech', list: [1] }]); assert.ok(!menu().textContent.includes('Claude usage'));
+  kcClick(win, menu().querySelector('[data-rk-act="close"]')); assert.strictEqual(menu(), null);
+  kcClick(win, doc.getElementById('plain') || doc.body);
+}));
+
+// ---- Pins, the Events panel, the last-file card, run records and the Claude controls: the places that took long argument lists
+test('pins: a pin or unpin saves the change with where it came from (build, screen, device) and keeps a short history', () => withPage('<script data-entry="app.js?v=abc123"></script><section id="section-news" class="app-section active"></section>', async (win) => {
+  const saved = [], audit = [], pinned = new Set(), rerendered = [];
+  globalThis.__PN = { pinned, db: {} };
+  const ref = { get: async () => ({ exists: true, data: () => ({ tickers: ['XYZ'] }) }), set: async (d) => { saved.push(d); } };
+  const auditRef = { get: async () => ({ exists: true, data: () => ({ log: Array.from({ length: 40 }, (_, i) => ({ n: i })) }) }), set: async (d) => { audit.push(d); } };
+  const P = await loadWithStubs('src/core/pins.js', '', {
+    './stocks.js': 'export const stocks = [{ ticker: "ABC" }];',
+    './store.js': 'export const dbCapabilityPromise = Promise.resolve(globalThis.__PN.db), getDb = () => globalThis.__PN.db, isPinnedTicker = (t) => globalThis.__PN.pinned.has(t), togglePinnedTicker = (t) => { const p = globalThis.__PN.pinned; if(p.has(t)) p.delete(t); else p.add(t); };',
+    '../detail/render.js': 'export const getShownIndex = () => 0, rerenderDetail = () => globalThis.__PN.rerendered.push(1);',
+    '../identity/session.js': 'export const pinsRef = () => globalThis.__PN.ref, userRef = () => globalThis.__PN.auditRef;' });
+  Object.assign(globalThis.__PN, { ref, auditRef, rerendered });
+  const settle = async () => { for(let i = 0; i < 50 && P.pinWritesInFlight(); i++) await new Promise((r) => setTimeout(r, 5)); };
+  const asUser = async (ua, fn) => {   // the browser the change comes from
+    const had = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    Object.defineProperty(globalThis, 'navigator', { value: { userAgent: ua }, configurable: true });
+    try { await fn(); } finally { if(had) Object.defineProperty(globalThis, 'navigator', had); else delete globalThis.navigator; }
+  };
+  await asUser('Mozilla/5.0 (X11; Linux x86_64)', async () => { P.togglePin('ABC'); await settle(); });
+  assert.deepStrictEqual(saved[0].tickers, ['XYZ', 'ABC']);
+  const who = saved[0].lastChange;
+  assert.deepStrictEqual([who.action, who.ticker, who.before, who.after, who.build, who.screen, who.visible, who.device], ['pin', 'ABC', 1, 2, 'abc123', 'news', win.document.visibilityState, 'desktop']);
+  assert.ok(audit[0].log.length === 40 && audit[0].log[39].action === 'pin');   // the history keeps the last 40 changes
+  assert.strictEqual(rerendered.length, 1);   // the shown stock is redrawn
+  assert.ok(P.isPinned({ ticker: 'ABC' }));
+  await asUser('Mozilla/5.0 (X11; Linux x86_64)', async () => { P.togglePin('ABC'); await settle(); }); assert.deepStrictEqual([saved[1].lastChange.action, saved[1].tickers], ['unpin', ['XYZ']]);
+  win.document.querySelector('script').remove(); win.document.querySelector('section').classList.remove('active');   // no build id, no active screen
+  await asUser('Mozilla/5.0 (iPhone)', async () => { P.togglePin('ABC'); await settle(); });
+  assert.deepStrictEqual([saved[2].lastChange.build, saved[2].lastChange.screen, saved[2].lastChange.device], [null, null, 'phone']);
+  globalThis.__PN.auditRef = null; globalThis.__PN.ref = null; await asUser('x', async () => { P.togglePin('ABC'); await settle(); }); assert.strictEqual(saved.length, 3);   // not signed in: nothing is saved
+}));
+
+test('stock events panel: coming up and recent events are grouped by day, links only open on http(s), sentiment is tagged, and text stays text', () => alone(async () => {
+  const E = await loadWithStubs('src/detail/events.js', '', {
+    '../core/util.js': 'export const escapeHtml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");', './icons.js': 'export const panelIcon = () => "";',
+    '../news/model.js': 'export const dateNote = (t) => t, shortDate = (d) => d, typeTag = (t) => t.toUpperCase();', '../news/upcoming.js': 'export const upcomingFor = (s) => s.up || [];' });
+  const today = new Date(Date.now() + 19800000).toISOString().slice(0, 10), ago = (n) => new Date(Date.parse(today + 'T00:00:00Z') - n * 86400000).toISOString().slice(0, 10);
+  const s = { up: [{ date: '2026-12-01T00:00:00', type: 'results', text: 'Q3 <results>', src: 'NSE', url: 'https://x.test/a' }, { date: '2026-12-01', type: 'company', text: '', src: 'BSE', url: 'javascript:alert(1)' }],
+    __events: [{ k: 'news', d: ago(2), t: 'Good news', src: 'Wire', url: 'https://n.test/1', s: 'pos' }, { k: 'news', d: ago(2), t: 'Bad news', s: 'neg' }, { k: 'earn', d: ago(5), t: 'Results out', s: 'neu' }, { k: 'news', d: ago(95), t: 'Too old' }, { k: 'other', d: ago(1), t: 'Not shown' }, null] };
+  const html = E.renderEventsPanel(s);
+  assert.ok(html.includes('Q3 &lt;results>') && html.includes('href="https://x.test/a"') && !html.includes('javascript:') && html.includes('Expected date') === false);   // a hostile link is dropped, text is escaped
+  assert.ok(html.includes('class="day-head"><b>2026-12-01</b><span>2</span>') && html.includes('2 coming'));   // two things on one day: said once
+  assert.ok(html.includes('news-tag news-positive">positive') && html.includes('news-tag news-negative">negative') && !html.includes('>neutral<'));
+  assert.ok(html.includes('Good news') && html.includes('Results out') && !html.includes('Too old') && !html.includes('Not shown'));
+  assert.ok(html.includes('BSE'));   // an event with no text shows its source
+  const empty = E.renderEventsPanel({});
+  assert.ok(empty.includes('Nothing coming up is saved for this stock') && empty.includes('No results, company events or news saved in the last 90 days'));
+}));
+
+test('last file card: a failed or cancelled import is written on the upload record, and nothing is written without a record, an id or a database', () => withPage('', async () => {
+  globalThis.__LF = { puts: [], sets: [], pruned: [] };
+  const L = await loadWithStubs('src/import/last-file.js', '', {
+    '../core/store.js': 'export const getDb = () => null, fundamentalCsvUploadLog = { put: (k, v) => globalThis.__LF.puts.push([k, v]), values: () => [] };',
+    '../core/util.js': 'export const escapeHtml = (t) => String(t), formatUploadTimestamp = (t) => String(t);', './joblock.js': 'export const lockBusy = () => false;',
+    '../joblogs/panels.js': 'export const pruneLogCollection = async (db, col) => { globalThis.__LF.pruned.push(col); };', '../core/safehtml.js': 'export const setHtml = () => {};' });
+  const db = { collection: (c) => ({ doc: (id) => ({ set: async (r) => { globalThis.__LF.sets.push([c, id, r]); } }) }) };
+  const rec = { uploadedAt: '2026-11-10T01:00:00Z', filename: 'f.csv', status: 'uploaded' };
+  await L.recordAttempt('fund', rec, { recId: 'r1', e: new Error('boom'), db });
+  const [col, id, saved] = globalThis.__LF.sets[0];
+  assert.deepStrictEqual([col, id, saved.status, saved.lastAttempt.outcome, saved.lastAttempt.message, /^\d{4}-/.test(saved.lastAttempt.at)], ['fundamentalCsvUploadLog', 'r1', 'uploaded', 'failed', 'boom', true]);
+  assert.deepStrictEqual([globalThis.__LF.puts.length, globalThis.__LF.pruned], [1, ['fundamentalCsvUploadLog']]);
+  await L.recordAttempt('fund', rec, { recId: 'r2', e: { cancelled: true, message: 'Stopped' }, db }); assert.strictEqual(globalThis.__LF.sets[1][2].lastAttempt.outcome, 'cancelled');
+  await L.recordAttempt('fund', rec, { recId: 'r3', e: 'x'.repeat(400), db }); assert.strictEqual(globalThis.__LF.sets[2][2].lastAttempt.message.length, 300);
+  await L.recordAttempt('fund', rec, { recId: 'r4', db }); assert.strictEqual(globalThis.__LF.sets[3][2].lastAttempt.message, '');
+  const n = globalThis.__LF.sets.length;
+  await L.recordAttempt('fund', null, { recId: 'r5', e: 1, db }); await L.recordAttempt('fund', rec, { e: 1, db }); await L.recordAttempt('fund', rec, { recId: 'r6', e: 1, db: null });
+  assert.strictEqual(globalThis.__LF.sets.length, n);
+}));
+
+test('run records: a run is saved with its times, only the newest two of each kind are kept, and a database that fails does not stop the run', () => alone(async () => {
+  const R = await loadWithStubs('src/refresh/runlog.js', '', { '../core/util.js': 'export const escapeHtml = (t) => String(t), formatUploadTimestamp = (t) => String(t);', '../core/safehtml.js': 'export const setHtml = () => {};' });
+  const docs = new Map([['old1', { kind: 'snapshot', startedAt: '2026-11-01T00:00:00.000Z' }], ['old2', { kind: 'snapshot', startedAt: '2026-11-02T00:00:00.000Z' }], ['old3', { kind: 'snapshot', startedAt: '2026-11-03T00:00:00.000Z' }], ['other', { kind: 'other', startedAt: '2026-10-01T00:00:00.000Z' }]]);
+  const writes = [], gone = [];
+  const db = { doc: (p) => ({ set: async (d) => { writes.push([p, d]); docs.set('new', d); }, delete: async () => { gone.push(p); } }), collection: () => ({ get: async () => ({ docs: [...docs].map(([id, d]) => ({ id, exists: true, data: () => d })) }) }) };
+  const t0 = Date.now() - 5000;
+  await R.saveRunLog(db, 'snapshot', { startedAt: '2026-11-10T01:02:03.456Z', t0 }, { saved: 7 });
+  const [path, rec] = writes[0];
+  assert.deepStrictEqual([path, rec.v, rec.kind, rec.trigger, rec.startedAt, rec.saved, rec.durationMs >= 5000 && rec.durationMs < 60000], ['refreshRunLog/snapshot-20261110T010203456Z', 2, 'snapshot', 'manual', '2026-11-10T01:02:03.456Z', 7, true]);
+  assert.deepStrictEqual(gone.sort(), ['refreshRunLog/old1', 'refreshRunLog/old2']);   // the newest two (the new run and old3) stay; another kind is untouched
+  await quietErrors(async (seen) => {
+    await R.saveRunLog({ doc: () => ({ set: async () => { throw new Error('full'); } }) }, 'snapshot', { startedAt: '2026-11-10T01:02:03.456Z', t0 }, {});
+    await R.saveRunLog({ doc: () => ({ set: async () => {} }), collection: () => ({ get: async () => { throw new Error('offline'); } }) }, 'snapshot', { startedAt: '2026-11-10T01:02:03.456Z', t0 }, {});
+    assert.deepStrictEqual(seen, ['Could not save the refresh run record', 'Could not remove the older run records']);
+  });
+}));
+
+test('Claude controls: a master switch and one switch per step, steps are off while the master is off, and a change is saved and redrawn', () => withPage('<div id="claudeControls"></div>', async (win) => {
+  globalThis.__CC = { on: { all: true, a: true, b: false }, calls: [] };
+  const C = await loadWithStubs('src/ui/claudecontrols.js', '', {
+    '../livedata/claudegate.js': 'export const CLAUDE_STEPS = [{ id: "a", label: "Step <A>", sub: "Does A" }, { id: "b", label: "Step \\"B\\"", sub: "Does B" }], claudeMasterOn = () => globalThis.__CC.on.all, claudeStepOn = (id) => globalThis.__CC.on[id], setClaudeStep = (id, v) => { globalThis.__CC.on[id] = v; globalThis.__CC.calls.push([id, v]); };',
+    '../core/safehtml.js': 'export const setHtml = (el, html) => { el.innerHTML = html; };' });
+  C.init_ui_claudecontrols();
+  const host = win.document.getElementById('claudeControls'), boxes = () => [...host.querySelectorAll('input')];
+  assert.deepStrictEqual(boxes().map((b) => [b.dataset.claudeStep, b.checked, b.disabled]), [['all', true, false], ['a', true, false], ['b', false, false]]);
+  assert.strictEqual(host.querySelectorAll('.settings-row-title')[1].textContent, 'Step <A>'); assert.strictEqual(host.querySelector('a'), null);   // titles stay text
+  assert.strictEqual(boxes()[2].getAttribute('aria-label'), 'Step &quot;B&quot;'.replace('&quot;', '"').replace('&quot;', '"'));
+  boxes()[0].checked = false; boxes()[0].dispatchEvent(new win.Event('change', { bubbles: true }));
+  assert.deepStrictEqual(globalThis.__CC.calls, [['all', false]]);
+  assert.deepStrictEqual(boxes().map((b) => b.disabled), [false, true, true]);   // with the master off the steps cannot be changed
+  host.dispatchEvent(new win.Event('change'));   // a change that is not from a switch
+  assert.strictEqual(globalThis.__CC.calls.length, 1);
+  win.document.body.innerHTML = ''; C.init_ui_claudecontrols();   // a page without the panel
+}));
+
+// ---- Fundamental factor card (src/detail/fundcell.js): the metric rows, the extra figures, the governance flags and the written research
+TV_VALUES.add('FUND_METRIC_LABEL'); TV_VALUES.add('PERCENTILE_METRIC_KEYS');
+const fcSetup = async (over) => {
+  const T = globalThis.__T = { FUND_METRIC_LABEL: { ROE: 'Return on equity' }, PERCENTILE_METRIC_KEYS: new Set(['Rank']), escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'),
+    hasSource: (f) => !!(f.research && f.research.sources && f.research.sources.length), scoreBand: () => 'fs-hold', fundMissingMetrics: (f) => f.missing || [], fundMetricDisplay: (k, v) => 'D' + v,
+    fundMetricNum: (f, k) => (f.nums || {})[k] ?? null, fundNoteExtra: (n) => n || '', fundBusinessSummary: () => '', isProxyFactor: (f) => !!f.proxy, metricDotHtml: (f, k, v) => '<i class="dot-' + k + '"></i>', toneDotHtml: (t) => '<i class="tone-' + t + '"></i>',
+    dropRepeats: (list, seen) => (list || []).filter((x) => !seen.includes(x)), pointsView: (f) => ({ nums: new Map([['ROE', [1, 2]]]), pts: f.pts || [], facts: f.facts || [] }) };
+  Object.assign(T, over || {});
+  return { T, M: await loadAllStubbed('src/detail/fundcell.js', '', []) };
+};
+test('factor card: metric rows show a dot, a label and a value, the extra figures are tidied and escaped, and governance red flags appear when the numbers cross their lines', () => alone(async () => {
+  const { M } = await fcSetup();
+  const f = { key: 'gov', name: 'Governance <b>', weight: 2, score: 1.234, metrics: [['ROE', '12%'], ['PE', 'n/a'], ['Rank', '90']], missing: ['PE', 'ROCE'], nums: { 'Promoter pledge': 30, 'Promoter holding change': -2.5, 'FII change 3yr': -4, 'DII change 3yr': -3.5 },
+    facts: [{ label: 'Price to book (TradingView)', value: '13.9496814684338 x', tone: 'pos', n: [3], note: 'a <note>' }, { label: 'Odd "label"', value: 5, tone: 'weird' }] };
+  const html = M.renderFundFactorCell(f, true);
+  assert.ok(html.includes('fund-cell-wide') && html.includes('1.23<span class="fund-cell-max">/2</span>') && html.includes('data-css="--w:62%"') && html.includes('Governance <b>'));   // the score bar is a share of the weight
+  assert.ok(html.includes('<span class="data-chip " data-n="1 2"><i class="dot-ROE"></i><span class="chip-label">Return on equity:</span><b class="chip-val">D12%</b></span>'));   // a metric linked to points 1 and 2
+  assert.ok(html.includes('chip-na') && html.includes('<span class="chip-label">PE:</span>') && html.includes('chip-long'));
+  assert.ok(html.includes('chip-new') && html.includes('data-n="3"') && html.includes('tone-pos') && html.includes('tone-neu') && html.includes('Price to book:</span>') && html.includes('13.95 x') && html.includes('a &lt;note>') && html.includes('Odd &quot;label&quot;:'));
+  assert.ok(html.includes('High promoter pledge (30.0%)') && html.includes('Promoters reduced their stake by 2.5%') && html.includes('FII holding down 4.0%') && html.includes('DII holding down 3.5%'));
+  assert.ok(html.includes('incomplete-tag') && html.includes('PE, ROCE'));
+  const calm = M.renderFundFactorCell({ key: 'gov', name: 'G', weight: 2, score: 1, metrics: [], nums: { 'Promoter pledge': 12 } }, false);
+  assert.ok(calm.includes('Elevated promoter pledge (12.0%)') && !calm.includes('fund-cell-wide') && !calm.includes('fund-flag fs-avoid'));
+  assert.ok(!M.renderFundFactorCell({ key: 'gov', name: 'G', weight: 2, score: 1, metrics: [], nums: { 'Promoter pledge': 5, 'Promoter holding change': -1, 'FII change 3yr': -1 } }, false).includes('fund-flag'));
+  assert.ok(!M.renderFundFactorCell({ key: 'fin', name: 'F', weight: 2, score: 1, metrics: [], nums: { 'Promoter pledge': 90 } }, false).includes('fund-flag'));   // flags are only for governance
+}));
+test('factor card: written research shows its points, strengths and watch-outs once, sources not already linked, and a warning when it is old; an excluded factor says so', () => alone(async () => {
+  const { M } = await fcSetup();
+  const old = new Date(Date.now() - 200 * 86400000).toISOString().slice(0, 10);
+  const f = { key: 'moat', name: 'Moat', weight: 2, score: 1, metrics: [], proxy: true, research: { asof: old, summary: 'Short <summary>', positives: ['Strong brand', 'Repeat'], negatives: ['Debt'], sources: [{ title: 'Linked', url: 'https://a.test/1' }, { title: 'Other <x>', url: 'https://b.test/2' }, 'plain source', { title: 'No link', url: 'javascript:alert(1)' }, null] },
+    pts: [{ text: 'A point', n: 1, url: 'https://a.test/1' }, { text: 'Another' }] };
+  const withPts = M.renderFundFactorCell(f, false);
+  assert.ok(withPts.includes('fund-cell-proxy') && withPts.includes('fr-tagged') && withPts.includes('data-n="1"') && withPts.includes('A point') && withPts.includes('Strong brand') && withPts.includes('fr-pos') && withPts.includes('fr-neg') && withPts.includes('Research is 200 days old'));
+  assert.ok(withPts.includes('Sources:') && withPts.includes('href="https://b.test/2"') && withPts.includes('Other &lt;x>') && !withPts.includes('>Linked ↗') && withPts.includes('plain source') && !withPts.includes('href="javascript:') && withPts.includes('No link'));   // a source already linked on a point is not repeated; a script link is not a link
+  const noPts = M.renderFundFactorCell(Object.assign({}, f, { pts: [], research: { asof: 'not a date', summary: 'Short <summary>', positives: ['Strong brand'], negatives: ['Debt'], sources: [{ title: 'S', url: 'https://s.test' }] } }), false);
+  assert.ok(noPts.includes('fund-research-summary') && noPts.includes('Short &lt;summary>') && noPts.includes('fund-research-list pos') && noPts.includes('fund-research-list neg') && !noPts.includes('days old'));   // no points: the plain lists
+  assert.ok(M.fundCellHasPoints(f) && !M.fundCellHasPoints({ key: 'fin' }) && !M.fundCellHasPoints({ research: { sources: [] }, pts: [] }) && M.fundCellHasPoints({ research: {}, pts: [{ text: 'x' }] }));
+  const excluded = M.renderFundFactorCell({ key: 'moat', name: 'Moat', weight: 2, score: 0, metrics: [], excluded: 'no data' }, false);
+  assert.ok(excluded.includes('Not scored') && excluded.includes('Left out of the score: no data. Run Refresh Fundamental Info') && !excluded.includes('fund-cell-bar'));
+  const na = M.renderFundFactorCell({ key: 'fin', name: 'Fin', weight: 2, score: 0, metrics: [], excluded: 'a bank', na: 'bank' }, false);
+  assert.ok(na.includes('Left out of the score: a bank'));
+}));
+
+// ---- Refresh queue (src/refresh/kit-queue.js): what a press of a Refresh button puts in the queue
+TV_VALUES.add('LD_BATCH_MAX');
+test('refresh queue: a request becomes one job per kind, stocks already waiting are skipped, big lists ask first and too-big ones are refused', () => withPage('', async () => {
+  const realInterval = globalThis.setInterval, realTimeout = globalThis.setTimeout;
+  globalThis.setInterval = () => 0; globalThis.setTimeout = (f, ms, ...a) => (ms > 100 ? 0 : realTimeout(f, ms, ...a));   // no heartbeat or delayed save left running after the test
+  try { await kqBody(); } finally { globalThis.setInterval = realInterval; globalThis.setTimeout = realTimeout; }
+  async function kqBody(){
+  const notices = [], kept = new Set();
+  const T = globalThis.__T = { LD_BATCH_MAX: { fund: 50, tech: 80 }, dbCapabilityPromise: Promise.resolve(null), notices, confirms: [], syncs: 0,
+    getLdBatch: () => ({ running: true }), sleep: () => new Promise(() => {}), pcTickerKey: (s) => s.name, needs: (kind, s) => kind === 'fund' ? !s.fundDone : !s.techDone, priorityOrder: (kind, l) => l.slice().reverse(),
+    userRef: () => null, sectionOf: (src) => 'sec-' + src, activityNotify: (n) => notices.push(n), registerBusy: () => {}, selKeys: () => kept, isExternalSelection: (n) => n === 'ext',
+    stockByKey: (k) => ({ name: k }), activityRun: () => {}, activityEnd: () => {}, activityDropWhere: () => {}, setNoticeDismissHandler: () => {}, tvMcp: async () => null, ldBatchStart: async () => {}, ldBatchStop: () => {} };
+  const Q = await loadAllStubbed('src/refresh/kit-queue.js', '', []);
+  Q.setQueueHooks({ openConfirm: (anchor, spec, plan) => T.confirms.push([anchor, spec.label, plan.map((p) => [p.kind, p.list.length])]), syncChecks: () => { T.syncs++; } });
+  const stocks = (n, pre = 'S') => Array.from({ length: n }, (_, i) => ({ name: pre + i }));
+  const spec = (over) => Object.assign({ list: stocks(3), kinds: ['tech', 'fund'], only: false, source: 'strat', label: 'Picks' }, over);
+  Q.request(spec(), null);
+  assert.deepStrictEqual(Q.queuedJobs().map((j) => [j.kind, j.keys, j.source, j.label, j.force, j.total, j.done]), [['tech', ['S0', 'S1', 'S2'], 'strat', 'Picks', false, 3, 0], ['fund', ['S0', 'S1', 'S2'], 'strat', 'Picks', false, 3, 0]]);
+  Q.request(spec({ list: [{ name: 'S1' }, { name: 'S9' }, { name: 'S9' }] }), null);   // S1 is already queued; S9 is new (once)
+  assert.deepStrictEqual(Q.queuedJobs().slice(2).map((j) => [j.kind, j.keys]), [['tech', ['S9']], ['fund', ['S9']]]);
+  Q.request(spec(), null); assert.ok(notices.some((n) => n.title === 'Already queued'));   // everything is waiting already
+  notices.length = 0;
+  Q.request(spec({ list: stocks(2, 'N'), kinds: ['fund'], only: true }), null);   // "only those that need it": Fundamental jobs are forced
+  assert.deepStrictEqual(Q.queuedJobs().slice(4).map((j) => [j.kind, j.keys, j.force]), [['fund', ['N1', 'N0'], true]]);   // most important first
+  Q.request(spec({ list: stocks(2, 'D').map((s) => Object.assign(s, { techDone: true })), kinds: ['tech'], only: true }), null);
+  assert.ok(notices.some((n) => n.title === 'Nothing to refresh') && Q.queuedJobs().length === 5);
+  notices.length = 0;
+  Q.request(spec({ list: stocks(1001, 'T'), kinds: ['tech'] }), null);
+  assert.ok(notices.some((n) => n.title === 'Too many stocks for one refresh' && /1001/.test(n.text)) && Q.queuedJobs().length === 5);
+  const anchor = {};
+  Q.request(spec({ list: stocks(51, 'F'), kinds: ['fund'], label: 'Big' }), anchor);   // over 50 Fundamental stocks: ask first
+  assert.deepStrictEqual(T.confirms, [[anchor, 'Big', [['fund', 51]]]]); assert.strictEqual(Q.queuedJobs().length, 5);
+  Q.request(spec({ list: stocks(51, 'F'), kinds: ['fund'], label: 'Big', confirmed: true, selName: 'strat', clearSel: true }), anchor);   // confirmed: it queues, and the ticks are cleared
+  assert.deepStrictEqual([Q.queuedJobs().length, T.syncs], [6, 1]);
+  kept.add('x'); Q.request(spec({ list: stocks(1, 'E'), kinds: ['tech'], selName: 'ext', clearSel: true }), null); assert.ok(kept.has('x'));   // a page-owned selection is cleared by the page
+  Q.request(spec({ list: stocks(1, 'G'), kinds: ['tech'] }), null); assert.ok(Q.busyIn('sec-strat') && !Q.busyIn('other') && !Q.busyIn(''));
+  }
+}));
+
+test('refresh queue, other devices: a run on another device shows in the bell, its notices and dismissals arrive here, a quiet run is paused, and this device steps back for or stops with the owner', () => withPage('', async () => {
+  const realInterval = globalThis.setInterval, realTimeout = globalThis.setTimeout;
+  globalThis.setInterval = () => 0; globalThis.setTimeout = (f, ms, ...a) => (ms > 100 ? 0 : realTimeout(f, ms, ...a));
+  try {
+    const runs = [], ends = [], notes = [], drops = [], sets = []; let snapCb = null, stops = 0;
+    const T = globalThis.__T = { LD_BATCH_MAX: { fund: 50, tech: 80 }, dbCapabilityPromise: Promise.resolve(null), getLdBatch: () => ({ running: false }), sleep: () => new Promise(() => {}), pcTickerKey: (s) => s.name, needs: () => true, priorityOrder: (k, l) => l,
+      userRef: () => ({ get: async () => ({ exists: false }), set: async (d) => { sets.push(d); }, update: async () => {}, onSnapshot: (cb) => { snapCb = cb; } }), sectionOf: (src) => 'sec-' + src, activityNotify: (n) => notes.push(n), registerBusy: () => {}, selKeys: () => new Set(), isExternalSelection: () => false,
+      stockByKey: (k) => ({ name: k }), activityRun: (id, info) => runs.push([id, info]), activityEnd: (id) => ends.push(id), activityDropWhere: (f) => drops.push(f), setNoticeDismissHandler: () => {}, tvMcp: async () => null, ldBatchStart: async () => {}, ldBatchStop: () => { stops++; } };
+    const Q = await loadAllStubbed('src/refresh/kit-queue.js', '', []); await Q.initQueue();
+    const send = (d) => snapCb(d === null ? { exists: false } : { exists: true, data: () => d }), now = () => new Date().toISOString(), idsOf = () => runs.map((r) => r[0]);
+    const job = (id, extra) => Object.assign({ id, kind: 'fund', keys: ['A', 'B', 'C'], done: 1, total: 3, source: 'strat', label: 'Picks' }, extra);
+    send(null); send({ v: 2 }); assert.strictEqual(runs.length, 0);
+    send({ v: 1, owner: 'other', heartbeatAt: now(), jobs: [job('j1'), job('j2', { kind: 'tech', keys: ['Z'] })], progress: { pct: 40, title: 'Step <b>', text: 'Reading' } });
+    assert.deepStrictEqual(idsOf(), ['rk-remote', 'rk-remote-q-j2']);
+    assert.deepStrictEqual([runs[0][1].title, runs[0][1].text, runs[0][1].pct, runs[0][1].section], ['Step <b>', 'Reading · Running on another device.', 40, 'sec-strat']);
+    assert.ok(runs[1][1].title === 'Queued: Technical refresh · 1 stock' && runs[1][1].text === 'Picks · Waiting for the current refresh to finish.');
+    assert.ok(Q.busyIn('sec-strat'));
+    runs.length = 0; send({ v: 1, owner: 'other', heartbeatAt: now(), jobs: [job('j1')] }); assert.ok(ends.includes('rk-remote-q-j2')); assert.ok(runs[0][1].title.startsWith('Refreshing Fundamental Info · 1 of 3 done') && runs[0][1].pct === 33);   // the queued one is gone
+    runs.length = 0; send({ v: 1, owner: 'other', heartbeatAt: new Date(Date.now() - 120000).toISOString(), jobs: [job('j1')] });   // nobody has touched it for two minutes
+    assert.ok(runs[0][1].title.startsWith('Refresh paused · Fundamental · 3 stocks left') && runs[0][1].text.includes('No dashboard is working on it')); await runs[0][1].onStop(); assert.ok(notes.some((n) => n.title === 'Fundamental refresh stopped · Picks')); notes.length = 0;   // Stop on a paused run clears it
+    ends.length = 0; send({ v: 1, jobs: [] }); assert.ok(ends.includes('rk-remote') && !Q.busyIn('sec-strat'));
+    const n1 = { tone: 'warn', title: 'Done <i>', text: 'ok', section: 'strat', at: 5 }, n2 = { title: 'Other', at: 6 };
+    send({ v: 1, notices: [n1, n2, null, { text: 'no title' }] }); assert.strictEqual(JSON.stringify(notes.map((n) => [n.tone, n.title, n.text, n.at])), '[["ok","Other","",6],["warn","Done <i>","ok",5]]');
+    notes.length = 0; send({ v: 1, notices: [n1, n2] }); assert.strictEqual(notes.length, 0);   // already shown
+    send({ v: 1, dismissed: ['5|Done <i>'], notices: [n1] }); assert.strictEqual(drops.length, 1); assert.strictEqual(drops[0](n1), true); assert.strictEqual(drops[0](n2), false);   // dismissed on another device
+    send({ v: 1, dismissed: ['5|Done <i>'], notices: [n1] }); assert.strictEqual(drops.length, 1);   // nothing new to drop
+    runs.length = 0; send({ v: 1, owner: 'other', heartbeatAt: now(), jobs: [job('j1', { label: '' }), job('j3', { label: '', kind: 'tech', keys: ['Q', 'R'] })] });   // no progress, no labels
+    assert.ok(runs[0][1].text === 'Running on another device.' && runs[1][1].text === 'Waiting for the current refresh to finish.');
+    await runs[0][1].onStop(); runs.length = 0; send({ v: 1, owner: 'other', heartbeatAt: now(), jobs: [job('j1')] });   // Stop was pressed here: the owner is asked
+    assert.ok(runs[0][1].stopping && runs[0][1].text.startsWith('Stopping'));
+    runs.length = 0; send({ v: 1, owner: 'other', heartbeatAt: new Date(Date.now() - 120000).toISOString(), jobs: [job('j1')] }); assert.ok(!runs[0][1].stopping);   // the owner went quiet: the request lapses
+    notes.length = 0; send({ v: 1, notices: [{ title: 'Bare' }] }); assert.deepStrictEqual([notes[0].tone, notes[0].text, notes[0].section, typeof notes[0].at], ['ok', '', '', 'number']);
+    // This device has its own run: another device that is fresh owns the queue, so this one steps back; a Stop sent to this device stops it.
+    T.ldBatchStart = () => new Promise(() => {}); T.getLdBatch = () => ({ running: true });   // this device's own run never finishes during the test
+    Q.request({ list: [{ name: 'M1' }, { name: 'M2' }], kinds: ['fund'], only: false, source: 'strat', label: 'Mine' }, null); Q.flushQueue(); await new Promise((r) => realTimeout(r, 10));
+    const owner = sets.at(-1) && sets.at(-1).owner; assert.ok(owner, 'this tab saved its run with its own id');
+    ends.length = 0; send({ v: 1, owner, heartbeatAt: now(), jobs: [job('x')], stopRequest: Date.now() + 5000 }); assert.strictEqual(stops, 1);   // asked to stop by another device
+    send({ v: 1, owner: 'other', heartbeatAt: now(), jobs: [job('x')] }); assert.ok(ends.includes('batch') && Q.queuedJobs().length === 0);   // it yielded
+  } finally { globalThis.setInterval = realInterval; globalThis.setTimeout = realTimeout; }
+}));
+
+// ---- Price bars (src/prices/refresh.js): fetch weekly and monthly bars, save them, and update the technical score
+TV_VALUES.add('priceHistoryByTicker');
+const prSetup = async (over) => {
+  const docs = new Map(), writes = [], calls = [], jobs = [];
+  const db = { doc: (p) => ({ get: async () => (docs.has(p) ? { exists: true, data: () => docs.get(p) } : { exists: false }), set: async (d) => { writes.push(['set', p, d]); docs.set(p, d); }, update: async (d) => { writes.push(['update', p, d]); docs.set(p, Object.assign({}, docs.get(p), d)); } }) };
+  const bar = (t, c) => [t, c, c, c, c, 1], now = Math.floor(Date.now() / 1000);
+  const T = globalThis.__T = { docs, writes, calls, db, dbCapabilityPromise: Promise.resolve(db), priceHistoryByTicker: {}, pcTickerKey: (s) => s.name, tickerSymbol: (s) => s.name, pillars: 5,
+    tvMcp: async () => true, tvResolveSymbol: async (s) => 'NSE:' + s.name, ensurePriceBars: async () => {}, priceHistoryStatus: () => ({ delta: null }), tvIstDate: (t) => (t ? 'D' + t : 'TODAY'), tvErrorText: (e) => 'TV: ' + e.message, tvValidate: () => {},
+    tvCall: async (tool, a) => { calls.push([a.interval, a.count]); return { iv: a.interval }; }, tvToRows: (p, kind) => (kind === 'weekly' ? [bar(now - 700000, 100), bar(now - 100, 101)] : [bar(now - 2600000, 100), bar(now - 100, 101)]),
+    tvMergeDelta: (old, nw) => old.concat(nw), noteFullSaved: (k, iv) => T.noted.push(k + iv), noted: [], priceApply: (k, b, sym, iso) => T.applied.push([k, Object.keys(b), sym, typeof iso]), applied: [],
+    computeTechnical: () => ({ score: 6.5, provisional: { score: 5.25 } }), jobs, bar, now };
+  Object.assign(T, over || {});
+  const M = await loadAllStubbed('src/prices/refresh.js', '', ['../refresh/historyplan.js']);
+  return { T, M, db };
+};
+const prStock = (over) => Object.assign({ name: 'ABC', pillars: { val: 0.5 } }, over);
+test('price bars: a first fetch asks for the whole history, saves both kinds as new documents, applies them and updates the technical score', () => alone(async () => {
+  const { T, M } = await prSetup(); const s = prStock();
+  await M.refreshOneNow(s, false);
+  assert.deepStrictEqual(T.calls, [['1W', 261], ['1mo', 60]]);
+  assert.deepStrictEqual(T.writes.map((w) => [w[0], w[1]]), [['set', 'priceHistory/NSE_ABC_1W'], ['set', 'priceHistory/NSE_ABC_1M'], ['set', 'stockUpdates/ABC']]);
+  assert.deepStrictEqual([T.writes[0][2].count, T.writes[0][2].interval, T.writes[0][2].symbol, T.writes[1][2].interval, T.writes[2][2].ticker, T.writes[2][2].technical.score], [2, '1W', 'NSE:ABC', '1M', 'ABC', 6.5]);
+  assert.deepStrictEqual([T.noted, T.applied.map((a) => [a[0], a[1], a[2], a[3]])], [['ABC1W', 'ABC1M'], [['ABC', ['1W', '1M'], 'NSE:ABC', 'string']]]);
+  const job = M.priceJobs.get('ABC');
+  assert.strictEqual(job.state, 'ok'); assert.ok(/^Bars to D\d+ \(2 weekly, 2 monthly\); technical score 6\.50 \(completed bars; this week\/month in progress reads 5\.25/.test(job.msg), job.msg);
+}));
+test('price bars: recent bars are merged into what is saved and only the kinds that are out of date are fetched and written; a merge that fails refetches everything', () => alone(async () => {
+  const { T, M } = await prSetup(); const s = prStock(), old = T.now - 5 * 86400 * 7;
+  T.priceHistoryByTicker.ABC = { '1W': [T.bar(old, 100)], '1M': [T.bar(T.now - 100, 100)] };   // weekly is old, monthly is current
+  T.priceHistoryStatus = () => ({ delta: { wkN: 7, moN: 2 } });
+  await M.refreshOneNow(s, true);
+  assert.deepStrictEqual(T.calls, [['1W', 7]]);   // lean: only the weekly bars are asked for
+  assert.deepStrictEqual(T.writes.map((w) => [w[0], w[1]]), [['update', 'priceHistory/NSE_ABC_1W'], ['set', 'stockUpdates/ABC']]);   // only the weekly document changes
+  T.calls.length = 0; T.writes.length = 0;
+  await M.refreshOneNow(s, false);   // not lean: both are asked for
+  assert.deepStrictEqual(T.calls, [['1W', 7], ['1mo', 2]]); assert.deepStrictEqual(T.writes.map((w) => w[0] + ' ' + w[1]), ['update priceHistory/NSE_ABC_1W', 'update priceHistory/NSE_ABC_1M', 'update stockUpdates/ABC']);
+  T.calls.length = 0; T.writes.length = 0; T.tvMergeDelta = () => null;   // prices were adjusted
+  await M.refreshOneNow(s, false);
+  assert.deepStrictEqual(T.calls, [['1W', 7], ['1mo', 2], ['1W', 261], ['1mo', 60]]);
+  assert.ok(/prices were adjusted since the last fetch, so the full history was refetched/.test(M.priceJobs.get('ABC').msg));
+  assert.deepStrictEqual(T.writes.slice(0, 2).map((w) => w[0]), ['set', 'set']);   // the full history replaces both documents
+}));
+test('price bars: the notes say when the closes disagree, when there is no valuation or too little history, and a stock with an earlier technical record updates it', () => alone(async () => {
+  let { T, M } = await prSetup({ tvToRows: (p, kind) => (kind === 'weekly' ? [[1, 1, 1, 1, 100, 1]] : [[1, 1, 1, 1, 110, 1]]), computeTechnical: () => ({ score: null }) }); const s = prStock();
+  T.docs.set('stockUpdates/ABC', { x: 1 });
+  await M.refreshOneNow(s, false);
+  assert.ok(/last weekly and monthly closes differ by more than 0\.3 %/.test(M.priceJobs.get('ABC').msg) && /technical score n\/a/.test(M.priceJobs.get('ABC').msg));
+  assert.strictEqual(T.writes[T.writes.length - 1][0], 'update');
+  ({ T, M } = await prSetup({ computeTechnical: () => null })); await M.refreshOneNow(prStock(), false); assert.ok(/not enough history for a technical score/.test(M.priceJobs.get('ABC').msg));
+  ({ T, M } = await prSetup()); await M.refreshOneNow(prStock({ pillars: {} }), false); assert.ok(/technical score not updated \(no valuation reading\)/.test(M.priceJobs.get('ABC').msg));
+}));
+test('price bars: no database, no connector or a failed fetch end the job with the reason; a listener follows the stages; compaction rewrites both kinds', () => alone(async () => {
+  let { T, M } = await prSetup({ dbCapabilityPromise: Promise.resolve(null) }); await M.refreshOneNow(prStock(), false);
+  assert.deepStrictEqual([M.priceJobs.get('ABC').state, M.priceJobs.get('ABC').msg], ['error', 'The database is not available in this view.']);
+  assert.strictEqual(await M.saveFullBars(prStock(), [[1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1]]), false);
+  ({ T, M } = await prSetup({ tvMcp: async () => false })); await M.refreshOneNow(prStock(), false); assert.strictEqual(M.priceJobs.get('ABC').msg, 'The TradingView connector is not available in this view.');
+  ({ T, M } = await prSetup({ tvCall: async () => { throw new Error('quota'); } })); await M.refreshOneNow(prStock(), false); assert.deepStrictEqual([M.priceJobs.get('ABC').state, M.priceJobs.get('ABC').msg], ['error', 'TV: quota']);
+  ({ T, M } = await prSetup()); const seen = [];
+  M.setPriceJobHook('ABC', (key, state, msg, stage) => seen.push(stage || state)); await M.refreshOneNow(prStock(), false);
+  assert.deepStrictEqual(seen, ['queued', 'symbol', 'history', 'bars', 'technical', 'ok']);
+  M.setPriceJobHook('ABC', () => { throw new Error('listener broke'); });
+  await quietErrors(async (errs) => { await M.refreshOneNow(prStock(), false); assert.ok(errs.includes('A price job listener failed')); });
+  M.setPriceJobHook('ABC', null); T.writes.length = 0;
+  assert.strictEqual(await M.saveFullBars(prStock(), [[1, 1, 1, 1, 1, 1]], [[2, 2, 2, 2, 2, 2]]), true);
+  assert.deepStrictEqual(T.writes.map((w) => w[0] + ' ' + w[1]), ['set priceHistory/NSE_ABC_1W', 'set priceHistory/NSE_ABC_1M']);   // a compaction replaces both
+  T.db.doc = () => ({ set: async () => { throw new Error('full'); }, update: async () => { throw new Error('full'); } });
+  await quietErrors(async (errs) => { assert.strictEqual(await M.saveFullBars(prStock(), [[1, 1, 1, 1, 1, 1]], [[2, 2, 2, 2, 2, 2]]), false); assert.ok(errs.includes('Could not compact the bars of ABC')); });
+}));
+
+// ---- Analysis controls (src/analysis/controls.js): the three range sliders and the axis toggles
+test('analysis controls: the RSI sliders show their range, the MoS slider follows the data bounds and keeps the chosen range inside them, and the toggles mark the current choice', () => alone(async () => {
+  globalThis.__AF = { weekMin: 20, weekMax: 80, monthMin: 0, monthMax: 100, mosLo: null, mosHi: null, xAxis: 'week', yAxis: 'month', colorBy: 'month' };
+  const C = await loadWithStubs('src/analysis/controls.js', '', { './state.js': 'export const analysisFilters = globalThis.__AF, saveAnalysisFilters = () => {};' });
+  const html = C.analysisControlsHtml(-10, 70);
+  assert.ok(html.includes('W RSI range: <span id="weekRsiRangeLabel">20&ndash;80</span>') && html.includes('id="weekRsiMinInput"') && html.includes('value="20"') && html.includes('value="80"') && html.includes('aria-label="W RSI minimum"') && html.includes('aria-label="W RSI maximum"'));
+  assert.ok(html.includes('<span id="monthRsiRangeLabel">0&ndash;100</span>') && html.includes('id="monthRsiMaxInput"') && html.includes('M RSI minimum'));
+  assert.ok(html.includes('MoS range: <span id="mosRangeLabel"></span>') && html.includes('min="-10" max="70" step="1" value="-10" id="mosMinInput"') && html.includes('min="-10" max="70" step="1" value="70" id="mosMaxInput"') && html.includes('Margin of Safety maximum'));   // no MoS filter: the whole range
+  globalThis.__AF.mosLo = -50; globalThis.__AF.mosHi = 200; const clamped = C.analysisControlsHtml(-10, 70);
+  assert.ok(clamped.includes('value="-10" id="mosMinInput"') && clamped.includes('value="70" id="mosMaxInput"'));   // a saved range outside the data is held at the bounds
+  globalThis.__AF.mosLo = 5; globalThis.__AF.mosHi = 30; const own = C.analysisControlsHtml(-10, 70);
+  assert.ok(own.includes('value="5" id="mosMinInput"') && own.includes('value="30" id="mosMaxInput"'));
+  assert.ok(html.includes('class="analysis-color-btn active" id="xAxisWeekBtn" data-axis-value="week"') && html.includes('class="analysis-color-btn" id="xAxisMonthBtn"') && html.includes('class="analysis-color-btn active" id="yAxisMonthBtn"') && html.includes('class="analysis-color-btn active" id="colorByMonthBtn" data-color-by="month"') && html.includes('X-axis:') && html.includes('Colour dots by:'));
+}));
+
+// ---- Analysis filter panel (src/analysis/filterpanel.js): the buttons with their counts, the notes, and what each click does
+TV_VALUES.add('analysisFilters');
+const fpSetup = async (over, filters) => {
+  const mk = (name, v, rating, w, m, extra) => Object.assign({ name, verdict: v, rating, technical: { states: { weekMacd: w, monthMacd: m }, raw: { weekRsi: 50, monthRsi: 50 } } }, extra);
+  const stocksList = [mk('A', 'buy', 'green', 'bull_above', 'bull_above', { rebound: true }), mk('B', 'buy', 'orange', 'bull_below', 'bear_below'), mk('C', 'hold', 'red', 'bear_above', 'bull_above', { rebound: true }),
+    mk('D', 'avoid', null, 'bear_below', 'bear_below', { noValuation: true }), mk('E', 'mbuy', 'green', 'bull_above', 'bull_below', { outRange: true }), mk('F', 'hold', 'green', null, null)];
+  const af = Object.assign({ verdicts: [], mosRatings: [], techW: [], techM: [], ideas: [], strategyId: '', rebound: false, weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, mosLo: null, mosHi: null }, filters || {});
+  const T = globalThis.__T = { stocks: stocksList, analysisFilters: af, saves: [], remembered: [], rerenders: 0, bars: [], sets: { up: null, early: null }, strat: null,
+    mosRatingAny: (s) => s.rating || null, saveAnalysisFilters: () => { T.saves.push(JSON.stringify(af)); }, stocksInRange: (l) => l.filter((s) => !s.outRange), publishedStrategies: () => [{ id: 's1', name: 'Quality <b>', rules: [] }, { id: 's2', name: 'Other', rules: [] }],
+    qualifyingStocks: (u, rules) => u.slice(0, 3), strategyStockSet: (id) => (id === 's1' ? new Set(stocksList.slice(0, 3)) : null), sheetFrame: (x) => x, filtersOpenSaved: () => false, rememberFiltersOpen: (k, v) => T.remembered.push([k, v]),
+    escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), isRebound: (s) => !!s.rebound, ensureAllPriceBars: async () => { T.bars.push(1); return T.barsOk !== false; },
+    ideasStockSet: (list, sid) => ({ set: list && list.length ? new Set(stocksList.slice(0, 2)) : null, source: T.source || {} }), ideasWhen: () => 'today', setHtml: (el, html) => { el.innerHTML = html; }, barsOk: true, source: null };
+  Object.assign(T, over || {});
+  return { T, F: await loadAllStubbed('src/analysis/filterpanel.js', '', []), af };
+};
+const FP_PAGE = '<div class="analysis-toolbar"><div class="analysis-view-bar"></div></div><div id="analysisGlobalFilters"></div><span id="analysisLeaderboardCount" data-short="5 of 6"></span>';
+test('analysis filters: every button shows how many stocks it would give, the chip lists what is chosen, and notes explain what the strategy and ideas lists hide', () => withPage(FP_PAGE, async (win) => {
+  const { T, F, af } = await fpSetup({}, { verdicts: ['buy'], mosRatings: ['red'], strategyId: 's1', ideas: ['up'], mosLo: 0 });
+  T.source = { name: 'Quality <b>', snap: { at: 1 } };
+  F.renderAnalysisFilterPanel(() => { T.rerenders++; });
+  const doc = win.document, btn = (sel) => doc.querySelector(sel), text = (el) => el.textContent.replace(/\s+/g, ' ');
+  assert.ok(doc.querySelector('.analysis-toolbar #analysisFilterPanel'), 'docked into the toolbar');
+  assert.strictEqual(text(btn('#analysisFiltersSummary')), 'Quality <b>, Upward Trend, Strong, Red');   // what is chosen, without the counts
+  assert.strictEqual(btn('#analysisFiltersCount').textContent, '5 of 6');
+  assert.ok(text(btn('#analysisVerdictFilters')).includes('Fundamental Score') && btn('#analysisVerdictFilters [data-averdict="buy"]').classList.contains('active') && !btn('#analysisVerdictFilters [data-averdict="all"]').classList.contains('active'));
+  assert.ok(btn('#analysisStrategyFilter [data-astrat="s1"]').classList.contains('active') && text(btn('#analysisStrategyFilter')).includes('Quality &lt;b>'.replace('&lt;', '<')) && !doc.querySelector('#analysisStrategyFilter b'));   // strategy names are text
+  assert.ok(text(btn('#analysisIdeasFilter')).includes('From “Quality <b>”, processed today') && !doc.querySelector('#analysisIdeasNote b'));
+  assert.ok(doc.querySelector('#analysisHiddenNote') && text(btn('#analysisHiddenNote')).includes('stocks in the Buy / Sell ideas list'));   // the MoS range is narrowed and some stocks cannot be shown
+  assert.ok(btn('#analysisMosFilters [title="Trading at or above CSV intrinsic value (MoS ≥ 0%)"]') && text(btn('#analysisTechWFilters')).includes('Bullish'));
+  assert.strictEqual(F.analysisBucket().length, 0);   // nothing in the strategy and ideas lists is Red
+  af.mosRatings = []; assert.strictEqual(F.analysisBucket().map((s) => s.name).join(''), 'AB');   // strategy, ideas and verdict all apply
+  af.ideas = []; T.source = {}; af.strategyId = ''; af.verdicts = []; F.renderAnalysisFilterPanel(() => {});
+  assert.strictEqual(F.analysisBucket().length, 6); assert.strictEqual(text(btn('#analysisFiltersSummary')), 'All stocks');
+  af.ideas = ['early']; T.source = { name: 'S' }; af.strategyId = 's2'; F.renderAnalysisFilterPanel(() => {});
+  assert.ok(text(btn('#analysisIdeasFilter')).includes('No Buy / Sell result is saved yet for “S”'));
+  af.strategyId = ''; af.ideas = ['up']; T.source = {}; F.renderAnalysisFilterPanel(() => {});
+  assert.ok(text(btn('#analysisIdeasFilter')).includes('No Buy / Sell result is saved yet.'));
+}));
+test('analysis filters: clicking a button sets that filter and redraws, "All" clears a group, a strategy can be chosen and unchosen, and the chip folds the panel', () => withPage(FP_PAGE, async (win) => {
+  const { T, F, af } = await fpSetup();
+  const redraw = () => { T.rerenders++; };
+  F.renderAnalysisFilterPanel(redraw);
+  const doc = win.document, click = (sel) => doc.querySelector(sel).click();
+  click('#analysisVerdictFilters [data-averdict="buy"]'); click('#analysisVerdictFilters [data-averdict="hold"]');
+  assert.deepStrictEqual([af.verdicts, T.rerenders, T.saves.length], [['buy', 'hold'], 2, 2]);
+  assert.ok(doc.querySelector('#analysisVerdictFilters [data-averdict="buy"]').classList.contains('active') && !doc.querySelector('#analysisVerdictFilters [data-averdict="all"]').classList.contains('active'));
+  click('#analysisVerdictFilters [data-averdict="buy"]'); assert.deepStrictEqual(af.verdicts, ['hold']);   // a second click takes it out
+  click('#analysisVerdictFilters [data-averdict="all"]'); assert.deepStrictEqual(af.verdicts, []);
+  click('#analysisTechWFilters [data-atechw="bull_above"]'); click('#analysisTechMFilters [data-atechm="bear_below"]'); click('#analysisMosFilters [data-amos="green"]');
+  assert.deepStrictEqual([af.techW, af.techM, af.mosRatings], [['bull_above'], ['bear_below'], ['green']]);
+  F.renderAnalysisFilterPanel(redraw);   // drawn again after a redraw: the new buttons work too
+  click('#analysisStrategyFilter [data-astrat="s1"]'); assert.strictEqual(af.strategyId, 's1');
+  click('#analysisStrategyFilter [data-astrat="s1"]'); assert.strictEqual(af.strategyId, '');   // the chosen one again: back to All
+  click('#analysisStrategyFilter [data-astrat="s2"]'); click('#analysisStrategyFilter [data-astrat="all"]'); assert.strictEqual(af.strategyId, '');
+  click('#analysisReboundFilter [data-arebound="on"]'); assert.strictEqual(af.rebound, true);
+  click('#analysisReboundFilter [data-arebound="on"]'); assert.strictEqual(af.rebound, false);   // off by a second click
+  click('#analysisReboundFilter [data-arebound="on"]'); click('#analysisReboundFilter [data-arebound="all"]'); assert.strictEqual(af.rebound, false);
+  click('#analysisIdeasFilter [data-aideas="up"]'); click('#analysisIdeasFilter [data-aideas="early"]'); assert.deepStrictEqual(af.ideas, ['up', 'early']);
+  const panel = doc.getElementById('analysisFilterPanel');
+  click('#analysisFiltersToggle'); assert.deepStrictEqual([panel.classList.contains('filters-collapsed'), doc.getElementById('analysisFiltersToggle').getAttribute('aria-expanded'), T.remembered.pop()], [false, 'true', ['aFiltersOpen', true]]);   // it starts folded
+  click('#analysisFiltersToggle'); assert.deepStrictEqual([panel.classList.contains('filters-collapsed'), T.remembered.pop()], [true, ['aFiltersOpen', false]]);
+}));
+test('analysis filters: last week\'s move needs the weekly bars, which are loaded once and the panel redrawn; a failed load is tried again next time', () => withPage(FP_PAGE, async () => {
+  const { T, F } = await fpSetup({}, { rebound: true });
+  const redraw = () => { T.rerenders++; };
+  F.renderAnalysisFilterPanel(redraw); F.renderAnalysisFilterPanel(redraw);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.deepStrictEqual([T.bars.length, T.rerenders], [1, 1]);   // asked once, redrawn once
+  const failing = await fpSetup({ barsOk: false }, { rebound: true });
+  failing.F.renderAnalysisFilterPanel(() => { failing.T.rerenders++; }); await new Promise((r) => setTimeout(r, 5));
+  failing.F.renderAnalysisFilterPanel(() => {}); await new Promise((r) => setTimeout(r, 5));
+  assert.deepStrictEqual([failing.T.bars.length, failing.T.rerenders], [2, 0]);   // nothing to redraw, so it asks again
+}));
+
+// ---- Analysis leaderboard (src/analysis/leaderboard.js): the toolbar, the rows, and every click, key and drag
+TV_VALUES.add('stockIndex'); TV_VALUES.add('ANALYSIS_LB_COLUMN_IDS');
+const lbSetup = async (n, over) => {
+  const list = Array.from({ length: n }, (_, i) => ({ name: 'S' + i, ticker: 'S' + i, score: i, pinned: i === 1 }));
+  const af = { sortCol: 'score', sortDir: 'desc', columnOrder: null };
+  const T = globalThis.__T = { stocks: list, stockIndex: new Map(list.map((s, i) => [s, i + 10])), analysisFilters: af, ANALYSIS_LB_COLUMN_IDS: ['rank', 'stock', 'score'], order: ['rank', 'stock', 'score'], calls: [], open: false, kit: null, full: [],
+    isPinned: (s) => !!s.pinned, togglePin: (t) => T.calls.push(['pin', t]), getAnalysisColumnsPanelOpen: () => T.open, setAnalysisColumnsPanelOpen: (v) => { T.open = v; T.calls.push(['panel', v]); }, analysisPersistUi: () => T.calls.push(['persist']),
+    setAnalysisShownIdx: (l) => { T.shown = l; }, saveAnalysisFilters: () => T.calls.push(['save', JSON.stringify(af)]), analysisTakeBatch: (k) => [k + '-batch'], defineAnalysisScope: () => {}, updateAnalysisRefresh: () => T.calls.push(['updateRefresh']),
+    analysisColumnOrder: () => T.order, analysisLbCell: (id, ctx) => '<td>' + id + ':' + ctx.s.name + '</td>', analysisRowContext: (s, i, idx) => ({ s, i, idx }), columnHeaderHtml: (id) => '<th>' + id + '</th>',
+    compareByColumn: () => (a, b) => b.score - a.score, nextSort: (cur, col) => ({ col, dir: cur.col === col && cur.dir === 'desc' ? 'asc' : 'desc' }), renderAnalysisColumnsPanel: () => '<div class="analysis-columns-list"></div>',
+    ldOpenPermissions: () => T.calls.push(['perm']), ldBatchStart: (...a) => T.calls.push(['batch', ...a]), ldBatchStop: () => T.calls.push(['stop']), browserFullscreen: (on) => T.full.push(on), fullscreenLabel: (on) => (on ? 'Exit full screen' : 'Full screen'),
+    watchFullscreenExit: (isOn, onExit) => { T.exitHook = onExit; }, getRefreshKit: () => T.kit, setHtml: (el, html) => { el.innerHTML = html; } };
+  Object.assign(T, over || {});
+  return { T, M: await loadAllStubbed('src/analysis/leaderboard.js', '', ['../core/evt.js']), af };
+};
+test('leaderboard: the toolbar has the Columns, Chart and Full screen buttons with their states, and the refresh kit adds its bar and selection slot when it is there', () => alone(async () => {
+  const { T, M } = await lbSetup(0);
+  const html = M.leaderboardHtml('<CHART>', '<VIEW>');
+  assert.ok(html.includes('<VIEW>') && html.includes('<CHART>') && html.includes('id="analysisColumnsBtn" title="Columns: choose and reorder the grid columns" aria-label="Columns: choose and reorder the grid columns" aria-pressed="false"'));
+  assert.ok(html.includes('id="analysisChartToggle" title="Show chart" aria-label="Show chart" aria-expanded="false"') && html.includes('id="analysisFullscreenBtn" title="Full screen (Esc to leave)" aria-label="Full screen (Esc to leave)" data-analysis-full aria-pressed="false"'));
+  assert.ok(html.includes('<span class="analysis-btn-label">Columns</span>') && html.includes('<th>rank</th><th>stock</th><th>score</th>') && html.includes('id="analysisLeaderboardBody"') && !html.includes('rk-bar'));
+  T.open = true; T.kit = { barHtml: (n) => '<span class="rk-bar">' + n + '</span>', selbarSlot: (n) => '<div class="slot">' + n + '</div>' };
+  const withKit = M.leaderboardHtml('', '');
+  assert.ok(withKit.includes('aria-pressed="true"') && withKit.includes('<span class="rk-bar">analysis</span>') && withKit.includes('<div class="slot">analysis</div>'));
+}));
+test('leaderboard: rows are ranked with pinned stocks first, the count is shown, more rows come in steps, and an empty range says so', () => withPage('<div id="analysisFiltersCount"></div><span id="analysisLeaderboardCount"></span><table><tbody id="analysisLeaderboardBody"></tbody></table><div id="analysisLeaderboardMore" hidden></div>', async (win) => {
+  const { T, M } = await lbSetup(105);
+  const doc = win.document, rows = () => [...doc.querySelectorAll('.analysis-lb-row')];
+  M.renderLeaderboardRows(T.stocks);
+  assert.strictEqual(doc.getElementById('analysisLeaderboardCount').textContent, 'Showing 105 of 105 stocks'); assert.strictEqual(doc.getElementById('analysisFiltersCount').textContent, '105 of 105'); assert.strictEqual(doc.getElementById('analysisLeaderboardCount').dataset.short, '105 of 105');
+  assert.strictEqual(rows().length, 100); assert.ok(rows()[0].classList.contains('pinned') && rows()[0].dataset.idx === '11' && rows()[0].textContent.replace(/\s+/g, '') === 'rank:S1stock:S1score:S1');   // S1 is pinned: first, then by score
+  assert.deepStrictEqual(rows().slice(1, 3).map((r) => r.dataset.idx), ['114', '113']);
+  const more = doc.getElementById('analysisLeaderboardMore'); assert.ok(!more.hidden && more.textContent.includes('Showing the first 100 rows') && more.textContent.includes('Show 5 more'));
+  assert.strictEqual(T.shown.length, 105); assert.ok(T.calls.some((c) => c[0] === 'updateRefresh'));
+  M.renderLeaderboardRows([]); assert.ok(doc.querySelector('.analysis-lb-empty').textContent.includes('No stocks in the current RSI range') && doc.querySelector('.analysis-lb-empty').colSpan === 3 && more.hidden);
+  T.kit = {}; M.renderLeaderboardRows([]); assert.strictEqual(doc.querySelector('.analysis-lb-empty').colSpan, 4);   // the refresh tick column
+  M.renderLeaderboardRows([T.stocks[5]]); assert.strictEqual(rows().length, 1); assert.ok(!rows()[0].classList.contains('pinned'));
+  doc.body.innerHTML = ''; M.renderLeaderboardRows(T.stocks);   // a page without the table: nothing to draw into
+}));
+test('leaderboard: clicks open a stock or pin it, sort by a header, show more, toggle full screen and the Columns panel, and start the refresh cards', () => kcPage('<div id="analysisFiltersCount"></div><div id="analysisToolbar"><button id="analysisColumnsBtn"></button><button id="analysisFullscreenBtn" class="x"></button><button id="analysisColumnsResetBtn"></button><button id="analysisSelFund"></button><button id="analysisSelTech"></button><button id="analysisStop-fund"></button><button id="analysisStop-tech"></button><button id="analysisPerm"></button></div><div class="analysis-leaderboard"><table class="strat-table"><thead><tr><th><button id="sortBtn" data-sort-col="stock">x</button></th><th id="plainTh">y</th></tr></thead><tbody id="analysisLeaderboardBody"><tr class="analysis-lb-row" data-idx="12"><td id="cell">c</td><td><button class="pin-btn" data-ticker="S2" id="pinB">p</button></td></tr></tbody></table></div><div id="analysisLeaderboardMore"><button data-lb-more="1" id="moreB"></button><span id="moreText">t</span></div>', async (win) => {
+  const { T, M, af } = await lbSetup(5), doc = win.document, click = (id) => doc.getElementById(id).click(), cb = { update: 0, rerender: 0, opened: [], tip: 0 };
+  M.wireLeaderboard({ update: () => { cb.update++; }, rerender: () => { cb.rerender++; }, openStock: (i) => cb.opened.push(i), hideTooltip: () => { cb.tip++; } });
+  click('cell'); assert.deepStrictEqual([cb.opened, cb.tip], [[12], 1]);
+  click('pinB'); assert.deepStrictEqual([T.calls.filter((c) => c[0] === 'pin'), cb.update, cb.opened.length], [[['pin', 'S2']], 1, 1]);   // the pin does not open the stock
+  doc.getElementById('analysisLeaderboardBody').click(); assert.strictEqual(cb.opened.length, 1);   // not on a row
+  click('moreB'); assert.strictEqual(cb.update, 2); click('moreText'); assert.strictEqual(cb.update, 2);
+  click('sortBtn'); assert.deepStrictEqual([af.sortCol, af.sortDir, cb.rerender], ['stock', 'desc', 1]); click('sortBtn'); assert.strictEqual(af.sortDir, 'asc'); click('plainTh'); assert.strictEqual(cb.rerender, 2);
+  click('analysisFullscreenBtn');
+  assert.deepStrictEqual([doc.body.classList.contains('lb-full-open'), doc.querySelector('.analysis-leaderboard').classList.contains('lb-full'), T.full, doc.getElementById('analysisFullscreenBtn').getAttribute('aria-pressed'), doc.getElementById('analysisFullscreenBtn').title], [true, true, [true], 'true', 'Exit full screen (Esc to leave)']);
+  M.init_leaderboard_fullscreen(); T.exitHook(); assert.deepStrictEqual([doc.body.classList.contains('lb-full-open'), doc.getElementById('analysisFullscreenBtn').title], [false, 'Full screen (Esc to leave)']);   // Esc leaves it
+  click('analysisFullscreenBtn'); click('analysisFullscreenBtn'); assert.deepStrictEqual(T.full, [true, true, false]);
+  click('analysisColumnsBtn'); assert.deepStrictEqual([T.open, cb.rerender, T.calls.filter((c) => c[0] === 'persist').length], [true, 3, 1]);
+  click('analysisColumnsResetBtn'); assert.deepStrictEqual([af.columnOrder, cb.rerender], [['rank', 'stock', 'score'], 4]);
+  click('analysisSelFund'); click('analysisSelTech'); click('analysisStop-fund'); click('analysisStop-tech'); click('analysisPerm');
+  assert.deepStrictEqual(T.calls.filter((c) => ['batch', 'stop', 'perm'].includes(c[0])), [['batch', 'fund', ['fund-batch'], 'analysis'], ['batch', 'tech', ['tech-batch'], 'analysis'], ['stop'], ['stop'], ['perm']]);
+}));
+const LB_COLS = '<div class="analysis-leaderboard"><table class="strat-table"><thead></thead><tbody id="analysisLeaderboardBody"></tbody></table></div><ul class="analysis-columns-list">' + ['rank', 'stock', 'score'].map((c) => '<li class="analysis-column-row" data-col="' + c + '"><button class="analysis-col-grip" data-col="' + c + '">::</button></li>').join('') + '</ul>';
+test('leaderboard: a column row can be dragged to a new place or moved with the arrow keys, and the new order is saved once on release', () => kcPage(LB_COLS, async (win) => {
+  const { T, M, af } = await lbSetup(2), doc = win.document, scrolls = []; let rerenders = 0;
+  win.scrollBy = (x, y) => scrolls.push(y);
+  M.wireLeaderboard({ update: () => {}, rerender: () => { rerenders++; }, openStock: () => {}, hideTooltip: () => {} });
+  const list = doc.querySelector('.analysis-columns-list'), rowOf = (c) => list.querySelector('[data-col="' + c + '"].analysis-column-row'), order = () => [...list.querySelectorAll('.analysis-column-row')].map((r) => r.dataset.col).join();
+  [...list.querySelectorAll('.analysis-column-row')].forEach((r, i) => { r.getBoundingClientRect = () => ({ top: i * 30, height: 30 }); });   // a row is 30 px high
+  const ev = (type, props) => { const e = new win.Event(type, { bubbles: true, cancelable: true }); for(const k of Object.keys(props || {})) Object.defineProperty(e, k, { value: props[k] }); return e; };
+  const grip = (c) => list.querySelector('.analysis-col-grip[data-col="' + c + '"]');
+  grip('rank').dispatchEvent(ev('pointerdown', { button: 2 })); assert.ok(!rowOf('rank').classList.contains('dragging'));   // not the main button
+  list.dispatchEvent(ev('pointerdown'));   // not on a handle
+  grip('rank').dispatchEvent(ev('pointerdown', { button: 0 })); assert.ok(rowOf('rank').classList.contains('dragging'));
+  doc.dispatchEvent(ev('pointermove', { clientY: 80 })); assert.strictEqual(order(), 'stock,score,rank');   // below the middle of the last row: to the end
+  doc.dispatchEvent(ev('pointermove', { clientY: 80 })); assert.strictEqual(order(), 'stock,score,rank');   // already there
+  doc.dispatchEvent(ev('pointermove', { clientY: 20 })); assert.strictEqual(order(), 'rank,stock,score');   // above the middle of the first row: to the front
+  doc.dispatchEvent(ev('pointermove', { clientY: 5 })); doc.dispatchEvent(ev('pointermove', { clientY: 5 }));
+  doc.dispatchEvent(ev('pointermove', { clientY: 790 })); assert.deepStrictEqual(scrolls.slice(-1), [14]); doc.dispatchEvent(ev('pointermove', { clientY: 30 })); assert.deepStrictEqual(scrolls.length >= 1, true);
+  doc.dispatchEvent(ev('pointermove', { clientY: 85 }));   // back to the end
+  assert.strictEqual(af.columnOrder, null); assert.strictEqual(rerenders, 0);   // nothing is saved while dragging
+  doc.dispatchEvent(ev('pointerup'));
+  assert.deepStrictEqual([af.columnOrder, rerenders, rowOf('rank').classList.contains('dragging')], [['stock', 'score', 'rank'], 1, false]);
+  doc.dispatchEvent(ev('pointermove', { clientY: 0 })); assert.strictEqual(order(), 'stock,score,rank');   // the drag is over: moving does nothing
+  T.order = ['stock', 'score', 'rank'];   // what the saved order now is
+  grip('rank').dispatchEvent(ev('keydown', { key: 'ArrowUp' })); assert.deepStrictEqual([order(), rerenders], ['stock,rank,score', 2]);
+  grip('rank').dispatchEvent(ev('keydown', { key: 'ArrowDown' })); assert.deepStrictEqual([order(), rerenders], ['stock,score,rank', 2]);   // back to the saved order: nothing to save
+  grip('rank').dispatchEvent(ev('keydown', { key: 'ArrowDown' })); assert.deepStrictEqual([order(), rerenders], ['stock,score,rank', 2]);   // already last: nothing moves
+  grip('stock').dispatchEvent(ev('keydown', { key: 'ArrowUp' })); assert.strictEqual(order(), 'stock,score,rank');
+  grip('stock').dispatchEvent(ev('keydown', { key: 'a' })); list.dispatchEvent(ev('keydown', { key: 'ArrowUp' })); assert.strictEqual(order(), 'stock,score,rank');
+}));
+
+// ---- Explorer / industries table (src/business/panel.js): the controls, the table and its details, the heat map, and every click
+TV_VALUES.add('PERIODS');
+const bzSetup = async (over) => {
+  const S = [{ name: 'S1', ticker: 'S1', technical: { score: 7.26 }, valuation: {} }, { name: 'S2', ticker: 'S2' }, { name: 'S3', ticker: 'S3' }];
+  const mkRow = (name, items, over2) => Object.assign({ name, count: items.length, mean: 1.5, median: 1, up: 1, down: 1, known: 2, news: [], pos: 0, neg: 0, matches: 1, matchMean: 2, items }, over2);
+  const rows = [mkRow('Autos <b>', [{ stock: S[0], match: true, change: 1 }, { stock: S[1], match: false, change: 2 }], { news: [{ d: '2026-11-01', t: 'Head <i>', url: 'https://n.test/1', s: 'pos', stock: 'S1', src: 'Wire' }, { d: 'bad', t: 'Other', url: 'javascript:1', s: 'neg', stock: 'S2' }], pos: 1, neg: 1 }),
+    mkRow('Banks', [{ stock: S[2], match: true, change: null }], { mean: null, median: null, known: 0, count: 1, matchMean: null, up: 0, down: 0 })];
+  const T = globalThis.__T = { S, rows, prefs: [], opened: [], inds: [], tips: 0, full: [], news: { stops: 0, runs: [] }, heat: [], syncs: 0, kitCalls: [], bars: [], barsOk: true, strat: null, validId: '', newsRun: null,
+    stocks: S, stockIndex: new Map(S.map((s, i) => [s, 20 + i])), appSections: { business: null }, priceHistoryByTicker: {}, PERIODS: [{ key: '1W', label: 'One week' }, { key: '1M', label: 'One month' }, { key: '6M', label: 'Six months' }],
+    kit: { defineToolbar: (n, f) => { T.toolbar = f; }, toolbarButton: (n) => '<kit-tb ' + n + '>', selbarSlot: (n) => '<kit-sel ' + n + '>', barHtml: (...a) => '<div class="kit-bar-stub"></div>', defineScope: (...a) => T.kitCalls.push(['scope', a[0]]), defineChoices: (id, f) => { T.kitCalls.push(['choices', id]); T.choices = f; }, choiceBtn: (id) => '<kit-choice ' + id + '>' },
+    keepScroll: (el, fn) => fn(), escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), ensureAllPriceBars: async () => { T.bars.push(1); return T.barsOk; }, pcTickerKey: (s) => s.name,
+    openIndustryInline: (...a) => T.inds.push(a), openStockInline: (...a) => T.opened.push(a), analysisLbCell: (id, ctx) => '<td>' + id + '</td>', analysisRowContext: (s, i, idx) => ({ s, i, idx, scoreLabel: s.name === 'S1' ? '7.3' : '' }),
+    columnHeaderHtml: (id) => '<th>' + id + '</th>', compareBy: (f, dir) => (a, b) => 0, compareByColumn: () => () => 0, nextSort: (cur, col) => ({ col, dir: 'asc' }), sortHeaderHtml: (id, label) => '<th data-sort-col="' + id + '">' + label + '</th>', stockGridColumnIds: () => ['rank', 'stock', 'industry', 'price', 'pin'],
+    publishedStrategies: () => [{ id: 'q1', name: 'Quality <s>' }], strategyStockSet: (id) => (id === 'q1' ? new Set([S[0], S[1]]) : null), validStrategyId: (id) => (id === 'q1' ? id : ''),
+    getNewsRun: () => T.newsRun, planNews: (list) => ({ stocks: list, again: false, left: 0 }), startNewsCollect: (list, label, cb) => T.news.runs.push([list.length, label, cb]), stopNewsCollect: () => { T.news.stops++; },
+    prefSet: (k, v) => T.prefs.push(JSON.parse(v)), browserFullscreen: (on) => T.full.push(on), fullscreenLabel: (on) => (on ? 'Leave full screen' : 'Full screen'), watchFullscreenExit: (isOn, onExit) => { T.exitHook = onExit; },
+    heatmapHtml: (rws, p, o) => { T.heat.push(o); return '<div class="heat-stub"><button type="button" data-biz-heat="Banks">tile</button></div>'; }, sheetFrame: (x) => x, syncSheets: () => { T.syncs++; }, filtersOpenSaved: () => false, rememberFiltersOpen: () => {},
+    industryTable: (list, o) => T.rows.slice(), needsBars: (p) => p === '6M', periodOf: (k) => T.PERIODS.find((x) => x.key === k) || T.PERIODS[1], dropMenuHtml: (o) => '<drop ' + o.extraClass + '>' + o.items.map((i) => i.attrs + (i.current ? '*' : '')).join('|') + '</drop>',
+    isRebound: (s) => s.name === 'S2', insertHtmlAfter: (el, html) => { el.insertAdjacentHTML('afterend', html); }, setHtml: (el, html) => { el.innerHTML = html; } };
+  Object.assign(T, over || {});
+  return { T, S, M: await loadAllStubbed('src/business/panel.js', '', ['../core/evt.js']) };
+};
+const BZ_PAGE = '<div id="analysisFiltersCount"></div><div id="businessBody"></div><div id="analysisPanelBody"><div id="embedHost"></div></div>';
+test('explorer: the page draws its controls, strategy buttons and an industry table whose names are text, and an industry opens in place with its details', () => kcPage(BZ_PAGE, async (win) => {
+  const { T, M } = await bzSetup();
+  const doc = win.document, body = () => doc.getElementById('businessBody'), txt = () => body().textContent.replace(/\s+/g, ' ');
+  T.appSections.business = doc.getElementById('businessBody'); M.init(); M.show();
+  assert.ok(body().querySelector('[data-biz-view="table"].active') && body().querySelector('[data-biz-period="1M"].active') && body().querySelector('[data-biz-by="industry"].active'));
+  assert.ok(body().querySelector('[data-biz-strat=""].active'));
+  assert.ok(txt().includes('Quality <s>') && !body().querySelector('.filter-label s') && body().querySelector('[data-biz-strat="q1"]').title === 'Highlight the stocks that qualify for this strategy today');
+  const names = [...body().querySelectorAll('.biz-row')].map((r) => r.dataset.bizName); assert.deepStrictEqual(names, ['Autos <b>', 'Banks']);
+  assert.ok(!body().querySelector('.biz-name b') && body().querySelector('[data-biz-open="Autos <b>"]') && body().querySelector('kit-tb') && body().querySelector('kit-sel'));
+  assert.ok(txt().includes('+1.50%') && txt().includes('n/a'));   // a missing average says n/a
+  assert.ok(body().querySelector('[data-biz-show="matched"]').disabled);   // no strategy chosen: nothing to match
+  body().querySelector('.biz-row').click();   // the row opens in place
+  assert.ok(body().querySelector('.biz-detail') && body().querySelector('.biz-row').classList.contains('open') && body().querySelector('.biz-row').getAttribute('aria-expanded') === 'true');
+  assert.ok(txt().includes('Fund 7.3 · Tech 7.3') || txt().includes('Fund 7.3'));   // scores under the stock in the lean grid
+  assert.ok(body().querySelector('.biz-detail .strat-row[data-idx="20"]') && !body().querySelector('.biz-detail a[href^="javascript"]'));
+  assert.strictEqual(body().querySelector('[data-biz-all]').dataset.bizAll, 'expand');
+  body().querySelector('.biz-row').click(); assert.ok(!body().querySelector('.biz-detail'));   // closes again
+  body().querySelector('[data-biz-all]').click(); assert.strictEqual(body().querySelectorAll('.biz-detail').length, 2); assert.strictEqual(body().querySelector('[data-biz-all]').dataset.bizAll, 'collapse');
+  body().querySelector('[data-biz-all]').click(); assert.strictEqual(body().querySelectorAll('.biz-detail').length, 0);
+}));
+
+test('explorer: the heat map sizes itself beside the filters and in full screen, and the controls, keys and tiles change what is drawn', () => kcPage(BZ_PAGE, async (win) => {
+  const { T, M } = await bzSetup();
+  const doc = win.document, body = () => doc.getElementById('businessBody'), click = (sel) => { const n = body().querySelector(sel); if(!n) throw new Error('no ' + sel); n.click(); };
+  T.appSections.business = body(); M.init(); M.show();
+  click('[data-biz-view="heat"]'); assert.ok(body().querySelector('.heat-stub'));
+  assert.ok(T.heat.at(-1).width >= 300 && T.heat.at(-1).hRatio === undefined && T.heat.at(-1).size === 'chg');   // beside the filters
+  click('[data-biz-size="count"]'); assert.strictEqual(T.heat.at(-1).size, 'count');
+  click('[data-biz-full]'); assert.deepStrictEqual(T.full, [true]);
+  assert.ok(T.heat.at(-1).hRatio >= .45 && T.heat.at(-1).hRatio <= .95);   // full screen: the height fits the window
+  T.exitHook(); assert.ok(T.heat.at(-1).hRatio === undefined);   // Esc leaves full screen
+  win.HTMLElement.prototype.scrollIntoView = function(){ T.scrolledTo = this.dataset.bizName; };
+  click('[data-biz-heat]'); assert.ok(body().querySelector('.biz-table') && body().querySelector('.biz-row[aria-expanded="true"]') && T.scrolledTo === 'Banks');   // a tile opens that industry in the table
+  body().click();   // a click on nothing in particular does nothing
+  click('[data-biz-view="heat"]'); click('[data-biz-view="table"]'); assert.ok(body().querySelector('.biz-table'));
+  click('[data-biz-strat="q1"]'); assert.ok(body().querySelector('.biz-showing') && body().querySelector('[data-biz-show="matched"]'));
+  click('[data-biz-show="matched"]');
+  click('[data-biz-rebound]'); click('[data-biz-period="6M"]'); assert.ok(T.bars.length >= 1);
+  click('[data-biz-by="group"]'); click('[data-biz-filters]');
+  T.newsRun = { state: 'running', label: 'Autos <b>', done: 1, total: 3, added: 2, failed: [] };
+  click('[data-sort-col]'); click('.biz-row'); click('[data-biz-cols]'); click('[data-biz-newstoggle]'); click('.biz-detail [data-sort-col]');
+  assert.strictEqual(JSON.stringify(T.toolbar().map((o) => [o.id, o.stocks().length])), '[["matched",2],["open",1],["all",2]]');   // what the Refresh button works on
+  click('[data-biz-open]'); assert.strictEqual(T.inds.length, 1);
+  click('.strat-row'); assert.strictEqual(T.opened.length, 1);
+  click('[data-biz-newsstop]'); assert.strictEqual(T.news.stops, 1);
+  const key = (sel, k) => { const e = new win.KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }); body().querySelector(sel).dispatchEvent(e); };
+  key('.strat-row', 'Enter'); assert.strictEqual(T.opened.length, 2);
+  key('.biz-row', ' '); key('.biz-row', 'Enter'); key('.biz-row', 'x');
+  await new Promise((r) => setTimeout(r, 0));   // the first history load finishes
+  T.barsOk = false; click('[data-biz-rebound]'); click('[data-biz-rebound]'); await new Promise((r) => setTimeout(r, 0));
+  assert.ok(body().querySelector('[data-biz-retry]')); T.barsOk = true; click('[data-biz-retry]'); await new Promise((r) => setTimeout(r, 0));
+  doc.dispatchEvent(new win.CustomEvent('alba-batch-done', { detail: { source: 'biz-kit' } }));
+  doc.dispatchEvent(new win.CustomEvent('alba-batch-done', { detail: { source: 'other' } }));
+  const host = doc.getElementById('embedHost'); M.showIn({ el: host, by: 'industry', section: 'analysis', label: 'Analysis', stocksNow: () => new Set(T.S.slice(0, 1)) });
+  assert.ok(host.querySelector('.biz-table') && body().textContent === '');
+  host.querySelector('.biz-row').click(); assert.ok(host.querySelector('.biz-detail'));
+  for(const n of host.querySelectorAll('[data-biz-matched-pick]')) n.click();
+  M.show(); assert.ok(host.textContent === '' && body().querySelector('.biz-table'));
+}));
+
+// ---- Industry page (src/industry/render.js): the page for one industry, its charts and the stocks grid
+for(const n of ['detailEl', 'EVENT_GROUPS', 'verdictLabel']) TV_VALUES.add(n);
+const INDUSTRY_PAGE = '<div id="detail"></div><div id="indCharts-host"></div>';
+const indSetup = async (win, over) => {
+  const S = Array.from({ length: 3 }, (_, i) => ({ name: 'S' + i, ticker: 'S' + i, ind: i < 2 ? 'Autos' : 'Banks', industryGroup: i < 2 ? 'Auto group' : '' }));
+  const T = globalThis.__T = Object.assign({ stocks: S, stockIndex: new Map(S.map((s, i) => [s, 10 + i])), detailEl: win.document.getElementById('detail'), priceHistoryByTicker: { S0: { '1W': [], '1M': [] }, S1: { '1W': [], '1M': [] } }, opened: [], jumps: 0, barsOk: true, evCalls: 0,
+    verdictLabel: { buy: 'Buy', mbuy: 'Maybe', hold: 'Hold', avoid: 'Avoid' }, EVENT_GROUPS: [{ id: 'news', label: 'News', glyph: '⚡' }, { id: 'earn', label: 'Results', glyph: 'E' }, { id: 'trade', label: 'Trade', glyph: 'T' }],
+    escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), safeText: (x) => String(x).replace(/</g, '&lt;'), tickerIndustry: (s) => s.ind, panelIcon: () => '', scoreBand: () => 'b-hold', pcTickerKey: (s) => s.name,
+    ensureAllPriceBars: async () => T.barsOk, bindJumpSpy: () => { T.jumps++; }, newsItemHtml: (n, g) => '<li class="news-stub">' + g + n.t + '</li>',
+    industryFactors: (m) => ({ score: 6.5, scoreN: m.length, count: m.length, tech: null, techN: 0, mos: -20, mosN: 1, undervalued: 0, verdicts: { buy: 1, mbuy: 0, hold: 1, avoid: 0 }, factors: [{ name: 'Fin <b>', avg: 7, n: 2 }, { name: 'Moat', avg: null, n: 0 }] }),
+    industryGlobal: () => ({ researched: 1, positive: [{ text: 'Demand <i>', source: 'Wire', url: 'https://g.test/1', stocks: ['S0', 'S1'] }], negative: [{ text: 'Tariff', source: 'Bad', url: 'javascript:1', stocks: ['S0'] }] }),
+    industryNews: () => [{ d: '2026-11-01', k: 'news', t: 'Head <i>', s: 'pos', stock: 'S0' }, { d: '2026-10-20', k: 'earn', t: 'Results', stock: 'S1', src: 'X' }],
+    industrySeries: (lists, k) => (k === 'W' ? Array.from({ length: 40 }, (_, i) => [1760000000 + i * 604800, i % 2 ? 1.2 : -.8, 2]) : [[1760000000, 1, 2]]),
+    eventsByBar: (events, series, span, shown) => { T.evCalls++; return new Map([[series.length - 1, [{ t: 5, group: 'news', s: 'pos', text: 'Head', d: '2026-11-01' }]]]); },
+    analysisLbCell: (id, ctx) => '<td>' + id + ctx.idx + '</td>', analysisRowContext: (s, i, idx) => ({ s, i, idx }), columnHeaderHtml: (id) => '<th data-sort-col="' + id + '">' + id + '</th>', compareByColumn: () => (a, b) => 0,
+    nextSort: (cur, col) => ({ col, dir: 'asc' }), stockGridColumnIds: () => ['rank', 'stock', 'industry'], appendHtml: (el, h) => { el.insertAdjacentHTML('beforeend', h); }, setHtml: (el, h) => { el.innerHTML = h; } }, over || {});
+  win.ResizeObserver = globalThis.ResizeObserver = class { observe(){ T.observed = true; } };
+  return { T, S, M: await loadAllStubbed('src/industry/render.js', '', ['../core/evt.js']) };
+};
+test('industry page: it lists the stocks of one industry, writes names as text, charts the weekly and monthly averages and opens a stock from its row', () => kcPage(INDUSTRY_PAGE, async (win) => {
+  const { T, M } = await indSetup(win), doc = win.document, detail = doc.getElementById('detail'), tick = () => new Promise((r) => setTimeout(r, 0));
+  const host = doc.createElement('div'); host.id = 'indCharts-probe';
+  win.HTMLElement.prototype.scrollIntoView = function(){ T.scrolled = this.id; };
+  M.renderIndustryDetail('industry', 'Autos', 'Explorer <x>', (idx) => T.opened.push(idx));
+  assert.ok(detail.textContent.includes('Back to Explorer <x>') && !detail.querySelector('x') && !detail.querySelector('.detail-name b'));
+  assert.deepStrictEqual([...detail.querySelectorAll('.strat-row')].map((r) => r.dataset.idx), ['10', '11']);   // the two Autos stocks only
+  assert.ok(detail.querySelector('.detail-ticker').textContent.includes('Industry') && T.jumps === 1);
+  assert.ok(!detail.querySelector('.fund-cell-label b') && detail.textContent.includes('Fin <b>'));   // names are text
+  assert.ok(!detail.querySelector('a[href^="javascript"]') && detail.querySelector('a[href="https://g.test/1"]'));
+  await tick();
+  assert.strictEqual(detail.querySelectorAll('.pc-panel').length, 2); assert.ok(T.observed);
+  assert.ok(detail.querySelector('.pc-panel svg').getAttribute('viewBox') && detail.querySelector('.pc-panel .pc-xh'));
+  assert.ok(detail.querySelector('.pc-panels').textContent.includes('Not enough price history'));   // the monthly series has one bar
+  detail.querySelector('.detail-jump a[data-jump]').click(); assert.strictEqual(T.scrolled, 'jump-ind-factors');
+  detail.querySelector('.strat-row').click(); assert.deepStrictEqual(T.opened, [10]);
+  detail.querySelector('.strat-row').dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); assert.deepStrictEqual(T.opened, [10, 10]);
+}));
+test('industry page: the chart range pills, the hover tooltip and the missing-history notice work', () => kcPage(INDUSTRY_PAGE, async (win) => {
+  const { T, M } = await indSetup(win), doc = win.document, detail = doc.getElementById('detail'), tick = () => new Promise((r) => setTimeout(r, 0));
+  M.renderIndustryDetail('group', 'Auto group', 'Explorer', () => {});
+  assert.ok(detail.querySelector('.detail-ticker').textContent.includes('Industry group'));
+  await tick();
+  const panel = detail.querySelector('.pc-panel'), chart = panel.querySelector('.pc-chart'), tip = panel.querySelector('.pc-tip');
+  chart.getBoundingClientRect = () => ({ left: 0, width: 300 });
+  const before = T.evCalls; panel.querySelectorAll('.pc-pill')[0].click(); assert.ok(T.evCalls > before && panel.querySelectorAll('.pc-pill')[0].getAttribute('aria-pressed') === 'true');
+  const ev = (type, x) => { const e = new win.Event(type, { bubbles: true }); Object.defineProperty(e, 'clientX', { value: x }); chart.dispatchEvent(e); };
+  ev('pointermove', 150); assert.ok(tip.classList.contains('is-shown') && tip.textContent.includes('Average change') && !tip.querySelector('b i'));
+  ev('pointerleave', 0); assert.ok(!tip.classList.contains('is-shown'));
+  const shell = new win.Event('pointermove'); chart.dispatchEvent(shell);
+  win.dispatchEvent(new win.Event('resize'));
+  T.barsOk = false; M.renderIndustryDetail('industry', 'Banks', 'Explorer', () => {}); await tick();
+  assert.ok(detail.textContent.includes('Price history is not available'));
+}));
+test('industry page: sorting a column and Show more rebuild the stock rows, and a large industry is drawn in steps', () => kcPage(INDUSTRY_PAGE, async (win) => {
+  const many = Array.from({ length: 130 }, (_, i) => ({ name: 'M' + i, ticker: 'M' + i, ind: 'Big' }));
+  const { T, M } = await indSetup(win, { stocks: many, stockIndex: new Map(many.map((s, i) => [s, i])) }), detail = win.document.getElementById('detail');
+  M.renderIndustryDetail('industry', 'Big', 'Explorer', () => {});
+  const rows = () => detail.querySelectorAll('.strat-row').length;
+  assert.strictEqual(rows(), 100); assert.ok(detail.textContent.includes('Showing the first 100 of 130'));
+  detail.querySelector('[data-ind-more]').click(); assert.strictEqual(rows(), 130); assert.ok(!detail.querySelector('[data-ind-more]'));
+  detail.querySelector('[data-sort-col]').click(); assert.strictEqual(rows(), 130);
+}));
+
+// ---- Preferences sync (src/identity/prefs.js): who owns the browser's mirror, and which copy wins when the page opens
+const prefsRun = (opts) => alone(async () => {
+  const store = new Map(Object.entries(opts.store || {})), old = global.localStorage, writes = [];
+  global.localStorage = { getItem: (k) => (opts.storageDown ? (() => { throw new Error('blocked'); })() : (store.has(k) ? store.get(k) : null)), setItem: (k, v) => { if(opts.storageDown) throw new Error('blocked'); store.set(k, v); }, removeItem: (k) => { store.delete(k); } };
+  globalThis.__T = { getUid: () => 'u2', userRef: () => (opts.noRef ? null : { get: async () => { if(opts.getFails) throw new Error('offline'); return { exists: !!opts.saved, data: () => opts.saved }; }, set: async (o) => { writes.push(o); } }) };
+  let errors = []; await quietErrors(async (seen) => { errors = seen; await (await loadAllStubbed('src/identity/prefs.js', '', ['./keys.js'])).syncPrefs(); });
+  global.localStorage = old; return { store, writes, errors };
+});
+test('preferences sync: another person on this browser starts clean; the saved record wins over an older mirror and an unsaved newer mirror is sent up', async () => {
+  const mirror = { 'albaDashboard.tradeView.v1': 'old', 'albaDashboard.prefsOwner.v1': 'u1', 'albaDashboard.strategies.v1': '[]' };
+  let r = await prefsRun({ store: mirror, saved: { v: 1, updatedAt: '2026-11-01T00:00:00Z', tradeView: 'new', analysis: { a: 1 } } });
+  assert.strictEqual(r.store.get('albaDashboard.prefsOwner.v1'), 'u2'); assert.ok(!r.store.has('albaDashboard.strategies.v1'));   // u1's copies are gone
+  assert.deepStrictEqual([r.store.get('albaDashboard.tradeView.v1'), r.store.get('albaDashboard.analysisFilters.v1'), r.store.has('albaDashboard.business.v1'), r.writes.length], ['new', '{"a":1}', false, 0]);
+  r = await prefsRun({ store: { 'albaDashboard.tradeView.v1': 'mine', 'albaDashboard.prefsOwner.v1': 'u2', 'albaDashboard.prefsLocalAt.v1': '2026-11-05T00:00:00Z' }, saved: { v: 1, updatedAt: '2026-11-01T00:00:00Z', tradeView: 'theirs' } });
+  assert.deepStrictEqual([r.store.get('albaDashboard.tradeView.v1'), r.writes.length, r.writes[0].tradeView, typeof r.writes[0].updatedAt], ['mine', 1, 'mine', 'string']);   // the browser's newer copy is kept and saved
+});
+test('preferences sync: a first visit seeds the record from the browser, an empty browser seeds nothing, and storage or database failures are survived', async () => {
+  let r = await prefsRun({ store: { 'albaDashboard.tradeView.v1': 'mine' }, saved: null });
+  assert.deepStrictEqual([r.writes.length, r.writes[0].tradeView], [1, 'mine']);
+  r = await prefsRun({ saved: null }); assert.strictEqual(r.writes.length, 0);
+  r = await prefsRun({ noRef: true, store: { 'albaDashboard.prefsOwner.v1': 'u1' } }); assert.strictEqual(r.store.get('albaDashboard.prefsOwner.v1'), 'u1');   // signed out: nothing touched
+  r = await prefsRun({ storageDown: true, saved: { v: 1, updatedAt: '2026-11-01T00:00:00Z', tradeView: 'x' } }); assert.strictEqual(r.writes.length, 0);
+  r = await prefsRun({ getFails: true }); assert.strictEqual(r.errors.length, 1);
+});
+test('preferences: a change is mirrored in the browser and saved to the signed-in record after a short wait or at once on flush; screen state is merged', () => alone(async () => {
+  const store = new Map(), writes = [], old = global.localStorage, timers = [], realSet = global.setTimeout, realClear = global.clearTimeout;
+  global.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => { store.set(k, v); }, removeItem: (k) => { store.delete(k); } };
+  global.setTimeout = (fn) => { timers.push(fn); return timers.length; }; global.clearTimeout = () => {};
+  let signedIn = false; globalThis.__T = { getUid: () => 'u', userRef: () => (signedIn ? { set: async (o) => { writes.push(o); } } : null) };
+  try {
+    const M = await loadAllStubbed('src/identity/prefs.js', '', ['./keys.js']);
+    M.prefSet('albaDashboard.tradeView.v1', 'v1'); assert.strictEqual(store.get('albaDashboard.tradeView.v1'), 'v1'); assert.strictEqual(timers.length, 0);   // signed out: only the mirror
+    signedIn = true; M.prefSet('albaDashboard.tradeView.v1', 'v2'); assert.strictEqual(timers.length, 1);
+    timers.pop()(); await Promise.resolve(); await Promise.resolve(); assert.deepStrictEqual(writes.map((w) => w.tradeView), ['v2']);
+    M.flushPrefs(); assert.strictEqual(writes.length, 1);   // nothing pending
+    M.prefSet('albaDashboard.tradeView.v1', 'v3'); M.flushPrefs(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); assert.strictEqual(writes.at(-1).tradeView, 'v3');
+    store.set('albaDashboard.uiState.v1', '{"a":1}'); M.flushUiState();   // no pending screen state: nothing to flush
+    M.uiStateSet({ b: 2 }); M.uiStateSet({ c: 3 }, 5); timers.pop()(); assert.deepStrictEqual(JSON.parse(store.get('albaDashboard.uiState.v1')), { a: 1, b: 2, c: 3 });
+    store.set('albaDashboard.uiState.v1', 'not json'); assert.deepStrictEqual(M.uiStateGet(), {});
+    store.set('albaDashboard.uiState.v1', '7'); assert.deepStrictEqual(M.uiStateGet(), {});
+    store.set('albaDashboard.analysisFilters.v1', '{broken'); store.set('albaDashboard.tradeView.v1', 'raw'); M.prefSet('albaDashboard.business.v1', '{}'); M.flushPrefs(); for(let i = 0; i < 6; i++) await Promise.resolve();
+    assert.ok(writes.at(-1).tradeView === 'raw' && !('analysis' in writes.at(-1)));   // a saved value that does not parse is left out
+    global.localStorage = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem(){} };
+    M.prefSet('k', 'v'); M.flushPrefs(); for(let i = 0; i < 6; i++) await Promise.resolve(); assert.strictEqual(writes.at(-1).v, 1);   // storage blocked: still saved to the record, with nothing from the browser
+    assert.deepStrictEqual(M.uiStateGet(), {});
+  } finally { global.localStorage = old; global.setTimeout = realSet; global.clearTimeout = realClear; }
+}));
+
+// ---- Live prices (src/live/ticker.js): the button, the market hours, which stocks are watched and how a quote moves a row
+for(const n of ['stockByTickerSymbolAny', 'priceSymbolByTicker', 'ldSymOk']) TV_VALUES.add(n);
+const LIVE_PAGE = '<div class="topbar"><input class="topbar-search"></div><div id="detail"><div class="detail-ticker"></div></div><section class="app-section active"><table><tbody>' +
+  [0, 1, 2].map((i) => '<tr data-idx="' + i + '"><td data-live="mos"></td><td data-live="price"></td><td data-live="weekChg"></td><td data-live="monthChg"></td></tr>').join('') + '</tbody></table></section><section id="section-trackrecord"></section>';
+const liveRun = (over, fn) => kcPage(LIVE_PAGE, async (win) => {
+  const RealDate = Date, FIXED = new RealDate('2026-11-10T10:00:00+05:30').getTime();   // a Tuesday, market open
+  class FixedDate extends RealDate { constructor(...a){ if(a.length) super(...a); else super(FIXED); } static now(){ return FIXED; } }
+  Object.defineProperty(win.HTMLElement.prototype, 'offsetParent', { configurable: true, get(){ return this.hasAttribute('hidden') ? null : this.ownerDocument.body; } });
+  Object.defineProperty(win.document, 'hidden', { configurable: true, get(){ return !!win.__tabHidden; } });
+  const S = [0, 1, 2].map((i) => ({ name: 'S' + i, ticker: 'S' + i, valuation: { currentPrice: 100 }, technical: i < 2 ? { raw: { weekPctChange: 0, monthPctChange: 0 } } : undefined }));
+  const T = globalThis.__T = Object.assign({ stocks: S, stockByTickerSymbolAny: new Map([['S1', S[1]], ['S9', null]]), detailEl: win.document.getElementById('detail'), priceSymbolByTicker: {}, ldSymOk: new Map([['S0', { sym: 'NSE:S0' }], ['S1', { sym: 'NSE:S1' }], ['S2', { sym: 'NSE:S2' }]]),
+    trades: [], timers: [], quotes: { S0: 110, S1: 120, S2: 130 }, calls: [], shown: 1, mcp: true, batch: null, painted: 0, idle: [],
+    allTrades: () => T.trades, pcTickerKey: (s) => s.name, getShownIndex: () => T.shown, getLdBatch: () => T.batch, tvMcp: async () => T.mcp, redrawWhenIdle: (id) => T.idle.push(id), renderTradeLogPanel: () => {},
+    periodStartSec: () => 1000, tvCall: async (tool, a) => { T.calls.push(a.interval); return { bars: { t: [100, 200, 5000], c: [50, 80, 99] } }; }, pctChangeSpan: (v) => '<i>' + v + '</i>',
+    ldQuote: async (sym) => { const p = T.quotes[sym.split(':')[1]]; if(p instanceof Error) throw p; return { price: p }; }, ldVerifiedSymbol: async (s) => ({ price: T.quotes[s.name] }),
+    analysisRowContext: (s, i, idx) => ({ mosLabel: '12%', mosClass: 'mos-up', price: String(s.valuation.currentPrice), r: s.technical ? s.technical.raw : {} }), setHtml: (el, h) => { el.innerHTML = h; } }, over);
+  const timers = []; const real = { st: globalThis.setTimeout, ct: globalThis.clearTimeout, D: globalThis.Date, doc: globalThis.document };
+  globalThis.setTimeout = (f, ms) => { timers.push([f, ms]); return timers.length; }; globalThis.clearTimeout = () => {}; globalThis.Date = FixedDate; globalThis.document = win.document;
+  try {
+    const M = await loadAllStubbed('src/live/ticker.js', '', []);
+    await fn({ win, T, S, M, timers, btn: () => win.document.querySelector('.live-toggle'), settle: async () => { for(let i = 0; i < 12; i++) await new Promise((r) => setImmediate(r)); } });
+  } finally { Object.assign(globalThis, { setTimeout: real.st, clearTimeout: real.ct, Date: real.D }); if(real.doc === undefined) delete globalThis.document; else globalThis.document = real.doc; }
+});
+test('live prices: the button starts off, turns on to move the prices and weekly and monthly changes of the rows on screen, and flags what changed', () => liveRun({}, async ({ win, T, S, M, timers, btn, settle }) => {
+  M.init_live_ticker(); assert.strictEqual(btn().textContent, 'Live off'); assert.strictEqual(btn().getAttribute('aria-pressed'), 'false');
+  btn().click(); await settle();
+  assert.deepStrictEqual([btn().textContent, btn().getAttribute('aria-pressed'), btn().dataset.short], ['● Live', 'true', 'Live']);
+  assert.deepStrictEqual(S.map((s) => s.valuation.currentPrice), [110, 120, 130]);
+  assert.deepStrictEqual([S[0].technical.raw.weekPctChange, S[0].technical.raw.monthPctChange], [37.5, 37.5]);   // 110 against the last close before the week (80)
+  assert.ok(win.document.querySelector('tr[data-idx="0"] [data-live="price"]').classList.contains('live-flash') && win.document.querySelector('tr[data-idx="0"] [data-live="weekChg"]').innerHTML === '<i>37.5</i>');
+  assert.ok(win.document.querySelector('.detail-ticker .live-px').textContent.includes('120 live'));   // the open stock page shows its live price
+  assert.strictEqual(T.calls.length, 4);   // the reference closes are read once per stock and period
+  btn().click(); assert.strictEqual(btn().textContent, 'Live off'); btn().click(); await settle(); assert.strictEqual(T.calls.length, 4);   // kept
+  assert.ok(btn().title.includes('refresh every 20 seconds'));
+  assert.ok(timers.some(([f, ms]) => ms === 20000));   // the next sweep is scheduled
+}));
+test('live prices: no price, a thrown quote, a missing connector or a batch in progress leave the rows alone; repeated misses pause the button', () => liveRun({}, async ({ win, T, S, M, timers, btn, settle }) => {
+  M.init_live_ticker(); T.quotes = { S0: null, S1: new Error('x'), S2: undefined };
+  for(let i = 0; i < 3; i++){ btn().click(); btn().click(); btn().click(); await settle(); }
+  assert.deepStrictEqual(S.map((s) => s.valuation.currentPrice), [100, 100, 100]);
+  assert.strictEqual(btn().dataset.short === 'Paused' || btn().dataset.short === 'Live' || btn().dataset.short === 'Live off', true);
+  T.mcp = false; btn().click(); await settle(); T.mcp = true; T.batch = { running: true }; btn().click(); btn().click(); await settle(); assert.strictEqual(T.calls.length, 0);
+}));
+test('live prices: the Trade Log adds open positions, a long list is swept oldest first, and outside market hours the button says closed', () => liveRun({}, async ({ win, T, S, M, timers, btn, settle }) => {
+  M.init_live_ticker();
+  win.document.getElementById('section-trackrecord').textContent = 'open'; T.trades = [{ ticker: 'S1', status: 'open' }, { ticker: 'S1', status: 'open' }, { ticker: 'S0', status: 'closed', sell: 1 }, { ticker: 'S9', status: 'open' }];
+  btn().click(); await settle(); assert.ok(T.idle.includes('tradelog'));
+  win.document.getElementById('detail').setAttribute('hidden', ''); btn().click(); btn().click(); await settle();
+  const rowsHtml = Array.from({ length: 60 }, (_, i) => '<tr data-idx="' + (i + 3) + '"><td data-live="price"></td></tr>').join('');
+  win.document.querySelector('tbody').insertAdjacentHTML('beforeend', rowsHtml); for(let i = 3; i < 63; i++){ S.push({ name: 'S' + i, ticker: 'S' + i, valuation: {} }); T.quotes['S' + i] = 5; T.ldSymOk.set('S' + i, { sym: 'NSE:S' + i }); }
+  btn().click(); btn().click(); await settle(); assert.ok(S.filter((s) => s.valuation.currentPrice === 5).length <= 50);
+  win.document.dispatchEvent(new win.Event('visibilitychange')); win.document.dispatchEvent(new win.Event('click')); for(const [f, ms] of timers.splice(0)) if(ms === 1500 || ms === 4000) f();
+  await settle();
+}));
+test('live prices: outside market hours or with the tab hidden the button says closed and nothing is asked', () => liveRun({}, async ({ win, T, M, timers, btn, settle }) => {
+  const Real = Date, Sat = new Real('2026-11-14T10:00:00+05:30').getTime();
+  globalThis.Date = class extends Real { constructor(...a){ if(a.length) super(...a); else super(Sat); } static now(){ return Sat; } };
+  M.init_live_ticker(); btn().click(); await settle(); assert.deepStrictEqual([btn().textContent, btn().dataset.short, T.calls.length], ['Market closed', 'Closed', 0]); assert.ok(btn().title.includes('weekdays 9:15'));
+}));
+test('live prices: a stock with no known symbol is looked up first, unreadable bars keep the shown change, repeated misses pause then back off, and a hidden tab waits', () => liveRun({}, async ({ win, T, S, M, timers, btn, settle }) => {
+  M.init_live_ticker();
+  T.ldSymOk.clear(); T.priceSymbolByTicker.S1 = 'NSE:S1X'; delete S[2].valuation;
+  T.tvCall = async (tool, a) => { T.calls.push(a.symbol); if(a.symbol === 'NSE:S1X') throw new Error('no bars'); return { bars: { t: [1], c: [] } }; };
+  T.ldQuote = async (sym) => ({ price: 140 }); T.ldVerifiedSymbol = async (s) => ({ price: 150 });
+  win.__tabHidden = true; btn().click(); await settle(); assert.strictEqual(S[0].valuation.currentPrice, 100);   // a hidden tab asks for nothing
+  win.__tabHidden = false; btn().click(); btn().click(); await settle();
+  assert.deepStrictEqual(S.map((s) => s.valuation.currentPrice), [150, 150, 150]);   // no symbol known yet: the verified lookup answers
+  T.ldSymOk.set('S0', { sym: 'NSE:S0' }); T.ldSymOk.set('S1', { sym: 'NSE:S1' });
+  btn().click(); btn().click(); await settle(); assert.ok(T.calls.includes('NSE:S1X') && S[1].technical.raw.weekPctChange === 0);   // the bars could not be read: the shown figures stay
+  T.shown = 7; btn().click(); btn().click(); await settle(); assert.ok(win.document.querySelector('.detail-ticker .live-px'));   // no stock on the stock page: its chip is left alone
+  T.shown = 0; T.quotes = {}; T.ldQuote = async () => ({ price: null }); T.ldVerifiedSymbol = async () => ({ price: null });
+  for(let i = 0; i < 4; i++){ win.document.dispatchEvent(new win.Event('visibilitychange')); await settle(); }   // the tab coming back looks again, without resetting the count of misses
+  assert.strictEqual(btn().textContent, 'Live paused'); assert.strictEqual(btn().dataset.short, 'Paused'); assert.ok(btn().title.includes('trying again every 2 minutes'));
+  await timers.find(([f, ms]) => ms === 20000)[0](); assert.ok(timers.some(([f, ms]) => ms === 120000));   // the next sweep, after the misses, waits two minutes
+  T.shown = 1; S[1].valuation.currentPrice = 1; T.ldQuote = async () => ({ price: 9 }); T.ldVerifiedSymbol = async () => ({ price: 9 }); btn().click(); btn().click(); await settle();
+  S.push({ name: 'S3', ticker: 'S3', valuation: {} }); win.document.querySelector('.detail-ticker').innerHTML = '<span class="live-px">old</span>'; T.shown = 3; T.ldVerifiedSymbol = async () => ({ price: null }); btn().click(); btn().click(); await settle();
+  assert.strictEqual(win.document.querySelector('.detail-ticker .live-px'), null);   // a stock never priced live shows no chip
+}));
+test('live prices: a page without a search box has no button', () => liveRun({}, async ({ win, M, btn }) => {
+  win.document.querySelector('.topbar-search').remove(); M.init_live_ticker(); assert.strictEqual(btn(), null);
+}));
+
+// ---- Stock events refresh (src/news/stockevents.js): TradingView dividend and results dates saved into news/events
+const evRun = async (over, list) => {
+  const realNow = Date.now; Date.now = () => new Date('2026-11-10T10:00:00+05:30').getTime();
+  try {
+    const sec = (d) => Math.floor(new Date(d + 'T00:00:00+05:30').getTime() / 1000), saved = [], changes = [], calls = [];
+    const T = globalThis.__T = Object.assign({ mcp: true, calls, saved, db: null, cached: { A: 'NSE:AAA', B: 'BSE:BBB', C: 'NSE:CCC' }, resolved: [], fatal: false,
+      dbCapabilityPromise: null, tvMcp: async () => T.mcp, tvIstDate: (x) => new Date((x + 19800) * 1000).toISOString().slice(0, 10), tvErrorText: (e) => e.message, tvIsFatal: (e) => /fatal/.test(e.message),
+      isinSymbolCached: (s) => T.cached[s.name], resolveIsinSymbols: async (l) => { T.resolved.push(l.length); if(T.resolveFails) throw new Error(T.resolveFails); }, tickerSymbol: (s) => s.name + 'T',
+      tvCall: async (tool, a) => { calls.push(tool); if(tool === 'mcp-tv-get-dividends-calendar') return { data: [{ symbol: 'NSE:AAA', dividend_ex_date_upcoming: '2026-11-20', dividend_amount_upcoming: 5 }, { symbol: 'BSE:OTHER', dividend_ex_date_upcoming: '2026-11-21' }, null, { symbol: 7 }] };
+        if(T.batchFails) throw new Error(T.batchFails); return { data: { 'NSE:AAA': { earnings_release_next_date: sec('2026-12-01') }, 'BSE:BBB': { earnings_release_next_date: sec('2027-06-01') }, 'NSE:CCC': { earnings_release_next_date: 0 } } }; } }, over || {});
+    T.dbCapabilityPromise = T.db === undefined ? null : T.db;
+    const M = await loadAllStubbed('src/news/stockevents.js', '', ['./model.js']);
+    const stocks = list || [{ name: 'A' }, { name: 'B' }, { name: 'C' }];
+    await M.refreshStockEvents(stocks, () => changes.push(M.getEventsRun().state));
+    return { T, run: M.getEventsRun(), changes, M, stocks };
+  } finally { Date.now = realNow; }
+};
+const evDb = (existing) => { const log = []; return { log, doc: (p) => ({ get: async () => ({ exists: !!existing, data: () => existing }), update: async (u) => { log.push(['update', u]); }, set: async (u) => { log.push(['set', u]); } }) }; };
+test('stock events refresh: dividend and results dates in the next 90 days are matched to the stocks and saved beside the existing items', () => alone(async () => {
+  const db = evDb({ items: [{ ticker: 'KEEP', type: 'board', date: '2026-12-05', text: 'Board meeting' }], tvAt: 'x' });
+  const { run, changes, T } = await evRun({ db });
+  assert.strictEqual(run.state, 'done'); assert.deepStrictEqual(changes.slice(0, 3), ['running', 'running', 'running']);
+  assert.ok(run.msg.includes('Checked 3 of 3 stocks: 1 dividend date and 1 results date in the next 90 days'));   // the 2027 date is outside the window; 0 is no date
+  assert.ok(!run.msg.includes('skipped') && !run.msg.includes('failed'));
+  const [kind, upd] = db.log[0]; assert.strictEqual(kind, 'update');
+  assert.deepStrictEqual(upd.items.map((x) => x.ticker + ':' + x.type).sort(), ['AT:dividend', 'AT:results', 'KEEP:board']);
+  assert.ok(T.calls.includes('mcp-tv-get-symbol-data-batch'));
+}));
+test('stock events refresh: a first save creates the record, missing symbols are looked up and skipped, a failed results call is counted and a full dividend page is noted', () => alone(async () => {
+  const db = evDb(null);
+  const { run, T } = await evRun({ db, cached: { A: 'NSE:AAA' }, batchFails: 'timeout' });
+  assert.strictEqual(db.log[0][0], 'set');
+  assert.ok(run.msg.includes('Checked 1 of 3 stocks') && run.msg.includes('2 skipped (no TradingView symbol yet)') && run.msg.includes('1 results call failed') && !run.msg.includes('limit'));
+  assert.deepStrictEqual(T.resolved, [0, 2]);   // the saved list is loaded, then the two missing stocks are searched
+  const many = await evRun({ db: evDb(null), tvCall: async (tool) => (tool === 'mcp-tv-get-dividends-calendar' ? { data: Array.from({ length: 200 }, () => null) } : { data: {} }) });
+  assert.ok(many.run.msg.includes('200 dividends (its limit)') && many.run.msg.includes('0 dividend dates and 0 results dates'));
+  const one = await evRun({ db: evDb(null), cached: { A: 'NSE:AAA' } }, [{ name: 'A' }]); assert.ok(one.run.msg.includes('1 dividend date and'));
+}));
+test('stock events refresh: it stops with a plain message when the connector, the database or any symbol is missing, or a fatal error occurs', () => alone(async () => {
+  assert.strictEqual((await evRun({ mcp: false, db: evDb(null) })).run.msg, 'The TradingView connector is not available in this view.');
+  assert.strictEqual((await evRun({ db: null })).run.msg, 'The database is not available in this view.');
+  assert.ok((await evRun({ db: evDb(null), cached: {} })).run.msg.includes('None of these stocks has a TradingView symbol yet'));
+  assert.strictEqual((await evRun({ db: evDb(null), cached: {}, resolveFails: 'search broke' })).run.state, 'error');   // a plain failure to resolve is ignored: still no symbols
+  assert.ok((await evRun({ db: evDb(null), cached: {}, resolveFails: 'fatal login' })).run.msg.includes('fatal login'));
+  assert.ok((await evRun({ db: evDb(null), batchFails: 'fatal login' })).run.msg.includes('fatal login'));   // a fatal results error aborts instead of counting
+}));
+
+// ---- Rules editor (src/strategies/editor.js): the table of rules of a strategy and what every control in it does
+for(const n of ['FIELDS', 'FIELD_BY_ID', 'OPS']) TV_VALUES.add(n);
+const EDITOR_PAGE = '<div id="root"></div>';
+const editorSetup = async (win, rules) => {
+  const FIELDS = [{ id: 'mos', group: 'Fundamental', label: 'MoS <b>', type: 'num', unit: ' %' }, { id: 'name', group: 'Basics', label: 'Name', type: 'text' }, { id: 'verdict', group: 'Fundamental', label: 'Verdict', type: 'enum', options: [['buy', 'Buy', 'good'], ['hold', 'Hold']], noneLabel: 'None' }];
+  const st = { name: 'S', rules, learned: 'old' }, T = globalThis.__T = { FIELDS, FIELD_BY_ID: new Map(FIELDS.map((f) => [f.id, f])), OPS: { num: [['>=', 'at least'], ['between', 'between']], text: [['contains', 'contains']], enum: [['in', 'is one of']] }, stocks: [{}, {}], saves: 0, changes: 0, st,
+    escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), knownField: (map, id) => map.get(id) || { type: 'num' }, isNum: (v) => typeof v === 'number' && isFinite(v),
+    defaultRule: (id) => (id === 'verdict' ? { field: id, op: 'in', value: [] } : id === 'name' ? { field: id, op: 'contains', value: '' } : { field: id, op: '>=', value: null }),
+    withOp: (r, op) => (op === 'between' ? { ...r, op, value: [typeof r.value === 'number' ? r.value : null, null] } : { ...r, op, value: typeof r.value === 'number' ? r.value : null }),
+    ruleReady: (r) => (Array.isArray(r.value) ? r.value.some((x) => x !== null) : r.value !== null && r.value !== ''), describeRule: (r) => r.field + ' ' + r.op, testRule: () => ({ pass: true }), qualifyingStocks: (list, rs) => list.slice(0, 1), saveStrategies: () => { T.saves++; } };
+  const M = await loadAllStubbed('src/strategies/editor.js', '', []), root = win.document.getElementById('root');
+  const draw = () => { root.innerHTML = M.rulesEditorHtml(st); }; draw();
+  M.wireRulesEditor(root, () => T.noStrategy ? null : st, () => { T.changes++; draw(); });
+  const change = (el, value) => { el.value = value; el.dispatchEvent(new win.Event('change', { bubbles: true })); };
+  return { T, st, root, draw, change, M, click: (sel) => root.querySelector(sel).click() };
+};
+test('rules editor: the table is drawn as text with the passing counts and a total, and a change of field, condition or value updates the rule and clears what was learned', () => withPage(EDITOR_PAGE, async (win) => {
+  const { T, st, root, change } = await editorSetup(win, [{ field: 'mos', op: '>=', value: 10 }, { field: 'name', op: 'contains', value: '<img onerror=x>' }, { field: 'verdict', op: 'in', value: ['buy'] }]);
+  assert.ok(!root.querySelector('img') && !root.querySelector('option b') && root.querySelector('.sr-total').textContent.includes('3 rules together: 1 stock pass'));
+  assert.strictEqual(root.querySelectorAll('.sr-row').length, 3);
+  change(root.querySelector('.sr-row[data-i="0"] .sr-v1'), '25'); assert.deepStrictEqual([st.rules[0].value, st.learned, T.saves, T.changes], [25, '', 1, 1]);
+  change(root.querySelector('.sr-row[data-i="0"] .sr-v1'), ' '); assert.strictEqual(st.rules[0].value, null);   // an empty box is no value
+  change(root.querySelector('.sr-row[data-i="0"] .sr-v1'), 'abc'); assert.strictEqual(st.rules[0].value, null);
+  change(root.querySelector('.sr-row[data-i="1"] .sr-v1'), 'bank'); assert.strictEqual(st.rules[1].value, 'bank');   // text stays text
+  change(root.querySelector('.sr-row[data-i="0"] .sr-op'), 'between'); assert.deepStrictEqual(st.rules[0], { field: 'mos', op: 'between', value: [null, null] });
+  change(root.querySelector('.sr-row[data-i="0"] .sr-v1'), '5'); change(root.querySelector('.sr-row[data-i="0"] .sr-v2'), '9'); assert.deepStrictEqual(st.rules[0].value, [5, 9]);
+  change(root.querySelector('.sr-row[data-i="2"] .sr-field'), 'mos'); assert.deepStrictEqual(st.rules[2], { field: 'mos', op: '>=', value: null });
+  assert.ok(root.querySelector('.sr-row[data-i="2"] .sr-incomplete'));
+  change(root.querySelector('.sr-add'), 'name'); assert.strictEqual(st.rules.length, 4);   // a new rule
+  change(root.querySelector('.sr-add'), ''); assert.strictEqual(st.rules.length, 4);
+  const before = T.changes; root.dispatchEvent(new win.Event('change', { bubbles: true })); assert.strictEqual(T.changes, before);   // not from a row: ignored
+}));
+test('rules editor: rules move with the arrows, are removed with an Undo line, and enum choices switch on and off', () => withPage(EDITOR_PAGE, async (win) => {
+  const { T, st, root, click, change } = await editorSetup(win, [{ field: 'mos', op: '>=', value: 1 }, { field: 'mos', op: '>=', value: 2 }, { field: 'verdict', op: 'in', value: [] }]);
+  win.document.body.append(root); const focused = () => win.document.activeElement.className;
+  click('.sr-row[data-i="0"] .sr-down'); assert.deepStrictEqual(st.rules.map((r) => r.value), [2, 1, []]); assert.ok(focused().includes('sr-down'));
+  click('.sr-row[data-i="1"] .sr-up'); assert.deepStrictEqual(st.rules.map((r) => r.value), [1, 2, []]);
+  click('.sr-row[data-i="2"] .sr-up'); click('.sr-row[data-i="1"] .sr-up');   // the verdict rule moves to the top
+  assert.strictEqual(st.rules[0].field, 'verdict'); const n = T.changes;
+  const first = root.querySelector('.sr-row[data-i="0"] .sr-up'); first.disabled = false; first.click(); assert.strictEqual(T.changes, n);   // nothing above the first
+  click('.sr-row[data-i="0"] .sr-opt[data-v="buy"]'); assert.deepStrictEqual(st.rules[0].value, ['buy']); click('.sr-row[data-i="0"] .sr-opt[data-v="buy"]'); assert.deepStrictEqual(st.rules[0].value, []);
+  click('.sr-row[data-i="1"] .sr-del'); assert.strictEqual(st.rules.length, 2); assert.ok(root.querySelector('.sr-undo').textContent.includes('Removed') && !root.querySelector('.sr-undo b'));
+  click('.sr-undo-btn'); assert.deepStrictEqual(st.rules.map((r) => r.value), [[], 1, 2]); assert.ok(!root.querySelector('.sr-undo'));
+}));
+test('rules editor: Undo only works for the strategy it was made in, and with no strategy selected the table does nothing', () => withPage(EDITOR_PAGE, async (win) => {
+  const { T, st, root, click } = await editorSetup(win, [{ field: 'mos', op: '>=', value: 1 }, { field: 'name', op: 'contains', value: '' }]);
+  click('.sr-row[data-i="1"] .sr-del'); assert.ok(root.querySelector('.sr-undo').textContent.includes('Name'));   // an unfinished rule is named by its field
+  T.noStrategy = true; const n = T.changes; click('.sr-undo-btn'); assert.strictEqual(T.changes, n);
+  T.noStrategy = false; T.st.rules.push({ field: 'mos', op: '>=', value: 3 }); root.querySelector('.sr-undo-btn').click(); assert.strictEqual(st.rules.length, 3);
+}));
+
+// ---- Trade Log forms (src/tradelog/form.js): add, sell and remove a trade, the stock suggestions and the table clicks
+const TL_PAGE = '<button id="tradeAddBtn">Add</button><button class="tl-view-btn" data-tl-view="open">Open</button><div id="tradeFormHost"></div><div id="tradeLogPanelBody"><a data-tl-open="AAA" href="#">A</a><span data-sort-col="ret">r</span><button data-tl-sell="t1">Sell</button><button data-tl-remove="t1">Remove</button><button>plain</button></div>';
+const tlSetup = async (win, over) => {
+  const A = { name: 'Acme <b>', ticker: 'AAA · NSE', valuation: { currentPrice: 50, intrinsicValue: 80 }, score: 7, verdict: 'buy' }, B = { name: 'Beta', ticker: 'BBB' };
+  const saved = [], removed = [], T = globalThis.__T = Object.assign({ stocks: [A, B], stockByTickerSymbolAny: new Map([['AAA', A]]), appSections: { trackrecord: 'sec' }, trades: {}, dbOk: true, saveFails: false, saved, removed, opened: [], views: [], sorts: [], told: [], msgs: [],
+    getTrade: (id) => T.trades[id], getTradeDb: () => (T.dbOk ? {} : null), tickerSymbol: (s) => String(s.ticker).split('·')[0].trim(), escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), formatDate: (d) => d,
+    marginOfSafety: (iv, p) => (iv && p ? Math.round((iv / p - 1) * 100) : null), fundamentalCompleteness: () => ({ complete: 3, total: 4 }), technicalCompleteness: () => ({ complete: 1, total: 2 }), buildSuggestions: (q) => T.stocks.filter((s) => s.name.toLowerCase().includes(q)),
+    sgMark: (t) => T.escapeHtml(t), holdingDaysBetween: () => 12, tlSetView: (v) => T.views.push(v), tlSortBy: (c) => T.sorts.push(c), tellUser: (m) => T.told.push(m), openStockInline: (...a) => T.opened.push(a), setHtml: (el, h) => { el.innerHTML = h; },
+    tradeCol: () => ({ doc: (id) => ({ set: async (r) => { if(T.saveFails) throw new Error('db'); saved.push([id, r]); }, delete: async () => { if(T.saveFails) throw new Error('db'); removed.push(id); } }) }) }, over || {});
+  return { T, A, B, M: await loadAllStubbed('src/tradelog/form.js', '', ['../core/evt.js']) };
+};
+const tlKey = (win, el, key) => el.dispatchEvent(new win.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+test('trade log form: the stock box suggests stocks as text, keys move through them, and saving a buy checks every field before storing the trade with a snapshot', () => kcPage(TL_PAGE, async (win) => {
+  const { T, A, M } = await tlSetup(win), doc = win.document, $ = (s) => doc.querySelector(s), type = (v) => { $('#tlStock').value = v; $('#tlStock').dispatchEvent(new win.Event('input', { bubbles: true })); };
+  win.HTMLElement.prototype.scrollIntoView = function(){};
+  const timers = [], realTimeout = globalThis.setTimeout; globalThis.setTimeout = (f, ms) => { timers.push(ms); return 1; };   // moving focus schedules the list to close; nothing may run after the test
+  try { await (async () => {
+  M.init_tradelog_form(); $('#tradeAddBtn').click(); assert.ok($('#tlStock') && doc.activeElement === $('#tlStock'));
+  $('#tradeFormHost').dispatchEvent(new win.Event('click')); $('#tlStock').dispatchEvent(new win.Event('focusin', { bubbles: true }));
+  type('a'); assert.ok($('#tlSuggest').classList.contains('show') && !$('#tlSuggest').querySelector('b') && $('#tlSuggest .sg-item'));   // names are text
+  tlKey(win, $('#tlStock'), 'ArrowDown'); assert.ok($('#tlSuggest .sg-item').classList.contains('active'));
+  tlKey(win, $('#tlStock'), 'ArrowUp'); tlKey(win, $('#tlStock'), 'ArrowDown');
+  tlKey(win, $('#tlStock'), 'x'); tlKey(win, $('#tlStock'), 'Escape'); assert.ok(!$('#tlSuggest').classList.contains('show'));
+  type('a'); tlKey(win, $('#tlStock'), 'Enter'); assert.ok($('#tlSuggest').classList.contains('show'));   // nothing chosen yet: Enter does nothing
+  tlKey(win, $('#tlStock'), 'ArrowDown'); tlKey(win, $('#tlStock'), 'Enter');
+  assert.deepStrictEqual([$('#tlStock').value, $('#tlPrice').value, doc.activeElement === $('#tlPrice')], ['Acme <b> (AAA)', '50', true]);
+  type('Acme <b> (AAA)'); assert.ok(!$('#tlSuggest').classList.contains('show'));   // the picked stock's own label asks nothing
+  type('zzz'); assert.ok(!$('#tlSuggest').classList.contains('show')); type('');
+  $('#tlSuggest').dispatchEvent(new win.Event('mousedown', { bubbles: true })); type('a'); $('#tlSuggest .sg-item').dispatchEvent(new win.Event('mousedown', { bubbles: true, cancelable: true })); assert.strictEqual($('#tlStock').value, 'Acme <b> (AAA)');
+  const msg = () => $('#tlMsg').textContent, save = () => { $('#tlSave').click(); return new Promise((r) => setImmediate(r)); };
+  $('#tlStock').value = 'nobody'; await save(); assert.strictEqual(msg(), 'Pick a stock from the suggestions.');
+  $('#tlStock').value = 'Acme <b> (AAA)'; $('#tlDate').value = ''; await save(); assert.strictEqual(msg(), 'Enter the buy date.');
+  $('#tlDate').value = '2026-11-03'; $('#tlPrice').value = '0'; await save(); assert.strictEqual(msg(), 'Enter a buy price above 0.');
+  $('#tlPrice').value = '50'; $('#tlQty').value = ''; await save(); assert.strictEqual(msg(), 'Enter a quantity of at least 1.');
+  $('#tlQty').value = '10'; T.trades['AAA-2026-11-03'] = {}; await save(); assert.ok(msg().includes('already exists'));
+  delete T.trades['AAA-2026-11-03']; T.dbOk = false; await save(); assert.ok(msg().includes('not reachable')); T.dbOk = true;
+  T.saveFails = true; await quietErrors(async () => { await save(); }); assert.ok(msg().includes('Could not save the trade') && !$('#tlSave').disabled); T.saveFails = false;
+  await save(); assert.strictEqual($('#tradeFormHost').textContent, '');   // the form closes
+  const [id, rec] = T.saved[0]; assert.strictEqual(id, 'AAA-2026-11-03'); assert.deepStrictEqual([rec.ticker, rec.status, rec.buy.quantity, rec.buy.snapshot.marginOfSafetyPct, rec.buy.snapshot.verdict], ['AAA', 'open', 10, 60, 'buy']);
+  $('#tradeAddBtn').click(); $('#tlStock').value = 'Beta'; $('#tlDate').value = '2026-11-04'; $('#tlPrice').value = '9'; $('#tlQty').value = '1'; await save(); assert.strictEqual(T.saved[1][1].buy.snapshot.currentPriceAtSnapshot, null);   // typed in full without picking
+  $('#tradeAddBtn').click(); $('#tlCancel').click(); assert.strictEqual($('#tradeFormHost').textContent, '');
+  timers.length = 0; $('#tradeAddBtn').click(); $('#tlStock').dispatchEvent(new win.Event('focusout', { bubbles: true })); assert.ok(timers.includes(120));   // the list closes shortly after the box loses focus
+  })(); } finally { globalThis.setTimeout = realTimeout; }
+}));
+test('trade log form: selling a position checks the date and price, closes it with the return, and the table links, sorts, view buttons and two-step remove work', () => kcPage(TL_PAGE, async (win) => {
+  const buy = { date: '2026-10-01', price: 40, quantity: 5, snapshot: {} };
+  const { T, M } = await tlSetup(win, { trades: { t1: { _id: 't1', ticker: 'AAA', name: 'Acme', status: 'open', buy, sell: null } } }), doc = win.document, $ = (s) => { const n = doc.querySelector(s); if(!n) throw new Error('no ' + s); return n; };
+  win.HTMLElement.prototype.scrollIntoView = function(){};
+  M.init_tradelog_form(); const settle = () => new Promise((r) => setImmediate(r));
+  $('[data-tl-sell]').click(); assert.ok($('#tlSellDate') && $('#tlSellPrice').value === '50' && $('.tl-form-title').textContent.includes('Sell: Acme'));
+  const msg = () => $('#tlMsg').textContent, close = async () => { $('#tlSellSave').click(); await settle(); };
+  $('#tlSellDate').value = '2026-09-01'; await close(); assert.ok(msg().includes('on or after the buy date'));
+  $('#tlSellDate').value = '2026-11-03'; $('#tlSellPrice').value = ''; await close(); assert.ok(msg().includes('above 0'));
+  $('#tlSellPrice').value = '60'; T.saveFails = true; await quietErrors(async () => { await close(); }); assert.ok(msg().includes('Could not save the sale') && !$('#tlSellSave').disabled); T.saveFails = false;
+  await close(); const rec = T.saved[0][1]; assert.deepStrictEqual([rec.status, rec.sell.price, rec.sell.realizedReturnPct, rec.sell.holdingDays, rec._id, rec.sell.snapshot.verdict], ['closed', 60, 50, 12, undefined, 'buy']);
+  T.dbOk = false; $('[data-tl-sell]').click(); $('#tlSellSave').click(); await settle(); T.dbOk = true; $('#tlCancel').click();
+  $('[data-tl-remove]').click(); assert.ok($('[data-tl-remove]').classList.contains('armed') && $('[data-tl-remove]').textContent === 'Confirm remove?');
+  $('[data-tl-remove]').click(); await settle(); assert.deepStrictEqual(T.removed, ['t1']);
+  T.saveFails = true; $('[data-tl-remove]').click(); await quietErrors(async () => { await settle(); }); assert.deepStrictEqual(T.told, ['Could not remove the trade. Please try again.']); T.saveFails = false;
+  T.dbOk = false; $('[data-tl-remove]').click(); await settle(); T.dbOk = true;
+  $('[data-tl-open]').click(); assert.strictEqual(T.opened.length, 1); assert.deepStrictEqual(T.opened[0], ['sec', 'Trade Log', 0]);
+  $('[data-tl-open]').setAttribute('data-tl-open', 'ZZZ'); $('[data-tl-open]').click(); assert.strictEqual(T.opened.length, 1);
+  $('[data-sort-col]').click(); assert.deepStrictEqual(T.sorts, ['ret']); $('.tl-view-btn').click(); assert.deepStrictEqual(T.views, ['open']);
+  $('#tradeLogPanelBody button:not([data-tl-sell]):not([data-tl-remove])').click(); $('#tradeLogPanelBody').click();
+}));
+test('trade log form: edge cases of the stock box, a typed full label, a stock without a price, and a sell form for a trade whose stock is gone', () => kcPage(TL_PAGE, async (win) => {
+  const { T, A, M } = await tlSetup(win, { trades: { gone: { ticker: 'ZZZ', name: '', status: 'open', buy: { date: '2026-10-01', price: 40, quantity: 5 }, sell: null } } }), doc = win.document, $ = (q) => doc.querySelector(q);
+  win.HTMLElement.prototype.scrollIntoView = function(){}; A.valuation = {}; A.ticker = 'AAA · NSE · extra';
+  const timers = [], real = globalThis.setTimeout; globalThis.setTimeout = (f, ms) => { timers.push(ms); return 1; };
+  try {
+    M.init_tradelog_form(); $('#tradeAddBtn').click();
+    tlKey(win, $('#tlSave'), 'ArrowDown'); $('#tlSave').dispatchEvent(new win.Event('input', { bubbles: true })); $('#tlSave').dispatchEvent(new win.Event('focusin', { bubbles: true })); $('#tlSave').dispatchEvent(new win.Event('focusout', { bubbles: true }));   // other controls: ignored
+    tlKey(win, $('#tlStock'), 'ArrowDown'); assert.ok(!$('#tlSuggest').classList.contains('show'));   // list closed: keys do nothing
+    $('#tlStock').value = 'a'; $('#tlStock').dispatchEvent(new win.Event('input', { bubbles: true })); tlKey(win, $('#tlStock'), 'ArrowDown'); tlKey(win, $('#tlStock'), 'Enter');
+    assert.strictEqual($('#tlPrice').value, '');   // no price known for the picked stock
+    $('#tlStock').value = 'Acme <b> (AAA)'; $('#tlDate').value = '2026-11-03'; $('#tlPrice').value = '5'; $('#tlQty').value = '2';
+    $('#tlStock').dispatchEvent(new win.Event('input', { bubbles: true })); $('#tlSave').click(); await new Promise((r) => setImmediate(r)); assert.strictEqual(T.saved.length, 1);   // a full label typed by hand is found
+    $('#tradeFormHost').dispatchEvent(new win.Event('click', { bubbles: true }));
+    $('#tradeAddBtn').click(); $('#tlStock').value = '  '; $('#tlSave').click(); await new Promise((r) => setImmediate(r)); assert.ok($('#tlMsg').textContent.includes('Pick a stock'));
+    $('#tlSave').closest('.tl-form').insertAdjacentHTML('beforeend', '<button id="other">x</button>'); $('#other').click();
+    T.trades.nothing = null; $('[data-tl-sell]').setAttribute('data-tl-sell', 'nothing'); $('[data-tl-sell]').click();
+    $('[data-tl-sell]').setAttribute('data-tl-sell', 'gone'); $('[data-tl-sell]').click(); assert.ok($('#tlSellPrice').value === '' && $('.tl-form-title').textContent.includes('Sell: ZZZ'));
+    $('#tlSellPrice').value = '10'; $('#tlSellSave').click(); await new Promise((r) => setImmediate(r)); assert.strictEqual(T.saved.at(-1)[1].sell.snapshot, null);   // the stock is gone: no snapshot
+  } finally { globalThis.setTimeout = real; }
+}));
+test('trade log form: an armed Remove button resets itself after a few seconds', () => kcPage(TL_PAGE, async (win) => {
+  const { M } = await tlSetup(win), timers = [], real = globalThis.setTimeout; globalThis.setTimeout = (f, ms) => { timers.push([f, ms]); return 1; };
+  try { M.init_tradelog_form(); const b = win.document.querySelector('[data-tl-remove]'); b.click(); assert.ok(b.classList.contains('armed')); timers.find(([f, ms]) => ms === 4000)[0](); assert.ok(!b.classList.contains('armed') && b.textContent === 'Remove'); }
+  finally { globalThis.setTimeout = real; }
+}));
+
+// ---- Top bar search (src/ui/globalsearch.js): suggestions as text, keys, picking a stock on top of the current page, "/" to focus
+const GS_PAGE = '<div class="topbar-search"><input id="globalSearch" placeholder="Search a company or ticker"><button id="globalSearchClear">x</button><div id="globalSuggest"></div></div><textarea id="ta"></textarea><div id="ce" contenteditable="true"></div><p id="plain">p</p>';
+const gsSetup = async (win, over) => {
+  const A = { name: 'Acme <b>', ticker: 'AAA · NSE', score: 7.256 }, B = { name: 'Beta', ticker: 'BBB', score: 5 }, listeners = [];
+  const T = globalThis.__T = Object.assign({ stockIndex: new Map([[A, 3], [B, 4]]), appSections: { analysis: { classList: { contains: () => !!T.onAnalysis } }, business: { classList: { contains: () => false } } }, onAnalysis: false, opened: [], shown: [], phone: false, A, B,
+    buildSuggestions: (q) => [A, B].filter((s) => s.name.toLowerCase().includes(q) || s.ticker.toLowerCase().includes(q)), sgMark: (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'), showSection: (n) => T.shown.push(n), openStockInline: (...a) => T.opened.push(a), setHtml: (el, h) => { el.innerHTML = h; } }, over || {});
+  win.matchMedia = () => ({ get matches(){ return T.phone; }, addEventListener: (t, f) => listeners.push(f) });
+  const M = await loadAllStubbed('src/ui/globalsearch.js', '', ['../core/evt.js']); M.init_ui_globalsearch();
+  return { T, A, B, listeners };
+};
+test('top bar search: matching stocks are listed as text, keys move through them, Enter opens the stock over the current page, and Clear and Escape reset the box', () => kcPage(GS_PAGE, async (win) => {
+  const { T, A, listeners } = await gsSetup(win), doc = win.document, $ = (q) => doc.querySelector(q), input = $('#globalSearch');
+  win.HTMLElement.prototype.scrollIntoView = function(){};
+  const type = (v) => { input.value = v; input.dispatchEvent(new win.Event('input', { bubbles: true })); }, key = (k, el = input) => { const e = new win.KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }); el.dispatchEvent(e); return e; };
+  type('ac'); assert.ok($('#globalSuggest').classList.contains('show') && $('#globalSearchClear').classList.contains('show') && input.getAttribute('aria-expanded') === 'true');
+  assert.ok(!$('#globalSuggest b') && $('.sg-score').textContent === '7.26' && $('.sg-sub').textContent === 'AAA · NSE');   // names are text
+  key('ArrowDown'); assert.ok($('.sg-item').classList.contains('active')); key('ArrowUp'); key('ArrowDown');
+  key('Enter'); assert.deepStrictEqual([T.shown, T.opened, input.value, $('#globalSuggest').classList.contains('show')], [['business'], [[T.appSections.business, 'Explorer', 3]], '', false]);
+  T.onAnalysis = true; type('ac'); key('Enter'); assert.deepStrictEqual(T.opened.at(-1), [T.appSections.analysis, 'Analysis', 3]); assert.strictEqual(T.shown.length, 1);   // already on a page that can host it
+  type('ac'); $('.sg-item').dispatchEvent(new win.Event('mousedown', { bubbles: true, cancelable: true })); assert.strictEqual(T.opened.length, 3);
+  type('ac'); $('#globalSuggest').dispatchEvent(new win.Event('mousedown', { bubbles: true })); assert.ok($('#globalSuggest').classList.contains('show'));   // not on an item
+  type('zzz'); assert.ok($('.sg-empty') && $('#globalSuggest').classList.contains('show')); key('Enter'); key('x');
+  type(''); assert.ok(!$('#globalSuggest').classList.contains('show') && !$('#globalSearchClear').classList.contains('show'));
+  type('ac'); key('Escape'); assert.ok(!$('#globalSuggest').classList.contains('show'));
+  type('ac'); $('#globalSearchClear').click(); assert.strictEqual(input.value, ''); assert.ok(doc.activeElement === input && !$('#globalSuggest').classList.contains('show') === true);
+  type('ac'); doc.getElementById('plain').dispatchEvent(new win.Event('mousedown', { bubbles: true })); assert.ok(!$('#globalSuggest').classList.contains('show'));   // a click elsewhere closes the list
+  type('ac'); input.dispatchEvent(new win.Event('mousedown', { bubbles: true })); assert.ok($('#globalSuggest').classList.contains('show'));   // inside the search area it stays
+  input.dispatchEvent(new win.Event('focus')); T.stockIndex.delete(A); type('ac'); key('ArrowDown'); key('Enter'); assert.strictEqual(T.opened.length, 3);   // a stock that is gone opens nothing
+  assert.strictEqual(input.getAttribute('placeholder'), 'Search a company or ticker'); T.phone = true; listeners.forEach((f) => f()); assert.strictEqual(input.getAttribute('placeholder'), 'Search a company');
+}));
+test('top bar search: "/" focuses the box from anywhere except while typing or with a modifier key', () => kcPage(GS_PAGE, async (win) => {
+  await gsSetup(win); const doc = win.document, input = doc.getElementById('globalSearch');
+  const slash = (el, init) => { const e = new win.KeyboardEvent('keydown', Object.assign({ key: '/', bubbles: true, cancelable: true }, init)); el.dispatchEvent(e); return e.defaultPrevented; };
+  assert.ok(slash(doc.getElementById('plain'))); assert.ok(doc.activeElement === input); input.blur();
+  assert.ok(!slash(doc.getElementById('ta'))); Object.defineProperty(doc.getElementById('ce'), 'isContentEditable', { value: true }); assert.ok(!slash(doc.getElementById('ce'))); assert.ok(!slash(input));
+  assert.ok(!slash(doc.getElementById('plain'), { ctrlKey: true })); assert.ok(!slash(doc.getElementById('plain'), { metaKey: true })); assert.ok(!slash(doc.getElementById('plain'), { altKey: true }));
+  assert.ok(!new win.KeyboardEvent('keydown', { key: 'a' }).defaultPrevented); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: '/', bubbles: true }));
+}));
+test('top bar search: a page without the box starts nothing', () => kcPage('<p>none</p>', async (win) => { await gsSetup(win); }));
+
+// ---- Stock updates overlay (src/overlays/updates.js): what a saved update changes on a stock, which dates win, and how an update is taken off again
+for(const n of ['COLS']) TV_VALUES.add(n);
+const upSetup = async () => {
+  const mk = (name, extra) => Object.assign({ name, ticker: name + ' · NSE', valuation: { currentPrice: 100, asof: '2026-11-01' }, globalFactors: { asof: '2026-10-01', positive: [{ t: 'old' }], negative: [] }, technical: { asof: '2026-10-20', score: 5, raw: { weekPctChange: 1, monthPctChange: 2 } } }, extra);
+  const A = mk('A'), B = mk('B', { technical: undefined, valuation: undefined }), S = [A, B];
+  const T = globalThis.__T = { stocks: S, COLS: ['x', 'change|1W', 'change|1M'], log: [], index: new Map([['A', A], ['B', B]]), merged: null, moves: null,
+    refreshAnalysisSoon: () => T.log.push('analysis'), setPeerGroupCache: (v) => T.log.push('peers'), rerenderDetail: () => T.log.push('detail'), paintFreshness: () => T.log.push('fresh'), stockByDocId: () => T.index,
+    mergedDoc: (s, data, row) => { if(T.mergeFails) throw new Error('bad row'); return T.merged ? T.merged(s, data, row) : data; }, periodStartSec: (k) => (k === 'W' ? 100 : 200), periodMove: (px, bars, start) => (bars ? bars + px : null), checkedMove: (a, b) => a,
+    recentBarsOf: (t) => T.moves && T.moves[t], setRecentFromDocs: (d) => T.log.push('recent'), sanitizeDocId: (x) => x, tickerSymbol: (s) => s.name };
+  return { T, A, B, M: await loadAllStubbed('src/overlays/updates.js', '', []) };
+};
+test('stock updates overlay: newer global factors, live price, liquidity, technical and week/month figures replace the stock\'s own, older ones do not, and removing an update puts the stock back', () => withPage('<section id="section-analysis"></section>', async () => {
+  const { T, A, B, M } = await upSetup(), doc = (id, data) => ({ id, data });
+  M.applyUpdatesOverlay([doc('A', { asof: '2026-11-05', snapAsof: '2026-11-04',
+    globalFactors: { asof: '2026-10-15', positive: [{ t: 'new' }], negative: [] }, valuation: { currentPrice: 120, asof: '2026-11-02', source: 'TV' },
+    liquidity: { avgVolume: 5000, marketCap: 90, nextResults: '2026-12-01', asof: '2026-11-02' }, technical: { asof: '2026-11-03', score: 8, raw: { rsi: 60 }, states: { a: 1 } },
+    pctChange: { asof: '2026-11-04', week: 3.5, month: -1 } })]);
+  assert.deepStrictEqual([A.globalFactors.positive[0].t, A.valuation.currentPrice, A.__livePrice, A.liquidity, A.__snapAsof, A.__updAsof], ['new', 120, { asof: '2026-11-02', source: 'TV' }, { avgVolume: 5000, marketCap: 90, nextResults: '2026-12-01', asof: '2026-11-02' }, '2026-11-04', '2026-11-05']);
+  assert.deepStrictEqual([A.technical.score, A.technical.asof, A.technical.raw.rsi, A.technical.raw.weekPctChange, A.technical.states], [8, '2026-11-03', 60, 3.5, { a: 1 }]);   // raw is merged with the old keys, then the newer week and month figures are laid on top
+  assert.deepStrictEqual(T.log.slice(0, 3), ['peers', 'detail', 'fresh']);
+  M.applyUpdatesOverlay([]); assert.deepStrictEqual([A.globalFactors.positive[0].t, A.valuation.currentPrice, A.technical.score, A.liquidity, A.__updBase, A.__livePrice], ['old', 100, 5, undefined, undefined, undefined]);   // back to the stock's own data
+  M.applyUpdatesOverlay([doc('A', { globalFactors: { asof: '2026-09-01', positive: [{ t: 'older' }] }, valuation: { currentPrice: 70, asof: '2026-10-01' }, technical: { asof: '2026-10-01', score: 1 }, pctChange: { asof: '2026-10-01', week: 9 }, liquidity: { avgVolume: -1, marketCap: 0, nextResults: 'soon' } })]);
+  assert.deepStrictEqual([A.globalFactors.positive[0].t, A.valuation.currentPrice, A.technical.score, A.technical.raw.weekPctChange, A.liquidity], ['old', 100, 5, 1, undefined]);   // older dates and empty liquidity change nothing
+  M.applyUpdatesOverlay([doc('A', { technical: { asof: '2026-11-01', score: 6 }, globalFactors: { positive: 'x' }, valuation: { currentPrice: -1 }, pctChange: { asof: '2026-11-01' } }), doc('B', { technical: { score: 4, asof: '2026-11-01' }, valuation: { currentPrice: 50, asof: '2026-11-01' }, pctChange: { asof: '2026-11-01', week: 1 }, asof: 7 }), doc('Z', { asof: 'x' })]);
+  assert.deepStrictEqual([A.technical.score, A.technical.raw.weekPctChange, A.valuation.currentPrice, B.technical.score, B.valuation, B.__updAsof], [6, 1, 100, 4, undefined, undefined]);   // no number to move, a stock with no valuation, an unknown stock
+}));
+test('stock updates overlay: snapshot rows, technical blocks and recent bars are laid under the stock\'s own update and move the week and month figures', () => withPage('<section id="section-analysis" class="app-section"></section>', async (win) => {
+  const { T, A, B, M } = await upSetup();
+  M.applyTechBlocksOverlay([{ data: { at: '2026-11-01T00:00:00Z', rows: [{ k: 'A', t: { asof: '2026-11-02', score: 9 } }, { k: 5 }, null, { k: 'B', t: 'bad' }] } }, { data: { at: '2026-10-01T00:00:00Z', rows: [{ k: 'A', t: { asof: '2026-11-09', score: 1 } }] } }, { data: null }, { data: { rows: 3 } }]);
+  assert.strictEqual(A.technical.score, 9);   // the later block wins
+  M.applyUpdatesOverlay([{ id: 'A', data: { technical: { asof: '2026-11-10', score: 7 } } }]); assert.strictEqual(A.technical.score, 7);   // the stock's own newer update wins over the block
+  M.applyTechBlocksOverlay([{ data: { at: '2026-11-01T00:00:00Z', rows: [{ k: 'A', t: { asof: '2026-11-12', score: 3 } }] } }]); assert.strictEqual(A.technical.score, 3);
+  T.merged = (s, data, row) => (row ? Object.assign({}, data, { valuation: { currentPrice: row.row.c[0], asof: row.asof } }) : data);
+  M.applySnapshotOverlay([{ data: { asof: '2026-11-11', at: '2026-11-11T10:00:00Z', rows: [{ k: 'A', c: [130, 1, 2] }, { k: 'B', c: [60], d: '2026-11-09', t: '2026-11-09T10:00:00Z' }, { k: 'A', c: [999], t: '2026-11-01T00:00:00Z' }, { k: 7 }, { k: 'C', c: 'x' }] } }, { data: { rows: [] } }, { data: null }]);
+  assert.deepStrictEqual([A.valuation.currentPrice, B.valuation && B.valuation.currentPrice], [130, undefined]);   // a row older than the one already kept is ignored; a stock with no valuation takes no price
+  T.mergeFails = true; assert.strictEqual(await quietErrors(async () => { M.applySnapshotOverlay([{ data: { asof: '2026-11-11', rows: [{ k: 'A', c: [1] }] } }]); }), undefined); T.mergeFails = false;
+  T.moves = { A: { w: 10, m: 20 } }; M.applyRecentBarsOverlay([{ id: 'x' }]);
+  assert.deepStrictEqual([T.log.includes('recent'), A.technical.raw.weekPctChange, A.technical.raw.monthPctChange], [true, 10 + A.valuation.currentPrice, 20 + A.valuation.currentPrice]);   // this week's and month's moves from the recent bars
+  T.log.length = 0; M.applyRecentBarsOverlay([]); assert.ok(!T.log.includes('analysis'));   // Analysis is not on screen
+  win.document.getElementById('section-analysis').classList.add('active'); T.moves = { A: { w: 11, m: 20 } }; M.applyRecentBarsOverlay([]); assert.ok(T.log.includes('analysis'));   // on screen: it redraws
+}));
+
+// ---- Global & Macro panel (src/detail/globalfactors.js)
+test('Global & Macro panel: unresearched stocks say so, notes and events are text with safe source links, and unknown impacts read as mixed', () => {
+  const R = load('src/detail/globalfactors.js').renderGlobalFactorsPanel, flat = (h) => h.replace(/\s+/g, ' ');
+  for(const g of [undefined, {}, { positive: [], negative: [] }]) assert.ok(flat(R({ globalFactors: g })).includes('Not yet researched for this stock') && !R({ globalFactors: g }).includes('global-cols'));
+  const html = R({ globalFactors: { positive: [{ text: '<img src=x onerror=1>', source: 'Wire <b>', url: 'https://u.test/?a=1&b=2' }, { text: 'plain' }], negative: [], events: [
+    { impact: 'positive', headline: 'H <b>', why: 'because', source: 'Src', url: 'javascript:alert(1)' }, { impact: 'negative', headline: 'N' }, { impact: 'odd', headline: 'M', why: '' }] } });
+  assert.ok(!html.includes('<img') && !html.includes('<b>') && !html.includes('javascript:') && html.includes('href="https://u.test/?a=1&amp;b=2"') && html.includes('target="_blank" rel="noopener noreferrer"'));
+  assert.ok(html.includes('--n:2') && html.includes('None identified.') && html.includes('ev-positive') && html.includes('Helps') && html.includes('Hurts') && html.includes('ev-mixed'));
+  assert.ok(!R({ globalFactors: { positive: [{ text: 'a' }], events: [] } }).includes('global-events') && R({ globalFactors: { negative: [{ text: 'a' }] } }).includes('--n:1'));
+});
+
+// ---- Industry Peers panel (src/detail/peers.js)
+const peersSetup = async (file, count, groupSize) => {
+  const mk = (i, over) => Object.assign({ name: 'P' + i, ticker: 'P' + i, industryGroup: 'Group <b>', ind: i < count ? 'Ind <i>' : 'Other', score: (i % 5) + 1 }, over);
+  const S = Array.from({ length: groupSize }, (_, i) => mk(i));
+  S.push(mk(99, { industryGroup: '', name: 'Loner' }), mk(98, { industryGroup: 'Solo', ind: 'Z', name: 'Solo1', score: null }), mk(97, { industryGroup: 'Group <b>', ind: 'Ind <i>', name: 'NoScore', score: null }));
+  const T = globalThis.__T = { stocks: S, escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), tickerIndustry: (s) => s.ind, panelIcon: () => '', stockGridColumnIds: () => ['rank', 'industry', 'stock'], NO_SORT: { col: '', dir: '' },
+    analysisLbCell: (id, ctx) => '<td>' + id + ctx.idx + '</td>', analysisRowContext: (s, i, idx) => ({ s, i, idx }), columnHeaderHtml: (id) => '<th>' + id + '</th>' };
+  return { T, S, M: await loadAllStubbed(file, '', []) };
+};
+test('Industry Peers panel: exact peers are ranked, a small industry falls back to its group, a small group to all stocks, and names are text', () => alone(async () => {
+  const { S, M } = await peersSetup('src/detail/peers.js', 12, 14), flat = (h) => h.replace(/\s+/g, ' ');
+  const big = M.renderPeersPanel(S[3], 3);
+  assert.ok(flat(big).includes('It sits #3 of 13 here') && big.includes('ranks this stock against these 13 peers') && big.includes('data-cols="rank,stock"') && !big.includes('<i>') && !big.includes('<b>') && big.includes('peers-self'));
+  assert.strictEqual((big.match(/<tr data-idx/g) || []).length, 13);   // the 12 and the unscored one share the industry
+  const small = M.renderPeersPanel(S[13], 13); assert.ok(small.includes('Only 2 stocks share this exact industry') && small.includes('wider Group &lt;b> group of 15 stocks'));   // two stocks in 'Other'
+  assert.ok(M.renderPeersPanel(S[14], 14).includes('Peer group not available'));   // no industry group
+  const solo = M.renderPeersPanel(S[15], 15); assert.ok(flat(solo).includes('No other stock shares the industry Z in Solo') && solo.includes('Both this industry and Solo have fewer than 10 stocks') && solo.includes('1 stock<'));
+  assert.ok(flat(M.renderPeersPanel(S[13], 13)).includes('share this exact industry') && M.renderPeersPanel(S[13], 14).includes('#0 of'));
+  M.setPeerGroupCache(null); assert.ok(M.renderPeersPanel(S[3], 3).includes('#3 of 13'));   // the groups are rebuilt on demand
+}));
+
+// ---- Fundamental Score panel (src/detail/fundamentals.js, fundsummary.js)
+const fsSetup = async (file, extra) => {
+  const T = globalThis.__T = Object.assign({ escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), fundBusinessSummary: (f) => f.biz || null, isProxyFactor: (f) => f.key === 'moat' || f.key === 'gov' }, extra || {});
+  return { T, M: await loadAllStubbed(file, '', []) };
+};
+const FS_FACTORS = [{ key: 'fin', weight: 2, score: 1.8, biz: { band: 'fs-buy', text: 'Strong <b>' } }, { key: 'prof', weight: 2, score: 1.5, biz: { band: 'fs-mbuy', text: 'Good' } }, { key: 'growth', weight: 2, score: 0.2, biz: { band: 'fs-avoid', text: 'Weak' } },
+  { key: 'moat', weight: 1, score: 0.1, biz: { band: 'fs-avoid', text: 'No moat' } }, { key: 'val', weight: 0, score: 1, biz: { band: 'fs-buy', text: 'no weight' } }, { key: 'gov', weight: 1, score: 0.8, excluded: true, biz: { band: 'fs-buy', text: 'excluded' } }, { key: 'x', weight: 1, score: 0.5, biz: null }];
+const FS_STOCKS = [{ fundamentals: null }, { fundamentals: { factors: [] } }, { fundamentals: { factors: FS_FACTORS } }, { fundamentals: { factors: [FS_FACTORS[1], FS_FACTORS[0]] } }, { fundamentals: { factors: [FS_FACTORS[2]] } }, { fundamentals: { factors: [FS_FACTORS[6]] } },
+  { fundamentals: { factors: FS_FACTORS }, __fundSummary: { strengths: [{ text: ' Cheap <i> ', tone: 'strong' }, { text: 'ok', tone: 'good' }, { text: '', tone: 'good' }, null, { text: 'x', tone: 'weird' }, { text: 'y' }, { text: 'z' }], watchouts: [{ text: 'Debt', tone: 'concern' }, { text: 'Slow', tone: 'caution' }] } },
+  { fundamentals: { factors: FS_FACTORS }, __fundSummary: { strengths: [{ text: 'only' }], watchouts: 'bad' } }, { fundamentals: { factors: FS_FACTORS }, __fundSummary: { strengths: [], watchouts: [] } }, { fundamentals: { factors: FS_FACTORS }, __fundSummary: 'bad' }];
+const FS_FLAT = (h) => h.replace(/\s+/g, ' ');
+test('fundamental summary: Strengths and Watch-outs come from Claude\'s review when it has one, otherwise from the factor headlines; proxies are marked and every text is escaped', () => alone(async () => {
+  const { M } = await fsSetup('src/detail/fundsummary.js'), R = (i) => M.renderFundOverallSummary(FS_STOCKS[i]);
+  assert.strictEqual(R(0), ''); assert.strictEqual(R(1), ''); assert.strictEqual(R(5), '');   // no breakdown, no factors, or no headline to show
+  const mech = FS_FLAT(R(2));
+  assert.ok(mech.includes('Strong &lt;b>') && !mech.includes('<b>') && mech.indexOf('Strong') < mech.indexOf('Good') && mech.includes('Weak') && mech.includes('No moat<sup class="fund-proxy-mark"') && mech.includes('† Moat and/or Governance'));
+  assert.ok(!mech.includes('no weight') && !mech.includes('excluded'));   // a factor with no weight or marked excluded says nothing
+  assert.ok(!FS_FLAT(R(3)).includes('fund-proxy-mark') && FS_FLAT(R(3)).includes('No major red flags this run.') && FS_FLAT(R(4)).includes('No standout strengths this run.'));
+  const rev = FS_FLAT(R(6));
+  assert.ok(rev.includes('Cheap &lt;i>') && !rev.includes('<i>') && rev.includes('fund-pc-dot fs-buy') && rev.includes('fund-pc-dot fs-hold') && rev.includes('fund-pc-dot fs-avoid') && !rev.includes('fund-proxy-mark'));
+  assert.strictEqual((rev.match(/<li><span class="fund-pc-dot fs-(buy|mbuy)/g) || []).length, 4);   // at most four strengths
+  assert.ok(FS_FLAT(R(7)).includes('No major red flags.') && !FS_FLAT(R(7)).includes('this run'));
+  assert.ok(FS_FLAT(R(8)).includes('Strong &lt;b>') && FS_FLAT(R(9)).includes('Strong &lt;b>'));   // an empty or malformed review falls back to the factor headlines
+}));
+const FUND_STUB = () => ({ panelIcon: () => '', verdictLabel: { buy: 'Buy' }, scoreBand: (v) => (v >= 7 ? 'fs-buy' : 'fs-hold'), completenessBadge: (c, w) => '<cb ' + c.complete + w + '>', fundamentalCompleteness: () => ({ complete: 2 }), setFundRenderStock: () => {}, renderFundOverallSummary: () => '<sum/>', fundCellHasPoints: (f) => !!f.pts, renderFundFactorCell: (f, wide) => '<cell ' + f.name + (wide ? ' wide' : '') + '/>' });
+TV_VALUES.add('verdictLabel');
+test('Fundamental Score panel: factors sit in one grid, or under Traditional, Buffett and Valuation with their sub-scores; cards with points take the whole row and a stock with no breakdown says so', () => alone(async () => {
+  const f = (name, category, pts) => ({ name, category, pts }), { M } = await fsSetup('src/detail/fundamentals.js', FUND_STUB()), R = (s) => FS_FLAT(M.renderFundamentals(Object.assign({ score: 7.256, verdict: 'buy' }, s)));
+  assert.ok(R({ fundamentals: null }).includes("hasn't been added"));
+  const flat = R({ fundamentals: { factors: [f('a'), f('b'), f('c', undefined, true)] } });
+  assert.ok(flat.includes('Fundamental Score &middot; 7.26/10') && flat.includes('<span class="badge b-buy">Buy</span>') && flat.includes('<cb 2factors>') && flat.includes('<sum/>') && flat.includes('<cell a/><cell b/><cell c wide/>') && !flat.includes('fund-subsection'));   // a pair of plain cards share a row; the card with points is wide
+  const cat = R({ fundamentals: { scoringBreakdown: { traditionalSubscore: 7.44, buffettSubscore: null }, factors: [f('a', 'Traditional'), f('b', 'Buffett', true), f('c', 'Valuation'), f('d'), f('e', 'Other'), f('g', 'Traditional')] } });
+  assert.ok(cat.includes('data-cat="Traditional"') && cat.includes('Traditional Analysis') && cat.includes('7.4<span class="fund-cell-max">/10</span>') && cat.includes('data-css="--w:74%"'));
+  assert.ok(cat.includes('Buffett-Style Analysis') && cat.includes('Not scored') && cat.indexOf('data-cat="Traditional"') < cat.indexOf('data-cat="Buffett"') && cat.indexOf('data-cat="Buffett"') < cat.indexOf('data-cat="Valuation"'));
+  assert.ok(cat.indexOf('<cell d') > cat.indexOf('data-cat="Valuation"') && cat.includes('<cell e'));   // factors with no known category follow the sections
+  assert.ok(!R({ fundamentals: { factors: [f('a', 'Traditional')] } }).includes('fund-subsection'));   // no scoring breakdown: one grid
+  assert.ok(!R({ fundamentals: { scoringBreakdown: {}, factors: [f('a', 'Nope'), f('b')] } }).includes('fund-subsection'));
+  assert.ok(R({ fundamentals: { scoringBreakdown: { valuationSubscore: 3 }, factors: [f('a', 'Valuation')] } }).includes('fs-hold'));
+}));
+
+// ---- Data freshness bars (src/joblogs/freshness.js)
+const FR_PAGE = '<p id="fundFreshnessSummary"></p><div id="fundFreshnessBars"></div><p id="techFreshnessSummary"></p><div id="techFreshnessBars"></div>';
+// Loads the module and paints with the clock held at `now`; the clock is only held during the one synchronous paint, so tests running alongside are not affected.
+const frRun = (file, stocks, now, fn) => withPage(FR_PAGE, async (win) => {
+  globalThis.__T = { stocks, escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), setHtml: (el, h) => { el.innerHTML = h; } };
+  const M = await loadAllStubbed(file, '', []);
+  const paint = () => { const RealDate = Date, FIXED = new RealDate(now).getTime(); globalThis.Date = class extends RealDate { constructor(...a){ if(a.length) super(...a); else super(FIXED); } static now(){ return FIXED; } }; try { M.paintFreshness(); } finally { globalThis.Date = RealDate; } };
+  await fn(Object.assign({}, M, { paint }), win);
+});
+const frMk = (asof, tAsof, snap) => ({ asof, technical: tAsof ? { asof: tAsof } : undefined, __snapAsof: snap });
+test('freshness bars: stocks are counted by the age of their date, a summary line says how fresh the data is, and unreadable dates are counted apart', () => frRun('src/joblogs/freshness.js', [frMk('2026-11-10'), frMk('2026-11-09'), frMk('2026-11-05'), frMk('2026-11-01'), frMk('2026-10-20'), frMk('2026-09-01'), frMk('bad'), frMk(''), frMk('9 Sept 2026'), frMk('1 Foo 2026'), frMk('21 Sep 2026'), frMk('2030-01-01')], '2026-11-10T12:00:00+05:30', async (M, win) => {
+  M.paint(); const $ = (id) => win.document.getElementById(id), rows = [...$('fundFreshnessBars').querySelectorAll('.refreshlog-freshness-row')];
+  assert.strictEqual(JSON.stringify(rows.map((r) => r.querySelector('.refreshlog-freshness-label').textContent + ' ' + r.querySelector('.refreshlog-freshness-count').textContent)), JSON.stringify(['Today 2 stocks', '1–3 days 1 stock', '4–7 days 1 stock', '8–14 days 1 stock', '15–30 days 1 stock', '31+ days 3 stocks']));   // a date in the future counts as today
+  assert.deepStrictEqual(rows.map((r) => r.querySelector('.refreshlog-freshness-fill').dataset.css), ['--w:67%', '--w:33%', '--w:33%', '--w:33%', '--w:33%', '--w:100%']);   // each bar is a share of the longest
+  assert.strictEqual($('fundFreshnessSummary').textContent, 'Average 24.2 days old, oldest 70 days, 3 of 9 (33%) refreshed in the last 3 days · 3 stocks with no parseable refresh date.');
+  assert.strictEqual($('techFreshnessSummary').textContent, 'No technical refresh dates recorded yet.'); assert.strictEqual($('techFreshnessBars').textContent, '');
+}));
+test('freshness bars: technical data is dated by its score or by the later snapshot day, one stock is singular, and a page without the panel is left alone', () => frRun('src/joblogs/freshness.js', [frMk('2026-11-09', '2026-11-01', '2026-11-08'), frMk('2026-11-09', '2026-11-08', '2026-11-02'), frMk('2026-11-09', undefined, '2026-11-07'), frMk(undefined, '2026-11-09')], '2026-11-10T12:00:00+05:30', async (M, win) => {
+  M.paint(); const t = win.document.getElementById('techFreshnessSummary').textContent;
+  assert.ok(t.includes('Average 2.0 days old, oldest 3 days, 4 of 4 (100%)')); assert.ok(win.document.getElementById('fundFreshnessSummary').textContent.includes('3 of 3') && win.document.getElementById('fundFreshnessSummary').textContent.includes('1 stock with no parseable refresh date'));
+  win.document.getElementById('techFreshnessBars').remove(); win.document.getElementById('techFreshnessSummary').textContent = 'kept'; M.paint(); assert.strictEqual(win.document.getElementById('techFreshnessSummary').textContent, 'kept');
+  M.init_joblogs_freshness();
+}));
+test('freshness bars: one stock refreshed a day ago reads in the singular', () => frRun('src/joblogs/freshness.js', [frMk('2026-11-09')], '2026-11-10T12:00:00+05:30', async (M, win) => { M.paint(); assert.ok(win.document.getElementById('fundFreshnessSummary').textContent.startsWith('Average 1.0 day old, oldest 1 day,') && win.document.getElementById('fundFreshnessBars').textContent.includes('1 stock')); }));
+
+// ---- Refresh Technical Info (src/livedata/technical.js): price, Margin of Safety and the bars job for one stock
+const techRun = async (over, stock) => {
+  const sets = [], saved = [], hooks = [], docs = new Map();
+  const T = globalThis.__T = Object.assign({ sets, saved, hooks, priceJobs: new Map(), ldSymOk: new Map([['S', { sym: 'old' }]]), batch: null, mcp: true, exists: false, job: { state: 'ok', msg: 'Bars saved' },
+    dbCapabilityPromise: Promise.resolve({ doc: (path) => ({ get: async () => ({ exists: T.exists }), update: async (d) => { saved.push(['update', path, d]); }, set: async (d) => { saved.push(['set', path, d]); } }) }),
+    pcTickerKey: (s) => s.name, tickerSymbol: (s) => s.name, sanitizeDocId: (x) => x, marginOfSafety: (iv, p) => (iv && p ? Math.round((iv / p - 1) * 100) : null), tvIstDate: () => '2026-11-10', tvMcp: async () => T.mcp,
+    ldSet: (k, kind, st) => sets.push([k, kind, st.pct, st.msg]), ldRupees: (v) => '₹' + v, ldMosText: (v) => (v == null ? 'n/a' : v + '%'), ldVerifiedSymbol: async () => ({ sym: 'NSE:S', price: 120 }), getLdBatch: () => T.batch,
+    setPriceJobHook: (k, h) => { hooks.push(h ? 'on' : 'off'); T.hook = h; }, refreshOneNow: async (s) => { if(T.hook){ T.hook('S', 'queued', '', ''); T.hook('S', 'run', '', 'history'); T.hook('S', 'run', '', 'nothing'); T.hook('other', 'queued', '', ''); } T.priceJobs.set('S', T.job); if(T.refreshFails) throw new Error('bars failed'); } }, over || {});
+  const M = await loadAllStubbed('src/livedata/technical.js', '', []);
+  return { T, M, run: () => M.ldRunTechnical(stock || { name: 'S', valuation: { intrinsicValue: 150, currentPrice: 100 } }) };
+};
+test('Refresh Technical Info: it saves the new price (creating or updating the stock\'s update), runs the bars job with progress, and reports price and Margin of Safety before and after', () => alone(async () => {
+  const a = await techRun(); const text = await a.run();
+  assert.strictEqual(text, 'Price ₹120 (was ₹100); MoS 50% → 25%. Bars saved.');
+  assert.deepStrictEqual(a.T.saved, [['set', 'stockUpdates/S', { ticker: 'S', valuation: { currentPrice: 120, asof: '2026-11-10', at: a.T.saved[0][2].valuation.at, source: 'TradingView (NSE:S)' } }]]);
+  assert.deepStrictEqual(a.T.sets.map((x) => x[2]), [3, 8, 20, 24, 38]); assert.deepStrictEqual(a.T.hooks, ['on', 'off']); assert.ok(a.T.ldSymOk.has('S') === false);   // the symbol is looked up again
+  const b = await techRun({ exists: true }, { name: 'S', valuation: { currentPrice: 120 } }); assert.strictEqual(await b.run(), 'Price ₹120; no intrinsic value on file, MoS not computed. Bars saved.'); assert.strictEqual(b.T.saved[0][0], 'update');
+  const c = await techRun({}, { name: 'S' }); assert.ok((await c.run()).startsWith('Price ₹120; no intrinsic'));
+}));
+test('Refresh Technical Info: a missing database or connector, a stop, or a failed bars job ends it with a clear error', () => alone(async () => {
+  await assert.rejects((await techRun({ dbCapabilityPromise: Promise.resolve(null) })).run(), /database is not available/);
+  await assert.rejects((await techRun({ mcp: false })).run(), (e) => e.code === 'no_mcp');
+  await assert.rejects((await techRun({ batch: { running: true, stop: true } })).run(), (e) => e.code === 'cancelled');
+  let calls = 0; await assert.rejects((await techRun({ batch: null, ldVerifiedSymbol: async () => { calls++; return { sym: 'x', price: 1 }; }, getLdBatch: () => (calls ? { running: true, stop: true } : null) })).run(), (e) => e.code === 'cancelled');   // stopped after the price lookup
+  const f = await techRun({ job: { state: 'error', msg: 'TV said no' } }); await assert.rejects(f.run(), /TV said no/); assert.deepStrictEqual(f.T.hooks, ['on', 'off']);
+  await assert.rejects((await techRun({ job: undefined })).run(), /did not finish/);
+  const g = await techRun({ refreshFails: true }); await assert.rejects(g.run(), /bars failed/); assert.deepStrictEqual(g.T.hooks, ['on', 'off']);   // the progress hook is always taken off
+}));
+
+// ---- Trade Log panel (src/tradelog/panel.js): cards, table, aggregate, phone layout and the daily call
+TV_VALUES.add('verdictLabel');
+const TLP_PAGE = '<button class="tl-view-btn" data-tl-view="cards"></button><button class="tl-view-btn" data-tl-view="table"></button><section id="section-trackrecord" data-tl-tab="positions"><div class="tabs-top"><button data-tl-tab="positions" class="on">P</button><button data-tl-tab="ideas">I</button><span id="tlTabPositions"></span></div><div id="tradeLogPanelBody"></div></section>';
+const tlpSetup = async (win, over) => {
+  const live = { name: 'Acme <b>', valuation: { currentPrice: 120 }, liveAt: Date.now() }, off = { name: 'Gone', active: false, valuation: { currentPrice: 40 } };
+  const trade = (id, ticker, extra) => Object.assign({ _id: id, ticker, name: ticker + ' <i>', status: 'open', buy: { date: '2026-10-01', price: 100, quantity: 10, snapshot: { score: 7.5, verdict: 'buy', fundamentalFactorsComplete: 3, fundamentalFactorsTotal: 4 } }, sell: null }, extra);
+  const trades = [trade('t1', 'AAA'), trade('t2', 'OFF', { buy: { date: '2026-10-05', price: 50, quantity: 4, snapshot: { score: 4, verdict: 'avoid' } } }), trade('t3', 'ORPH', { buy: { date: '2026-09-01', price: 0 } }),
+    trade('t4', 'AAA', { status: 'closed', buy: { date: '2026-08-01', price: 80, quantity: 5, snapshot: { score: 6, verdict: 'buy' } }, sell: { date: '2026-09-01', price: 100, quantity: 5, holdingDays: 31, realizedReturnPct: 25, snapshot: { score: 5, verdict: 'hold' } } })];
+  const T = globalThis.__T = Object.assign({ stockByTickerSymbolAny: new Map([['AAA', live], ['OFF', off]]), verdictLabel: { buy: 'Buy', avoid: 'Avoid', hold: 'Hold' }, trades, db: {}, prefs: [], ideas: 0, signalWrites: [], signalDocs: [], tradesList: null, live, off,
+    setHtml: (el, h) => { el.innerHTML = h; }, keepScroll: (el, fn) => fn(), allTrades: () => (T.tradesList || T.trades).slice(), getTradeDb: () => T.db, escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), formatDate: (d) => d || '-', pctChangeSpan: (v) => '<i class="pc">' + v.toFixed(1) + '</i>',
+    completenessBadge: (c, w) => '<cb ' + c.complete + '/' + c.total + '>', prefSet: (k, v) => T.prefs.push([k, v]), ymdOf: () => '20261110', refreshIdeasBody: () => { T.ideas++; },
+    signalCol: () => (T.noSignalCol ? null : { get: async () => { if(T.signalFails) throw new Error('db'); return { docs: T.signalDocs }; }, doc: (id) => ({ set: async (d) => { T.signalWrites.push([id, d]); } }) }),
+    compareBy: (f, dir) => (a, b) => { const x = f(a), y = f(b); return (x == null ? 1 : y == null ? -1 : (x > y ? 1 : x < y ? -1 : 0)) * (dir === 'desc' ? -1 : 1); }, nextSort: (cur, id) => ({ col: id, dir: cur.col === id && cur.dir === 'asc' ? 'desc' : 'asc' }), sortHeaderHtml: (id, label) => '<th data-sort-col="' + id + '">' + label + '</th>',
+    addSignalPoint: (h, day, sig) => (h || []).concat([{ d: day, call: sig.call }]), callChanges: (h) => (h || []).map((x, i) => ({ call: x.call, ymd: '2026110' + i })).reverse(), factsFor: (t, l) => ({ price: l && l.valuation ? l.valuation.currentPrice : null }),
+    tradeSignal: () => ({ call: 'hold', label: 'Hold <i>', reasons: ['why <b>'] }) }, over || {});
+  const M = await loadAllStubbed('src/tradelog/panel.js', '', ['../core/evt.js']);
+  return { T, M, body: () => win.document.getElementById('tradeLogPanelBody'), flat: () => win.document.getElementById('tradeLogPanelBody').innerHTML.replace(/\s+/g, ' ') };
+};
+test('Trade Log panel: it says when the view is signed out or empty, lists open and closed trades as cards with returns, an average by entry verdict and names as text', () => withPage(TLP_PAGE, async (win) => {
+  const { T, M, body, flat } = await tlpSetup(win, { db: null }), $ = (q) => win.document.querySelector(q);
+  M.renderTradeLogPanel(); assert.ok(body().textContent.includes('needs a signed-in view'));
+  T.db = {}; T.tradesList = []; M.renderTradeLogPanel(); assert.ok(body().textContent.includes('No trades yet'));
+  T.tradesList = null; T.noSignalCol = true; M.renderTradeLogPanel();
+  assert.strictEqual(win.document.querySelectorAll('.tl-card').length, 4); assert.ok(!body().querySelector('b') || !body().querySelector('.tl-card-name b'));
+  assert.ok(body().querySelector('.tl-view-btn') === null && $('[data-tl-view="cards"]').classList.contains('active') && !$('[data-tl-view="table"]').classList.contains('active'));
+  assert.deepStrictEqual([...body().querySelectorAll('.tl-card-tk')].map((e) => e.textContent), ['OFF', 'AAA', 'ORPH', 'AAA']);   // newest purchase first
+  const h = flat(); assert.ok(h.includes('AAA &lt;i&gt;') && h.includes('data-tl-open="AAA"') && h.includes('Inactive') && h.includes('Realized return') && h.includes('<i class="pc">25.0</i>') && h.includes('Unrealized return') && h.includes('<i class="pc">20.0</i>') && h.includes('<span class="tl-live">'));
+  assert.ok(h.includes('Buy: <b>+22.5%</b> avg (2 trades)') && h.includes('Avoid: <b>-20.0%</b>') === false || h.includes('Avoid: <b>-20.0%</b> avg (1 trade)'));   // buy: 20% and 25%; avoid: 40 against 50
+  assert.ok(h.includes('data-tl-sell="t1"') && h.includes('data-tl-remove="t4"') && !h.includes('data-tl-sell="t4"') && h.includes('why &lt;b&gt;'));
+  assert.strictEqual(win.document.getElementById('tlTabPositions').textContent, 'Positions 3'); assert.ok(T.ideas >= 1);
+  T.tradesList = [T.trades[0]]; M.renderTradeLogPanel(); assert.ok(!body().querySelector('.data-chips'));   // one trade: no average
+  T.tradesList = [T.trades[2], T.trades[3]]; M.renderTradeLogPanel(); assert.ok(body().querySelector('.data-chips') === null || body().querySelector('.data-chips').textContent.includes('Buy'));   // a trade with no return is left out
+}));
+test('Trade Log panel: the table view sorts by a header, keeps the choice, and the phone layout switches Open and Closed and expands a row', () => withPage(TLP_PAGE, async (win) => {
+  const { T, M, body } = await tlpSetup(win, { noSignalCol: true }), $ = (q) => win.document.querySelector(q);
+  M.init_tradelog_phone(); M.tlSetView('table'); assert.deepStrictEqual(T.prefs, [['albaDashboard.tradeView.v1', 'table']]);
+  assert.ok(body().querySelector('.help-table') && $('[data-tl-view="table"]').classList.contains('active') && body().textContent.includes('Return'));
+  const names = () => [...body().querySelectorAll('.help-table tbody tr')].map((r) => r.querySelector('.analysis-lb-ticker').textContent + r.cells[1].textContent.slice(0, 10)).join('|');
+  assert.ok(names().startsWith('OFF2026-10-05')); M.tlSortBy('buyDate'); assert.ok(names().startsWith('AAA2026-08-01'));   // the same column again reverses it
+  M.tlSortBy('ret'); M.tlSortBy('name'); M.tlSortBy('status'); M.tlSortBy('entry'); M.tlSortBy('data'); M.tlSortBy('held'); M.tlSortBy('exit'); M.tlSortBy('call'); assert.strictEqual(body().querySelectorAll('.help-table tbody tr').length, 4);
+  T.tradesList = [T.trades[0], T.trades[1]]; M.tlSetView('cards'); assert.ok(body().textContent.includes('Unrealized'));   // all open: the table header would say Unrealized
+  T.tradesList = [T.trades[0], T.trades[1]]; M.tlSetView('table'); assert.ok(body().querySelector('thead').textContent.includes('Unrealized') && !body().querySelector('thead').textContent.includes('Return'));
+  T.tradesList = null; M.renderTradeLogPanel();
+  const phone = body().querySelector('.tl-phone'); assert.ok(phone.textContent.includes('Open 3') && phone.textContent.includes('Closed 1') && phone.querySelector('.tl-pstrip').textContent.includes('Invested') && phone.querySelectorAll('.tl-prow').length === 3);
+  $('[data-tl-status="closed"]').click(); assert.ok(body().querySelector('.tl-phone').textContent.includes('Win rate') && body().querySelectorAll('.tl-prow').length === 1);
+  T.tradesList = [T.trades[0]]; $('[data-tl-status="open"]').click(); const row = $('[data-tl-row="t1"]'); row.click(); assert.ok(row.classList.contains('open')); row.click(); assert.ok(!row.classList.contains('open'));
+  row.querySelector('.tl-prow-det').click(); assert.ok(row.classList.contains('open')); row.querySelector('.refresh-btn').click(); assert.ok(row.classList.contains('open'));   // a click on a button inside the row does not toggle it
+  $('.tabs-top [data-tl-tab="ideas"]').click(); assert.strictEqual($('#section-trackrecord').getAttribute('data-tl-tab'), 'ideas'); assert.ok($('.tabs-top [data-tl-tab="ideas"]').classList.contains('on') && !$('.tabs-top [data-tl-tab="positions"]').classList.contains('on'));
+  T.tradesList = [T.trades[3]]; M.renderTradeLogPanel(); $('[data-tl-status="closed"]').click(); assert.ok(body().textContent.includes('Sold') && body().textContent.includes('Exit score'));
+  T.tradesList = [T.trades[0]]; M.renderTradeLogPanel(); assert.ok(body().textContent.includes('No closed trades.'));   // the Closed tab stays selected, and nothing in the list is closed
+  win.document.getElementById('section-trackrecord').remove(); M.init_tradelog_phone();
+}));
+test('Trade Log panel: sparse and extreme trades (no name, no price, unknown verdict, losses in crores, gains in lakhs) are shown without breaking the cards, table or phone summary', () => withPage(TLP_PAGE, async (win) => {
+  const tr = (id, extra) => Object.assign({ _id: id, status: 'open', buy: { date: '2026-10-01', price: 100, quantity: 10 }, sell: null }, extra);
+  const list = [tr(undefined, { buy: undefined }), tr('s2', { ticker: 'ZED', buy: { date: '2026-10-02', price: 100000, quantity: 200, snapshot: { score: 3, verdict: 'weird' } }, status: 'closed', sell: { date: '2026-10-09', price: 5, realizedReturnPct: -99, snapshot: { verdict: 'weird' } } }),
+    tr('s3', { ticker: 'WIN', buy: { date: '2026-10-03', price: 10, quantity: 100000, snapshot: { score: 9, verdict: 'weird' } }, status: 'closed', sell: { date: '2026-10-10', price: 15, realizedReturnPct: 50, holdingDays: 7 } }), tr('s4', { ticker: 'AAA', buy: { date: '2026-10-04', price: 100, quantity: 1e6 } }), tr('s5', { ticker: 'AAA', buy: { date: 'bad-date', price: 100, quantity: 2 } })];
+  const { T, M, body } = await tlpSetup(win, { tradesList: list, noSignalCol: true }), $ = (q) => win.document.querySelector(q);
+  M.init_tradelog_phone(); M.renderTradeLogPanel();
+  assert.strictEqual(win.document.querySelectorAll('.tl-card').length, 5); assert.ok(body().textContent.includes('weird: ') && body().textContent.includes('avg (2 trades)'));   // an unknown verdict is shown as it is
+  assert.ok(body().textContent.includes('—'));
+  $('[data-tl-status="closed"]').click(); const closedText = body().querySelector('.tl-phone').textContent;
+  assert.ok(closedText.includes('Win rate') && closedText.includes('1 of 2') && closedText.includes('Avg held') && closedText.includes('Cr') && closedText.includes('−'));
+  $('[data-tl-status="open"]').click(); const openText = body().querySelector('.tl-phone').textContent; assert.ok(openText.includes('Invested') && openText.includes('Cr'));
+  M.tlSetView('table'); for(const c of ['name', 'buyDate', 'status', 'entry', 'data', 'ret', 'held', 'exit', 'call']){ M.tlSortBy(c); M.tlSortBy(c); }
+  assert.strictEqual(body().querySelectorAll('.help-table tbody tr').length, 5);
+  T.tradesList = [tr('s6', { ticker: 'NOPX', buy: { date: '2026-10-04', price: 0, quantity: 0 } })]; M.renderTradeLogPanel(); $('[data-tl-status="open"]').click(); assert.ok(body().querySelector('.tl-phone').textContent.includes('Invested'));
+  T.tradesList = [tr('s7', { ticker: 'AAA', buy: { date: '2026-10-04', price: 200, quantity: 5 } })]; M.renderTradeLogPanel(); assert.ok(body().querySelector('.tl-phone').textContent.includes('−'));   // a loss against the live price
+  T.tradesList = [tr('s8', { ticker: 'AAA', buy: { date: '2026-10-04', price: 100, quantity: 5000 } }), tr('s9', { ticker: 'NOPE' })]; M.renderTradeLogPanel(); assert.ok(body().querySelector('.tl-phone').textContent.includes('L'));   // 5 lakh invested
+}));
+test('Trade Log panel: today\'s call is recorded once a day for open trades with a price, earlier changes are listed, and a failure only shows in the log', () => withPage(TLP_PAGE, async (win) => {
+  const { T, M, body } = await tlpSetup(win, { signalDocs: [{ id: 't1', exists: true, data: () => ({ history: [{ d: 'a', call: 'review' }, { d: 'b', call: 'add' }, { d: 'c', call: 'trim' }], notes: [{ d: '20261101', text: 'note <b>' }, { d: '20261102', text: 'two' }] }) }, { id: 'zz', exists: false }] });
+  M.renderTradeLogPanel(); await new Promise((r) => setImmediate(r)); await new Promise((r) => setImmediate(r));
+  assert.deepStrictEqual(T.signalWrites.map((w) => w[0]).sort(), ['t1', 't2']);   // open trades with a price; the unmatched and the closed ones are skipped
+  assert.ok(T.signalWrites.find((w) => w[0] === 't1')[1].history.length === 4 && T.signalWrites.find((w) => w[0] === 't1')[1].notes.length === 2);
+  const h = body().innerHTML; assert.ok(h.includes('Earlier:') && h.includes('Trimming') && h.includes('Adding') && h.includes('Review') && h.includes('note &lt;b&gt;') && !h.includes('note <b>'));
+  const n = T.signalWrites.length; M.renderTradeLogPanel(); await new Promise((r) => setImmediate(r)); assert.strictEqual(T.signalWrites.length, n);   // loaded once
+}));
+test('Trade Log panel: a failed call save is logged and does not stop the panel', () => withPage(TLP_PAGE, async () => {
+  const { T, M } = await tlpSetup({ document }, { signalFails: true });
+  await quietErrors(async (seen) => { M.renderTradeLogPanel(); await new Promise((r) => setImmediate(r)); await new Promise((r) => setImmediate(r)); assert.ok(seen.some((m) => m.includes('Trade calls were not saved'))); });
+}));
+test('Trade Log helpers: holding days between two dates, and the return of a trade', async () => {
+  const { M } = await alone(() => tlpSetup({ document: { getElementById: () => null } }));
+  assert.strictEqual(M.holdingDaysBetween('2026-10-01', '2026-10-31'), 30); assert.strictEqual(M.holdingDaysBetween('2026-10-31', '2026-10-01'), 0); assert.strictEqual(M.holdingDaysBetween('nope', '2026-10-01'), null); assert.strictEqual(M.holdingDaysBetween('2026-10-01', 'nope'), null);
+  assert.ok(M.holdingDaysBetween('2026-10-01', null) > 30);
+});
+
+// ---- Analysis section (src/analysis/section.js): the Stocks view with its chart, the industry views, the View menu, and the resize redraw
+for(const n of ['ANALYSIS_VIEW_KEYS', 'ANALYSIS_VIEW_OPTIONS', 'TOOLTIP_HTML']) TV_VALUES.add(n);
+const ANS_PAGE = '<section id="section-analysis" class="app-section active"><div id="analysisPanelBody"></div></section>';
+const ansSetup = async (win, over) => {
+  const mk = (name, wk, mo) => ({ name, technical: { raw: { weekRsi: wk, monthRsi: mo } } });
+  const S = [mk('A', 60, 40), mk('B', 30, 70), mk('NoRsi', null, null), { name: 'NoTech' }, mk('Pin', 55, 55)];
+  const T = globalThis.__T = Object.assign({ stocks: S, stockIndex: new Map(S.map((s, i) => [s, i])), analysisFilters: { view: 'stocks', xAxis: 'x', yAxis: 'y', colorBy: 'week' }, ANALYSIS_VIEW_KEYS: new Set(['stocks', 'industry', 'group']),
+    ANALYSIS_VIEW_OPTIONS: [{ value: 'stocks', label: 'Stocks <b>' }, { value: 'industry', label: 'Industries' }, { value: 'group', label: 'Groups' }], TOOLTIP_HTML: '<div id="tip"></div>', industryShown: [], appSections: { analysis: 'sec-analysis' }, bucket: S, log: [], saved: 0, opened: [], rafs: [], wired: {},
+    isPinned: (s) => s.name === 'Pin', mosPct: () => 10, escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), dropMenuHtml: (o) => '<div class="dm" data-label="' + o.label + '">' + o.items.map((i) => '<button ' + i.attrs + (i.current ? ' class="cur"' : '') + '>' + i.title + '</button>').join('') + '</div>',
+    saveAnalysisFilters: () => { T.saved++; }, openStockInline: (...a) => T.opened.push(a), analysisBucket: () => T.bucket, renderAnalysisFilterPanel: (cb) => T.log.push('filters'), syncSheets: () => T.log.push('sheets'),
+    chartGeometry: (body, plottable) => { T.plottable = plottable.map((s) => s.name); return { W: 400, H: 300, gridSvg: '<g/>', axisBox: '', quadrantLines: '', quadrantLabels: '', axisLabels: '', mosBoundLo: -20, mosBoundHi: 60, xFor: (v) => v, yFor: (v) => v, radiusForMos: () => 4 }; },
+    stocksInRange: (b) => b.filter((s) => s.name !== 'B'), valueFor: (s, axis) => (axis === 'x' ? s.technical.raw.weekRsi : s.technical.raw.monthRsi), analysisControlsHtml: (lo, hi) => '<div class="ctl" data-lo="' + lo + '"></div>',
+    wireAnalysisControls: (o) => { T.wired.controls = o; }, createAnalysisTooltip: () => ({ hide: () => T.log.push('hide') }), wireDotEvents: (el, tip, open) => { T.wired.dots = [el && el.id, open]; }, leaderboardHtml: (chart, bar) => '<div class="analysis-leaderboard">' + bar + '<button id="analysisChartToggle"><span class="analysis-btn-label"></span></button>' + chart + '</div>',
+    renderLeaderboardRows: (list) => T.log.push('rows:' + list.length), wireLeaderboard: (o) => { T.wired.board = o; }, keepScroll: (el, fn) => fn(), redrawWhenIdle: (id, fn) => T.log.push('idle:' + id), setHtml: (el, h) => { el.innerHTML = h; } }, over || {});
+  win.requestAnimationFrame = globalThis.requestAnimationFrame = (f) => { T.rafs.push(f); return T.rafs.length; };
+  return { T, S, M: await loadAllStubbed('src/analysis/section.js', '', ['../core/evt.js'], { __modules: { '../business/panel.js': 'export const showIn = (cfg) => { globalThis.__T.industryShown.push(cfg); };' } }), body: () => win.document.getElementById('analysisPanelBody') };
+};
+test('Analysis section, Stocks view: it plots the stocks with both RSI readings, marks pinned ones, fills the leaderboard and wires the controls; sliders redraw once per frame', () => kcPage(ANS_PAGE, async (win) => {
+  const { T, M, body } = await ansSetup(win), $ = (q) => win.document.querySelector(q);
+  const realTimeout = globalThis.setTimeout; globalThis.setTimeout = (f, ms) => (ms > 100 ? 0 : realTimeout(f, ms));
+  try { M.renderAnalysisSection(); } finally { globalThis.setTimeout = realTimeout; }
+  assert.deepStrictEqual(T.plottable, ['A', 'B', 'Pin']); assert.ok($('svg[viewBox="0 0 400 300"]') && $('#tip') && $('.ctl').dataset.lo === '-20');
+  assert.deepStrictEqual([...win.document.querySelectorAll('#analysisDots circle')].map((c) => c.dataset.idx), ['0', '4']);   // B is outside the sliders' range, the others have no RSI; the pinned one is drawn last
+  assert.ok($('#analysisDots .analysis-dot-star') && $('#analysisDots circle.pinned') && $('#analysisDots circle.color-green') && T.log.includes('rows:4') && T.log.includes('sheets') && T.log.includes('filters'));
+  assert.strictEqual(T.wired.dots[0], 'analysisDots'); T.wired.dots[1](3); assert.deepStrictEqual(T.opened.at(-1), ['sec-analysis', 'Analysis', 3]);
+  T.wired.board.openStock(2); assert.strictEqual(T.opened.at(-1)[2], 2); T.wired.board.hideTooltip(); T.wired.board.update(); T.wired.board.rerender();
+  const before = T.rafs.length; T.wired.controls.schedule(); T.wired.controls.schedule(); assert.strictEqual(T.rafs.length - before, 1);   // one redraw per frame
+  T.rafs.at(-1)(); T.wired.controls.schedule(); assert.strictEqual(T.rafs.length - before, 2); T.wired.controls.update(); T.wired.controls.rerender(); T.wired.controls.onRelease();
+  const btn = $('#analysisChartToggle'), box = $('.analysis-leaderboard'); assert.ok(box.classList.contains('chart-hidden') && btn.title === 'Show chart');   // hidden until first opened
+  btn.click(); assert.ok(!box.classList.contains('chart-hidden') && btn.getAttribute('aria-expanded') === 'true' && btn.title === 'Hide chart'); btn.click(); assert.ok(box.classList.contains('chart-hidden'));
+  T.analysisFilters.colorBy = 'month'; M.renderAnalysisSection(); assert.ok($('#analysisDots circle'));
+}));
+test('Analysis section: with no stocks it says so, the View menu switches the view and saves it, and the industry views show Loading and then the table', () => kcPage(ANS_PAGE, async (win) => {
+  const { M, body } = await ansSetup(win, { bucket: [] }), $ = (q) => win.document.querySelector(q);
+  M.renderAnalysisSection(); assert.ok(body().textContent.includes("No stocks match the current filters") && $('.analysis-view-bar'));
+  const cur = globalThis.__T; cur.bucket = cur.stocks; cur.analysisFilters.view = 'industry';
+  M.renderAnalysisSection(); assert.ok(body().textContent.includes('Loading')); await new Promise((r) => setTimeout(r, 30));
+  assert.deepStrictEqual([cur.industryShown.length, cur.industryShown[0].by, cur.industryShown[0].section, cur.industryShown[0].label, cur.industryShown[0].el.id], [1, 'industry', 'sec-analysis', 'Analysis', 'analysisIndustryBody']);   // the table's code was fetched and drew into the page
+  assert.strictEqual(cur.industryShown[0].stocksNow().size, 4);   // the stocks the filters let through
+  cur.analysisFilters.view = 'group'; M.renderAnalysisSection(); assert.deepStrictEqual([cur.industryShown.length, cur.industryShown[1].by, body().textContent.includes('Loading')], [2, 'group', false]);   // already fetched: drawn in the same step
+  const bar = $('.analysis-view-bar'); const before = cur.saved;
+  bar.querySelector('[data-analysis-view="group"]').click(); assert.strictEqual(cur.saved, before);   // already on it
+  bar.click(); bar.querySelector('.dm').click();
+  $('[data-analysis-view="stocks"]').click(); assert.strictEqual(cur.analysisFilters.view, 'stocks'); assert.strictEqual(cur.saved, before + 1);
+  assert.ok(body().querySelector('#analysisDots'));
+}));
+test('Analysis section: a page without the panel draws nothing, a resize redraws it only while it is on screen, and a background change waits until scrolling stops', () => kcPage(ANS_PAGE, async (win) => {
+  const { T, M } = await ansSetup(win), timers = [], real = { st: globalThis.setTimeout, ct: globalThis.clearTimeout };
+  globalThis.setTimeout = (f, ms) => { timers.push([f, ms]); return timers.length; }; globalThis.clearTimeout = () => {};
+  try {
+    M.init_analysis_section(); win.dispatchEvent(new win.Event('resize')); win.dispatchEvent(new win.Event('resize')); assert.strictEqual(timers.filter(([f, ms]) => ms === 200).length, 2);
+    const t = timers.filter(([f, ms]) => ms === 200).pop(); t[0](); assert.ok(win.document.getElementById('analysisDots'));   // on screen: redrawn
+    win.document.getElementById('section-analysis').classList.remove('active'); win.document.getElementById('analysisPanelBody').innerHTML = ''; t[0](); assert.strictEqual(win.document.getElementById('analysisDots'), null);
+    win.document.getElementById('section-analysis').classList.add('active'); T.analysisFilters.view = 'stocks'; T.bucket = null; t[0](); // an error in the redraw is logged, not thrown
+    M.refreshAnalysisSoon(); assert.ok(T.log.includes('idle:analysis'));
+    win.document.getElementById('analysisPanelBody').remove(); M.renderAnalysisSection();
+  } finally { globalThis.setTimeout = real.st; globalThis.clearTimeout = real.ct; }
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
@@ -4619,7 +6342,7 @@ test('analysis sort state: a saved sort of a known column is kept, an unknown on
 }));
 test('analysis grid columns: every column draws its cell, the headers and the Columns panel are drawn, and every sortable column sorts', () => alone(async () => {
   const T = globalThis.__T = {
-    mosPct: (s) => (typeof s.mos === 'number' ? s.mos : -Infinity), mosRatingAny: (s) => s.rating || null, isPinned: (s) => !!s.pinned, techRatingInfo: (k) => (k ? { cls: 'b-up', label: 'Bullish' } : null),
+    analysisFilters: {}, priceLoaded: new Set(), pcTickerKey: (s) => s.name, mosPct: (s) => (typeof s.mos === 'number' ? s.mos : -Infinity), mosRatingAny: (s) => s.rating || null, isPinned: (s) => !!s.pinned, techRatingInfo: (k) => (k ? { cls: 'b-up', label: 'Bullish' } : null),
     ideaRankOf: (s) => s.idea || null, ideasWhen: () => 'today', newsCounts: (s) => s.news || null, newsCellHtml: () => '<td>news</td>', eventMark: () => '', industryMedianW: (s) => (typeof s.indW === 'number' ? s.indW : null),
     stockShareLink: () => '#x', tvUrlFor: () => 'https://tv/x', stockResearchAgeDays: (s) => (typeof s.age === 'number' ? s.age : null), stockResearchAsof: () => '2026-11-01', getResearchTriggers: () => new Map(), getResearchTriggerKinds: () => new Map(),
     researchTriggerDone: () => true, analysisQueuePriceLoad: () => {}, scoreBand: () => 'fs-hi', getAnalysisColumnsPanelOpen: () => !!T.panelOpen, panelOpen: false };
@@ -4647,4 +6370,24 @@ test('analysis grid columns: every column draws its cell, the headers and the Co
   T.panelOpen = false; assert.strictEqual(C.renderAnalysisColumnsPanel(ids), '');
   T.panelOpen = true; const panel = C.renderAnalysisColumnsPanel(['pin', 'dayMacdBars', 'unknown']); assert.ok(/data-col="dayMacdBars"/.test(panel) && /D MACD bars/.test(panel) && /Pin/.test(panel) && /data-col="unknown"/.test(panel));
   assert.ok(C.analysisColumnOrder().indexOf('dayMacdBars') === C.analysisColumnOrder().indexOf('techM') + 1);
+  // Researched: how long ago, coloured by age
+  const aged = (n) => ({ name: 'R', ticker: 'R · X', age: n });
+  assert.ok(/rs-none[^>]*>Never</.test(cellOf({ name: 'R', ticker: 'R · X' }, 'researched')));
+  assert.deepStrictEqual([0, 1, 30, 31, 90, 91].map((n) => /(rs-\w+)[^>]*>([^<]+)</.exec(cellOf(aged(n), 'researched')).slice(1)),
+    [['rs-fresh', 'Today'], ['rs-fresh', '1 day ago'], ['rs-fresh', '30 days ago'], ['rs-aging', '31 days ago'], ['rs-aging', '90 days ago'], ['rs-old', '91 days ago']]);
+  // Triggered: nothing asked yet, research saved since the trigger, still waiting, and done afterwards
+  T.priceLoaded.add('R'); T.getResearchTriggers = () => new Map(); T.getResearchTriggerKinds = () => new Map();
+  assert.ok(/rs-none/.test(cellOf({ name: 'R', ticker: 'R · X' }, 'triggered')));   // never triggered, never researched
+  T.getResearchTriggers = () => new Map([['R', ago(10)]]);
+  assert.ok(/rs-fresh[^>]*>Today</.test(cellOf(aged(0), 'triggered')) && /rs-fresh[^>]*>3 days ago</.test(cellOf(aged(3), 'triggered')) && /rs-fresh[^>]*>1 day ago</.test(cellOf(aged(1), 'triggered')));   // saved after the trigger
+  T.researchTriggerDone = () => false;
+  assert.ok(/rs-aging[^>]*title="research triggered [^"]* - nothing saved since">10 days ago &middot; awaiting save</.test(cellOf(aged(null), 'triggered')));
+  T.researchTriggerDone = () => true; T.getResearchTriggerKinds = () => new Map([['R', 'price']]);
+  assert.ok(/rs-fresh[^>]*title="price history only triggered [^"]* - saved afterwards">10 days ago/.test(cellOf(aged(null), 'triggered')));
+  T.getResearchTriggers = () => new Map([['R', ago(1)]]);
+  assert.ok(/>1 day ago/.test(cellOf(aged(null), 'triggered')));
+  T.getResearchTriggers = () => new Map([['R', 'not a date']]);
+  assert.ok(/rs-none/.test(cellOf(aged(null), 'triggered')));   // a trigger time that cannot be read counts as never triggered
+  const queued = []; T.priceLoaded.clear(); T.analysisQueuePriceLoad = (x) => queued.push(x.name); T.getResearchTriggers = () => new Map([['R', ago(0)]]);
+  assert.ok(/rs-fresh[^>]*>Today/.test(cellOf(aged(null), 'triggered')) && queued.length === 1);   // the price history is fetched lazily, and the cell is not marked pending meanwhile
 }));

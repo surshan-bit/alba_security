@@ -48,18 +48,18 @@ const warnIcon = label => `<span class="srcico st-warn" role="img" aria-label="$
 // Long decimals from TradingView (13.9496814684338) are shown to two places.
 const tidyValue = v => String(v).replace(/-?\d+\.\d{3,}/g, m => parseFloat(m).toFixed(2));
 // One metric row: [dot] label ........ value (right-aligned, one column for the whole card). `ns` (the metric's links to the written points) is kept as data-n so a point and its rows light up together on hover.
-function rowHtml(cls, ns, dot, label, value, extra, attrs){
+/** @param {string} cls @param {any} ns @param {{ dot: string, label: string, value: string, extra: string, attrs?: string }} opts */
+function rowHtml(cls, ns, { dot, label, value, extra, attrs }){
   return `<span class="data-chip ${cls}"${ns.length ? ` data-n="${ns.join(' ')}"` : ''}${attrs || ''}>${dot}<span class="chip-label">${label}</span><b class="chip-val">${value}</b>${extra || ''}</span>`;
 }
 function chipHtml(f, view, k, v){
   const ns = view.nums.get(k) || [], pct = PERCENTILE_METRIC_KEYS.has(k);
-  return rowHtml((v === 'n/a' ? 'chip-na' : '') + (pct ? ' chip-long' : ''), ns, metricDotHtml(f, k, v), `${FUND_METRIC_LABEL[k] || k}:`, fundMetricDisplay(k, v), '',
-    pct ? ' title="A percentile, not a rank: 100th means the best of its industry peers, 50th is the middle, 1st is the weakest."' : '');
+  return rowHtml((v === 'n/a' ? 'chip-na' : '') + (pct ? ' chip-long' : ''), ns, { dot: metricDotHtml(f, k, v), label: `${FUND_METRIC_LABEL[k] || k}:`, value: fundMetricDisplay(k, v), extra: '', attrs: pct ? ' title="A percentile, not a rank: 100th means the best of its industry peers, 50th is the middle, 1st is the weakest."' : '' });
 }
 // Figures Claude found in the TradingView data that no metric row shows (kept only when the figure is in that data).
 function factHtml(x){
   const label = escapeHtml(String(x.label).replace(/\s*\(TradingView\)\s*$/i, '')) + ':';
-  return rowHtml('chip-new', x.n || [], toneDotHtml(['pos', 'neg'].includes(x.tone) ? x.tone : 'neu'), label, escapeHtml(tidyValue(x.value)), x.note ? `<span class="chip-note">${escapeHtml(x.note)}</span>` : '');
+  return rowHtml('chip-new', x.n || [], { dot: toneDotHtml(['pos', 'neg'].includes(x.tone) ? x.tone : 'neu'), label, value: escapeHtml(tidyValue(x.value)), extra: x.note ? `<span class="chip-note">${escapeHtml(x.note)}</span>` : '' });
 }
 // v1.309: a card is "wide" (the whole row) when it has written points, so its metrics and its points sit side by side.
 // Cards without points are shown two to a row (src/detail/fundamentals.js decides; a lone one is wide too).

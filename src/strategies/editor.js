@@ -72,57 +72,66 @@ function rulesEditorHtml(strategy){
     <div class="sr-foot"><select class="sr-add" aria-label="Add a rule"><option value="">Add a rule</option>${fieldOptions('')}</select><span class="sr-total">${total}</span></div>${undoLine}`;
 }
 
+const rowIndex = (el) => { const row = el.closest('.sr-row'); return row ? Number(row.dataset.i) : -1; };
+
+// A typed value goes into the rule: text as it is, numbers as a number or empty, and a "between" rule keeps its other end.
+function setRuleValue(rule, input){
+  if(knownField(FIELD_BY_ID, rule.field).type === 'text'){ rule.value = input.value; return; }
+  const v = input.value.trim() === '' ? null : Number(input.value), val = isNum(v) ? v : null;
+  if(rule.op !== 'between'){ rule.value = val; return; }
+  rule.value = input.classList.contains('sr-v1') ? [val, rule.value[1]] : [rule.value[0], val];
+}
+// A drop-down or input in the table changed. `commit` saves and redraws.
+function onRuleChange(e, st, commit){
+  const t = e.target;
+  if(t.classList.contains('sr-add')){
+    if(t.value){ st.rules.push(defaultRule(t.value)); commit(); }
+    return;
+  }
+  const i = rowIndex(t); if(i < 0) return;
+  if(t.classList.contains('sr-field')){ st.rules[i] = defaultRule(t.value); commit(); }
+  else if(t.classList.contains('sr-op')){ st.rules[i] = withOp(st.rules[i], t.value); commit(); }
+  else if(t.classList.contains('sr-v1') || t.classList.contains('sr-v2')){ setRuleValue(st.rules[i], t); commit(); }
+}
+// Moves a rule up or down, then puts keyboard focus on the same arrow at the rule's new place (or the other arrow when it ran out of room).
+function moveRule(root, st, mv, commit){
+  const up = mv.classList.contains('sr-up'), i = rowIndex(mv), j = up ? i - 1 : i + 1;
+  if(i < 0 || j < 0 || j >= st.rules.length) return;
+  [st.rules[i], st.rules[j]] = [st.rules[j], st.rules[i]];
+  commit();
+  const again = root.querySelector(`.sr-row[data-i="${j}"] ${up ? '.sr-up' : '.sr-down'}`) || root.querySelector(`.sr-row[data-i="${j}"] .sr-move button:not(:disabled)`);
+  if(again) again.focus();
+}
+// Removes a rule, keeping it for the Undo line.
+function deleteRule(st, del, commit){
+  const i = rowIndex(del); if(i < 0) return;
+  undo = { st, rule: st.rules[i], i }; st.rules.splice(i, 1); commit(true);
+}
+// Turns one choice of an "is one of" rule on or off.
+function toggleOption(st, opt, commit){
+  const i = rowIndex(opt); if(i < 0) return;
+  const list = st.rules[i].value, v = opt.dataset.v, k = list.indexOf(v);
+  if(k >= 0) list.splice(k, 1); else list.push(v);
+  commit();
+}
+// A click in the table: Undo, a move arrow, delete or a choice button. First match wins.
+function onRuleClick(e, root, st, commit){
+  if(e.target.closest('.sr-undo-btn')){
+    if(undo && undo.st === st){ st.rules.splice(Math.min(undo.i, st.rules.length), 0, undo.rule); undo = null; commit(); }
+    return;
+  }
+  const mv = e.target.closest('.sr-up, .sr-down');
+  if(mv && !mv.disabled){ moveRule(root, st, mv, commit); return; }
+  const del = e.target.closest('.sr-del');
+  if(del){ deleteRule(st, del, commit); return; }
+  const opt = e.target.closest('.sr-opt');
+  if(opt) toggleOption(st, opt, commit);
+}
 // One set of listeners on the section, using whichever strategy is selected at the time.
 function wireRulesEditor(root, getStrategy, onChange){
   const commit = (keepUndo) => { const st = getStrategy(); if(st) st.learned = ''; if(!keepUndo) undo = null; saveStrategies(); onChange(); };
-  const rowOf = (el) => { const row = el.closest('.sr-row'); return row ? Number(row.dataset.i) : -1; };
-  root.addEventListener('change', (e) => {
-    const st = getStrategy(); if(!st) return;
-    const t = e.target;
-    if(t.classList.contains('sr-add')){
-      if(t.value){ st.rules.push(defaultRule(t.value)); commit(); }
-      return;
-    }
-    const i = rowOf(t); if(i < 0) return;
-    const rule = st.rules[i];
-    if(t.classList.contains('sr-field')){ st.rules[i] = defaultRule(t.value); commit(); }
-    else if(t.classList.contains('sr-op')){ st.rules[i] = withOp(rule, t.value); commit(); }
-    else if(t.classList.contains('sr-v1') || t.classList.contains('sr-v2')){
-      if(knownField(FIELD_BY_ID, rule.field).type === 'text') rule.value = t.value;
-      else {
-        const v = t.value.trim() === '' ? null : Number(t.value);
-        const val = isNum(v) ? v : null;
-        if(rule.op === 'between') rule.value = t.classList.contains('sr-v1') ? [val, rule.value[1]] : [rule.value[0], val];
-        else rule.value = val;
-      }
-      commit();
-    }
-  });
-  root.addEventListener('click', (e) => {
-    const st = getStrategy(); if(!st) return;
-    if(e.target.closest('.sr-undo-btn')){ if(undo && undo.st === st){ st.rules.splice(Math.min(undo.i, st.rules.length), 0, undo.rule); undo = null; commit(); } return; }
-    const mv = e.target.closest('.sr-up, .sr-down');
-    if(mv && !mv.disabled){
-      const i = rowOf(mv), j = mv.classList.contains('sr-up') ? i - 1 : i + 1;
-      if(i >= 0 && j >= 0 && j < st.rules.length){
-        [st.rules[i], st.rules[j]] = [st.rules[j], st.rules[i]];
-        commit();
-        const again = root.querySelector(`.sr-row[data-i="${j}"] ${mv.classList.contains('sr-up') ? '.sr-up' : '.sr-down'}`) || root.querySelector(`.sr-row[data-i="${j}"] .sr-move button:not(:disabled)`);
-        if(again) again.focus();
-      }
-      return;
-    }
-    const del = e.target.closest('.sr-del');
-    if(del){ const i = rowOf(del); if(i >= 0){ undo = { st, rule: st.rules[i], i }; st.rules.splice(i, 1); commit(true); } return; }
-    const opt = e.target.closest('.sr-opt');
-    if(opt){
-      const i = rowOf(opt); if(i < 0) return;
-      const list = st.rules[i].value, v = opt.dataset.v;
-      const k = list.indexOf(v);
-      if(k >= 0) list.splice(k, 1); else list.push(v);
-      commit();
-    }
-  });
+  root.addEventListener('change', (e) => { const st = getStrategy(); if(st) onRuleChange(e, st, commit); });
+  root.addEventListener('click', (e) => { const st = getStrategy(); if(st) onRuleClick(e, root, st, commit); });
 }
 
 export { rulesEditorHtml, wireRulesEditor };

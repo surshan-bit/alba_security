@@ -105,7 +105,7 @@ async function runLearn(st, getStrategy){
     let i = 0;
     for(const [sym, e] of entries){
       const stock = stockByTickerSymbol.get(sym);
-      addStockSamples(set, i++, e.w, e.m, H, target, stock ? newsTimeline(stock) : null);
+      addStockSamples(set, i++, { week: e.w, month: e.m, H, target, news: stock ? newsTimeline(stock) : null });
       if(i % 40 === 0){ show(`Reading price history… ${i} of ${entries.length} stocks`); await nextTick(); }
     }
     show('Searching for rules…'); await nextTick();

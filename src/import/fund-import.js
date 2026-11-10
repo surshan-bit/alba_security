@@ -334,7 +334,7 @@ async function fiRunImport(){
     await fiStepFinish(run, { raw, scored, chk, out });
   } catch(e){
     console.error('Fundamental import failed', e);
-    recordAttempt('fund', run.rec, run.recId, e, db);
+    recordAttempt('fund', run.rec, { recId: run.recId, e, db });
     const msg = (e && e.message) ? e.message : String(e);
     fiShowFailure(e, run.current, msg);
     if(run.locked) await fiMarkFailed(run.job, msg);

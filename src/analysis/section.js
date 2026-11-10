@@ -137,31 +137,16 @@ function renderAnalysisSection(){ keepScroll(document.getElementById('section-an
 // The redraw for a change that arrived in the background (saved prices, a refresh, another device): it waits until scrolling has stopped.
 function refreshAnalysisSoon(){ redrawWhenIdle('analysis', renderAnalysisSection); }
 
-function drawAnalysisSection(){
-  const body = document.getElementById('analysisPanelBody');
-  if(!body) return;
-
-  const bucket = analysisBucket();
-  const plottable = bucket.filter(hasBothRsi);
-
-  if(analysisFilters.view !== 'stocks'){ drawIndustryView(body); return; }
-  if(bucket.length === 0){
-    setHtml(body, toolbarOnlyHtml() + `<p class="analysis-panel-sub">No stocks match the current filters, so there's nothing to plot.</p>`);
-    wireViewBar(body);
-    return;
-  }
-
-  const geo = chartGeometry(body, plottable);
-
-  // The RSI Quadrant (its sliders, axis choices and the scatter plot) sits inside the leaderboard, opened by its "Show chart" button.
-  setHtml(body, `
+// The RSI Quadrant (its sliders, axis choices and the scatter plot) sits inside the leaderboard, opened by its "Show chart" button.
+const stocksViewHtml = (geo) => `
     ${leaderboardHtml(`<div class="analysis-chart-block">
       ${analysisControlsHtml(geo.mosBoundLo, geo.mosBoundHi)}
       ${chartHtml(geo)}
     </div>`, viewBarHtml())}
     ${TOOLTIP_HTML}
-  `);
-
+  `;
+// Connects the freshly drawn Stocks view: the chart and leaderboard follow the sliders and filters, and clicks open a stock.
+function wireStocksView(body, bucket, geo){
   function updateAnalysisChart(){
     // Saving is done by the controls' own 'change' handlers (once per drag, on release), not here: this runs on
     // every 'input' tick, and a synchronous localStorage write per tick was a measurable drag-performance cost.
@@ -188,6 +173,24 @@ function drawAnalysisSection(){
   updateAnalysisChart();
   syncSheets();
   if(!industryMod) setTimeout(() => { loadIndustryMod().catch(() => { /* fetched again when the viewer opens an industry view */ }); }, 400);
+}
+
+function drawAnalysisSection(){
+  const body = document.getElementById('analysisPanelBody');
+  if(!body) return;
+
+  const bucket = analysisBucket();
+
+  if(analysisFilters.view !== 'stocks'){ drawIndustryView(body); return; }
+  if(bucket.length === 0){
+    setHtml(body, toolbarOnlyHtml() + `<p class="analysis-panel-sub">No stocks match the current filters, so there's nothing to plot.</p>`);
+    wireViewBar(body);
+    return;
+  }
+
+  const geo = chartGeometry(body, bucket.filter(hasBothRsi));
+  setHtml(body, stocksViewHtml(geo));
+  wireStocksView(body, bucket, geo);
 }
 
 // Redraw the chart when the window is resized, so it keeps filling the available width.
