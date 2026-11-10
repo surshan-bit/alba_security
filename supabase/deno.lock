@@ -60,6 +60,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@supabase/supabase-js@2.117.3",
+        "npm:axe-core@4.10.3",
         "npm:c8@12.0.0",
         "npm:esbuild@0.28.2",
         "npm:eslint-scope@9.1.2",
