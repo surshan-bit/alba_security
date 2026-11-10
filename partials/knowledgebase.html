@@ -266,9 +266,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
-            <h3>v1.364 &middot; 2026-11-06</h3>
+            <h3>v1.364 &middot; 2026-11-10</h3>
             <ul>
-              <li><strong>The daily (1D) import shows that it is working in batches:</strong> the batch call itself was already used (a run of 350 stocks read 349 in batches), but the progress line counted the stocks one at a time because each one was saved after the other, so it looked like a one-by-one fetch. The saves now run several at a time, and the progress line says how many stocks were brought up to date in batches, for example &ldquo;18 of 348 stocks (348 in batches)&rdquo;.</li>
+              <li><strong>The daily (1D) import now updates stocks that have saved bars in batches on any day, with no weekday rules:</strong> a Sunday special session (Muhurat trading) or a market holiday used to make the day check fail, so almost every stock went to a call of its own and the limit was used up (on 9 November, 100 one-by-one calls and 305 stocks left waiting). The batch call now returns the last three daily bars, the saved newest bar is found among them by its prices, and the bars after it are dated from the real trading days of one liquid stock, read once per run. A stock up to two sessions behind is brought up to date in the batch; the bar TradingView shows before the open as a copy of the last session is set aside.</li>
+              <li><strong>The import says what it plans before it calls TradingView:</strong> the progress line shows how many stocks have saved bars (and how many batch calls that takes) and how many have none, and the result lists the stocks that had no saved history and those too far behind for a batch. Those are the only ones fetched one by one, up to 100 per run. If the trading calendar cannot be read, the batch step stops with that reason instead of making a call for every stock.</li>
+              <li>The progress line shows how many stocks were updated in batches, and the bars of a stock are kept to the newest 500.</li>
             </ul>
             <h3>v1.363 &middot; 2026-11-06</h3>
             <ul>

@@ -3173,14 +3173,14 @@ test('refresh all stocks, daily MACD step: the stocks of the chosen strategy are
   const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks, strategies: [{ id: 's1', name: 'Value', rules: [] }], priceHistoryByTicker: {}, COMPACT_LAG: 1, isinSymbolCached: (s) => 'N:' + s.name,
     dailyStocksOf: (u) => ({ list: u, total: 5, needsOtherRule: false }),
     pcTickerKey: (s) => s.name, tvIstDate: () => '2026-11-04', loadDailyBars: async (d, sym) => ['saved ' + sym], saveDailyBars: async (d, who, bars, isNew) => { stored.push([d === db, who, bars, isNew]); },
-    readDailyStates: async (list, io, progress) => { calls.push([list.length, io.symbolOf(list[0]), io.keyOf(list[0]), io.stop(), io.today(), await io.loadBars(list[0], 'N:A')]); await io.saveBars(list[1], 'N:B', ['bar'], true); await io.pause(1); progress(1, 2, 3); progress(2, 2, 0); return { results: [{ key: 'A', state: 'above', asof: '2026-11-04' }], failures: [{}], abort: '', stored: 3, storeFailed: 1, pauses: 2, batched: 4, deferred: 7 }; },
+    readDailyStates: async (list, io, progress) => { calls.push([list.length, io.symbolOf(list[0]), io.keyOf(list[0]), io.stop(), io.today(), await io.loadBars(list[0], 'N:A')]); await io.saveBars(list[1], 'N:B', ['bar'], true); await io.pause(1); io.plan({ known: 1, none: 2, calls: 2 }); progress(1, 2, 3); progress(2, 2, 0); return { results: [{ key: 'A', state: 'above', asof: '2026-11-04' }], failures: [{}], abort: '', stored: 3, storeFailed: 1, pauses: 2, batched: 4, deferred: 7, noHistory: 5, behind: 6 }; },
     saveDailyStates: async (d, results, today) => { saved.push([d === db, results, today]); return { changed: 1, failed: 0 }; } };
   const M = await loadTvRefresh(), pick = { strategyId: 's1' }, run = tvRun(db, [], { dailyPick: pick });
   await M.rsDaily(run);
   assert.strictEqual(JSON.stringify(calls), JSON.stringify([[2, 'N:A', 'A', false, '2026-11-04', ['saved N:A']]])); assert.strictEqual(JSON.stringify(stored), JSON.stringify([[true, { sym: 'N:B', key: 'B', name: 'B' }, ['bar'], true]]));   // the saved bars are read and saved through the run's database
   assert.deepStrictEqual(saved, [[true, [{ key: 'A', state: 'above', asof: '2026-11-04' }], '2026-11-04']]);
-  assert.deepStrictEqual(run.dailyResult, { name: 'Value', stocks: 2, total: 5, read: 1, changed: 1, failed: 1, stored: 3, storeFailed: 1, pauses: 2, batched: 4, deferred: 7, notSaved: 0, abort: '' });
-  assert.ok(T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: reading 2 stocks')) && T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: 1 of 2 stocks (3 in batches)|')) && T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: 2 of 2 stocks|')));
+  assert.deepStrictEqual(run.dailyResult, { name: 'Value', stocks: 2, total: 5, read: 1, changed: 1, failed: 1, stored: 3, storeFailed: 1, pauses: 2, batched: 4, deferred: 7, noHistory: 5, behind: 6, notSaved: 0, abort: '' });
+  assert.ok(T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: reading 2 stocks')) && T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: 1 of 2 stocks (3 in batches)|')) && T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: 2 of 2 stocks|')) && T.log.some((l) => l.startsWith('verify|running|Daily MACD 30/60/5: 1 stocks have saved bars (2 batch calls), 2 have none (one call each)|')));
   M.__stop(true); calls.length = 0; await M.rsDaily(tvRun(db, [], { dailyPick: pick })); M.__stop(false); assert.strictEqual(calls[0][3], true);   // the read is told when Stop is pressed
   const idle = tvRun(db, [], {}); await M.rsDaily(idle); const stopped = tvRun(db, [], { dailyPick: pick, stopped: true }); await M.rsDaily(stopped);
   assert.deepStrictEqual([idle.dailyResult, stopped.dailyResult], [null, null]);   // not asked for, or Stop was pressed
@@ -3343,7 +3343,7 @@ test('daily MACD import: the stocks of a strategy besides its daily rule are cho
   const C = await loadWithStubs('src/tv/connector.js', '', { 'isin.js': 'export const isinOf = () => ""; export const isinSymbolCached = () => null; export const resolveIsinSymbols = async () => [];' });
   const all = { 'N:A': dailyRows(fall), 'N:B': dailyRows([...fall, 400, 410]), 'N:C': dailyRows(fall), 'N:D': dailyRows(fall), 'N:E': dailyRows(fall), 'N:F': dailyRows([...fall, 400]), 'N:G': dailyRows(fall.slice(0, 30)), 'N:EMPTY': [] };
   globalThis.__DM = { qualifying: (u, rules) => { seen.push(rules.map((r) => r.field)); return u; }, merge: C.tvMergeDelta, tvCall: async (tool, args) => {
-    calls.push([args.symbol, args.count]); if(args.symbol === 'N:BAD') throw new Error('bad reply'); if(args.symbol === 'N:QUOTA') throw new Error('quota used up'); if(args.symbol === 'N:LIMIT') throw new Error('quota: access is suspended for one minute'); if(args.symbol.startsWith('N:NEW')) return { rows: all['N:A'] }; return { rows: all[args.symbol].slice(-args.count) }; } };
+    if(args.symbol === 'NSE:RELIANCE') return { rows: dailyRows(fall).slice(-args.count) }; calls.push([args.symbol, args.count]); if(args.symbol === 'N:BAD') throw new Error('bad reply'); if(args.symbol === 'N:QUOTA') throw new Error('quota used up'); if(args.symbol === 'N:LIMIT') throw new Error('quota: access is suspended for one minute'); if(args.symbol.startsWith('N:NEW')) return { rows: all['N:A'] }; return { rows: all[args.symbol].slice(-args.count) }; } };
   const D = await loadWithStubs('src/refresh/dailymacd.js', '', DAILY_STUBS), stocks = Array.from({ length: 650 }, (_, i) => ({ name: 'S' + i }));
   const r = D.dailyStocksOf(stocks, { rules: [{ field: 'score' }, { field: 'dayMacd3060' }, { field: 'verdict', ready: false }] });
   assert.deepStrictEqual(seen, [['score']]); assert.deepStrictEqual([r.list.length, r.total, r.needsOtherRule], [600, 650, false]);   // the daily rule and a rule not ready are left out; at most 600 stocks
@@ -3351,7 +3351,7 @@ test('daily MACD import: the stocks of a strategy besides its daily rule are cho
   assert.deepStrictEqual(D.dailyStocksOf(stocks, { rules: [{ field: 'dayMacd3060' }] }), none); assert.deepStrictEqual(D.dailyStocksOf(stocks, {}), none); assert.deepStrictEqual(D.dailyStocksOf(stocks, undefined), none);
   // What is saved for each stock: B is two days short, C is up to date, D has prices that were adjusted since, E's record cannot be read, F cannot be saved, G has too few bars
   const have = { B: all['N:B'].slice(0, 68), C: all['N:C'], D: dailyRows(fall.map((c) => c * 2)), F: undefined }, kept = [];
-  const pauses = [], io = { symbolOf: (s) => s.sym, keyOf: (s) => s.key, stop: () => false, today: () => '2026-03-17', pause: async (ms) => { pauses.push(ms); }, nowS: () => 0, batch: async () => ({}),
+  const pauses = [], io = { symbolOf: (s) => s.sym, keyOf: (s) => s.key, stop: () => false, today: () => '2026-03-17', pause: async (ms) => { pauses.push(ms); }, batch: async () => ({}),
     loadBars: async (s) => { if(s.key === 'E') throw new Error('unreadable'); return have[s.key] || null; }, saveBars: async (s, sym, bars, isNew) => { if(s.key === 'F') throw new Error('database down'); kept.push([s.key, bars.length, isNew]); } };
   const progress = [], mk = (key, sym) => ({ key, sym });
   const out = await D.readDailyStates(['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((k) => mk(k, 'N:' + k)).concat([mk('BAD', 'N:BAD'), mk('NOSYM', null), mk('EMPTY', 'N:EMPTY')]), io, (d, n) => progress.push([d, n]));
@@ -3383,55 +3383,61 @@ test('daily MACD import: the stocks of a strategy besides its daily rule are cho
   globalThis.__DM.tvCall = async () => { throw Object.assign(new Error('no connector'), { code: 'no_mcp' }); };
   assert.strictEqual((await D.readDailyStates([mk('A', 'N:A')], io, () => {})).abort, 'no connector');
   const stopped = await D.readDailyStates([mk('A', 'N:A')], Object.assign({}, io, { stop: () => true }), () => {}); assert.deepStrictEqual([stopped.results.length, stopped.failures.length], [0, 0]);   // Stop was pressed
-  assert.deepStrictEqual(await D.readDailyStates([], io, () => {}), { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0, batched: 0, deferred: 0 });
+  assert.deepStrictEqual(await D.readDailyStates([], io, () => {}), { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0, batched: 0, deferred: 0, known: 0, noHistory: 0, behind: 0 });
   globalThis.__DM.tvCall = async () => { throw 'plain text'; };   // a failure that is not an Error
   assert.strictEqual((await D.readDailyStates([mk('A', 'N:A')], io, () => {})).failures[0].reason, 'plain text');
 }));
-test('daily batch: a stock with saved bars is brought up to date from the batch call, and anything that does not line up is left to a call of its own', async () => {
+test('daily batch: a stock with saved bars is brought up to date from the batch call (up to two sessions behind), dated by the trading calendar, and anything that does not line up is left to a call of its own', async () => {
   const B = await loadWithStubs('src/refresh/dailybatch.js', '', {});
-  const T = (d) => Date.parse(d + 'T03:45:00Z') / 1000, now = (d) => Date.parse(d + 'T06:30:00Z') / 1000;   // a bar opens 09:15 Indian time; "now" is noon Indian time
+  const T = (d) => Date.parse(d + 'T03:45:00Z') / 1000;   // a bar opens 09:15 Indian time
   const bar = (o, h, l, c, v) => ({ o, h, l, c, v }), row = (t, b) => [t, b.o, b.h, b.l, b.c, b.v];
-  const mon = bar(10, 11, 9, 10.5, 100), tueFinal = bar(10.5, 12, 10, 11, 200), tueForming = bar(10.5, 11.5, 10.2, 10.9, 150), wed = bar(11, 11.5, 10.8, 11.2, 50);
+  const mon = bar(10, 11, 9, 10.5, 100), tueFinal = bar(10.5, 12, 10, 11, 200), tueForming = bar(10.5, 11.5, 10.2, 10.9, 150), wed = bar(11, 11.5, 10.8, 11.2, 50), thu = bar(11.2, 12.2, 11, 12, 60);
+  const cal = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05'].map(T);   // Monday to Thursday
   const stored = (tue) => [row(T('2026-11-02'), mon), row(T('2026-11-03'), tue)];
-  const out = (stored_, bars, d) => B.alignDaily(stored_, bars, now(d));
-  assert.deepStrictEqual(out(stored(tueFinal), { cur: wed, prev: tueFinal }, '2026-11-04'), [row(T('2026-11-02'), mon), row(T('2026-11-03'), tueFinal), row(T('2026-11-04'), wed)]);   // a new day
-  assert.deepStrictEqual(out(stored(tueForming), { cur: wed, prev: tueFinal }, '2026-11-04')[1], row(T('2026-11-03'), tueFinal));   // the saved bar was still forming: now it is final
+  assert.deepStrictEqual(B.alignDaily(stored(tueFinal), [tueFinal, wed], cal.slice(1, 3)), [row(T('2026-11-02'), mon), row(T('2026-11-03'), tueFinal), row(T('2026-11-04'), wed)]);   // a new day
+  assert.deepStrictEqual(B.alignDaily(stored(tueForming), [tueFinal, wed], cal.slice(1, 3))[1], row(T('2026-11-03'), tueFinal));   // the saved bar was still forming: now it is final
   const wedForming = bar(11, 11.2, 10.8, 11.1, 30);
-  assert.deepStrictEqual(out(stored(tueFinal).concat([row(T('2026-11-04'), wedForming)]), { cur: wed, prev: tueFinal }, '2026-11-04'), [row(T('2026-11-02'), mon), row(T('2026-11-03'), tueFinal), row(T('2026-11-04'), wed)]);   // the saved bar of today grows
-  const wedFinal = bar(11, 11.5, 10.8, 11.2, 900), keep = stored(tueFinal).concat([row(T('2026-11-04'), wedFinal)]);
-  assert.strictEqual(out(keep, { cur: wedFinal, prev: tueFinal }, '2026-11-05').length, 3);   // a weekday with no session (a holiday): nothing is added
-  assert.strictEqual(out(keep, { cur: wedFinal, prev: tueFinal }, '2026-11-05')[2][0], T('2026-11-04'));
-  const fri = bar(12, 13, 11, 12.5, 70), thu = bar(11.2, 12.2, 11, 12, 60);
-  assert.strictEqual(out(keep.concat([row(T('2026-11-05'), thu)]), { cur: fri, prev: thu }, '2026-11-07')[4][0], T('2026-11-06'));   // run on a Saturday: Friday's bar
-  assert.strictEqual(out(stored(tueFinal), { cur: wed, prev: tueFinal }, '2026-11-06'), null);   // Wednesday is missing between the saved bar and the latest day
-  // before the market opens on a weekday the newest bar is still the previous weekday's: Friday 05:30 Indian time, saved up to Wednesday, TradingView's current bar is Thursday's
-  const preOpen = (d) => Date.parse(d + 'T00:00:00Z') / 1000;   // 05:30 Indian time = 00:00 UTC
-  const thuBar = bar(12, 12.5, 11.5, 12.2, 80), savedWed = [row(T('2026-11-03'), tueFinal), row(T('2026-11-04'), wedFinal)];
-  assert.deepStrictEqual(B.alignDaily(savedWed, { cur: thuBar, prev: wedFinal }, preOpen('2026-11-06')), savedWed.concat([row(T('2026-11-05'), thuBar)]));   // Thursday's bar is added before the Friday open
-  assert.strictEqual(B.alignDaily(savedWed, { cur: thuBar, prev: wedFinal }, now('2026-11-06')), null);   // after the open the current bar would be Friday's: Thursday's would be missing, so it is fetched on its own
-  assert.strictEqual(B.alignDaily(savedWed, { cur: thuBar, prev: wedFinal }, preOpen('2026-11-07')), null);   // a Saturday morning: Friday's bar is missing
-  assert.strictEqual(out(stored(tueFinal), { cur: bar(11, 12, 10, 11, 5), prev: bar(8, 12, 7, 11, 200) }, '2026-11-04'), null);   // prices were adjusted since: the previous bar does not match
-  assert.strictEqual(out([row(T('2026-11-02'), bar(10.5, 11, 9, 10.5, 100)), row(T('2026-11-03'), tueFinal)], { cur: tueFinal, prev: tueFinal }, '2026-11-04'), null);   // cannot tell the current bar from the previous one
-  assert.strictEqual(out(stored(tueFinal), { cur: bar(11, 10, 12, 11, 5), prev: tueFinal }, '2026-11-04'), null);   // a bar whose high is below its close
-  assert.strictEqual(out([row(T('2026-11-03'), tueFinal)], { cur: wed, prev: tueFinal }, '2026-11-04'), null);   // fewer than two saved bars
-  assert.strictEqual(out(null, { cur: wed, prev: tueFinal }, '2026-11-04'), null); assert.strictEqual(out(stored(tueFinal), null, '2026-11-04'), null);
-  const full = { open: 1, high: 2, low: 0.5, close: 1.5, volume: 9, 'open[1]': 3, 'high[1]': 4, 'low[1]': 2, 'close[1]': 3.5, 'volume[1]': 8 };
-  assert.deepStrictEqual(B.dailyBatchBars(full), { cur: bar(1, 2, 0.5, 1.5, 9), prev: bar(3, 4, 2, 3.5, 8) });
+  assert.deepStrictEqual(B.alignDaily(stored(tueFinal).concat([row(T('2026-11-04'), wedForming)]), [tueFinal, wed], cal.slice(2, 4).map((t, k) => cal[1 + k])), [row(T('2026-11-02'), mon), row(T('2026-11-03'), tueFinal), row(T('2026-11-04'), wed)]);   // the saved bar of today grows
+  assert.deepStrictEqual(B.alignDaily(stored(tueFinal), [tueFinal, wed, thu].slice(0, 3), cal.slice(1)).map((r) => r[0]), [T('2026-11-02'), T('2026-11-03'), T('2026-11-04'), T('2026-11-05')]);   // two sessions behind: both new bars are added
+  assert.strictEqual(B.alignDaily(stored(tueFinal), [wed, thu], cal.slice(2)), null);   // three sessions behind: the saved bar is not among the bars
+  // a special session on a Sunday (Muhurat) is a trading day of its own: it is dated from the calendar, not by weekday
+  const sunday = bar(12, 12.4, 11.9, 12.2, 20), monAfter = bar(12.2, 12.6, 12, 12.5, 80);
+  const calSun = [T('2026-11-05'), T('2026-11-06'), T('2026-11-08'), T('2026-11-09')], savedFri = [row(T('2026-11-05'), thu), row(T('2026-11-06'), tueFinal)];
+  assert.deepStrictEqual(B.alignDaily(savedFri, [tueFinal, sunday, monAfter], calSun.slice(1)).map((r) => r[0]), [T('2026-11-05'), T('2026-11-06'), T('2026-11-08'), T('2026-11-09')]);
+  // before the open TradingView serves the coming day's bar as a copy of the last session's; a run saved it, and now it is set aside
+  const copyOfWed = row(T('2026-11-05'), bar(11, 11.5, 10.8, 11.21, 52)), savedWithCopy = stored(tueFinal).concat([row(T('2026-11-04'), wed), copyOfWed]);
+  assert.deepStrictEqual(B.alignDaily(savedWithCopy, [tueFinal, wed, thu], cal.slice(1)).map((r) => r[0]), [T('2026-11-02'), T('2026-11-03'), T('2026-11-04'), T('2026-11-05')]);
+  assert.strictEqual(B.alignDaily(stored(tueFinal).concat([row(T('2026-11-04'), wed), row(T('2026-11-05'), bar(11, 11.5, 10.8, 11.9, 52))]), [tueFinal, wed, thu], cal.slice(1)), null);   // a close far from the bar before it: a real bar, not a copy
+  // a holiday: the calendar has no bar for it, so nothing is added for it
+  assert.strictEqual(B.alignDaily(stored(tueFinal), [tueFinal, tueFinal], cal.slice(1, 3)).length, 3);   // a bar equal to the one before it: the calendar day of the saved bar tells which it is
+  assert.strictEqual(B.alignDaily([row(T('2026-11-02'), tueFinal), row(T('2026-11-03'), tueFinal)], [tueFinal, tueFinal], cal.slice(1, 3)).length, 3);   // equal bars on two days: still told apart by the day
+  assert.strictEqual(B.alignDaily([row(T('2026-11-02'), tueFinal), row(T('2026-11-03'), tueFinal)], [tueFinal, tueFinal], [T('2026-11-03'), T('2026-11-03')]), null);   // a calendar that puts both on the saved day: cannot tell which one is saved
+  assert.strictEqual(B.alignDaily(stored(tueFinal), [tueFinal, wed], [T('2026-11-03'), T('2026-11-05')])[2][0], T('2026-11-05'));   // no session on Wednesday: the new bar is Thursday's
+  assert.strictEqual(B.alignDaily(stored(tueFinal), [tueFinal, wed], cal.slice(2)), null);   // the saved bar is not on the day the calendar gives for it
+  assert.strictEqual(B.alignDaily(stored(tueFinal), [tueFinal, wed, thu], cal.slice(2)), null);   // fewer calendar days than bars
+  assert.strictEqual(B.alignDaily(stored(tueFinal), [tueFinal, wed], null), null);
+  assert.strictEqual(B.alignDaily(stored(tueFinal), [bar(8, 12, 7, 11, 200), bar(11, 12, 10, 11, 5)], cal.slice(1, 3)), null);   // prices were adjusted since: the saved bar is not found
+  assert.strictEqual(B.alignDaily(stored(tueFinal), [tueFinal, bar(11, 10, 12, 11, 5)], cal.slice(1, 3)), null);   // a bar whose high is below its close
+  assert.strictEqual(B.alignDaily([row(T('2026-11-03'), tueFinal)], [tueFinal, wed], cal.slice(1, 3)), null);   // fewer than two saved bars
+  assert.strictEqual(B.alignDaily(null, [tueFinal, wed], cal.slice(1, 3)), null); assert.strictEqual(B.alignDaily(stored(tueFinal), null, cal), null);
+  const full = { open: 1, high: 2, low: 0.5, close: 1.5, volume: 9, 'open[1]': 3, 'high[1]': 4, 'low[1]': 2, 'close[1]': 3.5, 'volume[1]': 8, 'open[2]': 5, 'high[2]': 6, 'low[2]': 4, 'close[2]': 5.5, 'volume[2]': 7 };
+  assert.deepStrictEqual(B.dailyBatchBars(full), [bar(5, 6, 4, 5.5, 7), bar(3, 4, 2, 3.5, 8), bar(1, 2, 0.5, 1.5, 9)]);
+  assert.deepStrictEqual(B.dailyBatchBars(Object.assign({}, full, { 'open[2]': null })), [bar(3, 4, 2, 3.5, 8), bar(1, 2, 0.5, 1.5, 9)]);   // a stock with only two bars
   assert.strictEqual(B.dailyBatchBars(Object.assign({}, full, { volume: null })), null); assert.strictEqual(B.dailyBatchBars(Object.assign({}, full, { 'close[1]': undefined })), null); assert.strictEqual(B.dailyBatchBars(undefined), null);
-  assert.deepStrictEqual(B.DAILY_BAR_COLUMNS.length, 10);
+  assert.deepStrictEqual(B.DAILY_BAR_COLUMNS.length, 15);
 });
 test('daily MACD import in batches: stocks with saved bars go through the batch call, the rest one by one', async () => {
-  const fall = Array.from({ length: 70 }, (_, i) => 200 - i), calls = [], batches = [], kept = [];
+  const fall = Array.from({ length: 70 }, (_, i) => 200 - i), calls = [], batches = [], kept = [], calendarCalls = []; let calendarFails = false;
   const C = await loadWithStubs('src/tv/connector.js', '', { 'isin.js': 'export const isinOf = () => ""; export const isinSymbolCached = () => null; export const resolveIsinSymbols = async () => [];' });
   const T = (d) => Date.parse(d + 'T03:45:00Z') / 1000, now = Date.parse('2026-11-04T06:30:00Z') / 1000;
   const history = (n) => fall.slice(0, n).map((c, i) => [T('2026-11-03') - (n - 1 - i) * 86400, c, c + 0.5, c - 0.5, c, 100]);   // ends on Tuesday 3 Nov
   const last = history(70)[69], wedRow = { open: last[4], high: last[4] + 1, low: last[4] - 6, close: last[4] - 5, volume: 40, 'open[1]': last[1], 'high[1]': last[2], 'low[1]': last[3], 'close[1]': last[4], 'volume[1]': last[5] };
   const stale = Object.assign({}, wedRow, { 'open[1]': 999 });   // the previous bar does not match what is saved
-  globalThis.__DM = { qualifying: (u) => u, merge: C.tvMergeDelta, tvCall: async (tool, args) => { calls.push([args.symbol, args.count]); return { rows: history(70).concat([[T('2026-11-04'), 1, 1, 1, 1, 1]]).slice(-args.count) }; } };
+  globalThis.__DM = { qualifying: (u) => u, merge: C.tvMergeDelta, tvCall: async (tool, args) => { if(args.symbol === 'NSE:RELIANCE'){ calendarCalls.push(args.count); if(calendarFails) throw new Error('bad calendar'); return { rows: [[T('2026-11-02'), 1, 1, 1, 1, 1], [T('2026-11-03'), 1, 1, 1, 1, 1], [T('2026-11-04'), 1, 1, 1, 1, 1]] }; } calls.push([args.symbol, args.count]); return { rows: history(70).concat([[T('2026-11-04'), 1, 1, 1, 1, 1]]).slice(-args.count) }; } };
   const D = await loadWithStubs('src/refresh/dailymacd.js', '', DAILY_STUBS), mk = (key) => ({ key, sym: 'N:' + key });
   const saved = { X: history(70), Y: history(70), Z: history(70), N: null, F: history(70) };
   let data = { 'N:X': wedRow, 'N:Y': stale, 'N:F': wedRow }, batchError = null, saveFails = false;
-  const io = { symbolOf: (s) => s.sym, keyOf: (s) => s.key, stop: () => false, today: () => '2026-11-04', nowS: () => now, pause: async () => {},
+  const io = { symbolOf: (s) => s.sym, keyOf: (s) => s.key, stop: () => false, today: () => '2026-11-04', pause: async () => {},
     loadBars: async (s) => saved[s.key] || null, saveBars: async (s, sym, bars, isNew) => { if(saveFails) throw new Error('db down'); kept.push([s.key, bars.length, isNew]); },
     batch: async (syms) => { batches.push(syms.slice()); if(batchError) throw batchError; return data; } };
   const seen = [], out = await D.readDailyStates([mk('X'), mk('Y'), mk('Z'), mk('N')], io, (d, n, b) => seen.push(b));
@@ -3454,6 +3460,17 @@ test('daily MACD import in batches: stocks with saved bars go through the batch 
   batchError = new Error('quota used up'); const spent = await D.readDailyStates([mk('X')], io, () => {}); assert.strictEqual(spent.abort, 'quota used up');   // the quota does not come back: the read stops
   batchError = null; data = { 'N:X': wedRow }; saveFails = true; assert.strictEqual((await D.readDailyStates([mk('X')], io, () => {})).storeFailed, 1);
   const pressed = await D.readDailyStates([mk('X'), mk('Y')], Object.assign({}, io, { stop: () => true }), () => {}); assert.strictEqual(pressed.results.length, 0);
+  // the plan is known before any call: stocks with saved bars, stocks with none, and how many batch calls (one more for the trading calendar) it takes
+  batches.length = 0; calls.length = 0; calendarCalls.length = 0; data = { 'N:X': wedRow }; saveFails = false; const plans = [];
+  const planned = await D.readDailyStates([mk('X'), mk('N')], Object.assign({}, io, { plan: (p) => plans.push(p) }), () => {});
+  assert.deepStrictEqual(plans, [{ known: 1, none: 1, calls: 2 }]); assert.deepStrictEqual([planned.known, planned.noHistory, planned.behind, calendarCalls], [1, 1, 0, [10]]);
+  calendarCalls.length = 0; await D.readDailyStates([mk('N')], io, () => {}); assert.deepStrictEqual(calendarCalls, []);   // nothing to batch: no calendar call
+  // the trading calendar cannot be read: no call per stock to make up for it; the reason is reported
+  calendarFails = true; batches.length = 0; calls.length = 0; const noCal = await D.readDailyStates([mk('X'), mk('N')], io, () => {});
+  assert.deepStrictEqual([noCal.abort, batches.length, calls.length], ['the trading calendar could not be read: bad calendar', 0, 0]); calendarFails = false;
+  // more than 500 bars after the update: the newest 500 are kept
+  const bigOld = Array.from({ length: 500 }, (_, i) => [T('2026-11-03') - (499 - i) * 86400, 100, 101, 99, 100, 100]); bigOld[499] = last; saved.BIG = bigOld;
+  kept.length = 0; data = { 'N:BIG': wedRow }; await D.readDailyStates([mk('BIG')], io, () => {}); assert.deepStrictEqual(kept, [['BIG', 500, false]]);
 });
 test('daily bars store: a stock has one record in priceHistory1D like the weekly ones, written whole the first time and updated after', async () => {
   const sets = [], updates = [], docs = { 'priceHistory1D/NSE_TCS_1D': { exists: true, data: () => ({ bars: [[1, 1, 1, 1, 1, 1]] }) }, 'priceHistory1D/NSE_EMPTY_1D': { exists: true, data: () => ({ bars: [] }) }, 'priceHistory1D/NSE_NOBARS_1D': { exists: true, data: () => ({}) }, 'priceHistory1D/NSE_NONE_1D': { exists: false } };
@@ -3477,6 +3494,7 @@ test('daily MACD import, result line: what was read, and the problems there are'
   assert.deepStrictEqual(line({ name: 'P', stocks: 5, total: 5, read: 5, changed: 0, pauses: 1 }).text, 'Daily MACD 30/60/5 (P): 5 of 5 stocks read, 0 changed, waited 1 time for the TradingView call limit');
   assert.ok(line({ name: 'P', stocks: 5, total: 5, read: 5, changed: 0, pauses: 3 }).text.includes('waited 3 times'));
   assert.ok(line({ name: 'P', stocks: 5, total: 5, read: 1, changed: 0, deferred: 4 }).text.includes('4 more stocks wait for the next run'));
+  assert.ok(line({ name: 'P', stocks: 5, total: 5, read: 5, changed: 0, noHistory: 3, behind: 2 }).text.endsWith('3 had no saved history, 2 were too far behind for a batch'));
   assert.deepStrictEqual(line({ name: 'Q', stocks: 5, total: 5, read: 2, changed: 2, abort: 'quota used up' }), { text: 'Daily MACD 30/60/5 (Q): 2 of 5 stocks read, 2 changed. Stopped: quota used up', problem: true });
   assert.deepStrictEqual(line({ problem: 'the chosen strategy no longer exists' }), { text: 'Daily MACD 30/60/5: the chosen strategy no longer exists', problem: true });
 }));

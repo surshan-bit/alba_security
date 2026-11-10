@@ -15,6 +15,8 @@ const DAILY_PAUSES = 2;              // waits allowed in one run before the read
 const DAILY_OWN_MAX = 100;           // stocks fetched on their own per run (a first import, or a stock that did not line up); the rest are left for the next run
 // True when TradingView says the suspension lasts one minute; a longer one ("until 00:00 UTC") is not waited out.
 const briefLimit = e => /for one minute/i.test(String((e && e.message) || ''));
+const CALENDAR_SYMBOL = 'NSE:RELIANCE';   // a liquid stock whose daily bar times are the trading calendar (see dailybatch.js)
+const CALENDAR_BARS = 10;
 const DAILY_MAX = 600;               // stocks per run, so one run cannot use up the TradingView quota
 const IST_SECONDS = 19800;
 const dayBucket = t => Math.floor((t + IST_SECONDS) / 86400);   // the Indian day a bar belongs to
@@ -53,6 +55,8 @@ async function dailyBarsFor(sym, have, today){
   }
   return (await fetchDaily(sym, DAILY_KEEP)).slice(-DAILY_KEEP);
 }
+// The trading days of the market: the times of the newest daily bars of a liquid stock, oldest first.
+async function readCalendar(){ return (await fetchDaily(CALENDAR_SYMBOL, CALENDAR_BARS)).map(r => r[0]); }
 // True when the bars to save are what is saved already (same count, same first and newest bar).
 const sameDailyBars = (a, b) => !!a && a.length === b.length && JSON.stringify(a[0]) === JSON.stringify(b[0]) && JSON.stringify(a[a.length - 1]) === JSON.stringify(b[b.length - 1]);
 
@@ -66,8 +70,8 @@ async function pool(items, n, fn){
 
 // The pieces of one read: its result (`out`), the progress `tick`, and how a stock is read from the batch call (`batched`, a chunk at a time) or from a call of its own (`single`).
 function dailyReader(total, io, progress){
-  /** @type {{ results: { key: string, state: string, asof: string, bars: number | null }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number }} */
-  const out = { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0, batched: 0, deferred: 0 };
+  /** @type {{ results: { key: string, state: string, asof: string, bars: number | null }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number, known: number, noHistory: number, behind: number }} */
+  const out = { results: [], failures: [], abort: '', stored: 0, storeFailed: 0, pauses: 0, batched: 0, deferred: 0, known: 0, noHistory: 0, behind: 0 };
   let done = 0, resting = null;
   const tick = () => progress(++done, total, out.batched);
   const rest = () => { if(!resting){ out.pauses++; resting = Promise.resolve(io.pause(DAILY_PAUSE_MS)).finally(() => { resting = null; }); } return resting; };
@@ -90,39 +94,54 @@ function dailyReader(total, io, progress){
     await keep(s, sym, old, bars);
   };
   const single = async x => { try { await finish(x, await withRest(() => dailyBarsFor(x.sym, x.old, io.today()))); } catch(e){ fail(x.s, e); } tick(); };
-  const batched = async chunk => {   // returns the stocks of the chunk that need a call of their own
+  const batched = async (chunk, calendar) => {   // returns the stocks of the chunk that need a call of their own
     let data;
     try { data = await withRest(() => io.batch(chunk.map(x => x.sym))); } catch(e){ if(tvIsQuota(e) || (e && e.code === 'no_mcp')){ out.abort = e.message; return []; } data = null; }
     const own = [], aligned = [];
     for(const x of chunk){
-      const bars = data ? alignDaily(x.old, dailyBatchBars(data[x.sym]), io.nowS()) : null;
+      const bars = data ? alignDaily(x.old, dailyBatchBars(data[x.sym]), calendar) : null;
       if(bars) aligned.push({ x, bars }); else own.push(x);
     }
     out.batched += aligned.length;   // counted at once, so the progress line shows the batch before the saves, which run LOADERS at a time
-    await pool(aligned, LOADERS, async a => { await finish(a.x, a.bars); tick(); });
+    await pool(aligned, LOADERS, async a => { await finish(a.x, a.bars.slice(-DAILY_KEEP)); tick(); });
     return own;
   };
-  return { out, tick, batched, single };
+  return { out, tick, batched, single, withRest };
+}
+
+// The trading calendar: a stock cannot be dated without it, so when it cannot be read the batch step is skipped and the reason is reported (no call per stock to make up for it).
+async function tradingCalendar(rd){
+  try { return await rd.withRest(readCalendar); } catch(e){ rd.out.abort = (tvIsQuota(e) || (e && e.code === 'no_mcp') ? '' : 'the trading calendar could not be read: ') + String((e && e.message) || e).slice(0, 80); return null; }
+}
+
+// Each stock with its symbol and its saved bars (null when none, or when the record cannot be read: then the whole history is fetched again); a stock with no symbol is a failure.
+async function loadSaved(list, io, rd){
+  const loaded = [];
+  await pool(list, LOADERS, async s => {
+    const sym = io.symbolOf(s);
+    if(!sym){ rd.out.failures.push({ stock: s, reason: 'no TradingView symbol' }); rd.tick(); return; }
+    try { loaded.push({ s, sym, old: await io.loadBars(s, sym) }); } catch(e){ loaded.push({ s, sym, old: null }); }
+  });
+  return loaded;
 }
 
 /**
  * The daily MACD reading of each stock in `list` and their bars saved. A stock with saved bars is brought up to date from the batch call (BATCH stocks per call, no
  * fetch of its own); one with no saved bars, or whose saved bars do not line up with the batch answer, is fetched on its own, DAILY_WORKERS at a time.
- * `io` = { symbolOf(stock), keyOf(stock), stop(), today(), nowS(), loadBars(stock, sym), saveBars(stock, sym, bars, isNew), batch(symbols) -> { symbol: row }, pause(ms) };
+ * `io` = { symbolOf(stock), keyOf(stock), stop(), today(), plan?({ known, none, calls }), loadBars(stock, sym), saveBars(stock, sym, bars, isNew), batch(symbols) -> { symbol: row }, pause(ms) };
  * progress(done, total, batched) after each stock (`batched` = stocks brought up to date from the batch call so far). A stock that fails is listed with its reason and the rest go on; no connection stops the whole read (`abort` says why). When
  * TradingView refuses a call for its quota, all workers wait io.pause(DAILY_PAUSE_MS) and the call is tried again, up to DAILY_PAUSES waits (`pauses` counts them); after that
  * the read stops with the quota message. A suspension that is not "for one minute" stops the read at once. At most DAILY_OWN_MAX stocks are fetched on their own per run (`deferred` counts the rest). A bar document that cannot be read is fetched in full; one that cannot be saved is counted (`storeFailed`), its reading still counts.
- * @returns {Promise<{ results: { key: string, state: string, asof: string, bars: number | null }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number }>}
+ * @returns {Promise<{ results: { key: string, state: string, asof: string, bars: number | null }[], failures: { stock: any, reason: string }[], abort: string, stored: number, storeFailed: number, pauses: number, batched: number, deferred: number, known: number, noHistory: number, behind: number }>}
  */
 async function readDailyStates(list, io, progress){
-  const rd = dailyReader(list.length, io, progress), loaded = [];
-  await pool(list, LOADERS, async s => {
-    const sym = io.symbolOf(s);
-    if(!sym){ rd.out.failures.push({ stock: s, reason: 'no TradingView symbol' }); rd.tick(); return; }
-    try { loaded.push({ s, sym, old: await io.loadBars(s, sym) }); } catch(e){ loaded.push({ s, sym, old: null }); }   // unreadable: the whole history is fetched again
-  });
+  const rd = dailyReader(list.length, io, progress), loaded = await loadSaved(list, io, rd);
   const own = loaded.filter(x => !x.old || x.old.length < 2), known = loaded.filter(x => x.old && x.old.length >= 2);
-  for(let i = 0; i < known.length && !io.stop() && !rd.out.abort; i += BATCH) own.push(...await rd.batched(known.slice(i, i + BATCH)));
+  Object.assign(rd.out, { known: known.length, noHistory: own.length });
+  if(io.plan) io.plan({ known: known.length, none: own.length, calls: Math.ceil(known.length / BATCH) + 1 });
+  const calendar = known.length && !io.stop() ? await tradingCalendar(rd) : null;
+  for(let i = 0; calendar && i < known.length && !io.stop() && !rd.out.abort; i += BATCH) own.push(...await rd.batched(known.slice(i, i + BATCH), calendar));
+  rd.out.behind = own.length - rd.out.noHistory;
   rd.out.deferred = Math.max(0, own.length - DAILY_OWN_MAX);   // the first import of many stocks is spread over several runs
   await pool(own.slice(0, DAILY_OWN_MAX), DAILY_WORKERS, async x => { if(!io.stop() && !rd.out.abort) await rd.single(x); });
   return rd.out;
@@ -138,6 +157,8 @@ function dailyReportLine(d){
   if(d.total > d.stocks) parts.push('only the first ' + num(d.stocks) + ' of ' + num(d.total) + ' this run');
   if(d.stored) parts.push(num(d.stored) + ' daily records saved');
   if(d.batched) parts.push(num(d.batched) + ' updated in batches');
+  if(d.noHistory) parts.push(num(d.noHistory) + ' had no saved history');
+  if(d.behind) parts.push(num(d.behind) + ' were too far behind for a batch');
   if(d.deferred) parts.push(num(d.deferred) + ' more stocks wait for the next run');
   if(d.pauses) parts.push('waited ' + num(d.pauses) + ' time' + (d.pauses > 1 ? 's' : '') + ' for the TradingView call limit');
   if(d.failed) parts.push(num(d.failed) + ' failed');

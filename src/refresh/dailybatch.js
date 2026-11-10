@@ -1,31 +1,31 @@
 // Daily (1D) bars of the stocks that already have saved bars, from TradingView's batch call (50 stocks per call) instead of one call per stock (v1.356).
-// The batch tool returns the current and the previous daily bar (open, high, low, close, volume) but no bar times, so a bar is placed by the Indian day it belongs to,
-// the same way historyplan.js does it for the weekly and monthly bars. A stock whose newest saved bar is the current or the previous session can be brought up to
-// date this way; anything else (a longer gap, prices adjusted by a split, an unclear match) returns null and the stock is fetched on its own.
-const IST = 19800, DAY = 86400, OPEN_S = 33300;   // 09:15 Indian time: the time a daily bar opens
-const SAME_REL = 1e-4;
-const DAILY_BAR_COLUMNS = ['open', 'high', 'low', 'close', 'volume', 'open[1]', 'high[1]', 'low[1]', 'close[1]', 'volume[1]'];
+// The batch tool returns the current bar and the two before it (open, high, low, close, volume) but no bar times. The newest saved bar is found among them by its prices, and the bars
+// after it are dated from a trading calendar: the real bar times of one liquid stock, read once per run (v1.365). No weekday or holiday rule is used, so a holiday or a special
+// session (a Sunday Muhurat session) is placed correctly. A stock that is more than two sessions behind, whose saved bar is not found, or whose prices were adjusted returns
+// null and is fetched on its own.
+const IST = 19800, DAY = 86400;
+const SAME_REL = 1e-4, COPY_CLOSE = 0.005;
+const BAR_FIELDS = ['open', 'high', 'low', 'close', 'volume'];
+const DAILY_BAR_COLUMNS = BAR_FIELDS.concat(BAR_FIELDS.map(f => f + '[1]'), BAR_FIELDS.map(f => f + '[2]'));
 const dayNo = t => Math.floor((t + IST) / DAY);
-const weekday = d => (d + 3) % 7;   // day number 0 = 1970-01-01, a Thursday: Monday = 0 ... Sunday = 6
-const isWeekend = d => weekday(d) >= 5;
-// The first weekday after day number d, and the latest weekday whose session has begun by `nowS` (09:15 Indian time): before the open on a weekday morning the
-// newest bar TradingView has is still the previous weekday's, so that is the day the batch's "current" bar belongs to.
-const nextWeekday = d => { d++; while(isWeekend(d)) d++; return d; };
-const latestSessionDay = nowS => { let d = dayNo(nowS); while(isWeekend(d) || d * DAY - IST + OPEN_S > nowS) d--; return d; };
 
 /**
- * The current and the previous daily bar out of a batch row: { cur, prev } with { o, h, l, c, v }, or null when a number is missing.
- * @returns {{ cur: any, prev: any } | null}
+ * The newest bars out of a batch row, oldest first: the current bar, the one before it and, when TradingView has it, the one before that. Null when the first two are not whole.
+ * @returns {{ o: number, h: number, l: number, c: number, v: number }[] | null}
  */
 function dailyBatchBars(row){
   if(!row) return null;
   const pick = s => ({ o: row['open' + s], h: row['high' + s], l: row['low' + s], c: row['close' + s], v: row['volume' + s] });
-  const cur = pick(''), prev = pick('[1]');
   const ok = b => [b.o, b.h, b.l, b.c, b.v].every(Number.isFinite);
-  return ok(cur) && ok(prev) ? { cur, prev } : null;
+  const cur = pick(''), prev = pick('[1]'), older = pick('[2]');
+  if(!ok(cur) || !ok(prev)) return null;
+  return ok(older) ? [older, prev, cur] : [prev, cur];
 }
 const sameNum = (a, b) => Math.abs(a - b) <= SAME_REL * Math.abs(b) + 1e-9;
 const rowOf = (t, b) => [t, b.o, b.h, b.l, b.c, b.v];
+
+// True when saved bar `a` has the open, high and low of `b` and about its close (the repeated bar of a coming day, see alignDaily).
+const repeats = (a, b) => [1, 2, 3].every(i => sameNum(a[i], b[i])) && Math.abs(a[4] - b[4]) <= COPY_CLOSE * Math.abs(b[4]);   // the copy's close and volume may have moved a little since
 
 // True when every bar is a whole bar, in time order (the same checks as the weekly bars).
 function wellFormed(out){
@@ -38,25 +38,25 @@ function wellFormed(out){
 }
 
 /**
- * `stored` = the saved daily bars (oldest first, at least two), `bars` = dailyBatchBars of the stock, `nowS` = now in unix seconds. Returns the bars brought up to date,
- * or null when the stock must be fetched on its own.
+ * `stored` = the saved daily bars (oldest first, at least two), `bars` = dailyBatchBars of the stock, `calendar` = the bar times of a liquid stock, oldest first (at least as many as `bars`).
+ * Returns the bars brought up to date, or null when the stock must be fetched on its own.
  * @returns {any[][] | null}
  */
-function alignDaily(stored, bars, nowS){
-  if(!Array.isArray(stored) || stored.length < 2 || !bars) return null;
-  const L = stored[stored.length - 1], head = stored.slice(0, -1);
+function alignDaily(stored, bars, calendar){
+  if(!Array.isArray(stored) || stored.length < 2 || !bars || !Array.isArray(calendar) || calendar.length < bars.length) return null;
+  // Before the open TradingView serves the coming day's bar as a copy of the last session's, and a run then saved it: a newest bar that repeats the one before it is that copy, so it is set aside.
+  const copy = stored.length > 2 && repeats(stored[stored.length - 1], stored[stored.length - 2]);
+  if(copy) stored = stored.slice(0, -1);
+  const L = stored[stored.length - 1], head = stored.slice(0, -1), days = calendar.slice(-bars.length);
   // The saved newest bar may have been still forming when it was saved: the same bar later can only have a higher high, a lower low and more volume, and the same open.
   const same = b => sameNum(b.o, L[1]) && b.h >= L[2] - SAME_REL && b.l <= L[3] + SAME_REL && b.v >= L[5] * 0.99;
-  // When TradingView's "current" bar is the saved bar itself, its "previous" bar must be the one saved before it.
-  const prevIsBefore = sameNum(bars.prev.o, stored[stored.length - 2][1]);
-  const isPrev = same(bars.prev), isCur = same(bars.cur) && prevIsBefore;
-  let out = null;
-  if(isCur && !isPrev) out = head.concat([rowOf(L[0], bars.cur)]);   // no session since: the newest bar is still the saved one
-  else if(isPrev && !isCur){   // the saved bar has finished; the new bar is the very next weekday's, which must also be the latest weekday whose session has begun
-    const next = nextWeekday(dayNo(L[0]));
-    if(next === latestSessionDay(nowS)) out = head.concat([rowOf(L[0], bars.prev), rowOf(next * DAY - IST + OPEN_S, bars.cur)]);
-  }
-  return out && wellFormed(out) ? out : null;
+  // It is the bar of index i when its prices fit, the bar before it is the one saved before, and it is the same trading day in the calendar.
+  const fits = i => same(bars[i]) && (i === 0 || sameNum(bars[i - 1].o, stored[stored.length - 2][1])) && dayNo(L[0]) === dayNo(days[i]);
+  const found = bars.map((b, i) => i).filter(fits);
+  if(found.length !== 1) return null;   // not found, or cannot tell which of two similar bars it is
+  const i = found[0], fresh = bars.slice(i + 1).map((b, k) => rowOf(days[i + 1 + k], b));
+  const out = head.concat([rowOf(L[0], bars[i])], fresh);
+  return wellFormed(out) ? out : null;
 }
 
 export { DAILY_BAR_COLUMNS, alignDaily, dailyBatchBars };

@@ -370,11 +370,12 @@ async function rsDaily(run){
   try {
     const io = { symbolOf: snapshotSymbol, keyOf: s => sanitizeDocId(tickerSymbol(s)), stop: () => stopAsked, today: tvIstDate, loadBars: (s, sym) => loadDailyBars(run.db, sym),
       saveBars: (s, sym, bars, isNew) => saveDailyBars(run.db, { sym, key: pcTickerKey(s), name: s.name }, bars, isNew),
-      nowS: () => Math.floor(Date.now() / 1000), batch: async syms => ((await tvCall('mcp-tv-get-symbol-data-batch', { symbols: syms, columns: DAILY_BAR_COLUMNS })) || {}).data || {},
+      plan: p => fiSet('verify', 'running', 'Daily MACD 30/60/5: ' + num(p.known) + ' stocks have saved bars (' + num(p.calls) + ' batch calls), ' + num(p.none) + ' have none (one call each)', 0.2),
+      batch: async syms => ((await tvCall('mcp-tv-get-symbol-data-batch', { symbols: syms, columns: DAILY_BAR_COLUMNS })) || {}).data || {},
       pause: ms => { fiSet('verify', 'running', 'Daily MACD 30/60/5: TradingView asked for a pause, continuing in about a minute…', 0.3); return sleep(ms); } };
     const r = await readDailyStates(list, io, progress);
     const saved = await saveDailyStates(run.db, r.results, run.today, () => {});
-    run.dailyResult = { name: strategy.name, stocks: list.length, total, read: r.results.length, changed: saved.changed, failed: r.failures.length, stored: r.stored, storeFailed: r.storeFailed, pauses: r.pauses, batched: r.batched, deferred: r.deferred, notSaved: saved.failed, abort: r.abort };
+    run.dailyResult = { name: strategy.name, stocks: list.length, total, read: r.results.length, changed: saved.changed, failed: r.failures.length, stored: r.stored, storeFailed: r.storeFailed, pauses: r.pauses, batched: r.batched, deferred: r.deferred, noHistory: r.noHistory, behind: r.behind, notSaved: saved.failed, abort: r.abort };
   } catch(e){ console.error('The daily MACD could not be read', e); run.dailyResult = { name: strategy.name, problem: 'it could not be read' }; }
 }
 
