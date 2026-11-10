@@ -3,7 +3,7 @@
   "evalLike": 0,
   "inlineStyleAttrs": 0,
   "inlineStyleScriptWrites": 0,
-  "functionsOver40Lines": 29,
+  "functionsOver40Lines": 27,
   "functionsOver4Params": 23,
   "functionsNestedOver3": 20
 }
