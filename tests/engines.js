@@ -5093,6 +5093,95 @@ test('price bars: no database, no connector or a failed fetch end the job with t
   await quietErrors(async (errs) => { assert.strictEqual(await M.saveFullBars(prStock(), [[1, 1, 1, 1, 1, 1]], [[2, 2, 2, 2, 2, 2]]), false); assert.ok(errs.includes('Could not compact the bars of ABC')); });
 }));
 
+// ---- Analysis controls (src/analysis/controls.js): the three range sliders and the axis toggles
+test('analysis controls: the RSI sliders show their range, the MoS slider follows the data bounds and keeps the chosen range inside them, and the toggles mark the current choice', () => alone(async () => {
+  globalThis.__AF = { weekMin: 20, weekMax: 80, monthMin: 0, monthMax: 100, mosLo: null, mosHi: null, xAxis: 'week', yAxis: 'month', colorBy: 'month' };
+  const C = await loadWithStubs('src/analysis/controls.js', '', { './state.js': 'export const analysisFilters = globalThis.__AF, saveAnalysisFilters = () => {};' });
+  const html = C.analysisControlsHtml(-10, 70);
+  assert.ok(html.includes('W RSI range: <span id="weekRsiRangeLabel">20&ndash;80</span>') && html.includes('id="weekRsiMinInput"') && html.includes('value="20"') && html.includes('value="80"') && html.includes('aria-label="W RSI minimum"') && html.includes('aria-label="W RSI maximum"'));
+  assert.ok(html.includes('<span id="monthRsiRangeLabel">0&ndash;100</span>') && html.includes('id="monthRsiMaxInput"') && html.includes('M RSI minimum'));
+  assert.ok(html.includes('MoS range: <span id="mosRangeLabel"></span>') && html.includes('min="-10" max="70" step="1" value="-10" id="mosMinInput"') && html.includes('min="-10" max="70" step="1" value="70" id="mosMaxInput"') && html.includes('Margin of Safety maximum'));   // no MoS filter: the whole range
+  globalThis.__AF.mosLo = -50; globalThis.__AF.mosHi = 200; const clamped = C.analysisControlsHtml(-10, 70);
+  assert.ok(clamped.includes('value="-10" id="mosMinInput"') && clamped.includes('value="70" id="mosMaxInput"'));   // a saved range outside the data is held at the bounds
+  globalThis.__AF.mosLo = 5; globalThis.__AF.mosHi = 30; const own = C.analysisControlsHtml(-10, 70);
+  assert.ok(own.includes('value="5" id="mosMinInput"') && own.includes('value="30" id="mosMaxInput"'));
+  assert.ok(html.includes('class="analysis-color-btn active" id="xAxisWeekBtn" data-axis-value="week"') && html.includes('class="analysis-color-btn" id="xAxisMonthBtn"') && html.includes('class="analysis-color-btn active" id="yAxisMonthBtn"') && html.includes('class="analysis-color-btn active" id="colorByMonthBtn" data-color-by="month"') && html.includes('X-axis:') && html.includes('Colour dots by:'));
+}));
+
+// ---- Analysis filter panel (src/analysis/filterpanel.js): the buttons with their counts, the notes, and what each click does
+TV_VALUES.add('analysisFilters');
+const fpSetup = async (over, filters) => {
+  const mk = (name, v, rating, w, m, extra) => Object.assign({ name, verdict: v, rating, technical: { states: { weekMacd: w, monthMacd: m }, raw: { weekRsi: 50, monthRsi: 50 } } }, extra);
+  const stocksList = [mk('A', 'buy', 'green', 'bull_above', 'bull_above', { rebound: true }), mk('B', 'buy', 'orange', 'bull_below', 'bear_below'), mk('C', 'hold', 'red', 'bear_above', 'bull_above', { rebound: true }),
+    mk('D', 'avoid', null, 'bear_below', 'bear_below', { noValuation: true }), mk('E', 'mbuy', 'green', 'bull_above', 'bull_below', { outRange: true }), mk('F', 'hold', 'green', null, null)];
+  const af = Object.assign({ verdicts: [], mosRatings: [], techW: [], techM: [], ideas: [], strategyId: '', rebound: false, weekMin: 0, weekMax: 100, monthMin: 0, monthMax: 100, mosLo: null, mosHi: null }, filters || {});
+  const T = globalThis.__T = { stocks: stocksList, analysisFilters: af, saves: [], remembered: [], rerenders: 0, bars: [], sets: { up: null, early: null }, strat: null,
+    mosRatingAny: (s) => s.rating || null, saveAnalysisFilters: () => { T.saves.push(JSON.stringify(af)); }, stocksInRange: (l) => l.filter((s) => !s.outRange), publishedStrategies: () => [{ id: 's1', name: 'Quality <b>', rules: [] }, { id: 's2', name: 'Other', rules: [] }],
+    qualifyingStocks: (u, rules) => u.slice(0, 3), strategyStockSet: (id) => (id === 's1' ? new Set(stocksList.slice(0, 3)) : null), sheetFrame: (x) => x, filtersOpenSaved: () => false, rememberFiltersOpen: (k, v) => T.remembered.push([k, v]),
+    escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), isRebound: (s) => !!s.rebound, ensureAllPriceBars: async () => { T.bars.push(1); return T.barsOk !== false; },
+    ideasStockSet: (list, sid) => ({ set: list && list.length ? new Set(stocksList.slice(0, 2)) : null, source: T.source || {} }), ideasWhen: () => 'today', setHtml: (el, html) => { el.innerHTML = html; }, barsOk: true, source: null };
+  Object.assign(T, over || {});
+  return { T, F: await loadAllStubbed('src/analysis/filterpanel.js', '', []), af };
+};
+const FP_PAGE = '<div class="analysis-toolbar"><div class="analysis-view-bar"></div></div><div id="analysisGlobalFilters"></div><span id="analysisLeaderboardCount" data-short="5 of 6"></span>';
+test('analysis filters: every button shows how many stocks it would give, the chip lists what is chosen, and notes explain what the strategy and ideas lists hide', () => withPage(FP_PAGE, async (win) => {
+  const { T, F, af } = await fpSetup({}, { verdicts: ['buy'], mosRatings: ['red'], strategyId: 's1', ideas: ['up'], mosLo: 0 });
+  T.source = { name: 'Quality <b>', snap: { at: 1 } };
+  F.renderAnalysisFilterPanel(() => { T.rerenders++; });
+  const doc = win.document, btn = (sel) => doc.querySelector(sel), text = (el) => el.textContent.replace(/\s+/g, ' ');
+  assert.ok(doc.querySelector('.analysis-toolbar #analysisFilterPanel'), 'docked into the toolbar');
+  assert.strictEqual(text(btn('#analysisFiltersSummary')), 'Quality <b>, Upward Trend, Strong, Red');   // what is chosen, without the counts
+  assert.strictEqual(btn('#analysisFiltersCount').textContent, '5 of 6');
+  assert.ok(text(btn('#analysisVerdictFilters')).includes('Fundamental Score') && btn('#analysisVerdictFilters [data-averdict="buy"]').classList.contains('active') && !btn('#analysisVerdictFilters [data-averdict="all"]').classList.contains('active'));
+  assert.ok(btn('#analysisStrategyFilter [data-astrat="s1"]').classList.contains('active') && text(btn('#analysisStrategyFilter')).includes('Quality &lt;b>'.replace('&lt;', '<')) && !doc.querySelector('#analysisStrategyFilter b'));   // strategy names are text
+  assert.ok(text(btn('#analysisIdeasFilter')).includes('From “Quality <b>”, processed today') && !doc.querySelector('#analysisIdeasNote b'));
+  assert.ok(doc.querySelector('#analysisHiddenNote') && text(btn('#analysisHiddenNote')).includes('stocks in the Buy / Sell ideas list'));   // the MoS range is narrowed and some stocks cannot be shown
+  assert.ok(btn('#analysisMosFilters [title="Trading at or above CSV intrinsic value (MoS ≥ 0%)"]') && text(btn('#analysisTechWFilters')).includes('Bullish'));
+  assert.strictEqual(F.analysisBucket().length, 0);   // nothing in the strategy and ideas lists is Red
+  af.mosRatings = []; assert.strictEqual(F.analysisBucket().map((s) => s.name).join(''), 'AB');   // strategy, ideas and verdict all apply
+  af.ideas = []; T.source = {}; af.strategyId = ''; af.verdicts = []; F.renderAnalysisFilterPanel(() => {});
+  assert.strictEqual(F.analysisBucket().length, 6); assert.strictEqual(text(btn('#analysisFiltersSummary')), 'All stocks');
+  af.ideas = ['early']; T.source = { name: 'S' }; af.strategyId = 's2'; F.renderAnalysisFilterPanel(() => {});
+  assert.ok(text(btn('#analysisIdeasFilter')).includes('No Buy / Sell result is saved yet for “S”'));
+  af.strategyId = ''; af.ideas = ['up']; T.source = {}; F.renderAnalysisFilterPanel(() => {});
+  assert.ok(text(btn('#analysisIdeasFilter')).includes('No Buy / Sell result is saved yet.'));
+}));
+test('analysis filters: clicking a button sets that filter and redraws, "All" clears a group, a strategy can be chosen and unchosen, and the chip folds the panel', () => withPage(FP_PAGE, async (win) => {
+  const { T, F, af } = await fpSetup();
+  const redraw = () => { T.rerenders++; };
+  F.renderAnalysisFilterPanel(redraw);
+  const doc = win.document, click = (sel) => doc.querySelector(sel).click();
+  click('#analysisVerdictFilters [data-averdict="buy"]'); click('#analysisVerdictFilters [data-averdict="hold"]');
+  assert.deepStrictEqual([af.verdicts, T.rerenders, T.saves.length], [['buy', 'hold'], 2, 2]);
+  assert.ok(doc.querySelector('#analysisVerdictFilters [data-averdict="buy"]').classList.contains('active') && !doc.querySelector('#analysisVerdictFilters [data-averdict="all"]').classList.contains('active'));
+  click('#analysisVerdictFilters [data-averdict="buy"]'); assert.deepStrictEqual(af.verdicts, ['hold']);   // a second click takes it out
+  click('#analysisVerdictFilters [data-averdict="all"]'); assert.deepStrictEqual(af.verdicts, []);
+  click('#analysisTechWFilters [data-atechw="bull_above"]'); click('#analysisTechMFilters [data-atechm="bear_below"]'); click('#analysisMosFilters [data-amos="green"]');
+  assert.deepStrictEqual([af.techW, af.techM, af.mosRatings], [['bull_above'], ['bear_below'], ['green']]);
+  F.renderAnalysisFilterPanel(redraw);   // drawn again after a redraw: the new buttons work too
+  click('#analysisStrategyFilter [data-astrat="s1"]'); assert.strictEqual(af.strategyId, 's1');
+  click('#analysisStrategyFilter [data-astrat="s1"]'); assert.strictEqual(af.strategyId, '');   // the chosen one again: back to All
+  click('#analysisStrategyFilter [data-astrat="s2"]'); click('#analysisStrategyFilter [data-astrat="all"]'); assert.strictEqual(af.strategyId, '');
+  click('#analysisReboundFilter [data-arebound="on"]'); assert.strictEqual(af.rebound, true);
+  click('#analysisReboundFilter [data-arebound="on"]'); assert.strictEqual(af.rebound, false);   // off by a second click
+  click('#analysisReboundFilter [data-arebound="on"]'); click('#analysisReboundFilter [data-arebound="all"]'); assert.strictEqual(af.rebound, false);
+  click('#analysisIdeasFilter [data-aideas="up"]'); click('#analysisIdeasFilter [data-aideas="early"]'); assert.deepStrictEqual(af.ideas, ['up', 'early']);
+  const panel = doc.getElementById('analysisFilterPanel');
+  click('#analysisFiltersToggle'); assert.deepStrictEqual([panel.classList.contains('filters-collapsed'), doc.getElementById('analysisFiltersToggle').getAttribute('aria-expanded'), T.remembered.pop()], [false, 'true', ['aFiltersOpen', true]]);   // it starts folded
+  click('#analysisFiltersToggle'); assert.deepStrictEqual([panel.classList.contains('filters-collapsed'), T.remembered.pop()], [true, ['aFiltersOpen', false]]);
+}));
+test('analysis filters: last week\'s move needs the weekly bars, which are loaded once and the panel redrawn; a failed load is tried again next time', () => withPage(FP_PAGE, async () => {
+  const { T, F } = await fpSetup({}, { rebound: true });
+  const redraw = () => { T.rerenders++; };
+  F.renderAnalysisFilterPanel(redraw); F.renderAnalysisFilterPanel(redraw);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.deepStrictEqual([T.bars.length, T.rerenders], [1, 1]);   // asked once, redrawn once
+  const failing = await fpSetup({ barsOk: false }, { rebound: true });
+  failing.F.renderAnalysisFilterPanel(() => { failing.T.rerenders++; }); await new Promise((r) => setTimeout(r, 5));
+  failing.F.renderAnalysisFilterPanel(() => {}); await new Promise((r) => setTimeout(r, 5));
+  assert.deepStrictEqual([failing.T.bars.length, failing.T.rerenders], [2, 0]);   // nothing to redraw, so it asks again
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
@@ -5307,7 +5396,7 @@ test('analysis sort state: a saved sort of a known column is kept, an unknown on
 }));
 test('analysis grid columns: every column draws its cell, the headers and the Columns panel are drawn, and every sortable column sorts', () => alone(async () => {
   const T = globalThis.__T = {
-    priceLoaded: new Set(), pcTickerKey: (s) => s.name, mosPct: (s) => (typeof s.mos === 'number' ? s.mos : -Infinity), mosRatingAny: (s) => s.rating || null, isPinned: (s) => !!s.pinned, techRatingInfo: (k) => (k ? { cls: 'b-up', label: 'Bullish' } : null),
+    analysisFilters: {}, priceLoaded: new Set(), pcTickerKey: (s) => s.name, mosPct: (s) => (typeof s.mos === 'number' ? s.mos : -Infinity), mosRatingAny: (s) => s.rating || null, isPinned: (s) => !!s.pinned, techRatingInfo: (k) => (k ? { cls: 'b-up', label: 'Bullish' } : null),
     ideaRankOf: (s) => s.idea || null, ideasWhen: () => 'today', newsCounts: (s) => s.news || null, newsCellHtml: () => '<td>news</td>', eventMark: () => '', industryMedianW: (s) => (typeof s.indW === 'number' ? s.indW : null),
     stockShareLink: () => '#x', tvUrlFor: () => 'https://tv/x', stockResearchAgeDays: (s) => (typeof s.age === 'number' ? s.age : null), stockResearchAsof: () => '2026-11-01', getResearchTriggers: () => new Map(), getResearchTriggerKinds: () => new Map(),
     researchTriggerDone: () => true, analysisQueuePriceLoad: () => {}, scoreBand: () => 'fs-hi', getAnalysisColumnsPanelOpen: () => !!T.panelOpen, panelOpen: false };

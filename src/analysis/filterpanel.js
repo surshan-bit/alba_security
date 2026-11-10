@@ -270,17 +270,16 @@ const GROUPS = [
   ['analysisIdeasFilter', 'aideas', 'ideas']   // v1.306: Upward and Early Trend can both be chosen
 ];
 
-// Draws the panel and makes its buttons work. `rerender` redraws the whole Analysis section.
 let barsAsked = false;
-function renderAnalysisFilterPanel(rerender){
-  if(analysisFilters.rebound && !barsAsked){   // last week's move needs the weekly bars: load them once, then redraw
-    barsAsked = true;
-    ensureAllPriceBars().then(ok => { if(ok) rerender(); else barsAsked = false; });
-  }
-  const host = document.getElementById('analysisGlobalFilters');
-  const old = document.getElementById('analysisFilterPanel');
-  if(old) old.remove();   // the panel docked in the toolbar is the one being replaced
-  if(host) setHtml(host, analysisFiltersHtml());
+// Last week's move needs the weekly bars: load them once, then redraw.
+function loadReboundBars(rerender){
+  if(!analysisFilters.rebound || barsAsked) return;
+  barsAsked = true;
+  ensureAllPriceBars().then(ok => { if(ok) rerender(); else barsAsked = false; });
+}
+
+// The "Filters" chip: the line that lists what is selected, the count beside it and the button that folds the panel.
+function wireFiltersChip(){
   const panel = document.getElementById('analysisFilterPanel'), toggle = document.getElementById('analysisFiltersToggle'), summary = document.getElementById('analysisFiltersSummary');
   if(panel && toggle && summary){
     const names = Array.from(panel.querySelectorAll('.filter-btn.active')).filter(b => !(/** @type {(string | undefined)[]} */ (['all'])).includes(/** @type {HTMLElement} */ (b).dataset.averdict || /** @type {HTMLElement} */ (b).dataset.amos || /** @type {HTMLElement} */ (b).dataset.atechw || /** @type {HTMLElement} */ (b).dataset.atechm || /** @type {HTMLElement} */ (b).dataset.arebound || /** @type {HTMLElement} */ (b).dataset.astrat || /** @type {HTMLElement} */ (b).dataset.aideas)).map(b => {
@@ -295,18 +294,25 @@ function renderAnalysisFilterPanel(rerender){
       rememberFiltersOpen('aFiltersOpen', analysisFiltersOpen);
     });
   }
-  dockFiltersPanel();
+}
+
+// "All" or a strategy button: choose that strategy (clicking the chosen one again goes back to All).
+function wireStrategyButtons(rerender){
   document.querySelectorAll('#analysisStrategyFilter .filter-btn').forEach(btn => btn.addEventListener('click', () => {
     const id = /** @type {HTMLElement} */ (btn).dataset.astrat === 'all' ? '' : /** @type {HTMLElement} */ (btn).dataset.astrat;
     analysisFilters.strategyId = (id && id === analysisFilters.strategyId) ? '' : id;   // clicking the chosen one again goes back to All
     saveAnalysisFilters(analysisFilters);
     rerender();
   }));
+}
+function wireReboundButtons(rerender){
   document.querySelectorAll('#analysisReboundFilter .filter-btn').forEach(btn => btn.addEventListener('click', () => {
     analysisFilters.rebound = /** @type {HTMLElement} */ (btn).dataset.arebound === 'on' && !analysisFilters.rebound;
     saveAnalysisFilters(analysisFilters);
     rerender();
   }));
+}
+function wireGroupButtons(rerender){
   GROUPS.forEach(([id, attr, list]) => {
     const btns = Array.from(document.querySelectorAll('#' + id + ' .filter-btn'));
     wireMultiselectFilterGroup(btns, attr, { getSet: () => new Set(analysisFilters[list]), setSet: (s) => { analysisFilters[list] = Array.from(s); }, onChange: () => {
@@ -314,6 +320,20 @@ function renderAnalysisFilterPanel(rerender){
       rerender();
     } });
   });
+}
+
+// Draws the panel and makes its buttons work. `rerender` redraws the whole Analysis section.
+function renderAnalysisFilterPanel(rerender){
+  loadReboundBars(rerender);
+  const host = document.getElementById('analysisGlobalFilters');
+  const old = document.getElementById('analysisFilterPanel');
+  if(old) old.remove();   // the panel docked in the toolbar is the one being replaced
+  if(host) setHtml(host, analysisFiltersHtml());
+  wireFiltersChip();
+  dockFiltersPanel();
+  wireStrategyButtons(rerender);
+  wireReboundButtons(rerender);
+  wireGroupButtons(rerender);
 }
 
 export { analysisBucket, renderAnalysisFilterPanel };
