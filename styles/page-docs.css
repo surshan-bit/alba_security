@@ -2,18 +2,12 @@
 .doc-page .sub{max-width:none}
 .analysis-page table th,.analysis-page table td,.strat-page table th,.strat-page table td,.doc-page table th,.doc-page table td,.tl-page table th,.tl-page table td{border-color:transparent}
 .doc-page a{color:var(--accent)}
-@media (min-width:901px){
-:root[data-theme="white"] :is(.doc-page,.doc-page) :is(li,p,td){line-height:1.6}
+@media (min-width:901px){:root[data-theme="white"] :is(.doc-page,.doc-page) :is(li,p,td){line-height:1.6}
 :root[data-theme="white"] :is(.doc-page,.doc-page) .glossary-def{font-size:var(--t-md);line-height:1.55}
 :root[data-theme="white"] :is(.doc-page,.doc-page) th{font-size:var(--t-md);letter-spacing:.04em}
-:root[data-theme="white"] :is(.doc-page,.doc-page) h3{font-size:var(--t-lg);font-weight:700;color:var(--text)}
-}
+:root[data-theme="white"] :is(.doc-page,.doc-page) h3{font-size:var(--t-lg);font-weight:700;color:var(--text)}}
 :root[data-theme="white"] :is(.tl-page,.doc-page,.doc-page)>header .sub{display:none}
 :root[data-theme="white"] :is(.tl-page,.doc-page,.doc-page)>header{margin:0}
-@media (min-width:901px){
-:root[data-theme="white"] :is(.doc-page,.doc-page) h3{margin-top:28px}
-:root[data-theme="white"] :is(.doc-page,.doc-page) h3:first-child{margin-top:0}
-}
-@media (max-width:900px){
-:root[data-theme="white"] .doc-page h3{font-size:var(--t-md);font-weight:700;color:var(--text);margin-top:22px}
-}
+@media (min-width:901px){:root[data-theme="white"] :is(.doc-page,.doc-page) h3{margin-top:28px}
+:root[data-theme="white"] :is(.doc-page,.doc-page) h3:first-child{margin-top:0}}
+@media (max-width:900px){:root[data-theme="white"] .doc-page h3{font-size:var(--t-md);font-weight:700;color:var(--text);margin-top:22px}}
