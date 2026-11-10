@@ -6210,6 +6210,32 @@ test('safeUrl: only http and https addresses become links; scripts, data and rel
   for(const bad of ['javascript:alert(1)', ' https://a.test', 'data:text/html,x', '//a.test', '/path', 'ftp://a.test', '', null, undefined, 5, {}]) assert.strictEqual(safeUrl(bad), '');
 });
 
+// ---- Links from saved data (Trade Log ideas, Explorer news): only http and https addresses become links
+test('Trade Log ideas: a saved headline links only when its address is http(s), and every text is escaped', () => kcPage('<select id="tradeIdeasStrategy"></select><button id="tradeIdeasRun"></button><div id="tradeIdeasBody"></div>', async (win) => {
+  const news = { total: 2, pos: 0, neg: 1, items: [{ t: 'Head <i>', url: 'https://n.test/1', d: '2026-11-01', s: 'neg', src: 'Wire' }, { t: 'Bad <b>', url: 'javascript:alert(1)', d: '2026-11-02', s: 'pos' }, { t: 'Plain', d: '2026-11-03' }] };
+  const snap = { v: 1, at: '2026-11-10T08:00:00Z', today: '2026-11-10', n: 1, up: 1, early: 0, down: 0, mixed: 0, lists: { up: [{ sym: 'AAA', name: 'Acme <b>', reasons: ['why <i>'], news }], early: [] } };
+  globalThis.__T = { stocks: [{ name: 'Acme', ticker: 'AAA' }], publishedStrategies: () => [{ id: 's1', name: 'Quality <b>', rules: [] }], ideasResultsGet: () => ({ s1: snap }), ideasResultsSave: () => {}, tvIstDate: () => '2026-11-10', keepScroll: (el, fn) => fn(), setHtml: (el, h) => { el.innerHTML = h; },
+    escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), CAP_NAME: {}, BUY_TOP: 90 };
+  TV_VALUES.add('CAP_NAME');
+  const M = await loadAllStubbed('src/tradelog/ideas.js', '', ['../core/evt.js']);
+  M.init_ideas(); M.renderIdeas();
+  const sel = win.document.getElementById('tradeIdeasStrategy'); sel.value = 's1'; sel.dispatchEvent(new win.Event('change'));
+  const body = win.document.getElementById('tradeIdeasBody'), links = [...body.querySelectorAll('.tl-news-list a')];
+  assert.deepStrictEqual(links.map((a) => a.getAttribute('href')), ['https://n.test/1']);   // the script address and the headline with no address are plain text
+  assert.ok(body.textContent.includes('Bad <b>') && body.textContent.includes('Plain') && !body.querySelector('.tl-news-list b, .tl-news-list i') && !body.querySelector('a[href^="javascript"]'));
+}));
+test('Explorer news item and News page: only http(s) headlines are links', async () => {
+  const { newsItemHtml } = load('src/business/newsitem.js');
+  const good = newsItemHtml({ d: '2026-11-01', t: 'Head <i>', url: 'https://n.test/1', s: 'pos', stock: 'S' }, ''), bad = newsItemHtml({ d: '2026-11-01', t: 'Head <i>', url: 'javascript:alert(1)', s: 'pos', stock: 'S' }, '');
+  assert.ok(good.includes('href="https://n.test/1"') && good.includes('rel="noopener noreferrer"') && !good.includes('<i>'));
+  assert.ok(!bad.includes('href') && bad.includes('Head &lt;i&gt;'));
+});
+test('News page: the screen starts on its loading line until the news is read', () => alone(async () => {
+  globalThis.__T = { news: { ready: false, pulse: null }, getPulseRun: () => ({ state: 'idle' }), getEventsRun: () => ({ state: 'idle' }), escapeHtml: (x) => String(x), stocks: [], stockIndex: new Map(), publishedStrategies: () => [] };
+  const M = await loadAllStubbed('src/news/render.js', '', []);
+  assert.ok(M.newsHtml().includes('Loading…') && M.newsHtml().includes('Not refreshed yet'));
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
