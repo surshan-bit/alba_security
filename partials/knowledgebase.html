@@ -266,6 +266,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.365 &middot; 2026-11-10</h3>
+            <ul>
+              <li><strong>Cleaner inside (nothing looks different, nothing is scored differently):</strong> the TradingView watchlist sync was taken apart into small, tested steps: which symbol each stock gets, the checks on what TradingView holds, and the wording of the result now each have their own tested piece. The sync works exactly as before, including its safety rules (new list first, one delete at a time, never a raw BSE code).</li>
+            </ul>
             <h3>v1.364 &middot; 2026-11-10</h3>
             <ul>
               <li><strong>The daily (1D) import now updates stocks that have saved bars in batches on any day, with no weekday rules:</strong> a Sunday special session (Muhurat trading) or a market holiday used to make the day check fail, so almost every stock went to a call of its own and the limit was used up (on 9 November, 100 one-by-one calls and 305 stocks left waiting). The batch call now returns the last three daily bars, the saved newest bar is found among them by its prices, and the bars after it are dated from the real trading days of one liquid stock, read once per run. A stock up to two sessions behind is brought up to date in the batch; the bar TradingView shows before the open as a copy of the last session is set aside.</li>
