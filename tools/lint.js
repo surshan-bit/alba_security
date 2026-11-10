@@ -115,7 +115,7 @@ for(const f of require('fs').readdirSync('styles').filter(x => x.endsWith('.css'
 }
 // 7. the layer order of the built stylesheet: the bundler drops an @layer order line, so the order is the order the layers first appear in styles/main.css.
 {
-  const want = ['legacy', 'detail', 'phone', 'type', 'override', 'phone-last'];
+  const want = ['legacy', 'page', 'detail', 'phone', 'type', 'override', 'phone-last'];
   let built = '';
   try { built = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); } catch(e){ /* not built yet */ }
   if(built){

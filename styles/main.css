@@ -26,19 +26,19 @@
 @import "./refresh-kit.css" layer(legacy);
 @import "./late-global.css" layer(legacy);
 @import "./filters-ondemand.css" layer(legacy);
-@import "./page-docs.css" layer(legacy);
-@import "./page-settings.css" layer(legacy);
-@import "./page-buttons.css" layer(legacy);
-@import "./page-trade-log.css" layer(legacy);
-@import "./page-refreshlog.css" layer(legacy);
-@import "./page-analysis.css" layer(legacy);
-@import "./page-news.css" layer(legacy);
+@import "./page-docs.css" layer(page);
+@import "./page-settings.css" layer(page);
+@import "./page-buttons.css" layer(page);
+@import "./page-trade-log.css" layer(page);
+@import "./page-refreshlog.css" layer(page);
+@import "./page-analysis.css" layer(page);
+@import "./page-news.css" layer(page);
 @import "./detail.css" layer(detail);
 @import "./phone-boost.css" layer(phone);
 @import "./white-type.css" layer(type);
 @import "./overrides.css" layer(override);
 @import "./phone-overrides.css" layer(phone-last);
-/* Six layers, in the order they first appear in this file (the bundler drops an @layer order line; tools/lint.js checks the order): a later layer wins whatever the selector says,
-   so nothing in the stylesheet needs the important flag. legacy (the screen files and the page-*.css files at its end), detail (the stock page), phone (phone-boost.css),
-   type (white-type.css, the one type scale), override (overrides.css: the rules that must beat all of those) and phone-last (phone-overrides.css: the phone rules that must beat the override ones). */
+/* Seven layers, in the order they first appear in this file (the bundler drops an @layer order line; tools/lint.js checks the order): a later layer wins whatever the selector says,
+   so nothing in the stylesheet needs the important flag. legacy (the screen files), page (the page-*.css files: touches for one page, which must beat the shared parts whatever their selectors),
+   detail (the stock page), phone (phone-boost.css), type (white-type.css, the one type scale), override (overrides.css: the rules that must beat all of those) and phone-last (phone-overrides.css: the phone rules that must beat the override ones). */
 
