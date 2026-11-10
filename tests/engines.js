@@ -4838,6 +4838,110 @@ test('refresh kit: the toolbar menu runs the chosen group, a selection is refres
   kcClick(win, doc.getElementById('plain') || doc.body);
 }));
 
+// ---- Pins, the Events panel, the last-file card, run records and the Claude controls: the places that took long argument lists
+test('pins: a pin or unpin saves the change with where it came from (build, screen, device) and keeps a short history', () => withPage('<script data-entry="app.js?v=abc123"></script><section id="section-news" class="app-section active"></section>', async (win) => {
+  const saved = [], audit = [], pinned = new Set(), rerendered = [];
+  globalThis.__PN = { pinned, db: {} };
+  const ref = { get: async () => ({ exists: true, data: () => ({ tickers: ['XYZ'] }) }), set: async (d) => { saved.push(d); } };
+  const auditRef = { get: async () => ({ exists: true, data: () => ({ log: Array.from({ length: 40 }, (_, i) => ({ n: i })) }) }), set: async (d) => { audit.push(d); } };
+  const P = await loadWithStubs('src/core/pins.js', '', {
+    './stocks.js': 'export const stocks = [{ ticker: "ABC" }];',
+    './store.js': 'export const dbCapabilityPromise = Promise.resolve(globalThis.__PN.db), getDb = () => globalThis.__PN.db, isPinnedTicker = (t) => globalThis.__PN.pinned.has(t), togglePinnedTicker = (t) => { const p = globalThis.__PN.pinned; if(p.has(t)) p.delete(t); else p.add(t); };',
+    '../detail/render.js': 'export const getShownIndex = () => 0, rerenderDetail = () => globalThis.__PN.rerendered.push(1);',
+    '../identity/session.js': 'export const pinsRef = () => globalThis.__PN.ref, userRef = () => globalThis.__PN.auditRef;' });
+  Object.assign(globalThis.__PN, { ref, auditRef, rerendered });
+  const settle = async () => { for(let i = 0; i < 50 && P.pinWritesInFlight(); i++) await new Promise((r) => setTimeout(r, 5)); };
+  const asUser = async (ua, fn) => {   // the browser the change comes from
+    const had = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    Object.defineProperty(globalThis, 'navigator', { value: { userAgent: ua }, configurable: true });
+    try { await fn(); } finally { if(had) Object.defineProperty(globalThis, 'navigator', had); else delete globalThis.navigator; }
+  };
+  await asUser('Mozilla/5.0 (X11; Linux x86_64)', async () => { P.togglePin('ABC'); await settle(); });
+  assert.deepStrictEqual(saved[0].tickers, ['XYZ', 'ABC']);
+  const who = saved[0].lastChange;
+  assert.deepStrictEqual([who.action, who.ticker, who.before, who.after, who.build, who.screen, who.visible, who.device], ['pin', 'ABC', 1, 2, 'abc123', 'news', win.document.visibilityState, 'desktop']);
+  assert.ok(audit[0].log.length === 40 && audit[0].log[39].action === 'pin');   // the history keeps the last 40 changes
+  assert.strictEqual(rerendered.length, 1);   // the shown stock is redrawn
+  assert.ok(P.isPinned({ ticker: 'ABC' }));
+  await asUser('Mozilla/5.0 (X11; Linux x86_64)', async () => { P.togglePin('ABC'); await settle(); }); assert.deepStrictEqual([saved[1].lastChange.action, saved[1].tickers], ['unpin', ['XYZ']]);
+  win.document.querySelector('script').remove(); win.document.querySelector('section').classList.remove('active');   // no build id, no active screen
+  await asUser('Mozilla/5.0 (iPhone)', async () => { P.togglePin('ABC'); await settle(); });
+  assert.deepStrictEqual([saved[2].lastChange.build, saved[2].lastChange.screen, saved[2].lastChange.device], [null, null, 'phone']);
+  globalThis.__PN.auditRef = null; globalThis.__PN.ref = null; await asUser('x', async () => { P.togglePin('ABC'); await settle(); }); assert.strictEqual(saved.length, 3);   // not signed in: nothing is saved
+}));
+
+test('stock events panel: coming up and recent events are grouped by day, links only open on http(s), sentiment is tagged, and text stays text', () => alone(async () => {
+  const E = await loadWithStubs('src/detail/events.js', '', {
+    '../core/util.js': 'export const escapeHtml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");', './icons.js': 'export const panelIcon = () => "";',
+    '../news/model.js': 'export const dateNote = (t) => t, shortDate = (d) => d, typeTag = (t) => t.toUpperCase();', '../news/upcoming.js': 'export const upcomingFor = (s) => s.up || [];' });
+  const today = new Date(Date.now() + 19800000).toISOString().slice(0, 10), ago = (n) => new Date(Date.parse(today + 'T00:00:00Z') - n * 86400000).toISOString().slice(0, 10);
+  const s = { up: [{ date: '2026-12-01T00:00:00', type: 'results', text: 'Q3 <results>', src: 'NSE', url: 'https://x.test/a' }, { date: '2026-12-01', type: 'company', text: '', src: 'BSE', url: 'javascript:alert(1)' }],
+    __events: [{ k: 'news', d: ago(2), t: 'Good news', src: 'Wire', url: 'https://n.test/1', s: 'pos' }, { k: 'news', d: ago(2), t: 'Bad news', s: 'neg' }, { k: 'earn', d: ago(5), t: 'Results out', s: 'neu' }, { k: 'news', d: ago(95), t: 'Too old' }, { k: 'other', d: ago(1), t: 'Not shown' }, null] };
+  const html = E.renderEventsPanel(s);
+  assert.ok(html.includes('Q3 &lt;results>') && html.includes('href="https://x.test/a"') && !html.includes('javascript:') && html.includes('Expected date') === false);   // a hostile link is dropped, text is escaped
+  assert.ok(html.includes('class="day-head"><b>2026-12-01</b><span>2</span>') && html.includes('2 coming'));   // two things on one day: said once
+  assert.ok(html.includes('news-tag news-positive">positive') && html.includes('news-tag news-negative">negative') && !html.includes('>neutral<'));
+  assert.ok(html.includes('Good news') && html.includes('Results out') && !html.includes('Too old') && !html.includes('Not shown'));
+  assert.ok(html.includes('BSE'));   // an event with no text shows its source
+  const empty = E.renderEventsPanel({});
+  assert.ok(empty.includes('Nothing coming up is saved for this stock') && empty.includes('No results, company events or news saved in the last 90 days'));
+}));
+
+test('last file card: a failed or cancelled import is written on the upload record, and nothing is written without a record, an id or a database', () => withPage('', async () => {
+  globalThis.__LF = { puts: [], sets: [], pruned: [] };
+  const L = await loadWithStubs('src/import/last-file.js', '', {
+    '../core/store.js': 'export const getDb = () => null, fundamentalCsvUploadLog = { put: (k, v) => globalThis.__LF.puts.push([k, v]), values: () => [] };',
+    '../core/util.js': 'export const escapeHtml = (t) => String(t), formatUploadTimestamp = (t) => String(t);', './joblock.js': 'export const lockBusy = () => false;',
+    '../joblogs/panels.js': 'export const pruneLogCollection = async (db, col) => { globalThis.__LF.pruned.push(col); };', '../core/safehtml.js': 'export const setHtml = () => {};' });
+  const db = { collection: (c) => ({ doc: (id) => ({ set: async (r) => { globalThis.__LF.sets.push([c, id, r]); } }) }) };
+  const rec = { uploadedAt: '2026-11-10T01:00:00Z', filename: 'f.csv', status: 'uploaded' };
+  await L.recordAttempt('fund', rec, { recId: 'r1', e: new Error('boom'), db });
+  const [col, id, saved] = globalThis.__LF.sets[0];
+  assert.deepStrictEqual([col, id, saved.status, saved.lastAttempt.outcome, saved.lastAttempt.message, /^\d{4}-/.test(saved.lastAttempt.at)], ['fundamentalCsvUploadLog', 'r1', 'uploaded', 'failed', 'boom', true]);
+  assert.deepStrictEqual([globalThis.__LF.puts.length, globalThis.__LF.pruned], [1, ['fundamentalCsvUploadLog']]);
+  await L.recordAttempt('fund', rec, { recId: 'r2', e: { cancelled: true, message: 'Stopped' }, db }); assert.strictEqual(globalThis.__LF.sets[1][2].lastAttempt.outcome, 'cancelled');
+  await L.recordAttempt('fund', rec, { recId: 'r3', e: 'x'.repeat(400), db }); assert.strictEqual(globalThis.__LF.sets[2][2].lastAttempt.message.length, 300);
+  await L.recordAttempt('fund', rec, { recId: 'r4', db }); assert.strictEqual(globalThis.__LF.sets[3][2].lastAttempt.message, '');
+  const n = globalThis.__LF.sets.length;
+  await L.recordAttempt('fund', null, { recId: 'r5', e: 1, db }); await L.recordAttempt('fund', rec, { e: 1, db }); await L.recordAttempt('fund', rec, { recId: 'r6', e: 1, db: null });
+  assert.strictEqual(globalThis.__LF.sets.length, n);
+}));
+
+test('run records: a run is saved with its times, only the newest two of each kind are kept, and a database that fails does not stop the run', () => alone(async () => {
+  const R = await loadWithStubs('src/refresh/runlog.js', '', { '../core/util.js': 'export const escapeHtml = (t) => String(t), formatUploadTimestamp = (t) => String(t);', '../core/safehtml.js': 'export const setHtml = () => {};' });
+  const docs = new Map([['old1', { kind: 'snapshot', startedAt: '2026-11-01T00:00:00.000Z' }], ['old2', { kind: 'snapshot', startedAt: '2026-11-02T00:00:00.000Z' }], ['old3', { kind: 'snapshot', startedAt: '2026-11-03T00:00:00.000Z' }], ['other', { kind: 'other', startedAt: '2026-10-01T00:00:00.000Z' }]]);
+  const writes = [], gone = [];
+  const db = { doc: (p) => ({ set: async (d) => { writes.push([p, d]); docs.set('new', d); }, delete: async () => { gone.push(p); } }), collection: () => ({ get: async () => ({ docs: [...docs].map(([id, d]) => ({ id, exists: true, data: () => d })) }) }) };
+  const t0 = Date.now() - 5000;
+  await R.saveRunLog(db, 'snapshot', { startedAt: '2026-11-10T01:02:03.456Z', t0 }, { saved: 7 });
+  const [path, rec] = writes[0];
+  assert.deepStrictEqual([path, rec.v, rec.kind, rec.trigger, rec.startedAt, rec.saved, rec.durationMs >= 5000 && rec.durationMs < 60000], ['refreshRunLog/snapshot-20261110T010203456Z', 2, 'snapshot', 'manual', '2026-11-10T01:02:03.456Z', 7, true]);
+  assert.deepStrictEqual(gone.sort(), ['refreshRunLog/old1', 'refreshRunLog/old2']);   // the newest two (the new run and old3) stay; another kind is untouched
+  await quietErrors(async (seen) => {
+    await R.saveRunLog({ doc: () => ({ set: async () => { throw new Error('full'); } }) }, 'snapshot', { startedAt: '2026-11-10T01:02:03.456Z', t0 }, {});
+    await R.saveRunLog({ doc: () => ({ set: async () => {} }), collection: () => ({ get: async () => { throw new Error('offline'); } }) }, 'snapshot', { startedAt: '2026-11-10T01:02:03.456Z', t0 }, {});
+    assert.deepStrictEqual(seen, ['Could not save the refresh run record', 'Could not remove the older run records']);
+  });
+}));
+
+test('Claude controls: a master switch and one switch per step, steps are off while the master is off, and a change is saved and redrawn', () => withPage('<div id="claudeControls"></div>', async (win) => {
+  globalThis.__CC = { on: { all: true, a: true, b: false }, calls: [] };
+  const C = await loadWithStubs('src/ui/claudecontrols.js', '', {
+    '../livedata/claudegate.js': 'export const CLAUDE_STEPS = [{ id: "a", label: "Step <A>", sub: "Does A" }, { id: "b", label: "Step \\"B\\"", sub: "Does B" }], claudeMasterOn = () => globalThis.__CC.on.all, claudeStepOn = (id) => globalThis.__CC.on[id], setClaudeStep = (id, v) => { globalThis.__CC.on[id] = v; globalThis.__CC.calls.push([id, v]); };',
+    '../core/safehtml.js': 'export const setHtml = (el, html) => { el.innerHTML = html; };' });
+  C.init_ui_claudecontrols();
+  const host = win.document.getElementById('claudeControls'), boxes = () => [...host.querySelectorAll('input')];
+  assert.deepStrictEqual(boxes().map((b) => [b.dataset.claudeStep, b.checked, b.disabled]), [['all', true, false], ['a', true, false], ['b', false, false]]);
+  assert.strictEqual(host.querySelectorAll('.settings-row-title')[1].textContent, 'Step <A>'); assert.strictEqual(host.querySelector('a'), null);   // titles stay text
+  assert.strictEqual(boxes()[2].getAttribute('aria-label'), 'Step &quot;B&quot;'.replace('&quot;', '"').replace('&quot;', '"'));
+  boxes()[0].checked = false; boxes()[0].dispatchEvent(new win.Event('change', { bubbles: true }));
+  assert.deepStrictEqual(globalThis.__CC.calls, [['all', false]]);
+  assert.deepStrictEqual(boxes().map((b) => b.disabled), [false, true, true]);   // with the master off the steps cannot be changed
+  host.dispatchEvent(new win.Event('change'));   // a change that is not from a switch
+  assert.strictEqual(globalThis.__CC.calls.length, 1);
+  win.document.body.innerHTML = ''; C.init_ui_claudecontrols();   // a page without the panel
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
