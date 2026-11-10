@@ -12,7 +12,7 @@
 header{margin-bottom:12px;}
 /* The page name is in the top bar (Alba Securities > Page), so the heading stays only for screen readers and a page keeps just its short description. */
 .app-section > header h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:0;}
-.app-section > header:not(:has(.sub)){display:none;}
+.app-section > header:not(:has(.sub)){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:0;}   /* no visible subtitle: the header goes, but its h1 stays for screen readers */
 .app-section > header .sub{margin:0;}
 h1{margin:0 0 6px;font-size:var(--t-lg);font-weight:600;letter-spacing:.2px;}
 .sub{color:var(--muted);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:var(--t-sm);line-height:1.5;max-width:680px;}

@@ -210,7 +210,7 @@ function renderIndustryDetail(by, name, backLabel, openStock){
   const links = [['jump-ind-factors', 'Industry Factors'], ['jump-ind-global', 'Global & Macro'], ['jump-ind-charts', '% change'], ['jump-ind-news', 'News'], ['jump-ind-stocks', 'Stocks']];
   setHtml(detailEl, `
     <div class="detail-back-bar"><button type="button" class="detail-back" id="detailBackBtn" title="Back (Esc)">&larr; Back to ${escapeHtml(backLabel)}<span class="detail-back-key">Esc</span></button></div>
-    <div class="detail-top"><div class="detail-title"><div class="detail-title-text"><div class="detail-name">${escapeHtml(name)}</div><div class="detail-ticker">${by === 'group' ? 'Industry group' : 'Industry'} &middot; ${members.length} stock${members.length === 1 ? '' : 's'}</div></div></div></div>
+    <div class="detail-top"><div class="detail-title"><div class="detail-title-text"><h1 class="detail-name">${escapeHtml(name)}</h1><div class="detail-ticker">${by === 'group' ? 'Industry group' : 'Industry'} &middot; ${members.length} stock${members.length === 1 ? '' : 's'}</div></div></div></div>
     <nav class="detail-jump" aria-label="Jump to section"><div class="detail-jump-who"><span class="detail-jump-name">${escapeHtml(name)}</span></div><span class="detail-jump-label">Jump to</span>${links.map(l => `<a href="#" data-jump="${l[0]}">${l[1]}</a>`).join('')}</nav>
     ${factorsHtml(industryFactors(members))}
     ${globalHtml(industryGlobal(members))}

@@ -55,7 +55,7 @@ function detailHtml(s, idx, pinned){
     <div class="detail-top">
       <div class="detail-title">
         <button type="button" class="detail-star${pinned?' pinned':''}" id="detailPinBtn" aria-pressed="${pinned?'true':'false'}" aria-label="${pinned?'Unpin from top':'Pin to top'}" title="${pinned?'Pinned — click to unpin':'Pin to top'}">${pinned?'★':'☆'}</button>
-        <div class="detail-title-text"><div class="detail-name-row"><div class="detail-name">${escapeHtml(s.name)}</div>${capTagHtml(s)}</div><div class="detail-ticker">${escapeHtml(s.ticker)}</div></div>
+        <div class="detail-title-text"><div class="detail-name-row"><h1 class="detail-name">${escapeHtml(s.name)}</h1>${capTagHtml(s)}</div><div class="detail-ticker">${escapeHtml(s.ticker)}</div></div>
       </div>
     <div class="detail-meta">
      <div class="detail-meta-row detail-meta-links">

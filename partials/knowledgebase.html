@@ -26,7 +26,7 @@
         <li><b>Hosting:</b> every release is a new version of the same Artifact URL; only changed files are uploaded.</li>
       </ul>
       <h3>Screens and where they live</h3>
-      <div class="help-table-wrap"><table class="help-table">
+      <div class="help-table-wrap" tabindex="0" role="group" aria-label="Scrollable table"><table class="help-table">
         <thead><tr><th>Screen</th><th>Code</th><th>Notes</th></tr></thead>
         <tbody>
           <tr><td>Analysis</td><td><code>src/analysis/</code></td><td>Leaderboard (sort, columns with drag-and-drop order, Show chart for the RSI Quadrant and its filters, Full screen) with the Live Data Refresh cards below the grid. It draws 300 rows at a time; Show more adds 300 (counts, Select all and refresh still cover every stock).</td></tr>
@@ -37,7 +37,7 @@
         </tbody>
       </table></div>
       <h3>Shared building blocks (one place to change each)</h3>
-      <div class="help-table-wrap"><table class="help-table">
+      <div class="help-table-wrap" tabindex="0" role="group" aria-label="Scrollable table"><table class="help-table">
         <thead><tr><th>Module</th><th>What it centralises</th></tr></thead>
         <tbody>
           <tr><td><code>refresh/kit*.js</code></td><td>Every Refresh button, used identically by Analysis, Strategies and every Explorer industry: <code>kit-controls</code> (the buttons, their menus, the row ticks and selection bar), <code>kit-queue</code> (the saved queue of refresh jobs, the runner, the bell notices and the other-device sync), <code>kit-menu</code> (the floating menu) and <code>kit-lookup</code> (finding stocks by key, the registries of scopes and selections).</td></tr>
@@ -227,7 +227,7 @@
 
       <h2 id="kb-db" data-icon="db">7. Shared database (brief)</h2>
       <p>A few collections cover what must sync across devices or survive a republish. Nothing scoring-related lives here.</p>
-      <div class="help-table-wrap"><table class="help-table">
+      <div class="help-table-wrap" tabindex="0" role="group" aria-label="Scrollable table"><table class="help-table">
         <thead><tr><th>Collection / doc</th><th>Holds</th></tr></thead>
         <tbody>
           <tr><td>users/&lt;id&gt;</td><td>One small record per signed-in user (id, first and last seen). Ids only, no names or emails. Readable by editors only.</td></tr>

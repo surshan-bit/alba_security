@@ -69,3 +69,7 @@ select:not([multiple]):not([size]){background-image:url("data:image/svg+xml,%3Cs
 @media (max-width:900px){
 .sheet-slot :is([data-analysis-full],[data-biz-full]){display:none;}
 }
+
+/* Keyboard focus: every control that is not a text box shows a ring when it is reached by keyboard (some screen rules switch the browser's own ring off). Text boxes show their own accent border. */
+:where(a[href],button,summary,[tabindex]:not([tabindex="-1"]),input[type="checkbox"],input[type="radio"],input[type="file"]):focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+:root[data-theme="white"] .strat-layout .strat-main :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea):focus{border-bottom-color:var(--accent);box-shadow:0 1px 0 0 var(--accent);}   /* the Strategies boxes have only a bottom line: it turns accent and thickens on focus (the screen rule for this lost to a more specific one) */

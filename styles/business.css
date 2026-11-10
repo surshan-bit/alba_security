@@ -62,7 +62,7 @@
 .biz-stocks-head h3,.biz-stocks-head .upload-hint{margin:0;}
 .biz-news-bar .biz-newsbtn{margin:0;}
 /* Explorer: an opened industry is highlighted across the whole row (name cell included, which is sticky and so needs an opaque colour). */
-.biz-table > tbody > .biz-row.open > td{border-top:1px solid var(--line);background:color-mix(in srgb, var(--accent) 16%, var(--bg));}
+.biz-table > tbody > .biz-row.open > td{border-top:1px solid var(--line);background:color-mix(in srgb, var(--accent) 8%, var(--panel));}
 .biz-news-bar .biz-news-head{margin:0;}
 /* News line: heading and button share one centre line; the button is filled so it reads as an action. */
 .biz-detail-box .biz-news-bar{display:flex;align-items:center;gap:12px;}
@@ -88,8 +88,8 @@ a.stock-link{color:inherit;text-decoration:none;}
 .biz-main.biz-full .biz-table thead th{position:sticky;top:0;z-index:2;background:var(--bg);}
 /* The industries grid spans the full width, so the button above it lines up with the grid's right edge. */
 .biz-table{width:100%;min-width:max-content;}
-.biz-table > tbody > .biz-row.open > .biz-name{background:color-mix(in srgb, var(--accent) 16%, var(--bg));box-shadow:inset 3px 0 0 var(--accent);}
-.biz-table > tbody > .biz-row.open:hover > td{background:color-mix(in srgb, var(--accent) 24%, var(--bg));}
+.biz-table > tbody > .biz-row.open > .biz-name{background:color-mix(in srgb, var(--accent) 8%, var(--panel));box-shadow:inset 3px 0 0 var(--accent);}
+.biz-table > tbody > .biz-row.open:hover > td{background:color-mix(in srgb, var(--accent) 14%, var(--panel));}
 .biz-open{padding:0;border:0;background:none;color:var(--accent);font:inherit;text-align:left;cursor:pointer;}
 .biz-open:hover,.biz-open:focus-visible{color:var(--accent);text-decoration:underline;}
 .fund-verdicts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px;}

@@ -28,7 +28,7 @@ function openMenu(anchor, html, state) {
   menuEl = document.createElement("div");
   menuEl.className = "rk-menu"; menuEl.setAttribute("role", "menu");
   setHtml(menuEl, html);
-  document.body.appendChild(menuEl);
+  (document.getElementById('main') || document.body).appendChild(menuEl);   // inside the page's main area, so a screen reader finds the menu within a landmark
   menuAnchor = anchor; menuState = state || {};
   if (anchor) anchor.setAttribute("aria-expanded", "true");
   placeMenu();

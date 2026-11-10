@@ -5344,7 +5344,7 @@ test('explorer: the page draws its controls, strategy buttons and an industry ta
   assert.ok(txt().includes('+1.50%') && txt().includes('n/a'));   // a missing average says n/a
   assert.ok(body().querySelector('[data-biz-show="matched"]').disabled);   // no strategy chosen: nothing to match
   body().querySelector('.biz-row').click();   // the row opens in place
-  assert.ok(body().querySelector('.biz-detail') && body().querySelector('.biz-row').classList.contains('open') && body().querySelector('.biz-row').getAttribute('aria-expanded') === 'true');
+  assert.ok(body().querySelector('.biz-detail') && body().querySelector('.biz-row').classList.contains('open') && !body().querySelector('.biz-row').hasAttribute('role') && !body().querySelector('.biz-row').hasAttribute('aria-expanded') && body().querySelector('.biz-detail-box h2.biz-dname'));   // a focusable row, not a nested "button"; the industry name is a level-2 heading
   assert.ok(txt().includes('Fund 7.3 · Tech 7.3') || txt().includes('Fund 7.3'));   // scores under the stock in the lean grid
   assert.ok(body().querySelector('.biz-detail .strat-row[data-idx="20"]') && !body().querySelector('.biz-detail a[href^="javascript"]'));
   assert.strictEqual(body().querySelector('[data-biz-all]').dataset.bizAll, 'expand');
@@ -5364,7 +5364,7 @@ test('explorer: the heat map sizes itself beside the filters and in full screen,
   assert.ok(T.heat.at(-1).hRatio >= .45 && T.heat.at(-1).hRatio <= .95);   // full screen: the height fits the window
   T.exitHook(); assert.ok(T.heat.at(-1).hRatio === undefined);   // Esc leaves full screen
   win.HTMLElement.prototype.scrollIntoView = function(){ T.scrolledTo = this.dataset.bizName; };
-  click('[data-biz-heat]'); assert.ok(body().querySelector('.biz-table') && body().querySelector('.biz-row[aria-expanded="true"]') && T.scrolledTo === 'Banks');   // a tile opens that industry in the table
+  click('[data-biz-heat]'); assert.ok(body().querySelector('.biz-table') && body().querySelector('.biz-row.open') && T.scrolledTo === 'Banks');   // a tile opens that industry in the table
   body().click();   // a click on nothing in particular does nothing
   click('[data-biz-view="heat"]'); click('[data-biz-view="table"]'); assert.ok(body().querySelector('.biz-table'));
   click('[data-biz-strat="q1"]'); assert.ok(body().querySelector('.biz-showing') && body().querySelector('[data-biz-show="matched"]'));
@@ -6535,7 +6535,7 @@ test('analysis grid columns: every column draws its cell, the headers and the Co
   const cellOf = (s, id) => C.analysisLbCell(id, C.analysisRowContext(s, 0, 0));
   assert.strictEqual(cellOf(stocks[0], 'dayMacdBars'), '<td class="num">4</td>'); assert.strictEqual(cellOf(stocks[1], 'dayMacdBars'), '<td class="num">0</td>'); assert.strictEqual(cellOf(stocks[2], 'dayMacdBars'), '<td class="num"></td>');
   assert.ok(/61\.2/.test(cellOf(stocks[0], 'weekRsi')) && /Buy/.test(cellOf(stocks[1], 'idea')) && /Bullish/.test(cellOf(stocks[0], 'techW')) && /1,234\.5/.test(cellOf(stocks[0], 'price')) && /\+1\.5% W/.test(cellOf(stocks[0], 'industry')));
-  assert.ok(/<th class="num" title="Daily bars in a row[^"]*" aria-sort="none"><button[^>]*data-sort-col="dayMacdBars"/.test(C.columnHeaderHtml('dayMacdBars', { col: 'price', dir: 'asc' })) && /D MACD bars/.test(C.columnHeaderHtml('dayMacdBars')) && C.columnHeaderHtml('pin') === '<th class="pin-col"></th>' && C.columnHeaderHtml('nope') === '');
+  assert.ok(/<th class="num" title="Daily bars in a row[^"]*" aria-sort="none"><button[^>]*data-sort-col="dayMacdBars"/.test(C.columnHeaderHtml('dayMacdBars', { col: 'price', dir: 'asc' })) && /D MACD bars/.test(C.columnHeaderHtml('dayMacdBars')) && C.columnHeaderHtml('pin') === '<th class="pin-col"><span class="sr-only">Pin</span></th>' && C.columnHeaderHtml('nope') === '');
   assert.ok(/aria-sort="descending"/.test(C.columnHeaderHtml('dayMacdBars', { col: 'dayMacdBars', dir: 'desc' })) && !/data-sort-col/.test(C.columnHeaderHtml('tv', { col: 'price', dir: 'asc' })));   // a column that cannot sort has no button
   assert.deepStrictEqual([C.nextSort({ col: 'price', dir: 'desc' }, 'price'), C.nextSort(null, 'stock'), C.nextSort({ col: 'price', dir: 'desc' }, 'dayMacdBars'), C.nextSort({ col: 'stock', dir: 'asc' }, 'stock')],
     [{ col: 'price', dir: 'asc' }, { col: 'stock', dir: 'asc' }, { col: 'dayMacdBars', dir: 'desc' }, { col: 'stock', dir: 'desc' }]);
