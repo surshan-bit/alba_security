@@ -5928,6 +5928,31 @@ test('Fundamental Score panel: factors sit in one grid, or under Traditional, Bu
   assert.ok(R({ fundamentals: { scoringBreakdown: { valuationSubscore: 3 }, factors: [f('a', 'Valuation')] } }).includes('fs-hold'));
 }));
 
+// ---- Data freshness bars (src/joblogs/freshness.js)
+const FR_PAGE = '<p id="fundFreshnessSummary"></p><div id="fundFreshnessBars"></div><p id="techFreshnessSummary"></p><div id="techFreshnessBars"></div>';
+// Loads the module and paints with the clock held at `now`; the clock is only held during the one synchronous paint, so tests running alongside are not affected.
+const frRun = (file, stocks, now, fn) => withPage(FR_PAGE, async (win) => {
+  globalThis.__T = { stocks, escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), setHtml: (el, h) => { el.innerHTML = h; } };
+  const M = await loadAllStubbed(file, '', []);
+  const paint = () => { const RealDate = Date, FIXED = new RealDate(now).getTime(); globalThis.Date = class extends RealDate { constructor(...a){ if(a.length) super(...a); else super(FIXED); } static now(){ return FIXED; } }; try { M.paintFreshness(); } finally { globalThis.Date = RealDate; } };
+  await fn(Object.assign({}, M, { paint }), win);
+});
+const frMk = (asof, tAsof, snap) => ({ asof, technical: tAsof ? { asof: tAsof } : undefined, __snapAsof: snap });
+test('freshness bars: stocks are counted by the age of their date, a summary line says how fresh the data is, and unreadable dates are counted apart', () => frRun('src/joblogs/freshness.js', [frMk('2026-11-10'), frMk('2026-11-09'), frMk('2026-11-05'), frMk('2026-11-01'), frMk('2026-10-20'), frMk('2026-09-01'), frMk('bad'), frMk(''), frMk('9 Sept 2026'), frMk('1 Foo 2026'), frMk('21 Sep 2026'), frMk('2030-01-01')], '2026-11-10T12:00:00+05:30', async (M, win) => {
+  M.paint(); const $ = (id) => win.document.getElementById(id), rows = [...$('fundFreshnessBars').querySelectorAll('.refreshlog-freshness-row')];
+  assert.strictEqual(JSON.stringify(rows.map((r) => r.querySelector('.refreshlog-freshness-label').textContent + ' ' + r.querySelector('.refreshlog-freshness-count').textContent)), JSON.stringify(['Today 2 stocks', '1–3 days 1 stock', '4–7 days 1 stock', '8–14 days 1 stock', '15–30 days 1 stock', '31+ days 3 stocks']));   // a date in the future counts as today
+  assert.deepStrictEqual(rows.map((r) => r.querySelector('.refreshlog-freshness-fill').dataset.css), ['--w:67%', '--w:33%', '--w:33%', '--w:33%', '--w:33%', '--w:100%']);   // each bar is a share of the longest
+  assert.strictEqual($('fundFreshnessSummary').textContent, 'Average 24.2 days old, oldest 70 days, 3 of 9 (33%) refreshed in the last 3 days · 3 stocks with no parseable refresh date.');
+  assert.strictEqual($('techFreshnessSummary').textContent, 'No technical refresh dates recorded yet.'); assert.strictEqual($('techFreshnessBars').textContent, '');
+}));
+test('freshness bars: technical data is dated by its score or by the later snapshot day, one stock is singular, and a page without the panel is left alone', () => frRun('src/joblogs/freshness.js', [frMk('2026-11-09', '2026-11-01', '2026-11-08'), frMk('2026-11-09', '2026-11-08', '2026-11-02'), frMk('2026-11-09', undefined, '2026-11-07'), frMk(undefined, '2026-11-09')], '2026-11-10T12:00:00+05:30', async (M, win) => {
+  M.paint(); const t = win.document.getElementById('techFreshnessSummary').textContent;
+  assert.ok(t.includes('Average 2.0 days old, oldest 3 days, 4 of 4 (100%)')); assert.ok(win.document.getElementById('fundFreshnessSummary').textContent.includes('3 of 3') && win.document.getElementById('fundFreshnessSummary').textContent.includes('1 stock with no parseable refresh date'));
+  win.document.getElementById('techFreshnessBars').remove(); win.document.getElementById('techFreshnessSummary').textContent = 'kept'; M.paint(); assert.strictEqual(win.document.getElementById('techFreshnessSummary').textContent, 'kept');
+  M.init_joblogs_freshness();
+}));
+test('freshness bars: one stock refreshed a day ago reads in the singular', () => frRun('src/joblogs/freshness.js', [frMk('2026-11-09')], '2026-11-10T12:00:00+05:30', async (M, win) => { M.paint(); assert.ok(win.document.getElementById('fundFreshnessSummary').textContent.startsWith('Average 1.0 day old, oldest 1 day,') && win.document.getElementById('fundFreshnessBars').textContent.includes('1 stock')); }));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

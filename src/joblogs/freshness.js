@@ -23,55 +23,57 @@ function parseFundamentalAsof(raw){
 // against today, not baked in at publish time, so this stays accurate between refresh runs).
 // Shared by the Fundamental and Technical freshness panels — both used to be separate, near-
 // identical functions differing only in which field they read and which elements/copy they wrote.
+const DAY_MS = 86400000;
+const FRESH_DAYS = 3;   // "refreshed" on the summary line means within this many days
+const AGE_BUCKETS = [
+  { label: 'Today', test: d => d === 0 },
+  { label: '1–3 days', test: d => d >= 1 && d <= 3 },
+  { label: '4–7 days', test: d => d >= 4 && d <= 7 },
+  { label: '8–14 days', test: d => d >= 8 && d <= 14 },
+  { label: '15–30 days', test: d => d >= 15 && d <= 30 },
+  { label: '31+ days', test: d => d >= 31 }
+];
+const plural = (n) => (n === 1 ? '' : 's');
+// Days since each stock's date, and how many stocks have no readable date.
+function stockAges(getAsof, now){
+  const ages = [];
+  let unparsed = 0;
+  stocks.forEach(s => {
+    const d = parseFundamentalAsof(getAsof(s));
+    if(!d){ unparsed++; return; }
+    ages.push(Math.max(0, Math.floor((now.getTime() - d.getTime()) / DAY_MS)));
+  });
+  return { ages, unparsed };
+}
+function summaryText(ages, unparsed){
+  const avgAge = ages.reduce((a, d) => a + d, 0) / ages.length, oldestAge = Math.max(...ages);
+  const freshCount = ages.filter(d => d <= FRESH_DAYS).length;
+  return `Average ${avgAge.toFixed(1)} day${avgAge.toFixed(1) === '1.0' ? '' : 's'} old, oldest ${oldestAge} day${plural(oldestAge)}, ${freshCount} of ${ages.length} (${Math.round(100 * freshCount / ages.length)}%) refreshed in the last ${FRESH_DAYS} days`
+    + (unparsed ? ` · ${unparsed} stock${plural(unparsed)} with no parseable refresh date` : '') + '.';
+}
+function barRowHtml(label, count, maxCount){
+  const pct = Math.round(100 * count / maxCount);
+  return `
+      <div class="refreshlog-freshness-row">
+        <span class="refreshlog-freshness-label">${escapeHtml(label)}</span>
+        <span class="refreshlog-freshness-track"><span class="refreshlog-freshness-fill" data-css="--w:${count ? Math.max(pct, 3) : 0}%"></span></span>
+        <span class="refreshlog-freshness-count">${count} stock${plural(count)}</span>
+      </div>
+    `;
+}
 function renderFreshnessPanel(cfg){
   const summaryEl = document.getElementById(cfg.summaryElId);
   const barsEl = document.getElementById(cfg.barsElId);
   if(!summaryEl || !barsEl) return;
-
-  const now = new Date();
-  const ages = [];
-  let unparsed = 0;
-  stocks.forEach(s => {
-    const d = parseFundamentalAsof(cfg.getAsof(s));
-    if(!d){ unparsed++; return; }
-    ages.push(Math.max(0, Math.floor((now.getTime() - d.getTime()) / 86400000)));
-  });
-
+  const { ages, unparsed } = stockAges(cfg.getAsof, new Date());
   if(ages.length === 0){
     summaryEl.textContent = cfg.noDataText;
     barsEl.textContent = '';
     return;
   }
-
-  const buckets = [
-    {label:'Today', test: d => d === 0},
-    {label:'1–3 days', test: d => d >= 1 && d <= 3},
-    {label:'4–7 days', test: d => d >= 4 && d <= 7},
-    {label:'8–14 days', test: d => d >= 8 && d <= 14},
-    {label:'15–30 days', test: d => d >= 15 && d <= 30},
-    {label:'31+ days', test: d => d >= 31}
-  ];
-  const counts = buckets.map(b => ages.filter(b.test).length);
-  const maxCount = Math.max(...counts, 1);
-
-  const avgAge = (ages.reduce((a, d) => a + d, 0) / ages.length);
-  const oldestAge = Math.max(...ages);
-  const freshCount = ages.filter(d => d <= 3).length;
-
-  summaryEl.textContent = `Average ${avgAge.toFixed(1)} day${avgAge.toFixed(1) === '1.0' ? '' : 's'} old, oldest ${oldestAge} day${oldestAge === 1 ? '' : 's'}, ${freshCount} of ${ages.length} (${Math.round(100 * freshCount / ages.length)}%) refreshed in the last 3 days`
-    + (unparsed ? ` · ${unparsed} stock${unparsed === 1 ? '' : 's'} with no parseable refresh date` : '') + '.';
-
-  setHtml(barsEl, buckets.map((b, i) => {
-    const count = counts[i];
-    const pct = Math.round(100 * count / maxCount);
-    return `
-      <div class="refreshlog-freshness-row">
-        <span class="refreshlog-freshness-label">${escapeHtml(b.label)}</span>
-        <span class="refreshlog-freshness-track"><span class="refreshlog-freshness-fill" data-css="--w:${count ? Math.max(pct, 3) : 0}%"></span></span>
-        <span class="refreshlog-freshness-count">${count} stock${count === 1 ? '' : 's'}</span>
-      </div>
-    `;
-  }).join(''));
+  const counts = AGE_BUCKETS.map(b => ages.filter(b.test).length), maxCount = Math.max(...counts, 1);
+  summaryEl.textContent = summaryText(ages, unparsed);
+  setHtml(barsEl, AGE_BUCKETS.map((b, i) => barRowHtml(b.label, counts[i], maxCount)).join(''));
 }
 
 // The day a stock's technical data was last confirmed: its score's date, or the day TradingView's snapshot last covered it if that is later.
