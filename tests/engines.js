@@ -4406,7 +4406,7 @@ test('stock data: no database, no index, a short list or a missing chunk each st
 })));
 
 // ---- Refresh all stocks, history step (src/refresh/tvrefresh.js, rsFillHistory): who gets a full download, in what order, and when the step stops
-TV_VALUES.add('priceJobs'); TV_VALUES.add('stockByTickerSymbol');
+TV_VALUES.add('priceJobs'); TV_VALUES.add('stockByTickerSymbol'); TV_VALUES.add('priceLoaded');
 const fillSetup = (names, over) => {
   const jobs = new Map(), written = [], docs = {}, fails = {};
   const db = { doc: (p) => ({ get: async () => { if(fails.get) throw new Error('db down'); return docs[p] ? { exists: true, data: () => docs[p] } : { exists: false }; },
@@ -4720,7 +4720,7 @@ test('analysis sort state: a saved sort of a known column is kept, an unknown on
 }));
 test('analysis grid columns: every column draws its cell, the headers and the Columns panel are drawn, and every sortable column sorts', () => alone(async () => {
   const T = globalThis.__T = {
-    mosPct: (s) => (typeof s.mos === 'number' ? s.mos : -Infinity), mosRatingAny: (s) => s.rating || null, isPinned: (s) => !!s.pinned, techRatingInfo: (k) => (k ? { cls: 'b-up', label: 'Bullish' } : null),
+    priceLoaded: new Set(), pcTickerKey: (s) => s.name, mosPct: (s) => (typeof s.mos === 'number' ? s.mos : -Infinity), mosRatingAny: (s) => s.rating || null, isPinned: (s) => !!s.pinned, techRatingInfo: (k) => (k ? { cls: 'b-up', label: 'Bullish' } : null),
     ideaRankOf: (s) => s.idea || null, ideasWhen: () => 'today', newsCounts: (s) => s.news || null, newsCellHtml: () => '<td>news</td>', eventMark: () => '', industryMedianW: (s) => (typeof s.indW === 'number' ? s.indW : null),
     stockShareLink: () => '#x', tvUrlFor: () => 'https://tv/x', stockResearchAgeDays: (s) => (typeof s.age === 'number' ? s.age : null), stockResearchAsof: () => '2026-11-01', getResearchTriggers: () => new Map(), getResearchTriggerKinds: () => new Map(),
     researchTriggerDone: () => true, analysisQueuePriceLoad: () => {}, scoreBand: () => 'fs-hi', getAnalysisColumnsPanelOpen: () => !!T.panelOpen, panelOpen: false };
@@ -4748,4 +4748,24 @@ test('analysis grid columns: every column draws its cell, the headers and the Co
   T.panelOpen = false; assert.strictEqual(C.renderAnalysisColumnsPanel(ids), '');
   T.panelOpen = true; const panel = C.renderAnalysisColumnsPanel(['pin', 'dayMacdBars', 'unknown']); assert.ok(/data-col="dayMacdBars"/.test(panel) && /D MACD bars/.test(panel) && /Pin/.test(panel) && /data-col="unknown"/.test(panel));
   assert.ok(C.analysisColumnOrder().indexOf('dayMacdBars') === C.analysisColumnOrder().indexOf('techM') + 1);
+  // Researched: how long ago, coloured by age
+  const aged = (n) => ({ name: 'R', ticker: 'R · X', age: n });
+  assert.ok(/rs-none[^>]*>Never</.test(cellOf({ name: 'R', ticker: 'R · X' }, 'researched')));
+  assert.deepStrictEqual([0, 1, 30, 31, 90, 91].map((n) => /(rs-\w+)[^>]*>([^<]+)</.exec(cellOf(aged(n), 'researched')).slice(1)),
+    [['rs-fresh', 'Today'], ['rs-fresh', '1 day ago'], ['rs-fresh', '30 days ago'], ['rs-aging', '31 days ago'], ['rs-aging', '90 days ago'], ['rs-old', '91 days ago']]);
+  // Triggered: nothing asked yet, research saved since the trigger, still waiting, and done afterwards
+  T.priceLoaded.add('R'); T.getResearchTriggers = () => new Map(); T.getResearchTriggerKinds = () => new Map();
+  assert.ok(/rs-none/.test(cellOf({ name: 'R', ticker: 'R · X' }, 'triggered')));   // never triggered, never researched
+  T.getResearchTriggers = () => new Map([['R', ago(10)]]);
+  assert.ok(/rs-fresh[^>]*>Today</.test(cellOf(aged(0), 'triggered')) && /rs-fresh[^>]*>3 days ago</.test(cellOf(aged(3), 'triggered')) && /rs-fresh[^>]*>1 day ago</.test(cellOf(aged(1), 'triggered')));   // saved after the trigger
+  T.researchTriggerDone = () => false;
+  assert.ok(/rs-aging[^>]*title="research triggered [^"]* - nothing saved since">10 days ago &middot; awaiting save</.test(cellOf(aged(null), 'triggered')));
+  T.researchTriggerDone = () => true; T.getResearchTriggerKinds = () => new Map([['R', 'price']]);
+  assert.ok(/rs-fresh[^>]*title="price history only triggered [^"]* - saved afterwards">10 days ago/.test(cellOf(aged(null), 'triggered')));
+  T.getResearchTriggers = () => new Map([['R', ago(1)]]);
+  assert.ok(/>1 day ago/.test(cellOf(aged(null), 'triggered')));
+  T.getResearchTriggers = () => new Map([['R', 'not a date']]);
+  assert.ok(/rs-none/.test(cellOf(aged(null), 'triggered')));   // a trigger time that cannot be read counts as never triggered
+  const queued = []; T.priceLoaded.clear(); T.analysisQueuePriceLoad = (x) => queued.push(x.name); T.getResearchTriggers = () => new Map([['R', ago(0)]]);
+  assert.ok(/rs-fresh[^>]*>Today/.test(cellOf(aged(null), 'triggered')) && queued.length === 1);   // the price history is fetched lazily, and the cell is not marked pending meanwhile
 }));
