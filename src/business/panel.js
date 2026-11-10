@@ -264,14 +264,14 @@ function industryRowHtml(r, cols){
 }
 // What the Refresh button above the table works on: the matched stocks, the stocks of the open industries, or every stock in the table.
 function defineBizToolbar(rows){
-kit.defineToolbar('biz', () => {
-  const st = r => r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock), out = [];
-  if(strategyOn()) out.push({ id: 'matched', label: 'Matched stocks', stocks: () => rows.flatMap(r => r.items.filter(x => x.match).map(x => x.stock)) });
-  const o = rows.filter(r => open.has(r.name));
-  if(o.length) out.push({ id: 'open', label: 'Expanded industries (' + o.length + ')', stocks: () => o.flatMap(st) });
-  out.push({ id: 'all', label: 'Every stock in the table', stocks: () => rows.flatMap(st) });
-  return out;
-});
+  kit.defineToolbar('biz', () => {
+    const st = r => r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock), out = [];
+    if(strategyOn()) out.push({ id: 'matched', label: 'Matched stocks', stocks: () => rows.flatMap(r => r.items.filter(x => x.match).map(x => x.stock)) });
+    const o = rows.filter(r => open.has(r.name));
+    if(o.length) out.push({ id: 'open', label: 'Expanded industries (' + o.length + ')', stocks: () => o.flatMap(st) });
+    out.push({ id: 'all', label: 'Every stock in the table', stocks: () => rows.flatMap(st) });
+    return out;
+  });
 }
 
 function draw(el){

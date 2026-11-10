@@ -5284,7 +5284,7 @@ const bzSetup = async (over) => {
     publishedStrategies: () => [{ id: 'q1', name: 'Quality <s>' }], strategyStockSet: (id) => (id === 'q1' ? new Set([S[0], S[1]]) : null), validStrategyId: (id) => (id === 'q1' ? id : ''),
     getNewsRun: () => T.newsRun, planNews: (list) => ({ stocks: list, again: false, left: 0 }), startNewsCollect: (list, label, cb) => T.news.runs.push([list.length, label, cb]), stopNewsCollect: () => { T.news.stops++; },
     prefSet: (k, v) => T.prefs.push(JSON.parse(v)), browserFullscreen: (on) => T.full.push(on), fullscreenLabel: (on) => (on ? 'Leave full screen' : 'Full screen'), watchFullscreenExit: (isOn, onExit) => { T.exitHook = onExit; },
-    heatmapHtml: (rws, p, o) => { T.heat.push(o); return '<div class="heat-stub"></div>'; }, sheetFrame: (x) => x, syncSheets: () => { T.syncs++; }, filtersOpenSaved: () => false, rememberFiltersOpen: () => {},
+    heatmapHtml: (rws, p, o) => { T.heat.push(o); return '<div class="heat-stub"><button type="button" data-biz-heat="Banks">tile</button></div>'; }, sheetFrame: (x) => x, syncSheets: () => { T.syncs++; }, filtersOpenSaved: () => false, rememberFiltersOpen: () => {},
     industryTable: (list, o) => T.rows.slice(), needsBars: (p) => p === '6M', periodOf: (k) => T.PERIODS.find((x) => x.key === k) || T.PERIODS[1], dropMenuHtml: (o) => '<drop ' + o.extraClass + '>' + o.items.map((i) => i.attrs + (i.current ? '*' : '')).join('|') + '</drop>',
     isRebound: (s) => s.name === 'S2', insertHtmlAfter: (el, html) => { el.insertAdjacentHTML('afterend', html); }, setHtml: (el, html) => { el.innerHTML = html; } };
   Object.assign(T, over || {});
@@ -5322,13 +5322,17 @@ test('explorer: the heat map sizes itself beside the filters and in full screen,
   click('[data-biz-full]'); assert.deepStrictEqual(T.full, [true]);
   assert.ok(T.heat.at(-1).hRatio >= .45 && T.heat.at(-1).hRatio <= .95);   // full screen: the height fits the window
   T.exitHook(); assert.ok(T.heat.at(-1).hRatio === undefined);   // Esc leaves full screen
-  click('[data-biz-view="table"]'); assert.ok(body().querySelector('.biz-table'));
+  win.HTMLElement.prototype.scrollIntoView = function(){ T.scrolledTo = this.dataset.bizName; };
+  click('[data-biz-heat]'); assert.ok(body().querySelector('.biz-table') && body().querySelector('.biz-row[aria-expanded="true"]') && T.scrolledTo === 'Banks');   // a tile opens that industry in the table
+  body().click();   // a click on nothing in particular does nothing
+  click('[data-biz-view="heat"]'); click('[data-biz-view="table"]'); assert.ok(body().querySelector('.biz-table'));
   click('[data-biz-strat="q1"]'); assert.ok(body().querySelector('.biz-showing') && body().querySelector('[data-biz-show="matched"]'));
   click('[data-biz-show="matched"]');
   click('[data-biz-rebound]'); click('[data-biz-period="6M"]'); assert.ok(T.bars.length >= 1);
   click('[data-biz-by="group"]'); click('[data-biz-filters]');
   T.newsRun = { state: 'running', label: 'Autos <b>', done: 1, total: 3, added: 2, failed: [] };
   click('[data-sort-col]'); click('.biz-row'); click('[data-biz-cols]'); click('[data-biz-newstoggle]'); click('.biz-detail [data-sort-col]');
+  assert.strictEqual(JSON.stringify(T.toolbar().map((o) => [o.id, o.stocks().length])), '[["matched",2],["open",1],["all",2]]');   // what the Refresh button works on
   click('[data-biz-open]'); assert.strictEqual(T.inds.length, 1);
   click('.strat-row'); assert.strictEqual(T.opened.length, 1);
   click('[data-biz-newsstop]'); assert.strictEqual(T.news.stops, 1);
