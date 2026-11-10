@@ -5953,6 +5953,35 @@ test('freshness bars: technical data is dated by its score or by the later snaps
 }));
 test('freshness bars: one stock refreshed a day ago reads in the singular', () => frRun('src/joblogs/freshness.js', [frMk('2026-11-09')], '2026-11-10T12:00:00+05:30', async (M, win) => { M.paint(); assert.ok(win.document.getElementById('fundFreshnessSummary').textContent.startsWith('Average 1.0 day old, oldest 1 day,') && win.document.getElementById('fundFreshnessBars').textContent.includes('1 stock')); }));
 
+// ---- Refresh Technical Info (src/livedata/technical.js): price, Margin of Safety and the bars job for one stock
+const techRun = async (over, stock) => {
+  const sets = [], saved = [], hooks = [], docs = new Map();
+  const T = globalThis.__T = Object.assign({ sets, saved, hooks, priceJobs: new Map(), ldSymOk: new Map([['S', { sym: 'old' }]]), batch: null, mcp: true, exists: false, job: { state: 'ok', msg: 'Bars saved' },
+    dbCapabilityPromise: Promise.resolve({ doc: (path) => ({ get: async () => ({ exists: T.exists }), update: async (d) => { saved.push(['update', path, d]); }, set: async (d) => { saved.push(['set', path, d]); } }) }),
+    pcTickerKey: (s) => s.name, tickerSymbol: (s) => s.name, sanitizeDocId: (x) => x, marginOfSafety: (iv, p) => (iv && p ? Math.round((iv / p - 1) * 100) : null), tvIstDate: () => '2026-11-10', tvMcp: async () => T.mcp,
+    ldSet: (k, kind, st) => sets.push([k, kind, st.pct, st.msg]), ldRupees: (v) => '₹' + v, ldMosText: (v) => (v == null ? 'n/a' : v + '%'), ldVerifiedSymbol: async () => ({ sym: 'NSE:S', price: 120 }), getLdBatch: () => T.batch,
+    setPriceJobHook: (k, h) => { hooks.push(h ? 'on' : 'off'); T.hook = h; }, refreshOneNow: async (s) => { if(T.hook){ T.hook('S', 'queued', '', ''); T.hook('S', 'run', '', 'history'); T.hook('S', 'run', '', 'nothing'); T.hook('other', 'queued', '', ''); } T.priceJobs.set('S', T.job); if(T.refreshFails) throw new Error('bars failed'); } }, over || {});
+  const M = await loadAllStubbed('src/livedata/technical.js', '', []);
+  return { T, M, run: () => M.ldRunTechnical(stock || { name: 'S', valuation: { intrinsicValue: 150, currentPrice: 100 } }) };
+};
+test('Refresh Technical Info: it saves the new price (creating or updating the stock\'s update), runs the bars job with progress, and reports price and Margin of Safety before and after', () => alone(async () => {
+  const a = await techRun(); const text = await a.run();
+  assert.strictEqual(text, 'Price ₹120 (was ₹100); MoS 50% → 25%. Bars saved.');
+  assert.deepStrictEqual(a.T.saved, [['set', 'stockUpdates/S', { ticker: 'S', valuation: { currentPrice: 120, asof: '2026-11-10', at: a.T.saved[0][2].valuation.at, source: 'TradingView (NSE:S)' } }]]);
+  assert.deepStrictEqual(a.T.sets.map((x) => x[2]), [3, 8, 20, 24, 38]); assert.deepStrictEqual(a.T.hooks, ['on', 'off']); assert.ok(a.T.ldSymOk.has('S') === false);   // the symbol is looked up again
+  const b = await techRun({ exists: true }, { name: 'S', valuation: { currentPrice: 120 } }); assert.strictEqual(await b.run(), 'Price ₹120; no intrinsic value on file, MoS not computed. Bars saved.'); assert.strictEqual(b.T.saved[0][0], 'update');
+  const c = await techRun({}, { name: 'S' }); assert.ok((await c.run()).startsWith('Price ₹120; no intrinsic'));
+}));
+test('Refresh Technical Info: a missing database or connector, a stop, or a failed bars job ends it with a clear error', () => alone(async () => {
+  await assert.rejects((await techRun({ dbCapabilityPromise: Promise.resolve(null) })).run(), /database is not available/);
+  await assert.rejects((await techRun({ mcp: false })).run(), (e) => e.code === 'no_mcp');
+  await assert.rejects((await techRun({ batch: { running: true, stop: true } })).run(), (e) => e.code === 'cancelled');
+  let calls = 0; await assert.rejects((await techRun({ batch: null, ldVerifiedSymbol: async () => { calls++; return { sym: 'x', price: 1 }; }, getLdBatch: () => (calls ? { running: true, stop: true } : null) })).run(), (e) => e.code === 'cancelled');   // stopped after the price lookup
+  const f = await techRun({ job: { state: 'error', msg: 'TV said no' } }); await assert.rejects(f.run(), /TV said no/); assert.deepStrictEqual(f.T.hooks, ['on', 'off']);
+  await assert.rejects((await techRun({ job: undefined })).run(), /did not finish/);
+  const g = await techRun({ refreshFails: true }); await assert.rejects(g.run(), /bars failed/); assert.deepStrictEqual(g.T.hooks, ['on', 'off']);   // the progress hook is always taken off
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
