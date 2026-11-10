@@ -12,7 +12,7 @@ const num = x => Number(x || 0).toLocaleString('en-IN');
 function duration(ms){ const t = Math.max(0, Math.round(ms / 1000)), m = Math.floor(t / 60); return m ? m + ' min ' + (t % 60) + ' s' : t + ' s'; }
 
 // Saves the record of a run and removes the older ones of its kind. Never stops a run: a failed save only means a missing record.
-async function saveRunLog(db, kind, startedAt, t0, rec){
+async function saveRunLog(db, kind, { startedAt, t0 }, rec){
   try {
     const endedAt = new Date().toISOString();
     await db.doc('refreshRunLog/' + kind + '-' + startedAt.replace(/[-:.]/g, '')).set(Object.assign({ v: 2, kind, trigger: 'manual', startedAt, endedAt, durationMs: Date.now() - t0 }, rec));

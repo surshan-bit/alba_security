@@ -89,7 +89,7 @@ async function saveRecord(kind, recId, record, db){
 }
 
 // Records the outcome of a failed or cancelled import attempt on the file's upload record (it stays 'uploaded', so it can be tried again).
-async function recordAttempt(kind, rec, recId, e, db){
+async function recordAttempt(kind, rec, { recId, e, db }){
   if(!rec || !recId || !db) return;
   const lastAttempt = { at: new Date().toISOString(), outcome: e && e.cancelled ? 'cancelled' : 'failed', message: String((e && e.message) || e || '').slice(0, 300) };
   await saveRecord(kind, recId, Object.assign({}, rec, { lastAttempt }), db);

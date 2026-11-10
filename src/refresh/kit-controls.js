@@ -54,7 +54,7 @@ function choiceMenuHtml(id) {
   if (!c) return "";
   menuChoices = c.items;
   return (c.head ? '<div class="rk-menu-head">' + esc(c.head) + "</div>" : "") + (c.note ? '<p class="rk-menu-note">' + esc(c.note) + "</p>" : "") +
-    c.items.map((it, i) => item("choice-run", 'data-rk-i="' + i + '"', esc(it.label), it.small ? esc(it.small) : "", it.off)).join("");
+    c.items.map((it, i) => item("choice-run", 'data-rk-i="' + i + '"', esc(it.label), { small: it.small ? esc(it.small) : "", off: it.off })).join("");
 }
 let menuChoices = [];
 function stockBtn(s) {
@@ -113,21 +113,21 @@ function barMenuHtml(id) {
   const a = 'data-rk-scope="' + esc(id) + '"';
   return '<div class="rk-menu-head">' + esc(sc.label) + " · " + n + " stock" + (n === 1 ? "" : "s") + "</div>" +
     '<p class="rk-menu-note">' + (n ? sumPart("Fundamental", c.fund, c.n) + ".<br>" + sumPart("Technical", c.tech, c.n) + "." + (c.attn ? "<br>" + c.attn + " with new results, news or a big price move." : "") : "Nothing here to refresh.") + "</p>" +
-    item("menu-run", a + ' data-rk-kind="fund" data-rk-only="0"', "↻ Fundamental", "all " + n, !n) +
-    item("menu-run", a + ' data-rk-kind="tech" data-rk-only="0"', "↻ Technical", "all " + n, !n) +
-    item("menu-run", a + ' data-rk-kind="both" data-rk-only="0"', "↻ Both", "all " + n, !n) +
+    item("menu-run", a + ' data-rk-kind="fund" data-rk-only="0"', "↻ Fundamental", { small: "all " + n, off: !n }) +
+    item("menu-run", a + ' data-rk-kind="tech" data-rk-only="0"', "↻ Technical", { small: "all " + n, off: !n }) +
+    item("menu-run", a + ' data-rk-kind="both" data-rk-only="0"', "↻ Both", { small: "all " + n, off: !n }) +
     '<div class="rk-menu-head">Only what is out of date</div>' +
-    item("menu-run", a + ' data-rk-kind="fund" data-rk-only="1"', "↻ Fundamental", c.fund + " stock" + (c.fund === 1 ? "" : "s"), !c.fund) +
-    item("menu-run", a + ' data-rk-kind="tech" data-rk-only="1"', "↻ Technical", c.tech + " stock" + (c.tech === 1 ? "" : "s"), !c.tech) +
-    item("menu-run", a + ' data-rk-kind="both" data-rk-only="1"', "↻ Both", "only those that need it", !(c.fund || c.tech));
+    item("menu-run", a + ' data-rk-kind="fund" data-rk-only="1"', "↻ Fundamental", { small: c.fund + " stock" + (c.fund === 1 ? "" : "s"), off: !c.fund }) +
+    item("menu-run", a + ' data-rk-kind="tech" data-rk-only="1"', "↻ Technical", { small: c.tech + " stock" + (c.tech === 1 ? "" : "s"), off: !c.tech }) +
+    item("menu-run", a + ' data-rk-kind="both" data-rk-only="1"', "↻ Both", { small: "only those that need it", off: !(c.fund || c.tech) });
 }
 function rowMenuHtml(key, selName) {
   const s = stockByKey(key), f = s ? freshness(s) : null;
   const a = 'data-rk-key="' + esc(key) + '" data-rk-sel="' + esc(selName) + '"';
   return '<div class="rk-menu-head">' + esc(s ? s.name : key) + "</div>" +
-    item("row-run", a + ' data-rk-kind="fund"', "↻ Fundamental", f ? (f.fund.age === null ? "not researched yet" : "researched " + ago(f.fund.age) + (f.why.length ? " · " + f.why.join(", ") : "")) : "") +
-    item("row-run", a + ' data-rk-kind="tech"', "↻ Technical", f ? (f.tech.age === null ? "no price date" : "price as of " + ago(f.tech.age)) : "") +
-    item("row-run", a + ' data-rk-kind="both"', "↻ Both", "");
+    item("row-run", a + ' data-rk-kind="fund"', "↻ Fundamental", { small: f ? (f.fund.age === null ? "not researched yet" : "researched " + ago(f.fund.age) + (f.why.length ? " · " + f.why.join(", ") : "")) : "" }) +
+    item("row-run", a + ' data-rk-kind="tech"', "↻ Technical", { small: f ? (f.tech.age === null ? "no price date" : "price as of " + ago(f.tech.age)) : "" }) +
+    item("row-run", a + ' data-rk-kind="both"', "↻ Both", { small: "" });
 }
 function toolbarChoices(name) {
   try { return (getToolbar(name) || (() => []))(); } catch (e) { return []; }

@@ -20,7 +20,7 @@ function snapshotRows(batch, data, prevRows, today){
   /** @type {{ rows: any[], skipped: any[], carried: number, scored: number, kept: number }} */
   const out = { rows: [], skipped: [], carried: 0, scored: 0, kept: 0 };
   for(const { s, sym } of batch){
-    const k = sanitizeDocId(tickerSymbol(s)), u = snapshotUpdate(s, data[sym], today, sym, s.technical);
+    const k = sanitizeDocId(tickerSymbol(s)), u = snapshotUpdate(s, data[sym], { today, sym, keepAgainst: s.technical });
     if(!u.reason){
       out.rows.push({ k, y: sym, c: packValues(data[sym]) });
       if(u.technical) out.scored++;

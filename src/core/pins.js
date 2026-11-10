@@ -12,7 +12,7 @@ function isPinned(s){
 }
 
 // Where a pin change came from: build, device and screen. Also kept as a short history (data/users/<uid>/pinAudit, last 40 changes).
-function changeInfo(action, ticker, nBefore, nAfter, at){
+function changeInfo(action, ticker, { nBefore, nAfter, at }){
   const sc = document.querySelector('script[data-entry]');
   const m = sc && /[?&]v=([0-9a-f]+)/.exec(sc.getAttribute('data-entry') || '');
   const sec = document.querySelector('.app-section.active');
@@ -51,7 +51,7 @@ async function persistPin(ticker, add){
       const set = new Set(before);
       if(add) set.add(ticker); else set.delete(ticker);
       const at = new Date().toISOString();
-      const who = changeInfo(add ? 'pin' : 'unpin', ticker, before.length, set.size, at);
+      const who = changeInfo(add ? 'pin' : 'unpin', ticker, { nBefore: before.length, nAfter: set.size, at });
       // The date and origin of the latest change are stored with the list, so a later surprise can be traced to a build and a device.
       await ref.set({ tickers: Array.from(set), updatedAt: at, lastChange: who });
       await appendAudit(who);

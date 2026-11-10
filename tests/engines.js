@@ -1600,9 +1600,9 @@ test('trade call: history keeps one point a day and lists when the call changed'
   });
   test('live snapshot: the saving side protects a recent completed-weeks block and reports missing prices', () => {
     const keep = { technical: { asof: '2026-10-14', basis: { week: '2026-10-09', month: '2026-09-01' } } };
-    assert.strictEqual(L.snapshotUpdate(stock, tv, '2026-10-14', 'NSE:ABC', keep.technical).kept, true);
-    assert.ok(L.snapshotUpdate(stock, tv, '2026-10-14', 'NSE:ABC', null).technical);
-    assert.ok(L.snapshotUpdate(stock, {}, '2026-10-14', 'NSE:ABC', null).reason);
+    assert.strictEqual(L.snapshotUpdate(stock, tv, { today: '2026-10-14', sym: 'NSE:ABC', keepAgainst: keep.technical }).kept, true);
+    assert.ok(L.snapshotUpdate(stock, tv, { today: '2026-10-14', sym: 'NSE:ABC', keepAgainst: null }).technical);
+    assert.ok(L.snapshotUpdate(stock, {}, { today: '2026-10-14', sym: 'NSE:ABC', keepAgainst: null }).reason);
   });
 }
 
@@ -2260,7 +2260,7 @@ test('refresh menu: it opens under its button (or above it, or in the middle wit
   try {
     assert.deepStrictEqual([M.menuIsOpen(), M.menuQuery('x'), M.menuQueryAll('x')], [false, null, []]);
     M.closeMenu(true); M.refillMenu('<p>nothing open</p>');
-    assert.strictEqual(M.item('go', 'data-x="1"', 'Go', 'small text', true).includes('disabled'), true);
+    assert.strictEqual(M.item('go', 'data-x="1"', 'Go', { small: 'small text', off: true }).includes('disabled'), true);
     assert.strictEqual(M.item('go', '', 'Go').includes('<small>'), false);
     M.openMenu(anchor, '<button class="rk-btn" type="button">One</button><input id="i">', { kind: 'fund' });
     assert.deepStrictEqual(place(), [1, '50px', '106px'], 'under the button, left edges aligned');
@@ -3112,7 +3112,7 @@ test('refresh all stocks: a whole run goes through its steps in order, the weekl
   try {
     const T = globalThis.__T = { log: [], fiSet: (...a) => T.log.push(a.join('|')), stocks, priceHistoryByTicker: { A: { '1W': bars, '1M': bars } }, pcTickerKey: (s) => s.name, COMPACT_LAG: 1, pillars: 1, getFiRunning: () => false, getFiOwner: () => true, getFiDb: () => db,
       tvMcp: async () => true, tvIstDate: () => '2026-11-04', debugHandle: () => ({}), loadRuns: async () => [], priorityOrder: (k, l) => l, isinSymbolCached: (s) => 'N:' + s.name, isinOf: () => 'INE1', buildTech2Chunks: () => [], fiShowResult: (...a) => shown.push(a),
-      tvCall: async (tool, args) => (args.symbols ? tvAnswer(args.symbols) : { data: {} }), ensureAllPriceBars: async () => { steps.push('bars loaded'); }, saveRunLog: async (d, kind, at, t0, rec) => { steps.push('log ' + rec.saved); },
+      tvCall: async (tool, args) => (args.symbols ? tvAnswer(args.symbols) : { data: {} }), ensureAllPriceBars: async () => { steps.push('bars loaded'); }, saveRunLog: async (d, kind, times, rec) => { steps.push('log ' + rec.saved); },
       saveCrossStates: async (d, items) => { steps.push('cross ' + JSON.stringify(items)); return { read: 1, changed: 1, chunksWritten: 0, failed: 0 }; } };
     const db = { collection: () => ({ get: async () => ({ docs: [] }) }), doc: () => ({ get: async () => ({ exists: false }), set: async () => {} }) };
     const M = await loadTvRefresh();
