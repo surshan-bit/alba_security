@@ -2845,7 +2845,7 @@ async function loadAllStubbed(file, extra, keep, more){
     if(keep.includes(m[2])) continue;
     stubs[m[2]] = [...new Set(m[1].split(',').map((n) => n.trim().split(' as ')[0]).concat(m[2] === '../tv/connector.js' ? ['tvIsFatal'] : [], (more || {})[m[2]] || []))].map((n) => TV_VALUES.has(n) ? `export const ${n} = globalThis.__T.${n};` : `export const ${n} = globalThis.__TVFN('${n}');`).join('\n');
   }
-  return loadWithStubs(file, extra, stubs);
+  return loadWithStubs(file, extra, Object.assign(stubs, (more || {}).__modules || {}));   // `more.__modules`: stand-ins for modules loaded with import(), which have no import line to read
 }
 const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { noteLivePrices, paintHint, rsBars, rsCross, rsDaily, rsFillHistory, rsFixSymbols, rsReport, rsSnapshot, rsTech2, runSnapshot, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
   ['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js', './finalchunk.js']);
@@ -6068,6 +6068,65 @@ test('Trade Log helpers: holding days between two dates, and the return of a tra
   assert.strictEqual(M.holdingDaysBetween('2026-10-01', '2026-10-31'), 30); assert.strictEqual(M.holdingDaysBetween('2026-10-31', '2026-10-01'), 0); assert.strictEqual(M.holdingDaysBetween('nope', '2026-10-01'), null); assert.strictEqual(M.holdingDaysBetween('2026-10-01', 'nope'), null);
   assert.ok(M.holdingDaysBetween('2026-10-01', null) > 30);
 });
+
+// ---- Analysis section (src/analysis/section.js): the Stocks view with its chart, the industry views, the View menu, and the resize redraw
+for(const n of ['ANALYSIS_VIEW_KEYS', 'ANALYSIS_VIEW_OPTIONS', 'TOOLTIP_HTML']) TV_VALUES.add(n);
+const ANS_PAGE = '<section id="section-analysis" class="app-section active"><div id="analysisPanelBody"></div></section>';
+const ansSetup = async (win, over) => {
+  const mk = (name, wk, mo) => ({ name, technical: { raw: { weekRsi: wk, monthRsi: mo } } });
+  const S = [mk('A', 60, 40), mk('B', 30, 70), mk('NoRsi', null, null), { name: 'NoTech' }, mk('Pin', 55, 55)];
+  const T = globalThis.__T = Object.assign({ stocks: S, stockIndex: new Map(S.map((s, i) => [s, i])), analysisFilters: { view: 'stocks', xAxis: 'x', yAxis: 'y', colorBy: 'week' }, ANALYSIS_VIEW_KEYS: new Set(['stocks', 'industry', 'group']),
+    ANALYSIS_VIEW_OPTIONS: [{ value: 'stocks', label: 'Stocks <b>' }, { value: 'industry', label: 'Industries' }, { value: 'group', label: 'Groups' }], TOOLTIP_HTML: '<div id="tip"></div>', industryShown: [], appSections: { analysis: 'sec-analysis' }, bucket: S, log: [], saved: 0, opened: [], rafs: [], wired: {},
+    isPinned: (s) => s.name === 'Pin', mosPct: () => 10, escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), dropMenuHtml: (o) => '<div class="dm" data-label="' + o.label + '">' + o.items.map((i) => '<button ' + i.attrs + (i.current ? ' class="cur"' : '') + '>' + i.title + '</button>').join('') + '</div>',
+    saveAnalysisFilters: () => { T.saved++; }, openStockInline: (...a) => T.opened.push(a), analysisBucket: () => T.bucket, renderAnalysisFilterPanel: (cb) => T.log.push('filters'), syncSheets: () => T.log.push('sheets'),
+    chartGeometry: (body, plottable) => { T.plottable = plottable.map((s) => s.name); return { W: 400, H: 300, gridSvg: '<g/>', axisBox: '', quadrantLines: '', quadrantLabels: '', axisLabels: '', mosBoundLo: -20, mosBoundHi: 60, xFor: (v) => v, yFor: (v) => v, radiusForMos: () => 4 }; },
+    stocksInRange: (b) => b.filter((s) => s.name !== 'B'), valueFor: (s, axis) => (axis === 'x' ? s.technical.raw.weekRsi : s.technical.raw.monthRsi), analysisControlsHtml: (lo, hi) => '<div class="ctl" data-lo="' + lo + '"></div>',
+    wireAnalysisControls: (o) => { T.wired.controls = o; }, createAnalysisTooltip: () => ({ hide: () => T.log.push('hide') }), wireDotEvents: (el, tip, open) => { T.wired.dots = [el && el.id, open]; }, leaderboardHtml: (chart, bar) => '<div class="analysis-leaderboard">' + bar + '<button id="analysisChartToggle"><span class="analysis-btn-label"></span></button>' + chart + '</div>',
+    renderLeaderboardRows: (list) => T.log.push('rows:' + list.length), wireLeaderboard: (o) => { T.wired.board = o; }, keepScroll: (el, fn) => fn(), redrawWhenIdle: (id, fn) => T.log.push('idle:' + id), setHtml: (el, h) => { el.innerHTML = h; } }, over || {});
+  win.requestAnimationFrame = globalThis.requestAnimationFrame = (f) => { T.rafs.push(f); return T.rafs.length; };
+  return { T, S, M: await loadAllStubbed('src/analysis/section.js', '', ['../core/evt.js'], { __modules: { '../business/panel.js': 'export const showIn = (cfg) => { globalThis.__T.industryShown.push(cfg); };' } }), body: () => win.document.getElementById('analysisPanelBody') };
+};
+test('Analysis section, Stocks view: it plots the stocks with both RSI readings, marks pinned ones, fills the leaderboard and wires the controls; sliders redraw once per frame', () => kcPage(ANS_PAGE, async (win) => {
+  const { T, M, body } = await ansSetup(win), $ = (q) => win.document.querySelector(q);
+  const realTimeout = globalThis.setTimeout; globalThis.setTimeout = (f, ms) => (ms > 100 ? 0 : realTimeout(f, ms));
+  try { M.renderAnalysisSection(); } finally { globalThis.setTimeout = realTimeout; }
+  assert.deepStrictEqual(T.plottable, ['A', 'B', 'Pin']); assert.ok($('svg[viewBox="0 0 400 300"]') && $('#tip') && $('.ctl').dataset.lo === '-20');
+  assert.deepStrictEqual([...win.document.querySelectorAll('#analysisDots circle')].map((c) => c.dataset.idx), ['0', '4']);   // B is outside the sliders' range, the others have no RSI; the pinned one is drawn last
+  assert.ok($('#analysisDots .analysis-dot-star') && $('#analysisDots circle.pinned') && $('#analysisDots circle.color-green') && T.log.includes('rows:4') && T.log.includes('sheets') && T.log.includes('filters'));
+  assert.strictEqual(T.wired.dots[0], 'analysisDots'); T.wired.dots[1](3); assert.deepStrictEqual(T.opened.at(-1), ['sec-analysis', 'Analysis', 3]);
+  T.wired.board.openStock(2); assert.strictEqual(T.opened.at(-1)[2], 2); T.wired.board.hideTooltip(); T.wired.board.update(); T.wired.board.rerender();
+  const before = T.rafs.length; T.wired.controls.schedule(); T.wired.controls.schedule(); assert.strictEqual(T.rafs.length - before, 1);   // one redraw per frame
+  T.rafs.at(-1)(); T.wired.controls.schedule(); assert.strictEqual(T.rafs.length - before, 2); T.wired.controls.update(); T.wired.controls.rerender(); T.wired.controls.onRelease();
+  const btn = $('#analysisChartToggle'), box = $('.analysis-leaderboard'); assert.ok(box.classList.contains('chart-hidden') && btn.title === 'Show chart');   // hidden until first opened
+  btn.click(); assert.ok(!box.classList.contains('chart-hidden') && btn.getAttribute('aria-expanded') === 'true' && btn.title === 'Hide chart'); btn.click(); assert.ok(box.classList.contains('chart-hidden'));
+  T.analysisFilters.colorBy = 'month'; M.renderAnalysisSection(); assert.ok($('#analysisDots circle'));
+}));
+test('Analysis section: with no stocks it says so, the View menu switches the view and saves it, and the industry views show Loading and then the table', () => kcPage(ANS_PAGE, async (win) => {
+  const { M, body } = await ansSetup(win, { bucket: [] }), $ = (q) => win.document.querySelector(q);
+  M.renderAnalysisSection(); assert.ok(body().textContent.includes("No stocks match the current filters") && $('.analysis-view-bar'));
+  const cur = globalThis.__T; cur.bucket = cur.stocks; cur.analysisFilters.view = 'industry';
+  M.renderAnalysisSection(); assert.ok(body().textContent.includes('Loading')); await new Promise((r) => setTimeout(r, 30));
+  assert.deepStrictEqual([cur.industryShown.length, cur.industryShown[0].by, cur.industryShown[0].section, cur.industryShown[0].label, cur.industryShown[0].el.id], [1, 'industry', 'sec-analysis', 'Analysis', 'analysisIndustryBody']);   // the table's code was fetched and drew into the page
+  assert.strictEqual(cur.industryShown[0].stocksNow().size, 4);   // the stocks the filters let through
+  cur.analysisFilters.view = 'group'; M.renderAnalysisSection(); assert.deepStrictEqual([cur.industryShown.length, cur.industryShown[1].by, body().textContent.includes('Loading')], [2, 'group', false]);   // already fetched: drawn in the same step
+  const bar = $('.analysis-view-bar'); const before = cur.saved;
+  bar.querySelector('[data-analysis-view="group"]').click(); assert.strictEqual(cur.saved, before);   // already on it
+  bar.click(); bar.querySelector('.dm').click();
+  $('[data-analysis-view="stocks"]').click(); assert.strictEqual(cur.analysisFilters.view, 'stocks'); assert.strictEqual(cur.saved, before + 1);
+  assert.ok(body().querySelector('#analysisDots'));
+}));
+test('Analysis section: a page without the panel draws nothing, a resize redraws it only while it is on screen, and a background change waits until scrolling stops', () => kcPage(ANS_PAGE, async (win) => {
+  const { T, M } = await ansSetup(win), timers = [], real = { st: globalThis.setTimeout, ct: globalThis.clearTimeout };
+  globalThis.setTimeout = (f, ms) => { timers.push([f, ms]); return timers.length; }; globalThis.clearTimeout = () => {};
+  try {
+    M.init_analysis_section(); win.dispatchEvent(new win.Event('resize')); win.dispatchEvent(new win.Event('resize')); assert.strictEqual(timers.filter(([f, ms]) => ms === 200).length, 2);
+    const t = timers.filter(([f, ms]) => ms === 200).pop(); t[0](); assert.ok(win.document.getElementById('analysisDots'));   // on screen: redrawn
+    win.document.getElementById('section-analysis').classList.remove('active'); win.document.getElementById('analysisPanelBody').innerHTML = ''; t[0](); assert.strictEqual(win.document.getElementById('analysisDots'), null);
+    win.document.getElementById('section-analysis').classList.add('active'); T.analysisFilters.view = 'stocks'; T.bucket = null; t[0](); // an error in the redraw is logged, not thrown
+    M.refreshAnalysisSoon(); assert.ok(T.log.includes('idle:analysis'));
+    win.document.getElementById('analysisPanelBody').remove(); M.renderAnalysisSection();
+  } finally { globalThis.setTimeout = real.st; globalThis.clearTimeout = real.ct; }
+}));
 
 (async () => {
 await Promise.all(pending);
