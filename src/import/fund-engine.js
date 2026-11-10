@@ -204,21 +204,23 @@ function scoreToVerdict(score) {
 }
 
 // ---- Main entry point ----
-function scoreCsv(csvText, opts) {
-  const rows = parseCSV(csvText);
-  if (rows.length < 2) throw new Error('No data rows found.');
-  const colMap = buildColumnMap(rows[0]);
-  // A symbol listed twice (the same NSE or BSE code on two rows) is read once, from its first row: two stocks with one ticker would break the data.
-  const allRecords = extractRecords(rows, colMap), seenSym = new Set(), duplicates = /** @type {string[]} */ ([]);
+// A symbol listed twice (the same NSE or BSE code on two rows) is read once, from its first row: two stocks with one ticker would break the data.
+function dedupeBySymbol(allRecords) {
+  const seenSym = new Set(), duplicates = /** @type {string[]} */ ([]);
   const records = allRecords.filter(r => { const k = normSym(r.sym); if (seenSym.has(k)) { duplicates.push(r.sym); return false; } seenSym.add(k); return true; });
-  if (records.length === 0) throw new Error('No rows had an NSE or BSE code to key off.');
-  // v3: attach each record's exact industry label (symbol -> label map built from the dashboard's own ticker fields; keys normalised with normSym).
+  return { records, duplicates };
+}
+
+// v3: attach each record's exact industry label (symbol -> label map built from the dashboard's own ticker fields; keys normalised with normSym).
+// Banks, insurers and lenders: the Financial Health figures that mean nothing for them are skipped (see core/finsector.js).
+function attachIndustries(records, opts) {
   const exactMap = opts && opts.exactIndustryBySym;
   for (const r of records) r.exactIndustry = exactMap ? (exactMap.get(normSym(r.sym)) || null) : null;
-  // Banks, insurers and lenders: the Financial Health figures that mean nothing for them are skipped (see core/finsector.js).
   for (const r of records) r.finKind = financialKind(r);
-  const moatBasis = new Map(), piotBasis = new Map();
+}
 
+// Every metric ranked against its peers (see relativePercentiles). piotBasis records the peer level the Piotroski rank came from.
+function buildPercentiles(records, piotBasis) {
   const pct = {
     deInv: relativePercentiles(records, r => { const d = finApplies(r, 'de') ? deRankValue(r) : null; return d == null ? null : -d; }, groupKey),
     intCov: relativePercentiles(records, r => (finApplies(r, 'interestCoverage') ? r.interestCoverage : null), groupKey),
@@ -241,14 +243,21 @@ function scoreCsv(csvText, opts) {
     reinvest: relativePercentiles(records, reinvestMetric, groupKey),
     mos: populationPercentiles(records, marginOfSafetyPct),
   };
+  return pct;
+}
 
+// The Moat rank: the average of the ROCE, ROE and OPM ranks. moatBasis records the peer level each rank came from.
+function buildMoatPct(records, pct, moatBasis) {
   const moatInputs = new Map();
   for (const r of records) {
     const parts = [pct.roceRaw.get(r), pct.roeRaw.get(r), pct.opm.get(r)].filter(v => v != null);
     if (parts.length) moatInputs.set(r, sum(parts) / parts.length);
   }
-  const moatPct = relativePercentiles(records, r => (moatInputs.has(r) ? moatInputs.get(r) : null), groupKey, moatBasis);
+  return relativePercentiles(records, r => (moatInputs.has(r) ? moatInputs.get(r) : null), groupKey, moatBasis);
+}
 
+// Scores every record from the rank tables { pct, moatPct, moatBasis, piotBasis }.
+function scoreAll(records, { pct, moatPct, moatBasis, piotBasis }) {
   for (const r of records) {
     r.scored = scoreOne(r, pct, moatPct);
     // v3 extras for the dashboard's moat/governance wording: the percentile used and which peer level it was ranked at.
@@ -258,6 +267,19 @@ function scoreCsv(csvText, opts) {
     r.scored.govBasis = piotBasis.get(r) || null;
     r.scored.reinvestCroic = useCroic(r);
   }
+}
+
+function scoreCsv(csvText, opts) {
+  const rows = parseCSV(csvText);
+  if (rows.length < 2) throw new Error('No data rows found.');
+  const colMap = buildColumnMap(rows[0]);
+  const { records, duplicates } = dedupeBySymbol(extractRecords(rows, colMap));
+  if (records.length === 0) throw new Error('No rows had an NSE or BSE code to key off.');
+  attachIndustries(records, opts);
+  const moatBasis = new Map(), piotBasis = new Map();
+  const pct = buildPercentiles(records, piotBasis);
+  const moatPct = buildMoatPct(records, pct, moatBasis);
+  scoreAll(records, { pct, moatPct, moatBasis, piotBasis });
   return { records, columnMap: colMap, duplicates };
 }
 

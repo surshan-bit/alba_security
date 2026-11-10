@@ -4562,6 +4562,27 @@ test('stock suggestions: the symbol is matched first, then the name, a word of t
   assert.strictEqual(S.sgMark('Plain', 'zz'), 'Plain');
 }));
 
+// ---- Fundamental CSV preview (src/import/csv-upload.js): which stocks the file holds, which are new and which are not in it
+test('fundamental csv preview: symbols come from the NSE code, else the BSE code; new and missing stocks are counted; a bad file says why', () => withPage('<div id="fundamentalUploadResult"></div>', async (win) => {
+  globalThis.__CU = { stocks: [{ ticker: 'AAA · Auto' }, { ticker: 'bbb · Steel' }, { ticker: 'CCC · Oil' }], html: [] };
+  const U = await loadWithStubs('src/import/csv-upload.js', 'export { processFundamentalCsvText };', {
+    '../core/stocks.js': 'export const stocks = globalThis.__CU.stocks;', '../core/util.js': 'export const escapeHtml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");',
+    './upload-history.js': 'export const recordFundamentalCsvUpload = () => {};', '../core/safehtml.js': 'export const setHtml = (el, html) => { globalThis.__CU.html.push(html); };' });
+  const last = () => globalThis.__CU.html[globalThis.__CU.html.length - 1];
+  const csv = 'Name,NSE Code,BSE Code,ISIN Code\nA,aaa,500001,INE1\nNew via BSE,,0500325,INE2\nWord BSE,,ABC12,INE3\nNo codes,,,INE4\n,  ,  ,\nDup,AAA,,INE5\n';
+  assert.deepStrictEqual(U.processFundamentalCsvText(csv), { rowCount: 4, newCount: 2, droppedCount: 2 });   // AAA, 500325 (no leading zero), ABC12, AAA again
+  assert.ok(last().includes('<b>4</b>In file') && last().includes('<b>2</b>Already scored') && last().includes('<b>2</b>New') && last().includes('<b>2</b>Not in file') && last().includes('New: 500325, ABC12'));
+  const many = 'NSE Code\n' + Array.from({ length: 15 }, (_, i) => 'N' + i).join('\n');
+  assert.deepStrictEqual(U.processFundamentalCsvText(many), { rowCount: 15, newCount: 15, droppedCount: 3 });
+  assert.ok(last().includes('N0, N1, N2, N3, N4, N5, N6, N7, N8, N9, N10, N11 … +3'));   // twelve are listed, the rest counted
+  assert.deepStrictEqual(U.processFundamentalCsvText('NSE Code\nAAA\nBBB\nCCC'), { rowCount: 3, newCount: 0, droppedCount: 0 });
+  assert.ok(!last().includes('New:'));   // nothing new: no line for it
+  assert.strictEqual(U.processFundamentalCsvText('NSE Code'), null); assert.ok(last().includes('No data rows found'));
+  assert.strictEqual(U.processFundamentalCsvText('Name,Sector\nA,B'), null); assert.ok(last().includes('Could not find an "NSE Code", "BSE Code" or "ISIN Code" column'));
+  assert.strictEqual(U.processFundamentalCsvText('NSE Code,ISIN Code\n,INE1\n  ,'), null); assert.ok(last().includes('no rows had an NSE or BSE code'));
+  assert.strictEqual(U.processFundamentalCsvText('ISIN Code\nINE1'), null);   // an ISIN alone is not enough to match on
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
