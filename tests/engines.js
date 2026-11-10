@@ -2834,15 +2834,16 @@ test('daily MACD for a strategy: only that reading of a saved block changes, and
 // ---- Refresh all stocks (src/refresh/tvrefresh.js): the snapshot and bar steps, driven with a made-up TradingView and database
 const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG', 'fundamentalCsvUploadLog', 'tabId', 'strategies', 'watchlistSyncLog', 'TV_SERVER']);
 const TV_DEFAULTS = { tickerSymbol: (s) => s.ticker, sanitizeDocId: (x) => x, sleep: () => Promise.resolve(), sameValue: (a, b) => JSON.stringify(a) === JSON.stringify(b) };   // what the real helpers do, without their imports and waits
+// `more` names extra exports a kept module needs from a stubbed one: { '../strategies/rules.js': ['qualifyingStocks'] }.
 // A stand-in for an imported function: it calls whatever the running test put in globalThis.__T (looked up at call time) or a default. Made here, not in the stub's text, so it is not counted as source code.
 globalThis.__TVFN = (n) => (...a) => (globalThis.__T[n] ? globalThis.__T[n](...a) : (TV_DEFAULTS[n] || (() => undefined))(...a));
 // Loads a src module with every import replaced by a stand-in, except the modules named in `keep` (which load for real). A stand-in function calls whatever the
 // running test put in globalThis.__T (or a default); the stand-ins for values are read from globalThis.__T when the module loads.
-async function loadAllStubbed(file, extra, keep){
+async function loadAllStubbed(file, extra, keep, more){
   const src = fs.readFileSync(path.join(root, file), 'utf8'), stubs = {};
   for(const m of src.matchAll(/^import \{([^}]*)\} from '([^']+)';/gm)){
     if(keep.includes(m[2])) continue;
-    stubs[m[2]] = m[1].split(',').map((n) => n.trim().split(' as ')[0]).concat(m[2] === '../tv/connector.js' ? ['tvIsFatal'] : []).map((n) => TV_VALUES.has(n) ? `export const ${n} = globalThis.__T.${n};` : `export const ${n} = globalThis.__TVFN('${n}');`).join('\n');
+    stubs[m[2]] = m[1].split(',').map((n) => n.trim().split(' as ')[0]).concat(m[2] === '../tv/connector.js' ? ['tvIsFatal'] : [], (more || {})[m[2]] || []).map((n) => TV_VALUES.has(n) ? `export const ${n} = globalThis.__T.${n};` : `export const ${n} = globalThis.__TVFN('${n}');`).join('\n');
   }
   return loadWithStubs(file, extra, stubs);
 }
@@ -3774,6 +3775,308 @@ test('fundamental import: a missing file, wrong columns, a busy lock, a refused 
   } finally { console.error = realError; }
 }));
 let fiAskedText = '';
+
+// ---- TradingView watchlist sync (src/import/wlplan.js, wlreport.js, wlsync.js): the plan, the wording, and whole runs against a made-up TradingView and database
+const WL_RULES_STUB = { '../strategies/rules.js': 'export const qualifyingStocks = (u, rules) => u.filter((s) => rules.includes(s.ticker));' };   // a "rule" here is just a ticker that qualifies
+const wlStock = (ticker, name) => ({ ticker, name: name || ticker });
+
+test('watchlist plan: each ticker gets its TradingView symbol; BSE-only stocks need a saved alpha symbol and are asked for once; odd tickers are noted', () => alone(async () => {
+  const W = await loadWithStubs('src/import/wlplan.js', '', WL_RULES_STUB);
+  const universe = [wlStock('AAA'), wlStock('NAM-INDIA'), wlStock('J-K'), wlStock('M&M · NSE'), wlStock('M&M · BSE'), wlStock('500001', 'Beta Ltd'), wlStock('500002', 'Gamma'), wlStock('500003', 'Delta')];
+  const bse = { version: 4, updatedAt: 'x', __version: 1, _version: 1, 500002: 'GAMMA', 500003: 'BSE:DELTA' };
+  const first = { name: 'One', rules: universe.map((s) => s.ticker) }, second = { name: 'Two', rules: ['AAA', '500001'] };
+  const plan = W.wlBuild(universe, bse, [first, second]);
+  assert.deepStrictEqual(plan.lists.One, ['NSE:AAA', 'NSE:NAM_INDIA', 'NSE:J_K', 'NSE:M_M', 'BSE:GAMMA', 'BSE:DELTA']);   // M&M is not a confirmed spelling, so & becomes _
+  assert.deepStrictEqual(plan.lists.Two, ['NSE:AAA']);
+  assert.deepStrictEqual(plan.needsLookup, [{ code: '500001', name: 'Beta Ltd' }]);   // asked for once although two strategies hold it
+  assert.deepStrictEqual(plan.unverified, ['J-K', 'M&M']);
+  assert.deepStrictEqual(plan.notes, ['duplicate symbol skipped: NSE:M_M']);   // the same stock listed on two exchanges
+  const confirmed = W.wlBuild([wlStock('KLBRENG-B'), wlStock('GVT&D')], null, [{ name: 'C', rules: ['KLBRENG-B', 'GVT&D'] }]);
+  assert.deepStrictEqual([confirmed.lists.C, confirmed.unverified], [['NSE:KLBRENG_B', 'NSE:GVT&D'], []]);   // confirmed spellings are used as they are and are not flagged
+  assert.throws(() => W.wlBuild([wlStock('500009')], { 500009: '123' }, [{ name: 'X', rules: ['500009'] }]), /refusing to send a raw BSE code \(BSE:123\)/);
+}));
+
+test('watchlist plan: company names compare without Ltd / punctuation, lists compare as sets, and dropped symbols are told from ones that landed on the other form', () => alone(async () => {
+  const W = await loadWithStubs('src/import/wlplan.js', '', WL_RULES_STUB);
+  assert.strictEqual(W.wlNorm('Tata Motors Ltd.'), W.wlNorm('The TATA Motors Limited'));
+  assert.strictEqual(W.wlNorm('M&M Co'), 'm and m');
+  assert.strictEqual(W.wlNorm(null), '');
+  assert.deepStrictEqual([W.wlSame(['a', 'b'], ['b', 'a']), W.wlSame(['a'], ['a', 'b']), W.wlSame(['a', 'c'], ['a', 'b']), W.wlSame([], [])], [true, false, false, true]);
+  assert.deepStrictEqual(W.wlMissing(['a', 'b', 'c'], ['b']), ['a', 'c']);
+  assert.deepStrictEqual(W.wlStillDropped(['NSE:X', 'NSE:M_M', 'NSE:G_H', 'NSE:K'], ['BSE:X', 'NSE:M&M', 'NSE:G_H', 'NSE:J']), ['NSE:K']);   // X moved to BSE, M_M came back as M&M, G_H is there
+  assert.deepStrictEqual([W.wlDropLimit(100), W.wlDropLimit(1000)], [10, 30]);
+  assert.deepStrictEqual(W.wlDiff(['a', 'b'], ['b', 'c', 'd']), { added: 2, removed: 1 });
+  assert.deepStrictEqual(W.wlSteps([{ name: 'A' }, { name: 'B' }]), [{ key: 'build', label: 'Match the stocks', w: 10 }, { key: 'l0', label: 'A', w: 40 }, { key: 'l1', label: 'B', w: 40 }, { key: 'old', label: 'Remove the old fixed lists', w: 10 }]);
+  assert.strictEqual(W.wlSteps(Array.from({ length: 200 }, () => ({ name: 'n' })))[1].w, 1);   // a step never shrinks below 1
+  assert.deepStrictEqual([W.wlPicksProblem([]), W.wlPicksProblem([{ name: 'A' }, { name: '' }]), W.wlPicksProblem([{ name: 'A' }, { name: 'A' }]), W.wlPicksProblem([{ name: 'A' }, { name: 'B' }])],
+    ['Tick at least one strategy to sync.', 'Each ticked strategy needs its own name, because the TradingView list takes the strategy name.', 'Each ticked strategy needs its own name, because the TradingView list takes the strategy name.', '']);
+}));
+
+test('watchlist wording: one line per list, a note for the log, and result lines that clip long lists; hostile names stay plain text', () => {
+  const R = load('src/import/wlreport.js');
+  assert.strictEqual(R.wlDoneLine('Q', { action: 'unchanged', count: 5, added: 0, removed: 0 }), 'Q: 5 symbols, unchanged');
+  assert.strictEqual(R.wlDoneLine('Q', { action: 'replaced', count: 5, added: 2, removed: 1 }), 'Q: 5 symbols (+2 / −1)');
+  assert.deepStrictEqual([R.wlStepDetail({ action: 'unchanged' }), R.wlStepDetail({ action: 'created', added: 3, removed: 0 })], ['unchanged', '+3 / −0']);
+  assert.strictEqual(R.wlNote(['A', 'B'], { lists: { A: [1], B: [1, 2] }, needsLookup: [] }), 'A 1, B 2.');
+  assert.strictEqual(R.wlNote(['A'], { lists: { A: [1] }, needsLookup: [{}, {}] }), 'A 1. No TradingView symbol yet for 2 BSE-only stocks.');
+  const quiet = R.wlResultLines({ picks: [{}], done: ['Q: 1 symbols (+1 / −0)'], added: 1, removed: 0, dropped: [], partial: false, plan: { needsLookup: [], unverified: [] } });
+  assert.deepStrictEqual(quiet.map((l) => l.text), ['Sync complete.', 'Q: 1 symbols (+1 / −0)', '1 strategy · 1 added · 0 removed in total.']);
+  const many = Array.from({ length: 20 }, (_, i) => 'NSE:D' + i), lookups = Array.from({ length: 9 }, (_, i) => ({ code: '5000' + i, name: i === 0 ? '<img src=x onerror=alert(1)>' : 'Co ' + i }));
+  const loud = R.wlResultLines({ picks: [{}, {}], done: [], added: 0, removed: 0, dropped: many, partial: true, plan: { needsLookup: lookups, unverified: ['J-K', 'M&M'] } }).map((l) => l.text);
+  assert.strictEqual(loud[0], 'Sync finished with gaps.'); assert.strictEqual(loud[1], '2 strategies · 0 added · 0 removed in total.');
+  assert.strictEqual(loud[2], 'TradingView could not resolve: ' + many.slice(0, 15).join(', ') + ' … +5.');
+  assert.strictEqual(loud[3], 'No TradingView symbol yet (left out): 50000 <img src=x onerror=alert(1)>; 50001 Co 1; 50002 Co 2; 50003 Co 3; 50004 Co 4; 50005 Co 5; 50006 Co 6; 50007 Co 7 … +1.');   // text only: the panel sets it with textContent
+  assert.strictEqual(loud[4], 'Symbols with - or & that were not checked beforehand: J-K, M&M.');
+  assert.deepStrictEqual(R.wlStoppedLines('boom', ['Q: done']), [{ text: 'Sync stopped: boom', cls: 'fi-line fi-line-strong' }, { text: 'Done before the stop — Q: done', cls: 'fi-line fi-line-muted' }]);
+});
+
+// A made-up TradingView: lists held in memory, writes that can be made to fail before or after they take effect, and a symbol search.
+const wlTv = (lists, over) => {
+  const tv = Object.assign({ calls: [], reads: 0, next: 100, accept: () => true, search: {}, before: {}, after: {}, onRead: null, alsoDelete: null, keepOnDelete: false, skip: {}, badList: false }, over);
+  tv.lists = lists.map((l, i) => Object.assign({ id: 'L' + i, type: 'custom', symbols: [] }, l));
+  tv.count = (tool) => tv.calls.filter((c) => c === tool).length;
+  tv.names = () => tv.lists.map((l) => l.name);
+  tv.byName = (name) => tv.lists.find((l) => l.name === name);
+  tv.call = async (tool, args) => {
+    if(tool === 'mcp-watchlist-list-watchlists'){ tv.reads++; if(tv.onRead) tv.onRead(tv.reads, tv); return tv.badList ? { oops: 1 } : { watchlists: JSON.parse(JSON.stringify(tv.lists)) }; }
+    const hits = tv.search[args.query];
+    if(hits instanceof Error) throw hits;
+    return JSON.stringify({ data: { symbols: hits || [] } });   // the connector hands back text; the page unwraps it
+  };
+  const effects = {
+    'mcp-watchlist-create-watchlist': (i) => tv.lists.push({ id: 'N' + tv.next++, name: i.name, type: 'custom', symbols: i.symbols.filter(tv.accept) }),
+    'mcp-watchlist-add-to-watchlist': (i) => { const l = tv.lists.find((x) => x.id === i.watchlist_id); l.symbols = l.symbols.concat(i.symbols.filter(tv.accept)); },
+    'mcp-watchlist-update-watchlist': (i) => { tv.lists.find((x) => x.id === i.watchlist_id).name = i.name; },
+    'mcp-watchlist-delete-watchlist': (i) => { if(tv.keepOnDelete) return; tv.lists = tv.lists.filter((x) => x.id !== i.watchlist_id && x.id !== tv.alsoDelete); }
+  };
+  tv.mcp = { callTool: async (server, tool, input) => {
+    tv.calls.push(tool);
+    if(tv.before[tool]) tv.before[tool](input, tv.count(tool));
+    if(!tv.skip[tool]) effects[tool](input);
+    if(tv.after[tool]) tv.after[tool](input, tv.count(tool));
+    return { payload: { ok: true } };
+  } };
+  return tv;
+};
+const wlDb = (over) => {
+  const o = Object.assign({ bse: undefined, getFails: false, updateFails: false }, over), db = { jobs: [], updates: [] };
+  db.doc = (p) => ({
+    get: async () => { if(o.getFails) throw new Error('database down'); return o.bse === undefined ? { exists: false } : { exists: true, data: () => o.bse }; },
+    update: async (d) => { if(o.updateFails) throw new Error('database down'); db.updates.push([p, d]); },
+    set: async (d) => { db.jobs.push([p, d.status]); }
+  });
+  return db;
+};
+const wlSetup = (tv, db, over) => {
+  const T = globalThis.__T = { log: [], logs: [], results: [], marked: [], beats: 0, running: [], reset: null, state: { status: {} },
+    stocks: [wlStock('A1', 'Alpha'), wlStock('A2', 'Beta'), wlStock('A3', 'Gamma')],
+    strategies: [{ id: 's1', name: ' Quality ', rules: ['A1', 'A2', 'A3'] }, { id: 's2', name: 'Value', rules: ['A1'] }],
+    ruleReady: (r) => r !== 'blank', qualifyingStocks: (u, rules) => u.filter((s) => rules.includes(s.ticker)),
+    getFiRunning: () => false, getFiOwner: () => true, getFiDb: () => db, getFiState: () => T.state, setFiRunning: (v) => T.running.push(v),
+    fiSet: (...a) => T.log.push(a.slice(0, 3).join('|')), fiReset: (title, steps) => { T.reset = [title, steps.map((s) => s.key)]; },
+    fiShowResult: (kind, lines) => T.results.push([kind, lines.map((l) => l.text)]), fiTakeLock: async () => () => { T.beats++; }, fiRetry: async (fn) => fn(),
+    fiMarkFailed: async (job, msg) => T.marked.push(msg), fiErr: (e) => e.message, watchlistSyncLog: { put: (id, rec) => T.logs.push(rec) },
+    tvCall: tv.call, tvMcp: async () => tv.mcp, tvErrorText: (e) => 'TV: ' + e.message };
+  Object.assign(T, over || {});
+  return T;
+};
+const wlPage = (fn, html) => withPage(html === undefined ? '<div id="wlStrategyPicker"></div>' : html, async (win) => {
+  const had = globalThis.window; globalThis.window = win;
+  try { await fn(win); } finally { if(had === undefined) delete globalThis.window; else globalThis.window = had; }
+});
+TV_VALUES.add('strategies'); TV_VALUES.add('watchlistSyncLog');
+const wlLoad = () => loadAllStubbed('src/import/wlsync.js', '', ['./wlplan.js', './wlreport.js'], { '../strategies/rules.js': ['qualifyingStocks'] });
+// Opens the page, ticks the strategies (by id) in the picker and presses the button's function.
+const wlRun = async (win, ids) => {
+  const M = await wlLoad(); M.renderWlPicker();
+  [...win.document.querySelectorAll('#wlStrategyPicker input')].forEach((box, i) => { if(ids.includes(globalThis.__T.strategies[i].id)){ box.checked = true; box.dispatchEvent(new win.Event('change')); } });
+  await M.wlRunSync();
+  return M;
+};
+const quietErrors = async (fn) => { const real = console.error, seen = []; console.error = (...a) => seen.push(String(a[0])); try { await fn(seen); } finally { console.error = real; } };
+
+test('watchlist sync: a new list is created, an old one replaced, leftovers and the four fixed lists are removed, other lists are left, and the run is logged', () => wlPage(async (win) => {
+  const tv = wlTv([{ name: 'Value', symbols: ['NSE:A9'] }, { name: 'Alba - Green', symbols: ['NSE:A1'] }, { name: 'Quality (syncing)', symbols: ['NSE:OLD'] }, { type: 'colored', color: 'red', symbols: ['NSE:KEEP'] }]);
+  const db = wlDb(), T = wlSetup(tv, db);
+  await wlRun(win, ['s1', 's2']);
+  assert.deepStrictEqual(T.results, [['ok', ['Sync complete.', 'Quality: 3 symbols (+3 / −0)', 'Value: 1 symbols (+1 / −1)', 'Removed old lists: Alba - Green', '2 strategies · 4 added · 1 removed in total.']]]);
+  assert.deepStrictEqual(tv.lists.map((l) => [l.name, l.symbols]).sort(), [[undefined, ['NSE:KEEP']], ['Quality', ['NSE:A1', 'NSE:A2', 'NSE:A3']], ['Value', ['NSE:A1']]]);
+  assert.deepStrictEqual(T.logs.map((l) => l.status), ['running', 'completed']);
+  assert.strictEqual(T.logs[1].qualifiedCount, 4); assert.strictEqual(T.logs[1].note, 'Quality 3, Value 1.');
+  assert.deepStrictEqual(db.jobs, [['importJobs/watchlist', 'done']]);
+  assert.deepStrictEqual([T.beats, T.running], [1, [true, false]]);   // the lock heartbeat was stopped
+  assert.ok(T.log.includes('l0|running|Creating the new list…') && T.log.includes('l1|running|Replacing the old list…') && T.log.includes('old|done|1 removed'));
+  assert.deepStrictEqual(T.reset, ['Syncing TradingView watchlists', ['build', 'l0', 'l1', 'old']]);
+}));
+
+test('watchlist sync: a list that already holds the right symbols is left alone, a strategy with no match is skipped, and the gaps make the result a warning', () => wlPage(async (win) => {
+  const tv = wlTv([{ name: 'Value', symbols: ['NSE:A1'] }]);
+  const db = wlDb(), T = wlSetup(tv, db, { strategies: [{ id: 's2', name: 'Value', rules: ['A1'] }, { id: 's3', name: 'Nothing', rules: ['ZZ'] }] });
+  await wlRun(win, ['s2', 's3']);
+  assert.deepStrictEqual(T.results, [['warn', ['Sync finished with gaps.', 'Value: 1 symbols, unchanged', 'Nothing: no stock matches, list left as it is', '2 strategies · 0 added · 0 removed in total.']]]);
+  assert.deepStrictEqual(tv.calls, []);   // nothing was written
+  assert.ok(T.log.includes('l0|done|unchanged') && T.log.includes('l1|done|no match') && T.log.includes('old|done|none found'));
+  assert.strictEqual(T.logs[1].status, 'partial');
+}));
+
+test('watchlist sync: a BSE-only stock is found by its exact company name and saved; a near match, an ambiguous one and a failed search are left for a person', () => wlPage(async (win) => {
+  const hit = (symbol, description) => ({ symbol, exchange: 'BSE', type: 'stock', description });
+  const tv = wlTv([], { search: { 'Gamma Industries Limited': [hit('BSE:GAMMAIND', 'GAMMA INDUSTRIES LTD'), { symbol: 'NSE:GAMMAIND', exchange: 'NSE', type: 'stock', description: 'Gamma Industries Ltd' }, null],
+    'Beta Works Ltd': [hit('BSE:BETA1', 'Beta Works Ltd'), hit('BSE:BETA2', 'Beta Works Limited')], 'Delta Co': [hit('BSE:DELTAX', 'Delta Corporation')], 'Eps Ltd': new Error('search down') } });
+  const db = wlDb({ bse: { version: 1 } });
+  const universe = [wlStock('500001', 'Gamma Industries Limited'), wlStock('500002', 'Beta Works Ltd'), wlStock('500003', 'Delta Co'), wlStock('500004', 'Eps Ltd'), wlStock('A1', 'Alpha')];
+  const T = wlSetup(tv, db, { stocks: universe, strategies: [{ id: 's9', name: 'Mixed', rules: ['500001', '500002', '500003', '500004', 'A1'] }] });
+  await wlRun(win, ['s9']);
+  assert.deepStrictEqual(db.updates, [['stockMeta/bseAlpha', { 500001: 'GAMMAIND' }]]);
+  assert.deepStrictEqual(tv.byName('Mixed').symbols, ['BSE:GAMMAIND', 'NSE:A1']);
+  assert.strictEqual(T.results[0][0], 'warn');
+  assert.ok(T.results[0][1].includes('No TradingView symbol yet (left out): 500002 Beta Works Ltd; 500003 Delta Co; 500004 Eps Ltd.'));
+  assert.deepStrictEqual(T.logs[1].droppedTickers, ['500002', '500003', '500004']);
+  assert.ok(T.log.includes('build|running|Looking up 4 BSE symbol(s)…') && T.log.includes('build|done|2 symbols'));
+}));
+
+test('watchlist sync: a database that cannot be read or written does not stop the sync', () => wlPage(async (win) => {
+  await quietErrors(async (seen) => {
+    const hit = { symbol: 'BSE:GAMMAIND', exchange: 'BSE', type: 'stock', description: 'Gamma' };
+    const tv = wlTv([], { search: { Gamma: [hit] } }), db = wlDb({ getFails: true, updateFails: true });
+    const T = wlSetup(tv, db, { stocks: [wlStock('500001', 'Gamma')], strategies: [{ id: 's9', name: 'B', rules: ['500001'] }] });
+    await wlRun(win, ['s9']);
+    assert.deepStrictEqual(tv.byName('B').symbols, ['BSE:GAMMAIND']); assert.strictEqual(T.results[0][0], 'ok');   // the symbol found is used although it could not be saved
+    assert.deepStrictEqual(seen, ['Could not read the BSE symbol map', 'Could not save the new BSE symbols']);
+  });
+}));
+
+test('watchlist sync: symbols TradingView dropped are tried on the other exchange and in the other spelling; the ones that stay missing are reported', () => wlPage(async (win) => {
+  const tv = wlTv([], { accept: (s) => !['NSE:RESONANCE', 'NSE:M_M', 'NSE:GHOST'].includes(s), search: { RESONANCE: [{ symbol: 'NSE:RESONANCE', exchange: 'NSE', type: 'stock' }, { symbol: 'BSE:RESONANCE', exchange: 'BSE', type: 'stock' }],
+    M_M: new Error('search down'), 'M&M': [{ symbol: 'NSE:M&M', exchange: 'NSE', type: 'stock' }] } });
+  const db = wlDb(), T = wlSetup(tv, db, { stocks: ['A1', 'RESONANCE', 'M&M', 'GHOST'].map((t) => wlStock(t)), strategies: [{ id: 's9', name: 'L', rules: ['A1', 'RESONANCE', 'M&M', 'GHOST'] }] });
+  await wlRun(win, ['s9']);
+  assert.deepStrictEqual(tv.byName('L').symbols, ['NSE:A1', 'BSE:RESONANCE', 'NSE:M&M']);   // GHOST has no other form, so it stays out
+  assert.strictEqual(T.results[0][0], 'warn'); assert.ok(T.results[0][1].includes('TradingView could not resolve: NSE:GHOST.'));
+  assert.ok(T.log.includes('l0|running|Resolving 3 symbols TradingView dropped…'));
+}));
+
+test('watchlist sync: long lists go in chunks, a chunk that failed ambiguously is sent again, and the new list replaces the old one only afterwards', () => wlPage(async (win) => {
+  const names = Array.from({ length: 650 }, (_, i) => 'S' + i);
+  const tv = wlTv([{ name: 'Big', symbols: ['NSE:OLD'] }], { before: { 'mcp-watchlist-add-to-watchlist': (input, n) => { if(n === 1) throw Object.assign(new Error('upstream'), { code: 'upstream_error' }); } } });
+  const db = wlDb(), T = wlSetup(tv, db, { stocks: names.map((t) => wlStock(t)), strategies: [{ id: 's9', name: 'Big', rules: names }] });
+  await wlRun(win, ['s9']);
+  assert.strictEqual(tv.byName('Big').symbols.length, 650); assert.strictEqual(tv.count('mcp-watchlist-add-to-watchlist'), 3);   // chunk 2 failed and was not applied, chunk 3 landed, the 300 missing were sent again
+  assert.deepStrictEqual(T.results[0], ['ok', ['Sync complete.', 'Big: 650 symbols (+650 / −1)', '1 strategy · 650 added · 1 removed in total.']]);
+  assert.ok(T.log.includes('l0|running|Adding symbols 600 / 650…') && T.log.includes('l0|running|Adding symbols 650 / 650…'));
+  assert.deepStrictEqual(tv.calls.filter((c) => c.includes('delete')), ['mcp-watchlist-delete-watchlist']);
+}));
+
+test('watchlist sync: when TradingView refuses too many symbols the old list is kept, the run stops with the reason and the lock is released as failed', () => wlPage(async (win) => {
+  const names = Array.from({ length: 12 }, (_, i) => 'S' + i);
+  const tv = wlTv([{ name: 'Big', symbols: ['NSE:OLD'] }], { accept: () => false });
+  const db = wlDb(), T = wlSetup(tv, db, { stocks: names.map((t) => wlStock(t)), strategies: [{ id: 's9', name: 'Big', rules: names }] });
+  await quietErrors(() => wlRun(win, ['s9']));
+  const why = 'TradingView did not accept 12 of 12 symbols, so the existing "Big" list was left untouched (the new one is saved as "Big (syncing)")';
+  assert.deepStrictEqual(T.results, [['err', ['Sync stopped: ' + why]]]);
+  assert.deepStrictEqual(T.marked, [why]); assert.deepStrictEqual(tv.byName('Big').symbols, ['NSE:OLD']);
+  assert.deepStrictEqual(T.logs.map((l) => l.status), ['running', 'failed']); assert.ok(T.log.includes('l0|error|'));
+  assert.deepStrictEqual(T.running, [true, false]); assert.strictEqual(T.beats, 1);
+}));
+
+test('watchlist sync: a failed delete, a list that vanishes with it, duplicate names, a missing connector and a thrown string each stop the run with their own message', () => wlPage(async (win) => {
+  const run = async (lists, over, setup) => {
+    const tv = wlTv(lists, over), T = wlSetup(tv, wlDb(), Object.assign({ strategies: [{ id: 's2', name: 'Value', rules: ['A1'] }] }, setup));
+    await quietErrors(() => wlRun(win, ['s2'])); return { tv, T, text: T.results[0][1][0] };
+  };
+  let r = await run([{ name: 'Value', symbols: ['NSE:A9'] }, { name: 'Other', id: 'O1' }], { alsoDelete: 'O1' });
+  assert.strictEqual(r.text, 'Sync stopped: Safety stop: after deleting "Value" these lists are also gone: Other. Nothing more was touched.');
+  r = await run([{ name: 'Value', symbols: ['NSE:A9'] }], { keepOnDelete: true });
+  assert.strictEqual(r.text, 'Sync stopped: "Value" could not be deleted');
+  r = await run([{ name: 'Value', symbols: ['NSE:A9'] }], { keepOnDelete: true, before: { 'mcp-watchlist-delete-watchlist': () => { throw new Error('denied'); } } });
+  assert.strictEqual(r.text, 'Sync stopped: "Value" could not be deleted (denied)');
+  r = await run([{ name: 'Value' }, { name: 'Value' }]);
+  assert.strictEqual(r.text, 'Sync stopped: there are 2 lists called "Value" in TradingView; rename or delete the extras first'); assert.deepStrictEqual(r.tv.calls, []);
+  r = await run([], {}, { tvMcp: async () => null });
+  assert.strictEqual(r.text, 'Sync stopped: TV: The TradingView connector is not available in this view.');
+  r = await run([], { before: { 'mcp-watchlist-create-watchlist': () => { throw 'plain text'; } } });
+  assert.strictEqual(r.text, 'Sync stopped: plain text');
+}));
+
+test('watchlist sync: a list that never appears, one that disappears while checked, one that cannot be renamed and a reply that is not a list each stop the run', () => wlPage(async (win) => {
+  const run = async (over) => {
+    const tv = wlTv([], over), T = wlSetup(tv, wlDb(), { strategies: [{ id: 's2', name: 'Value', rules: ['A1'] }] });
+    await quietErrors(() => wlRun(win, ['s2'])); return T.results[0][1][0];
+  };
+  assert.strictEqual(await run({ skip: { 'mcp-watchlist-create-watchlist': true } }), 'Sync stopped: could not create the temporary list in TradingView');
+  assert.strictEqual(await run({ onRead: (n, tv) => { if(n === 3) tv.lists.length = 0; } }), 'Sync stopped: the temporary list disappeared');
+  assert.strictEqual(await run({ skip: { 'mcp-watchlist-update-watchlist': true } }), 'Sync stopped: the new list is ready but could not be renamed; it is saved as "Value (syncing)" in TradingView');
+  assert.strictEqual(await run({ badList: true }), 'Sync stopped: TradingView returned an unexpected reply when listing watchlists');
+}));
+
+test('watchlist sync: it does nothing while another sync runs or for a viewer who is not the owner, and it says why when there is no database or nothing valid is ticked', () => wlPage(async (win) => {
+  const check = async (setup, ids) => { const T = wlSetup(wlTv([]), wlDb(), setup); await wlRun(win, ids); return T; };
+  let T = await check({ getFiRunning: () => true }, ['s1']);
+  assert.deepStrictEqual([T.results, T.reset, T.running], [[], null, []]);
+  T = await check({ getFiOwner: () => false }, ['s1']);
+  assert.deepStrictEqual([T.results, T.reset, T.running], [[], null, []]);
+  T = await check({ getFiDb: () => null }, ['s1']);
+  assert.deepStrictEqual([T.results, T.reset], [[['err', ['The database is not available in this view, so the sync cannot run here.']]], ['Watchlist sync', ['build', 'l0', 'old']]]);
+  T = await check({}, []);
+  assert.deepStrictEqual([T.results, T.reset, T.running], [[['err', ['Tick at least one strategy to sync.']]], ['Watchlist sync', ['build', 'old']], []]);
+  const twice = 'Each ticked strategy needs its own name, because the TradingView list takes the strategy name.';
+  T = await check({ strategies: [{ id: 'a', name: 'Value', rules: ['A1'] }, { id: 'b', name: ' Value ', rules: ['A1'] }] }, ['a', 'b']);
+  assert.deepStrictEqual(T.results, [['err', [twice]]]);
+  T = await check({ strategies: [{ id: 'a', name: '   ', rules: ['A1'] }] }, ['a']);
+  assert.deepStrictEqual(T.results, [['err', [twice]]]);
+}));
+
+test('watchlist sync: a lock that is taken stops the run before anything is touched, is not marked failed, and keeps the step that was already done', () => wlPage(async (win) => {
+  await quietErrors(async () => {
+    const busy = (T) => async (job, text, opts) => { T.busy = text('since 10:00'); T.lockOpts = opts; throw new Error(T.busy); };
+    let T = wlSetup(wlTv([]), wlDb(), { state: { status: { build: 'done' } } }); T.fiTakeLock = busy(T);
+    await wlRun(win, ['s2']);
+    assert.strictEqual(T.busy, 'another sync is already running (since 10:00). Try again in a few minutes.');
+    assert.deepStrictEqual([T.results[0][0], T.marked, T.log, T.state.error.message, typeof T.lockOpts.startedAt], ['err', [], [], T.busy, 'string']);
+    assert.deepStrictEqual(T.logs.map((l) => l.status), ['failed']);
+    T = wlSetup(wlTv([]), wlDb(), { getFiState: () => null }); T.fiTakeLock = busy(T);   // no progress panel state: still reported
+    await wlRun(win, ['s2']);
+    assert.strictEqual(T.results[0][0], 'err');
+  });
+}));
+
+test('watchlist sync: the log is also written to the database as plain data, and a log that cannot be saved does not stop the run', () => wlPage(async (win) => {
+  const saved = [], logDb = { collection: (c) => ({ doc: (id) => ({ set: async (rec) => saved.push([c, id, rec]) }) }) };
+  let T = wlSetup(wlTv([]), wlDb(), { getDb: () => logDb, strategies: [{ id: 's2', name: 'Value', rules: ['A1'] }] });
+  await wlRun(win, ['s2']);
+  assert.deepStrictEqual(saved.map((x) => [x[0], x[2].status]), [['watchlistSyncLog', 'running'], ['watchlistSyncLog', 'completed']]);
+  assert.strictEqual(saved[0][1], saved[1][1]);   // one document per run
+  assert.ok(!('droppedTickers' in saved[0][2]) && saved[1][2].droppedTickers.length === 0);
+  await quietErrors(async (seen) => {
+    T = wlSetup(wlTv([]), wlDb(), { watchlistSyncLog: { put: () => { throw new Error('no room'); } }, strategies: [{ id: 's2', name: 'Value', rules: ['A1'] }] });
+    await wlRun(win, ['s2']);
+    assert.strictEqual(T.results[0][0], 'ok'); assert.deepStrictEqual(seen, ['Could not save the sync log', 'Could not save the sync log']);
+  });
+}));
+
+test('watchlist picker: one checkbox per strategy, a strategy without rules cannot be ticked, names are text, ticks survive a redraw and a reload of the strategies', () => wlPage(async (win) => {
+  const hostile = '<img src=x onerror=alert(1)>';
+  const T = wlSetup(wlTv([]), wlDb(), { strategies: [{ id: 's1', name: hostile, rules: ['A1'] }, { id: 's2', name: 'Blank', rules: ['blank'] }] });
+  const M = await wlLoad(), host = win.document.getElementById('wlStrategyPicker'), boxes = () => [...host.querySelectorAll('input')];
+  M.renderWlPicker();
+  assert.deepStrictEqual([host.querySelectorAll('label').length, host.querySelector('img'), host.querySelector('.wl-pick-name').textContent], [2, null, hostile]);
+  assert.deepStrictEqual([boxes()[0].disabled, boxes()[1].disabled, host.querySelectorAll('.wl-pick-name')[1].textContent], [false, true, 'Blank (no rules yet)']);
+  const tick = (box, on) => { box.checked = on; box.dispatchEvent(new win.Event('change')); };
+  tick(boxes()[0], true); M.renderWlPicker();
+  assert.strictEqual(boxes()[0].checked, true);
+  tick(boxes()[0], false); M.renderWlPicker();
+  assert.strictEqual(boxes()[0].checked, false);
+  tick(boxes()[0], true); T.strategies[0].rules = ['blank']; T.strategies.push({ id: 's3', name: 'Third', rules: ['A2'] });
+  win.dispatchEvent(new win.Event('alba-strategies-reloaded'));   // the Strategies screen changed: the first one lost its rules, so its tick is dropped
+  assert.deepStrictEqual([boxes().length, boxes()[0].disabled, boxes()[0].checked], [3, true, false]);
+  T.strategies.length = 0; M.renderWlPicker();
+  assert.strictEqual(host.textContent, 'No strategies yet. Create one in Strategies first.');
+}));
+
+test('watchlist picker: a page without the picker is left alone', () => wlPage(async () => {
+  wlSetup(wlTv([]), wlDb());
+  (await wlLoad()).renderWlPicker();
+}, ''));
 
 (async () => {
 await Promise.all(pending);
