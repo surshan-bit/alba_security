@@ -4242,6 +4242,91 @@ test('strategies section: wiring leaves a page without the section alone, and ha
   M.__init(); assert.deepStrictEqual(T.calls, [['wireRulesEditor', 'function', 'function'], ['wireLearnPanel', 'function', 'function'], ['wireTrackPanel', 'function', 'function']]);
 }));
 
+// ---- Refresh News (src/news/pulse.js): the quotes, the calendar and the two Claude steps, each told apart in the note it leaves
+for(const n of ['dbCapabilityPromise', 'news', 'BRIEFING_FEEDS', 'PULSE_SYMBOLS']) TV_VALUES.add(n);
+// A made-up database (news/pulse exists with an old reading, news/macro does not yet), TradingView and Claude.
+const pulseSetup = async (over) => {
+  const writes = [], docs = { 'news/pulse': { reading: ['old'], readingAt: 't0' } };
+  const db = { doc: (path) => ({
+    get: async () => docs[path] ? { exists: true, data: () => docs[path] } : { exists: false },
+    set: async (d) => { writes.push(['set', path, Object.keys(d).sort().join(',')]); docs[path] = Object.assign({}, d); },
+    update: async (d) => { writes.push(['update', path, Object.keys(d).sort().join(',')]); docs[path] = Object.assign({}, docs[path], d); } }) };
+  const T = globalThis.__T = { writes, docs, db, dbCapabilityPromise: Promise.resolve(db), news: { macro: { calendar: [{ date: 'd' }] } }, BRIEFING_FEEDS: ['F1', 'F2'], PULSE_SYMBOLS: ['S1'],
+    tiles: [1, 2, 3, 4, 5], briefings: ['b1', 'b2'], reading: ['l1', 'l2', 'l3'], claudeOn: { newsPulse: true, newsBriefings: true },
+    tvMcp: async () => ({}), ldEnsureClaudeAccess: async () => {}, ldErrText: (e) => 'LD:' + (e && e.message), claudeStepOn: (k) => T.claudeOn[k],
+    tvCall: async (tool) => {
+      if(tool === 'mcp-tv-get-symbol-data-batch') return { data: T.tiles };
+      if(tool === 'mcp-tv-get-economic-calendar') return { result: [{ date: '2026-11-12' }] };
+      return { data: { headlines: T.headlines || ['h1'] } };
+    },
+    buildTiles: (d) => d || [], buildCalendar: (r, c) => r.map((x) => ({ date: x.date, c })), mergeHeadlines: (g) => g.flat(), cleanBriefings: (r) => r, cleanReading: (r) => r,
+    nextBigEvents: (cal, now, n) => ({ n, cal: cal.length }), briefingsPrompt: (h) => 'B' + h.length, readingPrompt: (t, e) => 'R' + t.length + ':' + e.n + ':' + e.cal,
+    ldAskJson: async (sample, prompt) => { T.asked.push(prompt); return prompt[0] === 'B' ? T.briefings : T.reading; }, asked: [] };
+  Object.assign(T, over || {});
+  const M = await loadAllStubbed('src/news/pulse.js', '', []);
+  const seen = [], onChange = () => seen.push(M.getPulseRun().state + ': ' + M.getPulseRun().msg);
+  return { T, M, seen, onChange };
+};
+const withClaude = async (sample, fn) => { const had = globalThis.claude; globalThis.claude = { use: async () => sample }; try { return await fn(); } finally { if(had === undefined) delete globalThis.claude; else globalThis.claude = had; } };
+
+test('refresh news: quotes, calendar, briefings and reading are saved in turn, the old reading is kept until the new one is written, and the screen follows each step', () => alone(() => withClaude({}, async () => {
+  const { T, M, seen, onChange } = await pulseSetup();
+  await M.refreshPulse(onChange);
+  assert.deepStrictEqual(seen, ['running: Getting market quotes…', 'running: Getting the economic calendar…', 'running: Writing the briefings…', 'running: Writing the reading…', 'done: 5 quotes saved. Calendar updated: 2 events. Briefings updated: 2. Reading updated.']);
+  assert.deepStrictEqual(T.writes, [['set', 'news/pulse', 'at,reading,readingAt,tiles'], ['set', 'news/macro', 'calendar,calendarAt'], ['update', 'news/macro', 'asof,briefings,briefingsAt'], ['update', 'news/pulse', 'reading,readingAt']]);
+  assert.deepStrictEqual(T.asked, ['B2', 'R5:3:1']);   // two feeds' headlines go in; the reading is written from the quotes and the next 3 events
+  assert.deepStrictEqual(T.docs['news/pulse'].reading, ['l1', 'l2', 'l3']);
+})));
+
+test('refresh news: a run that is already going is not started twice, and the first quotes keep the reading that was there', () => alone(async () => {
+  const { T, M, seen, onChange } = await pulseSetup({ claudeOn: { newsPulse: false, newsBriefings: false } });
+  const first = M.refreshPulse(onChange);
+  await M.refreshPulse(onChange);   // ignored: it does not even call the screen
+  assert.deepStrictEqual(seen, ['running: Getting market quotes…']);
+  await first;
+  assert.strictEqual(M.getPulseRun().state, 'done');
+  assert.deepStrictEqual(T.writes.slice(0, 1), [['set', 'news/pulse', 'at,reading,readingAt,tiles']]);
+  assert.deepStrictEqual([T.docs['news/pulse'].reading, T.docs['news/pulse'].readingAt], [['old'], 't0']);
+}));
+
+test('refresh news: no connector, no database or too few quotes stop the run with that reason and write nothing', () => alone(async () => {
+  const stop = async (over) => { const x = await pulseSetup(over); await x.M.refreshPulse(x.onChange); return [x.M.getPulseRun(), x.T.writes.length]; };
+  assert.deepStrictEqual(await stop({ tvMcp: async () => null }), [{ state: 'error', msg: 'The TradingView connector is not available in this view.' }, 0]);
+  assert.deepStrictEqual(await stop({ dbCapabilityPromise: Promise.resolve(null) }), [{ state: 'error', msg: 'The database is not available in this view.' }, 0]);
+  assert.deepStrictEqual(await stop({ tiles: [1, 2] }), [{ state: 'error', msg: 'TradingView returned too few quotes (2).' }, 0]);
+  assert.deepStrictEqual(await stop({ tvErrorText: () => 'TradingView said no' , tvCall: async () => { throw new Error('x'); } }), [{ state: 'error', msg: 'TradingView said no' }, 0]);
+  assert.deepStrictEqual(await stop({ tvMcp: async () => { throw 'plain'; } }), [{ state: 'error', msg: 'plain' }, 0]);
+}));
+
+test('refresh news: a calendar that fails is a note, not a stop, and the Claude steps that are switched off say so', () => alone(async () => {
+  const x = await pulseSetup({ claudeOn: { newsPulse: false, newsBriefings: false }, tvCall: async (tool) => { if(tool === 'mcp-tv-get-symbol-data-batch') return { data: [1, 2, 3] }; throw new Error('calendar tool missing'); } });
+  await x.M.refreshPulse(x.onChange);
+  assert.strictEqual(x.M.getPulseRun().msg, '3 quotes saved. The calendar was not updated (calendar tool missing). The briefings step is switched off in Settings. The reading step is switched off in Settings.');
+  assert.deepStrictEqual(x.T.writes.map((w) => w[1]), ['news/pulse']);
+}));
+
+test('refresh news: without Claude the quotes and calendar still save and the note says why Claude was skipped', () => alone(async () => {
+  const x = await pulseSetup();   // no claude object on the page
+  await x.M.refreshPulse(x.onChange);
+  assert.strictEqual(x.M.getPulseRun().msg, '5 quotes saved. Calendar updated: 2 events. Claude steps skipped (LD:Claude is not available in this view.).');
+  assert.deepStrictEqual(x.seen.filter((s) => /Writing/.test(s)), []);
+  const y = await withClaude({}, async () => { const p = await pulseSetup({ ldEnsureClaudeAccess: async () => { throw new Error('no access'); } }); await p.M.refreshPulse(p.onChange); return p; });
+  assert.ok(y.M.getPulseRun().msg.endsWith('Claude steps skipped (LD:no access).'));
+  const z = await withClaude(null, async () => { const p = await pulseSetup({ claudeOn: { newsPulse: true, newsBriefings: false } }); await p.M.refreshPulse(p.onChange); return p; });
+  assert.ok(z.M.getPulseRun().msg.includes('Claude steps skipped') && z.M.getPulseRun().msg.endsWith('The briefings step is switched off in Settings.'));
+}));
+
+test('refresh news: briefings or a reading that cannot be written are a note each, and the other one still runs', () => alone(() => withClaude({}, async () => {
+  const run = async (over) => { const x = await pulseSetup(over); await x.M.refreshPulse(x.onChange); return x.M.getPulseRun().msg; };
+  const base = '5 quotes saved. Calendar updated: 2 events.';
+  assert.strictEqual(await run({ headlines: [] }), base + ' The briefings were not updated (LD:TradingView returned no headlines.). Reading updated.');
+  assert.strictEqual(await run({ briefings: [] }), base + ' The briefings were not updated (LD:Claude wrote no usable briefings.). Reading updated.');
+  assert.strictEqual(await run({ reading: [] }), base + ' Briefings updated: 2. The reading was not updated (LD:Claude wrote no usable lines.).');
+  assert.strictEqual(await run({ ldAskJson: async () => { throw new Error('quota'); } }), base + ' The briefings were not updated (LD:quota). The reading was not updated (LD:quota).');
+  assert.strictEqual(await run({ tvErrorText: (e) => e.tv ? 'TV down' : '', tvCall: async (tool) => { if(tool === 'mcp-tv-get-news') throw Object.assign(new Error('x'), { tv: 1 }); return tool === 'mcp-tv-get-symbol-data-batch' ? { data: [1, 2, 3] } : { result: [{ date: 'd' }] }; } }),
+    '3 quotes saved. Calendar updated: 2 events. The briefings were not updated (TV down). Reading updated.');
+})));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
