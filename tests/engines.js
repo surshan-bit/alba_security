@@ -5024,6 +5024,47 @@ test('refresh queue: a request becomes one job per kind, stocks already waiting 
   }
 }));
 
+test('refresh queue, other devices: a run on another device shows in the bell, its notices and dismissals arrive here, a quiet run is paused, and this device steps back for or stops with the owner', () => withPage('', async () => {
+  const realInterval = globalThis.setInterval, realTimeout = globalThis.setTimeout;
+  globalThis.setInterval = () => 0; globalThis.setTimeout = (f, ms, ...a) => (ms > 100 ? 0 : realTimeout(f, ms, ...a));
+  try {
+    const runs = [], ends = [], notes = [], drops = [], sets = []; let snapCb = null, stops = 0;
+    const T = globalThis.__T = { LD_BATCH_MAX: { fund: 50, tech: 80 }, dbCapabilityPromise: Promise.resolve(null), getLdBatch: () => ({ running: false }), sleep: () => new Promise(() => {}), pcTickerKey: (s) => s.name, needs: () => true, priorityOrder: (k, l) => l,
+      userRef: () => ({ get: async () => ({ exists: false }), set: async (d) => { sets.push(d); }, update: async () => {}, onSnapshot: (cb) => { snapCb = cb; } }), sectionOf: (src) => 'sec-' + src, activityNotify: (n) => notes.push(n), registerBusy: () => {}, selKeys: () => new Set(), isExternalSelection: () => false,
+      stockByKey: (k) => ({ name: k }), activityRun: (id, info) => runs.push([id, info]), activityEnd: (id) => ends.push(id), activityDropWhere: (f) => drops.push(f), setNoticeDismissHandler: () => {}, tvMcp: async () => null, ldBatchStart: async () => {}, ldBatchStop: () => { stops++; } };
+    const Q = await loadAllStubbed('src/refresh/kit-queue.js', '', []); await Q.initQueue();
+    const send = (d) => snapCb(d === null ? { exists: false } : { exists: true, data: () => d }), now = () => new Date().toISOString(), idsOf = () => runs.map((r) => r[0]);
+    const job = (id, extra) => Object.assign({ id, kind: 'fund', keys: ['A', 'B', 'C'], done: 1, total: 3, source: 'strat', label: 'Picks' }, extra);
+    send(null); send({ v: 2 }); assert.strictEqual(runs.length, 0);
+    send({ v: 1, owner: 'other', heartbeatAt: now(), jobs: [job('j1'), job('j2', { kind: 'tech', keys: ['Z'] })], progress: { pct: 40, title: 'Step <b>', text: 'Reading' } });
+    assert.deepStrictEqual(idsOf(), ['rk-remote', 'rk-remote-q-j2']);
+    assert.deepStrictEqual([runs[0][1].title, runs[0][1].text, runs[0][1].pct, runs[0][1].section], ['Step <b>', 'Reading · Running on another device.', 40, 'sec-strat']);
+    assert.ok(runs[1][1].title === 'Queued: Technical refresh · 1 stock' && runs[1][1].text === 'Picks · Waiting for the current refresh to finish.');
+    assert.ok(Q.busyIn('sec-strat'));
+    runs.length = 0; send({ v: 1, owner: 'other', heartbeatAt: now(), jobs: [job('j1')] }); assert.ok(ends.includes('rk-remote-q-j2')); assert.ok(runs[0][1].title.startsWith('Refreshing Fundamental Info · 1 of 3 done') && runs[0][1].pct === 33);   // the queued one is gone
+    runs.length = 0; send({ v: 1, owner: 'other', heartbeatAt: new Date(Date.now() - 120000).toISOString(), jobs: [job('j1')] });   // nobody has touched it for two minutes
+    assert.ok(runs[0][1].title.startsWith('Refresh paused · Fundamental · 3 stocks left') && runs[0][1].text.includes('No dashboard is working on it')); await runs[0][1].onStop(); assert.ok(notes.some((n) => n.title === 'Fundamental refresh stopped · Picks')); notes.length = 0;   // Stop on a paused run clears it
+    ends.length = 0; send({ v: 1, jobs: [] }); assert.ok(ends.includes('rk-remote') && !Q.busyIn('sec-strat'));
+    const n1 = { tone: 'warn', title: 'Done <i>', text: 'ok', section: 'strat', at: 5 }, n2 = { title: 'Other', at: 6 };
+    send({ v: 1, notices: [n1, n2, null, { text: 'no title' }] }); assert.strictEqual(JSON.stringify(notes.map((n) => [n.tone, n.title, n.text, n.at])), '[["ok","Other","",6],["warn","Done <i>","ok",5]]');
+    notes.length = 0; send({ v: 1, notices: [n1, n2] }); assert.strictEqual(notes.length, 0);   // already shown
+    send({ v: 1, dismissed: ['5|Done <i>'], notices: [n1] }); assert.strictEqual(drops.length, 1); assert.strictEqual(drops[0](n1), true); assert.strictEqual(drops[0](n2), false);   // dismissed on another device
+    send({ v: 1, dismissed: ['5|Done <i>'], notices: [n1] }); assert.strictEqual(drops.length, 1);   // nothing new to drop
+    runs.length = 0; send({ v: 1, owner: 'other', heartbeatAt: now(), jobs: [job('j1', { label: '' }), job('j3', { label: '', kind: 'tech', keys: ['Q', 'R'] })] });   // no progress, no labels
+    assert.ok(runs[0][1].text === 'Running on another device.' && runs[1][1].text === 'Waiting for the current refresh to finish.');
+    await runs[0][1].onStop(); runs.length = 0; send({ v: 1, owner: 'other', heartbeatAt: now(), jobs: [job('j1')] });   // Stop was pressed here: the owner is asked
+    assert.ok(runs[0][1].stopping && runs[0][1].text.startsWith('Stopping'));
+    runs.length = 0; send({ v: 1, owner: 'other', heartbeatAt: new Date(Date.now() - 120000).toISOString(), jobs: [job('j1')] }); assert.ok(!runs[0][1].stopping);   // the owner went quiet: the request lapses
+    notes.length = 0; send({ v: 1, notices: [{ title: 'Bare' }] }); assert.deepStrictEqual([notes[0].tone, notes[0].text, notes[0].section, typeof notes[0].at], ['ok', '', '', 'number']);
+    // This device has its own run: another device that is fresh owns the queue, so this one steps back; a Stop sent to this device stops it.
+    T.ldBatchStart = () => new Promise(() => {}); T.getLdBatch = () => ({ running: true });   // this device's own run never finishes during the test
+    Q.request({ list: [{ name: 'M1' }, { name: 'M2' }], kinds: ['fund'], only: false, source: 'strat', label: 'Mine' }, null); Q.flushQueue(); await new Promise((r) => realTimeout(r, 10));
+    const owner = sets.at(-1) && sets.at(-1).owner; assert.ok(owner, 'this tab saved its run with its own id');
+    ends.length = 0; send({ v: 1, owner, heartbeatAt: now(), jobs: [job('x')], stopRequest: Date.now() + 5000 }); assert.strictEqual(stops, 1);   // asked to stop by another device
+    send({ v: 1, owner: 'other', heartbeatAt: now(), jobs: [job('x')] }); assert.ok(ends.includes('batch') && Q.queuedJobs().length === 0);   // it yielded
+  } finally { globalThis.setInterval = realInterval; globalThis.setTimeout = realTimeout; }
+}));
+
 // ---- Price bars (src/prices/refresh.js): fetch weekly and monthly bars, save them, and update the technical score
 TV_VALUES.add('priceHistoryByTicker');
 const prSetup = async (over) => {

@@ -263,29 +263,32 @@ function clearRemote() {
   remoteIds.forEach((id) => activityEnd(id)); remoteIds.clear();
   if (remote) { remote = null; repaint(); }
 }
-function applyRemote(d) {
-  lastRemoteData = d;
-  if (!d || d.v !== 1) { clearRemote(); return; }
-  if (Array.isArray(d.dismissed)) {   // notices removed on another device disappear here too
-    const gone = d.dismissed.filter((k) => !dismissed.includes(k));
-    dismissed = d.dismissed.concat(dismissed.filter((k) => !d.dismissed.includes(k))).slice(0, 200);
-    if (gone.length) { history = history.filter((n) => !isDismissed(n)); activityDropWhere((n) => isDismissed(n)); }
-  }
-  // notices written by another device (or an earlier visit) that this device has not shown yet
+// Notices removed on another device disappear here too.
+function syncDismissed(d) {
+  if (!Array.isArray(d.dismissed)) return;
+  const gone = d.dismissed.filter((k) => !dismissed.includes(k));
+  dismissed = d.dismissed.concat(dismissed.filter((k) => !d.dismissed.includes(k))).slice(0, 200);
+  if (gone.length) { history = history.filter((n) => !isDismissed(n)); activityDropWhere((n) => isDismissed(n)); }
+}
+// Notices written by another device (or an earlier visit) that this device has not shown yet.
+function showRemoteNotices(d) {
   (Array.isArray(d.notices) ? d.notices : []).slice().reverse().forEach((n) => {
     if (!n || !n.title || seen.has(noticeKey(n)) || isDismissed(n)) return;
     seen.add(noticeKey(n));
     history.unshift({ tone: n.tone || "ok", title: n.title, text: n.text || "", section: n.section || "", at: n.at || Date.now() });
     activityNotify({ tone: n.tone || "ok", title: n.title, text: n.text || "", section: n.section || "", at: n.at || Date.now() });
   });
-  history = history.slice(0, 10);
-  const jobs = liveJobs(d);
+}
+// Another device owns the run: this one steps back (a run it started itself must not be done twice), or passes on a Stop pressed elsewhere.
+function followOwner(d, jobs) {
   if (queue.length && d.owner && d.owner !== tabId && jobs.length && hbAge(d) < TAKEOVER_MS) { yieldRun(); }   // another device has the run: do not run it twice
   if (queue.length && d.owner === tabId && d.stopRequest > Math.max(stopHandled, claimedAt)) {   // Stop was pressed on another device
     stopHandled = d.stopRequest;
     if (engineBusy()) ldBatchStop(); else stopPending = true;
   }
-  if (!jobs.length || d.owner === tabId || queue.length) { clearRemote(); return; }
+}
+// The bell shows the refresh running on another device (or paused, when no dashboard is working on it), and the jobs queued behind it.
+function showRemoteJobs(d, jobs) {
   if (stopAsked && (!fresh0(d) || Date.now() - stopAsked > 90000)) stopAsked = 0;
   const fresh = fresh0(d), left = jobs.reduce((n, j) => n + j.keys.length, 0), j0 = jobs[0], p = d.progress || null;
   const pct = p && typeof p.pct === "number" ? p.pct : Math.round((j0.done / Math.max(1, j0.total)) * 100);
@@ -303,7 +306,18 @@ function applyRemote(d) {
   remoteIds.forEach((id) => { if (!ids.has(id)) activityEnd(id); });
   remoteIds.clear(); ids.forEach((id) => remoteIds.add(id));
   remote = { jobs, stale: !fresh }; repaint();
-  if (!fresh && !starting) takeOver();
+}
+function applyRemote(d) {
+  lastRemoteData = d;
+  if (!d || d.v !== 1) { clearRemote(); return; }
+  syncDismissed(d);
+  showRemoteNotices(d);
+  history = history.slice(0, 10);
+  const jobs = liveJobs(d);
+  followOwner(d, jobs);
+  if (!jobs.length || d.owner === tabId || queue.length) { clearRemote(); return; }
+  showRemoteJobs(d, jobs);
+  if (!fresh0(d) && !starting) takeOver();
 }
 const fresh0 = (d) => hbAge(d) < TAKEOVER_MS;
 // Stop pressed on a device that is not running the refresh: ask the running one, or clear a paused job.
