@@ -1,13 +1,13 @@
 // Global & Macro panel.
 import { panelIcon } from './icons.js';
-import { escapeHtml, safeText } from '../core/util.js';
+import { escapeHtml, safeText, safeUrl } from '../core/util.js';
 
 const EVENT_IMPACTS = ['positive', 'negative', 'mixed'];
 const EVENT_TAGS = { positive: 'Helps', negative: 'Hurts' };
 // A source with a web address (f.url, http/https only) is a link that opens in a new tab; one without stays plain text.
 function srcHtml(f){
   const label = escapeHtml(f.source);
-  return typeof f.url === 'string' && /^https?:\/\//i.test(f.url)
+  return safeUrl(f.url)
     ? `<a href="${escapeHtml(f.url)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>` : label;
 }
 const itemHtml = (f) => `<li class="global-item">${safeText(f.text)}${f.source ? `<span class="global-item-source">Source: ${srcHtml(f)}</span>` : ''}</li>`;

@@ -3,7 +3,7 @@
 import { keepScroll } from '../ui/scrollkeep.js';
 import { stockByTickerSymbolAny, stocks } from '../core/stocks.js';
 import { allTrades } from '../core/store.js';
-import { escapeHtml, tickerSymbol } from '../core/util.js';
+import { escapeHtml, safeUrl, tickerSymbol } from '../core/util.js';
 import { publishedStrategies } from '../strategies/state.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { appSections } from '../ui/navigation.js';
@@ -101,7 +101,7 @@ function newsHtml(nw){
   if(!nw) return '<div class="tl-news tl-news-none">News: not read yet &ndash; run Refresh Fundamental Info.</div>';
   const head = `<div class="tl-news-head">News, last 14 days: ${nw.total ? `<span class="news-pos">+${nw.pos}</span> <span class="news-neg">&minus;${nw.neg}</span> of ${nw.total}` : 'none'}${nw.neg ? ' &middot; <b class="news-neg">read the negative news before buying</b>' : ''}</div>`;
   if(!nw.items.length) return `<div class="tl-news">${head}</div>`;
-  const item = x => { const text = escapeHtml(x.t), inner = x.url ? `<a href="${escapeHtml(x.url)}" target="_blank" rel="noopener noreferrer">${text}</a>` : text;
+  const item = x => { const text = escapeHtml(x.t), inner = safeUrl(x.url) ? `<a href="${escapeHtml(x.url)}" target="_blank" rel="noopener noreferrer">${text}</a>` : text;
     return `<li class="tl-news-${x.s || 'neu'}"><span class="tl-news-dot" aria-hidden="true"></span><span>${inner} <span class="tl-news-meta">${escapeHtml(x.d)}${x.src ? ' &middot; ' + escapeHtml(x.src) : ''}${x.s === 'neg' ? ' &middot; negative' : x.s === 'pos' ? ' &middot; positive' : ''}</span></span></li>`; };
   return `<div class="tl-news">${head}<ul class="tl-news-list">${nw.items.map(item).join('')}</ul></div>`;
 }

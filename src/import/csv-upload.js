@@ -2,6 +2,7 @@
 import { stocks } from '../core/stocks.js';
 import { escapeHtml } from '../core/util.js';
 import { parseCSV } from './csvparse.js';
+import { csvFileProblem } from './file-limits.js';
 import { recordFundamentalCsvUpload } from './upload-history.js';
 import { targetEl } from '../core/evt.js';
 import { setHtml } from '../core/safehtml.js';
@@ -98,6 +99,8 @@ function processFundamentalCsvText(text){
 
 function handleFundamentalCsvFile(file){
   const resultEl = document.getElementById('fundamentalUploadResult');
+  const problem = csvFileProblem(file);
+  if(problem){ setHtml(resultEl, `<div class="upload-error">${escapeHtml(problem)}</div>`); return; }
   setHtml(resultEl, `<div class="upload-hint">Reading ${escapeHtml(file.name)}…</div>`);
   const reader = new FileReader();
   reader.onload = () => {

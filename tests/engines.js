@@ -2833,7 +2833,7 @@ test('daily MACD for a strategy: only that reading of a saved block changes, and
 
 // ---- Refresh all stocks (src/refresh/tvrefresh.js): the snapshot and bar steps, driven with a made-up TradingView and database
 const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG', 'fundamentalCsvUploadLog', 'tabId', 'strategies', 'watchlistSyncLog', 'TV_SERVER']);
-const TV_DEFAULTS = { tickerSymbol: (s) => s.ticker, sanitizeDocId: (x) => x, sleep: () => Promise.resolve(), sameValue: (a, b) => JSON.stringify(a) === JSON.stringify(b) };   // what the real helpers do, without their imports and waits
+const TV_DEFAULTS = { tickerSymbol: (s) => s.ticker, sanitizeDocId: (x) => x, sleep: () => Promise.resolve(), sameValue: (a, b) => JSON.stringify(a) === JSON.stringify(b), safeUrl: (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : '') };   // what the real helpers do, without their imports and waits
 // `more` names extra exports a kept module needs from a stubbed one: { '../strategies/rules.js': ['qualifyingStocks'] }.
 // A stand-in for an imported function: it calls whatever the running test put in globalThis.__T (looked up at call time) or a default. Made here, not in the stub's text, so it is not counted as source code.
 globalThis.__TVFN = (n) => (...a) => (globalThis.__T[n] ? globalThis.__T[n](...a) : (TV_DEFAULTS[n] || (() => undefined))(...a));
@@ -4872,7 +4872,7 @@ test('pins: a pin or unpin saves the change with where it came from (build, scre
 
 test('stock events panel: coming up and recent events are grouped by day, links only open on http(s), sentiment is tagged, and text stays text', () => alone(async () => {
   const E = await loadWithStubs('src/detail/events.js', '', {
-    '../core/util.js': 'export const escapeHtml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");', './icons.js': 'export const panelIcon = () => "";',
+    '../core/util.js': 'export const escapeHtml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"), safeUrl = (u) => (typeof u === "string" && /^https?:\\/\\//i.test(u) ? u : "");', './icons.js': 'export const panelIcon = () => "";',
     '../news/model.js': 'export const dateNote = (t) => t, shortDate = (d) => d, typeTag = (t) => t.toUpperCase();', '../news/upcoming.js': 'export const upcomingFor = (s) => s.up || [];' });
   const today = new Date(Date.now() + 19800000).toISOString().slice(0, 10), ago = (n) => new Date(Date.parse(today + 'T00:00:00Z') - n * 86400000).toISOString().slice(0, 10);
   const s = { up: [{ date: '2026-12-01T00:00:00', type: 'results', text: 'Q3 <results>', src: 'NSE', url: 'https://x.test/a' }, { date: '2026-12-01', type: 'company', text: '', src: 'BSE', url: 'javascript:alert(1)' }],
@@ -6180,6 +6180,129 @@ test('Technical Score and Valuation panels: every trend label and RSI zone, the 
   const bands = [[100, 70], [100, 90], [100, 110], [100, 130], [100, 100]].map(([iv, px]) => V.renderValuationPanel({ valuation: { intrinsicValue: iv, currentPrice: px } }));
   assert.ok(bands[0].includes('b-buy') && bands[1].includes('b-mbuy') && bands[2].includes('b-hold') && bands[3].includes('b-avoid') && bands[0].includes('+30.0%') && bands[3].includes('−') && bands[4].includes('Valuation'));
   assert.ok(V.renderValuationPanel({ valuation: { currentPrice: 100 } }).includes('No reliable intrinsic-value source') && V.renderValuationPanel({}) === '');
+}));
+
+// ---- Upload limits (src/import/file-limits.js, src/import/csv-upload.js): a picked file is checked before it is read
+test('upload limits: only a non-empty .csv file up to 10 MB is accepted, with a plain sentence for each refusal', () => {
+  const L = load('src/import/file-limits.js'), ok = (name, size) => L.csvFileProblem({ name, size });
+  assert.strictEqual(ok('export.csv', 1000), ''); assert.strictEqual(ok('EXPORT.CSV', 1), ''); assert.strictEqual(ok("big.csv", 10 * 1048576), '');
+  assert.ok(ok('big.csv', 10 * 1048576 + 1).includes('larger than 10 MB')); assert.ok(ok('a.csv', 0).includes('empty'));
+  for(const bad of [{ name: 'a.exe', size: 5 }, { name: 'a.csv.exe', size: 5 }, { name: 'csv', size: 5 }, { size: 5 }, null, undefined, { name: 5, size: 5 }]) assert.ok(L.csvFileProblem(bad).includes('.csv'));
+  for(const bad of [{ name: 'a.csv' }, { name: 'a.csv', size: -1 }, { name: 'a.csv', size: NaN }, { name: 'a.csv', size: '5' }]) assert.ok(L.csvFileProblem(bad).includes('unreadable'));
+});
+test('CSV upload: a wrong or oversized file is refused with a message and never read', () => withPage('<input id="fundamentalCsvInput" type="file"><div id="fundamentalUploadResult"></div>', async (win) => {
+  globalThis.__T = { stocks: [], escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), setHtml: (el, h) => { el.innerHTML = h; }, parseCSV: () => { throw new Error('should not be read'); }, recordFundamentalCsvUpload: () => { throw new Error('should not be recorded'); } };
+  const input = win.document.getElementById('fundamentalCsvInput'), out = win.document.getElementById('fundamentalUploadResult'); let reads = 0;
+  const M = await loadAllStubbed('src/import/csv-upload.js', '', ['../core/evt.js', './file-limits.js']);
+  const FR = globalThis.FileReader; globalThis.FileReader = class { readAsText(){ reads++; } };
+  try {
+    M.init_import_csv_upload();
+    const pick = (file) => { Object.defineProperty(input, 'files', { configurable: true, value: [file] }); input.dispatchEvent(new win.Event('change', { bubbles: true })); };
+    pick({ name: '<img onerror=x>.exe', size: 10 }); assert.ok(out.textContent.includes('Choose a .csv file') && !out.querySelector('img'));
+    pick({ name: 'huge.csv', size: 50 * 1048576 }); assert.ok(out.textContent.includes('larger than 10 MB'));
+    assert.strictEqual(reads, 0);   // neither file was read
+  } finally { if(FR === undefined) delete globalThis.FileReader; else globalThis.FileReader = FR; }
+}));
+
+test('safeUrl: only http and https addresses become links; scripts, data and relative addresses are dropped', () => {
+  const { safeUrl } = load('src/core/util.js');
+  assert.strictEqual(safeUrl('https://a.test/x?y=1&z=2'), 'https://a.test/x?y=1&z=2'); assert.strictEqual(safeUrl('HTTP://a.test'), 'HTTP://a.test');
+  for(const bad of ['javascript:alert(1)', ' https://a.test', 'data:text/html,x', '//a.test', '/path', 'ftp://a.test', '', null, undefined, 5, {}]) assert.strictEqual(safeUrl(bad), '');
+});
+
+// ---- Links from saved data (Trade Log ideas, Explorer news): only http and https addresses become links
+test('Trade Log ideas: a saved headline links only when its address is http(s), and every text is escaped', () => kcPage('<select id="tradeIdeasStrategy"></select><button id="tradeIdeasRun"></button><div id="tradeIdeasBody"></div>', async (win) => {
+  const news = { total: 2, pos: 0, neg: 1, items: [{ t: 'Head <i>', url: 'https://n.test/1', d: '2026-11-01', s: 'neg', src: 'Wire' }, { t: 'Bad <b>', url: 'javascript:alert(1)', d: '2026-11-02', s: 'pos' }, { t: 'Plain', d: '2026-11-03' }] };
+  const snap = { v: 1, at: '2026-11-10T08:00:00Z', today: '2026-11-10', n: 1, up: 1, early: 0, down: 0, mixed: 0, lists: { up: [{ sym: 'AAA', name: 'Acme <b>', reasons: ['why <i>'], news }], early: [] } };
+  globalThis.__T = { stocks: [{ name: 'Acme', ticker: 'AAA' }], publishedStrategies: () => [{ id: 's1', name: 'Quality <b>', rules: [] }], ideasResultsGet: () => ({ s1: snap }), ideasResultsSave: () => {}, tvIstDate: () => '2026-11-10', keepScroll: (el, fn) => fn(), setHtml: (el, h) => { el.innerHTML = h; },
+    escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), CAP_NAME: {}, BUY_TOP: 90 };
+  TV_VALUES.add('CAP_NAME');
+  const M = await loadAllStubbed('src/tradelog/ideas.js', '', ['../core/evt.js']);
+  M.init_ideas(); M.renderIdeas();
+  const sel = win.document.getElementById('tradeIdeasStrategy'); sel.value = 's1'; sel.dispatchEvent(new win.Event('change'));
+  const body = win.document.getElementById('tradeIdeasBody'), links = [...body.querySelectorAll('.tl-news-list a')];
+  assert.deepStrictEqual(links.map((a) => a.getAttribute('href')), ['https://n.test/1']);   // the script address and the headline with no address are plain text
+  assert.ok(body.textContent.includes('Bad <b>') && body.textContent.includes('Plain') && !body.querySelector('.tl-news-list b, .tl-news-list i') && !body.querySelector('a[href^="javascript"]'));
+}));
+test('Trade Log ideas: the panel says what to do before a strategy is chosen, when it is gone, when nothing was processed and when nothing qualified', () => kcPage('<select id="tradeIdeasStrategy"></select><button id="tradeIdeasRun"></button><div id="tradeIdeasBody"></div>', async (win) => {
+  const T = globalThis.__T = { stocks: [], publishedStrategies: () => [{ id: 's1', name: 'Q', rules: [] }], ideasResultsGet: () => ({}), ideasResultsSave: () => {}, tvIstDate: () => '2026-11-10', keepScroll: (el, fn) => fn(), setHtml: (el, h) => { el.innerHTML = h; },
+    escapeHtml: (x) => String(x), CAP_NAME: {}, BUY_TOP: 90 };
+  const M = await loadAllStubbed('src/tradelog/ideas.js', '', ['../core/evt.js']), d = win.document, body = () => d.getElementById('tradeIdeasBody').textContent, sel = d.getElementById('tradeIdeasStrategy'), run = d.getElementById('tradeIdeasRun');
+  const pick = (v) => { sel.value = v; sel.dispatchEvent(new win.Event('change')); };
+  M.init_ideas(); M.renderIdeas(); assert.ok(body().includes('Choose a strategy') && run.disabled);
+  pick('s1'); assert.ok(body().includes('Press Process') && run.textContent === 'Process' && !run.disabled);
+  T.ideasResultsGet = () => ({ s1: { v: 1, at: '2026-11-10T08:00:00Z', today: '2026-11-10', n: 0, lists: { up: [], early: [] } } }); M.refreshIdeasBody(); assert.ok(body().includes('no stock qualified') && body().includes('(today)') && run.textContent === 'Process again');
+  T.ideasResultsGet = () => ({ s1: { v: 1, at: '2026-11-09T08:00:00Z', today: '2026-11-09', n: 3, up: 1, early: 1, down: 0, mixed: 1, ranksUp: {}, lists: { up: [], early: [] } } }); M.refreshIdeasBody(); assert.ok(body().includes('3 stocks') && body().includes('1 day ago') && body().includes('yesterday'));
+  T.ideasResultsGet = () => ({ s1: { v: 1, at: '2026-11-01T08:00:00Z', today: '2026-11-01', n: 3, up: 3, early: 0, down: 0, mixed: 0, ranksUp: {}, lists: { up: [{ sym: 'X', name: 'X', reasons: [], price: 12 }], early: [] } } }); M.refreshIdeasBody(); assert.ok(body().includes('9 days ago') && body().includes('1 Nov') && body().includes('₹12'));
+  T.ideasResultsGet = () => ({ s1: { v: 1, at: 'bad', today: '2026-11-01', n: 3, up: 3, early: 0, down: 0, mixed: 0, ranksUp: {}, lists: { up: [], early: [] } } }); M.refreshIdeasBody();
+  T.ideasResultsGet = () => ({ s1: { v: 1, n: 3 } }); M.refreshIdeasBody(); assert.ok(body().includes('Press Process'));   // a record without lists is treated as not processed
+  T.publishedStrategies = () => []; M.renderIdeas(); assert.ok(body().includes('Choose a strategy'));   // the chosen strategy was unpublished
+  d.getElementById('tradeIdeasBody').remove(); M.refreshIdeasBody(); M.renderIdeas();
+}));
+test('Explorer news item and News page: only http(s) headlines are links', async () => {
+  const { newsItemHtml } = load('src/business/newsitem.js');
+  const good = newsItemHtml({ d: '2026-11-01', t: 'Head <i>', url: 'https://n.test/1', s: 'pos', stock: 'S' }, ''), bad = newsItemHtml({ d: '2026-11-01', t: 'Head <i>', url: 'javascript:alert(1)', s: 'pos', stock: 'S' }, '');
+  assert.ok(good.includes('href="https://n.test/1"') && good.includes('rel="noopener noreferrer"') && !good.includes('<i>'));
+  assert.ok(!bad.includes('href') && bad.includes('Head &lt;i&gt;'));
+});
+const newsSetup = async (over) => {
+  const A = { name: 'Acme <b>', ticker: 'AAA', __events: [{ k: 'earn', d: '2026-11-05', t: 'Results out <i>', url: 'https://x.test/r', s: 'pos' }, { k: 'news', d: '2026-11-08', t: 'Odd', url: 'javascript:1', s: 'neg' }, { k: 'corp', d: '2026-11-09', t: 'Event', s: 'mix' }] }, B = { name: 'Beta', ticker: 'BBB' };
+  const today = new Date(Date.now() + 19800000).toISOString().slice(0, 10), day = (n) => new Date(Date.parse(today + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const T = globalThis.__T = Object.assign({ news: { ready: true, pulse: { at: new Date().toISOString(), tiles: [{ id: 'nifty', close: 24000, change: -1.2 }, { id: 'vix', close: 14, change: 3 }, { id: 'nope', close: 1, change: 0 }], reading: ['Oil is falling, good for India', 'Rates are rising and risk is high'] },
+    macro: { asof: day(0), briefingsAt: new Date().toISOString(), calendarAt: '2020-01-01T00:00:00Z', briefings: [{ headline: 'Markets <b>', group: 'market', impact: 'positive', date: day(0), why: 'because', links: [{ label: 'Src', url: 'https://b.test/1' }, { label: 'Bad', url: 'javascript:1' }, { label: 'Vid', url: 'https://b.test/v', kind: 'video' }] }, { headline: 'Odd group', group: 'zzz' }, null],
+      calendar: [{ date: day(2) + 'T09:00:00Z', title: 'CPI', country: 'us', importance: 1, forecast: 3, previous: 2.5, unit: '%', source: 'BLS', url: 'https://c.test/1' }, { date: day(3) + 'T09:00:00Z', title: 'Minor', country: '', importance: -1 }] },
+    events: { tvAt: new Date().toISOString(), items: [{ ticker: 'AAA', type: 'results', date: day(3), text: 'Results expected <i>', url: 'https://e.test/1', src: 'TV' }, { ticker: 'ZZZ', type: 'dividend', date: day(4), text: 'Ex-dividend', name: 'Zed' }, { ticker: 'BBB', type: 'board', date: day(4), text: 'Board' }] } },
+    getPulseRun: () => ({ state: 'idle', msg: '' }), getEventsRun: () => ({ state: 'idle', msg: '' }), stocks: [A, B], stockIndex: new Map([[A, 0], [B, 1]]), stockByTickerSymbol: new Map([['AAA', A], ['BBB', B]]), publishedStrategies: () => [{ id: 'q1', name: 'Positive MoS', rules: [{}] }, { id: 'q2', name: 'Empty <b>', rules: [] }],
+    qualifyingStocks: () => [A], allTrades: () => [{ ticker: 'AAA', status: 'open' }, { ticker: 'BBB', status: 'closed', sell: {} }], isPinned: (s) => s === B,
+    dropMenuHtml: (o) => '<div class="dm">' + o.items.map((i) => '<i ' + i.attrs + '>' + i.title + '</i>').join('') + '</div>' }, over || {});
+  TV_VALUES.add('news');
+  return { T, A, B, day, M: await loadAllStubbed('src/news/render.js', '', ['../core/util.js', './model.js']) };
+};
+test('News page, Global & Macro: market tiles, the reading, briefings by group, and the calendar are shown as text with safe links; Show all widens the calendar', () => alone(async () => {
+  const { T, M } = await newsSetup(), flat = (h) => h.replace(/\s+/g, ' ');
+  const h = flat(M.newsHtml());
+  assert.ok(h.includes('Market pulse') && h.includes('Nifty 50') && h.includes('India VIX') && !h.includes('nope') && h.includes('Why it matters') && h.includes('news-tone-positive') && h.includes('news-tone-negative'));
+  assert.ok(h.includes('Briefings') && h.includes('Markets &lt;b&gt;') && !h.includes('<b>Markets') && h.includes('href="https://b.test/1"') && h.includes('news-video') && !h.includes('javascript:') && h.includes('Odd group') && h.includes('Other'));
+  assert.ok(h.includes('Economic calendar') && h.includes('CPI') && h.includes('forecast 3%') && h.includes('previous 2.5%') && h.includes('Watch next') && h.includes('Show all') && !h.includes('Minor') && h.includes('updated'));
+  M.view.calAll = true; assert.ok(flat(M.newsHtml()).includes('Minor') && flat(M.newsHtml()).includes('Show only medium and high importance')); M.view.calAll = false;
+  T.news.pulse = null; T.news.macro = null; const empty = flat(M.newsHtml());
+  assert.ok(empty.includes('Not refreshed yet') && empty.includes('No market quotes yet') && empty.includes('No briefings yet') && empty.includes('No calendar yet'));
+  T.news.macro = { calendar: [{ date: '2020-01-01T00:00:00Z', title: 'Old', importance: 1 }], briefings: [] }; assert.ok(flat(M.newsHtml()).includes('No upcoming events in the saved calendar'));
+  T.getPulseRun = () => ({ state: 'running', msg: 'Reading <b>' }); assert.ok(flat(M.newsHtml()).includes('Reading &lt;b&gt;') && flat(M.newsHtml()).includes('disabled'));
+  T.getPulseRun = () => ({ state: 'error', msg: 'Failed' }); assert.ok(M.newsHtml().includes('news-err'));
+  T.news.ready = false; assert.ok(M.newsHtml().includes('Loading…'));
+}));
+test('News page, variations: stamps are not repeated, calendar rows without importance, country or numbers, open groups, and odd saved shapes are tolerated', () => alone(async () => {
+  const now = new Date().toISOString(), { T, M, day } = await newsSetup({}), flat = (h) => h.replace(/\s+/g, ' ');
+  T.news.pulse = { at: now, tiles: 'bad', reading: 'bad' };
+  T.news.macro = { asof: day(0), briefingsAt: now, calendarAt: now, briefings: [{ headline: 'Open one', group: 'india', impact: 'weird', date: 'bad' }, { headline: 'Neg', group: 'india', impact: 'negative' }, { headline: 'Mixed', group: 'data', impact: 'mixed', links: 'bad' }],
+    calendar: [{ date: day(1) + 'T09:00:00Z', title: 'No details', country: 'USA', importance: 0 }, { date: day(1) + 'T10:00:00Z', title: 'Nulls', country: 'in', importance: 1, forecast: null, previous: '' }, { date: day(0), title: 'Today', importance: -1 }] };
+  M.view.openGroups.add('india'); M.view.calAll = true;
+  const h = flat(M.newsHtml());
+  assert.ok(h.includes('From TradingView headlines') && h.includes(', from TradingView') && h.includes('data-news-grp="india" open') && h.includes('news-dot-none') && h.includes('news-dot-negative') && h.includes('news-dot-mixed'));
+  assert.ok(h.includes('No details') && h.includes('news-lvl-md') && h.includes('news-lvl-hi') && h.includes('news-lvl-lo') && h.includes('<b>USA</b>') && h.includes('news-flag'));
+  T.news.macro = { briefings: [{ headline: 'No stamp' }], calendar: [] }; assert.ok(flat(M.newsHtml()).includes('No stamp') && flat(M.newsHtml()).includes('No calendar yet'));   // no date on the briefings: no stamp line
+  T.news.macro = { asof: day(0), briefings: [{ headline: 'Old stamp' }], calendar: [], calendarAt: '2020-01-01T00:00:00Z' }; assert.ok(flat(M.newsHtml()).includes('Old stamp'));
+  T.news.pulse = { at: 'not a date', tiles: [{ id: 'gold', close: 2000, change: null }, { id: 'us10y', close: 4.2, change: 0.5 }, { id: 'brent', close: 80, change: -0.4 }] }; const odd = flat(M.newsHtml());
+  assert.ok(odd.includes('Updated') && odd.includes('Gold') && odd.includes('$80') && odd.includes('4.20%'));   // an unreadable time shows no stamp; a tile with no change shows none
+  M.view.openGroups.clear(); M.view.calAll = false;
+}));
+test('News page, Stock events: upcoming and recent events follow the chosen strategy, mark held and pinned stocks, and keep links to http(s)', () => alone(async () => {
+  const { T, M } = await newsSetup(), flat = (h) => h.replace(/\s+/g, ' ');
+  M.view.tab = 'events'; M.view.strategy = '';
+  const up = flat(M.newsHtml());
+  assert.ok(up.includes('from your &quot;Positive MoS&quot; strategy') && up.includes('Covers 1 stocks') && up.includes('HELD') && up.includes('data-news-open="0"') && up.includes('Acme &lt;b&gt;') && up.includes('href="https://e.test/1"') && !up.includes('ZZZ'));
+  T.stocks.push({ name: 'Cee', ticker: 'CCC' }); T.news.events.items.push({ ticker: 'CCC', type: 'company', date: new Date(Date.now() + 19800000 + 3 * 86400000).toISOString().slice(0, 10), text: '', src: 'Wire' }, { ticker: 'CCC', type: 'news', date: new Date(Date.now() + 19800000 + 3 * 86400000).toISOString().slice(0, 10), text: 'Hot', sentiment: 'neg' });
+  M.setPick('all'); const all = flat(M.newsHtml()); assert.ok(all.includes('news-stock">CCC') || all.includes('>CCC<'));   // a stock the page cannot open is shown by its code
+  T.stocks.pop(); assert.ok(all.includes('(all stocks)') && all.includes('PINNED') && all.includes('Board') && !all.includes('Zed'));   // an unknown ticker is not in the dashboard
+  M.setPick('q2'); assert.ok(flat(M.newsHtml()).includes('Empty &lt;b&gt;')); M.setPick('gone'); assert.ok(flat(M.newsHtml()).includes('Positive MoS')); M.setPick('');
+  M.view.type = 'dividend'; M.view.upto = 7; M.setPick('all'); assert.ok(flat(M.newsHtml()).includes('Nothing matches these filters')); M.view.type = 'all'; M.view.upto = 30;
+  T.news.events = { items: [] }; assert.ok(flat(M.newsHtml()).includes('No upcoming events saved yet')); T.news.events = null; assert.ok(flat(M.newsHtml()).includes('Not refreshed yet'));
+  T.getEventsRun = () => ({ state: 'running', msg: 'Reading dates' }); assert.ok(flat(M.newsHtml()).includes('Reading dates'));
+  M.view.when = 'recent'; T.stocks.forEach((s) => { if(s.__events) s.__events.forEach((e, i) => { e.d = new Date(Date.now() + 19800000 - (i + 1) * 86400000).toISOString().slice(0, 10); }); });
+  const rec = flat(M.newsHtml()); assert.ok(rec.includes('The last 30 days') && rec.includes('Results out &lt;i&gt;') && !rec.includes('href="javascript') && rec.includes('news-positive') && rec.includes('news-negative') && rec.includes('news-mixed'));
+  M.view.type = 'dividend'; assert.ok(flat(M.newsHtml()).includes('No saved events in the last 30 days')); M.view.type = 'all';
+  M.view.when = 'upcoming'; M.view.tab = 'macro';
 }));
 
 (async () => {

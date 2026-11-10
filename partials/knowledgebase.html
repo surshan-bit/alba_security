@@ -266,6 +266,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.372 &middot; 2026-11-10</h3>
+            <ul>
+              <li><strong>Security tightened:</strong> a file picked for the Fundamental upload is now checked before it is read (it must be a .csv file, not empty and not over 10 MB, the same limit the server applies). Every link built from saved data now goes through one shared check that lets only http and https addresses through, which closes a gap in the Trade Log ideas panel where a saved headline address was not checked. The call to Claude is cut off after two minutes instead of waiting forever, and the website sends three more protective headers (cross-origin opener and resource policies, and no cross-domain policy files). Nothing else looks or works differently.</li>
+              <li>Reviewed and found already in place: the strict Content-Security-Policy, the database access rules (133 automated checks), the owner-only Claude function with its call limit and size checks, the Screener worker's token, size and rate limits, pinned build actions with minimal permissions, and a clean dependency audit.</li>
+            </ul>
             <h3>v1.371 &middot; 2026-11-10</h3>
             <ul>
               <li><strong>Screen-specific styling folded into page stylesheets (nothing looks different):</strong> the one file of rules written for a single screen or element was split into seven page stylesheets (Help and Knowledge Base, Settings, Trade Log, Data Refresh, buttons, Analysis and Strategies, News), and the hook names those rules hang on now say what the thing is (for example <em>doc-page</em>, <em>tl-panel-body</em>, <em>jump-target</em>) instead of repeating the screen name. The five &ldquo;scroll to this section&rdquo; hooks on the stock page became one shared class. A computed-style comparison of every element on every screen, in the White theme at three widths, found no difference before and after.</li>

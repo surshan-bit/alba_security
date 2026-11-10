@@ -1,6 +1,6 @@
 // One factor card of the Fundamental Score panel: score bar, business line, governance flags, note,
 // researched findings and the metric chips.
-import { escapeHtml } from '../core/util.js';
+import { escapeHtml, safeUrl } from '../core/util.js';
 import { hasSource } from '../core/fundscore.js';
 import { scoreBand } from '../list/metrics.js';
 import { fundMissingMetrics } from './completeness.js';
@@ -116,7 +116,7 @@ function renderFactorResearchBlock(f, view){
   const src = (x) => {
     if(typeof x === 'string') return escapeHtml(x);
     const title = escapeHtml((x && (x.title || x.url)) || '');
-    return x && /^https?:\/\//.test(x.url || '') ? `<a href="${escapeHtml(x.url)}" target="_blank" rel="noopener noreferrer">${title} ↗</a>` : title;
+    return x && safeUrl(x.url) ? `<a href="${escapeHtml(x.url)}" target="_blank" rel="noopener noreferrer">${title} ↗</a>` : title;
   };
   // A news source already linked on a bullet is not listed again.
   // v1.301: a Strengths / Watch-outs line that repeats a numbered point (or each other) is shown once.

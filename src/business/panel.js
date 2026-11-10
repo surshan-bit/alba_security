@@ -1,7 +1,7 @@
 // The Explorer page (code name "business"): every industry with its average price change over a chosen period, and the news of its stocks.
 import { keepScroll } from '../ui/scrollkeep.js';
 import { stockIndex, stocks } from '../core/stocks.js';
-import { escapeHtml } from '../core/util.js';
+import { escapeHtml, safeUrl } from '../core/util.js';
 import { ensureAllPriceBars, pcTickerKey, priceHistoryByTicker } from '../prices/store.js';
 import { appSections } from '../ui/navigation.js';
 import { openIndustryInline, openStockInline } from '../ui/inlinedetail.js';
@@ -120,7 +120,7 @@ function paintNewsStatus(){
 
 function newsRowHtml(n){
   const dot = n.s === 'pos' ? '<span class="biz-nd pos" title="Positive" aria-label="Positive"></span>' : n.s === 'neg' ? '<span class="biz-nd neg" title="Negative" aria-label="Negative"></span>' : '<span class="biz-nd"></span>';
-  const title = /^https?:\/\//i.test(n.url) ? '<a href="' + escapeHtml(n.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(n.t) + '</a>' : escapeHtml(n.t);
+  const title = safeUrl(n.url) ? '<a href="' + escapeHtml(n.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(n.t) + '</a>' : escapeHtml(n.t);
   const d = new Date(n.d + 'T00:00:00'), day = isNaN(d.getTime()) ? escapeHtml(n.d) : d.getDate() + ' ' + d.toLocaleString('en-GB', { month: 'short' });
   return '<li class="biz-nrow"><span class="biz-news-date">' + day + '</span>' + dot + '<span class="biz-nt">' + title + '</span><span class="biz-news-meta">' + escapeHtml(n.stock) + (n.src ? ' · ' + escapeHtml(n.src) : '') + '</span></li>';
 }
