@@ -5733,6 +5733,46 @@ test('trade log form: an armed Remove button resets itself after a few seconds',
   finally { globalThis.setTimeout = real; }
 }));
 
+// ---- Top bar search (src/ui/globalsearch.js): suggestions as text, keys, picking a stock on top of the current page, "/" to focus
+const GS_PAGE = '<div class="topbar-search"><input id="globalSearch" placeholder="Search a company or ticker"><button id="globalSearchClear">x</button><div id="globalSuggest"></div></div><textarea id="ta"></textarea><div id="ce" contenteditable="true"></div><p id="plain">p</p>';
+const gsSetup = async (win, over) => {
+  const A = { name: 'Acme <b>', ticker: 'AAA · NSE', score: 7.256 }, B = { name: 'Beta', ticker: 'BBB', score: 5 }, listeners = [];
+  const T = globalThis.__T = Object.assign({ stockIndex: new Map([[A, 3], [B, 4]]), appSections: { analysis: { classList: { contains: () => !!T.onAnalysis } }, business: { classList: { contains: () => false } } }, onAnalysis: false, opened: [], shown: [], phone: false, A, B,
+    buildSuggestions: (q) => [A, B].filter((s) => s.name.toLowerCase().includes(q) || s.ticker.toLowerCase().includes(q)), sgMark: (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'), showSection: (n) => T.shown.push(n), openStockInline: (...a) => T.opened.push(a), setHtml: (el, h) => { el.innerHTML = h; } }, over || {});
+  win.matchMedia = () => ({ get matches(){ return T.phone; }, addEventListener: (t, f) => listeners.push(f) });
+  const M = await loadAllStubbed('src/ui/globalsearch.js', '', ['../core/evt.js']); M.init_ui_globalsearch();
+  return { T, A, B, listeners };
+};
+test('top bar search: matching stocks are listed as text, keys move through them, Enter opens the stock over the current page, and Clear and Escape reset the box', () => kcPage(GS_PAGE, async (win) => {
+  const { T, A, listeners } = await gsSetup(win), doc = win.document, $ = (q) => doc.querySelector(q), input = $('#globalSearch');
+  win.HTMLElement.prototype.scrollIntoView = function(){};
+  const type = (v) => { input.value = v; input.dispatchEvent(new win.Event('input', { bubbles: true })); }, key = (k, el = input) => { const e = new win.KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }); el.dispatchEvent(e); return e; };
+  type('ac'); assert.ok($('#globalSuggest').classList.contains('show') && $('#globalSearchClear').classList.contains('show') && input.getAttribute('aria-expanded') === 'true');
+  assert.ok(!$('#globalSuggest b') && $('.sg-score').textContent === '7.26' && $('.sg-sub').textContent === 'AAA · NSE');   // names are text
+  key('ArrowDown'); assert.ok($('.sg-item').classList.contains('active')); key('ArrowUp'); key('ArrowDown');
+  key('Enter'); assert.deepStrictEqual([T.shown, T.opened, input.value, $('#globalSuggest').classList.contains('show')], [['business'], [[T.appSections.business, 'Explorer', 3]], '', false]);
+  T.onAnalysis = true; type('ac'); key('Enter'); assert.deepStrictEqual(T.opened.at(-1), [T.appSections.analysis, 'Analysis', 3]); assert.strictEqual(T.shown.length, 1);   // already on a page that can host it
+  type('ac'); $('.sg-item').dispatchEvent(new win.Event('mousedown', { bubbles: true, cancelable: true })); assert.strictEqual(T.opened.length, 3);
+  type('ac'); $('#globalSuggest').dispatchEvent(new win.Event('mousedown', { bubbles: true })); assert.ok($('#globalSuggest').classList.contains('show'));   // not on an item
+  type('zzz'); assert.ok($('.sg-empty') && $('#globalSuggest').classList.contains('show')); key('Enter'); key('x');
+  type(''); assert.ok(!$('#globalSuggest').classList.contains('show') && !$('#globalSearchClear').classList.contains('show'));
+  type('ac'); key('Escape'); assert.ok(!$('#globalSuggest').classList.contains('show'));
+  type('ac'); $('#globalSearchClear').click(); assert.strictEqual(input.value, ''); assert.ok(doc.activeElement === input && !$('#globalSuggest').classList.contains('show') === true);
+  type('ac'); doc.getElementById('plain').dispatchEvent(new win.Event('mousedown', { bubbles: true })); assert.ok(!$('#globalSuggest').classList.contains('show'));   // a click elsewhere closes the list
+  type('ac'); input.dispatchEvent(new win.Event('mousedown', { bubbles: true })); assert.ok($('#globalSuggest').classList.contains('show'));   // inside the search area it stays
+  input.dispatchEvent(new win.Event('focus')); T.stockIndex.delete(A); type('ac'); key('ArrowDown'); key('Enter'); assert.strictEqual(T.opened.length, 3);   // a stock that is gone opens nothing
+  assert.strictEqual(input.getAttribute('placeholder'), 'Search a company or ticker'); T.phone = true; listeners.forEach((f) => f()); assert.strictEqual(input.getAttribute('placeholder'), 'Search a company');
+}));
+test('top bar search: "/" focuses the box from anywhere except while typing or with a modifier key', () => kcPage(GS_PAGE, async (win) => {
+  await gsSetup(win); const doc = win.document, input = doc.getElementById('globalSearch');
+  const slash = (el, init) => { const e = new win.KeyboardEvent('keydown', Object.assign({ key: '/', bubbles: true, cancelable: true }, init)); el.dispatchEvent(e); return e.defaultPrevented; };
+  assert.ok(slash(doc.getElementById('plain'))); assert.ok(doc.activeElement === input); input.blur();
+  assert.ok(!slash(doc.getElementById('ta'))); Object.defineProperty(doc.getElementById('ce'), 'isContentEditable', { value: true }); assert.ok(!slash(doc.getElementById('ce'))); assert.ok(!slash(input));
+  assert.ok(!slash(doc.getElementById('plain'), { ctrlKey: true })); assert.ok(!slash(doc.getElementById('plain'), { metaKey: true })); assert.ok(!slash(doc.getElementById('plain'), { altKey: true }));
+  assert.ok(!new win.KeyboardEvent('keydown', { key: 'a' }).defaultPrevented); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: '/', bubbles: true }));
+}));
+test('top bar search: a page without the box starts nothing', () => kcPage('<p>none</p>', async (win) => { await gsSetup(win); }));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
