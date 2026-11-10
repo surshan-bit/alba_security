@@ -266,6 +266,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.370 &middot; 2026-11-10</h3>
+            <ul>
+              <li><strong>Cleaner inside (nothing looks different, nothing is scored differently):</strong> the first step of Refresh all stocks, the full price history for stocks that have none, was taken apart into small, tested steps: working out who needs a download, giving each stock its bars a couple at a time, noting which ones failed and stopping when TradingView refuses every call. The order, the progress line and the list of stocks to skip next time are exactly as before; this was checked by running the old and the new code side by side on five cases.</li>
+            </ul>
             <h3>v1.369 &middot; 2026-11-10</h3>
             <ul>
               <li><strong>Cleaner inside (nothing looks different, nothing is scored differently):</strong> the part that loads your stock list when the page opens was taken apart into small, tested steps: reading the index, using the copy kept in this browser, fetching the parts, noting how the load went and watching for a newer version. The messages on the loading cover and the &ldquo;data updated &mdash; reload&rdquo; banner behave exactly as before.</li>
