@@ -207,54 +207,87 @@ function heatMap(rows, p, el){
   const w = Math.max(300, window.innerWidth - 40), ratio = Math.min(.95, Math.max(.45, (window.innerHeight - 140) / w));
   return heatmapHtml(rows, period, { width: w, size: heatSize, hRatio: ratio });
 }
-function draw(el){
-  document.body.classList.toggle('biz-full-open', bizFull);
-  const p = periodOf(period);
-  const rows = visibleRows();
-  const allOpen = rows.length > 0 && rows.every(r => open.has(r.name));
-  // Inside Analysis, Period and "Show" are drop-down menus like View: the button shows the current choice, the list marks it.
+// Inside Analysis, Period and "Show" are drop-down menus like View: the button shows the current choice, the list marks it.
+function controlsHtml(){
   const periodSelect = dropMenuHtml({ btnHtml: '<small>Period</small> <b>' + periodOf(period).label + '</b> <span class="dm-caret" aria-hidden="true">&#9662;</span>', label: 'Period', items: PERIODS.map(x => ({ attrs: 'data-biz-period="' + x.key + '"', title: x.label, current: x.key === period })), extraClass: 'dm-period' });
   const matchedBox = dropMenuHtml({ btnHtml: '<small>Show</small> <b>' + (matchedOnly() ? 'Matched only' : 'All') + '</b> <span class="dm-caret" aria-hidden="true">&#9662;</span>', label: strategyOn() ? 'Show all industries, or only the ones that match the filters' : 'Show: narrow the stocks with the filters first to use Matched only', extraClass: 'dm-show', items: [{ attrs: 'data-biz-matched-pick="0"', title: 'All', desc: 'Every industry', current: !matchedOnly() }, { attrs: 'data-biz-matched-pick="1"' + (strategyOn() ? '' : ' disabled'), title: 'Matched only', desc: strategyOn() ? 'Only the industries and stocks that match the filters' : 'Narrow the stocks with the filters first', current: matchedOnly() }] });
   const controls = embed ? '<div class="biz-controls">' + periodSelect + matchedBox + '</div>' : '<div class="biz-controls"><div class="tl-view-toggle" role="group" aria-label="View"><button type="button" class="tl-view-btn' + (view === 'table' ? ' active' : '') + '" data-biz-view="table">Table</button><button type="button" class="tl-view-btn' + (view === 'heat' ? ' active' : '') + '" data-biz-view="heat">Heat map</button></div><div class="tl-view-toggle" role="group" aria-label="Period">' + PERIODS.map(x => '<button type="button" class="tl-view-btn' + (x.key === period ? ' active' : '') + '" data-biz-period="' + x.key + '">' + x.key + '</button>').join('') + '</div>'
     + '<div class="tl-view-toggle" role="group" aria-label="Grouping"><button type="button" class="tl-view-btn' + (by === 'industry' ? ' active' : '') + '" data-biz-by="industry">Industry</button><button type="button" class="tl-view-btn' + (by === 'group' ? ' active' : '') + '" data-biz-by="group">Industry group</button></div>'
     + strategyGroupHtml()
     + '</div>';
+  return controls;
+}
+// All / Matched: show every industry and stock, or only the ones that match the chosen strategy or filters.
+function matchToggleHtml(){
   const viewToggle = '<div class="tl-view-toggle biz-match-toggle" role="group" aria-label="Show">'
     + '<button type="button" class="tl-view-btn' + (!matchedOnly() ? ' active' : '') + '" data-biz-show="all" title="Show every industry and stock">All</button>'
     + '<button type="button" class="tl-view-btn' + (matchedOnly() ? ' active' : '') + '" data-biz-show="matched"' + (strategyOn() ? ' title="Show only the industries and stocks that match the ' + (embed ? 'filters' : 'chosen strategy') + '"' : ' disabled title="' + (embed ? 'Narrow the stocks with the filters first' : 'Choose a strategy or Rebound first') + '"') + '>Matched</button></div>';
+  return viewToggle;
+}
+function sizeToggleHtml(){
   const sizeToggle = '<div class="tl-view-toggle biz-match-toggle biz-size-toggle" role="group" aria-label="Size the tiles by"><button type="button" class="tl-view-btn' + (heatSize === 'chg' ? ' active' : '') + '" data-biz-size="chg" title="Bigger tiles = bigger average change">% Change</button><button type="button" class="tl-view-btn' + (heatSize === 'count' ? ' active' : '') + '" data-biz-size="count" title="Bigger tiles = more stocks">No. of stocks</button></div>';
+  return sizeToggle;
+}
+function fullButtonHtml(){
   const fullBtn = '<button type="button" class="biz-expand" data-biz-full="1" aria-pressed="' + bizFull + '" title="Show the ' + (view === 'heat' ? 'heat map' : 'table') + ' across the whole window (Esc to leave)">' + fullscreenLabel(bizFull) + '</button>';
-  const expandBtn = viewToggle + '<button type="button" class="biz-expand" data-biz-all="' + (allOpen ? 'collapse' : 'expand') + '">' + (allOpen ? 'Collapse all' : 'Expand all') + '</button>' + fullBtn;
-  // Inside Analysis the table's own buttons are quieter: "Matched only" is a checkbox, and Table / Heat map, Expand all, size and Full screen sit in one "more" menu.
+  return fullBtn;
+}
+function expandHtml(allOpen){
+  return matchToggleHtml() + '<button type="button" class="biz-expand" data-biz-all="' + (allOpen ? 'collapse' : 'expand') + '">' + (allOpen ? 'Collapse all' : 'Expand all') + '</button>' + fullButtonHtml();
+}
+// Inside Analysis the table's own buttons are quieter: "Matched only" is a checkbox, and Table / Heat map, Expand all, size and Full screen sit in one "more" menu.
+function moreMenuHtml(allOpen){
   const moreItems = [{ attrs: 'data-biz-view="' + (view === 'heat' ? 'table' : 'heat') + '"', title: view === 'heat' ? 'Show as table' : 'Show as heat map' }]
     .concat(view === 'heat' ? [{ attrs: 'data-biz-size="' + (heatSize === 'chg' ? 'count' : 'chg') + '"', title: heatSize === 'chg' ? 'Size tiles by number of stocks' : 'Size tiles by % change' }] : [{ attrs: 'data-biz-all="' + (allOpen ? 'collapse' : 'expand') + '"', title: allOpen ? 'Collapse all' : 'Expand all' }])
     .concat([{ attrs: 'data-biz-full="1"', title: bizFull ? 'Leave full screen' : 'Full screen' }]);
   const moreMenu = dropMenuHtml({ btnHtml: '<span aria-hidden="true">&#8943;</span>', label: 'More: view, expand, full screen', items: moreItems, right: true, extraClass: 'dm-more' });
+  return moreMenu;
+}
+// What is shown while the price history loads or when it could not be loaded.
+function statusHtml(p){
   let status = '';
   if(needsBars(period)){
     if(loadState === 'loading') status = '<p class="upload-hint">Loading price history…</p>';
     else if(loadState === 'failed') status = '<p class="upload-hint biz-warn">Could not load the price history, so ' + p.label + ' figures are missing. <button type="button" class="refresh-btn" data-biz-retry="1">Retry</button></p>';
   }
-  const total = rows.reduce((a, r) => a + r.matches, 0);
-  const filterNote = strategyOn() ? '<p class="upload-hint biz-showing">Matched ' + total + ' of ' + stocks.length + ' stocks</p>' : '';
+  return status;
+}
+function tableHeadHtml(p){
   const th = (id, label, cls) => sortHeaderHtml(id, label, tableSort, cls ? ' class="' + cls + '"' : '');
   const head = '<tr>' + th('name', curBy() === 'group' ? 'Industry group' : 'Industry') + th('count', 'Stocks', 'num') + th('mean', 'Average ' + p.key, 'num') + th('median', 'Median', 'num') + th('breadth', 'Up / down') + th('news', 'News', 'num') + (strategyOn() ? th('matches', 'Matching', 'num') + th('matchMean', 'Match avg ' + p.key, 'num') + th('vsIndustry', 'vs industry', 'num') : '') + '</tr>';
-  const cols = strategyOn() ? 9 : 6;
-  drawnRows = rows; drawnCols = cols;
-  const body = rows.map(r => {
+  return head;
+}
+// One industry row, followed by its detail when it is open.
+function industryRowHtml(r, cols){
     const isOpen = open.has(r.name);
     return '<tr class="biz-row' + (isOpen ? ' open' : '') + '" data-biz-name="' + escapeHtml(r.name) + '" tabindex="0" role="button" aria-expanded="' + isOpen + '"><td class="biz-name">' + '<button type="button" class="biz-open" data-biz-open="' + escapeHtml(r.name) + '" title="Open the industry page: factors, news and charts">' + escapeHtml(r.name) + '</button></td><td class="num">' + r.count + '</td><td class="num">' + pct(r.mean) + '</td><td class="num">' + pct(r.median) + '</td><td>' + breadth(r) + '</td><td class="num">' + (r.news.length ? r.news.length + (r.pos || r.neg ? ' <span class="news-pos">+' + r.pos + '</span> <span class="news-neg">&minus;' + r.neg + '</span>' : '') : '') + '</td>' + (strategyOn() ? '<td class="num">' + (r.matches ? '<b class="biz-matchcount">' + r.matches + '</b> of ' + r.count : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null ? pct(r.matchMean) : '') + '</td><td class="num">' + (r.matches && r.matchMean !== null && r.mean !== null ? signedPp(r.matchMean - r.mean) : '') + '</td>' : '') + '</tr>' + (isOpen ? detailHtml(r, cols) : '');
-  }).join('');
-  if(view === 'heat'){ setHtml(el, layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + (embed ? moreMenu : viewToggle + sizeToggle + fullBtn) + '</div></div>' + heatMap(rows, p, el))); syncSheets(); return; }
-  kit.defineToolbar('biz', () => {
-    const st = r => r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock), out = [];
-    if(strategyOn()) out.push({ id: 'matched', label: 'Matched stocks', stocks: () => rows.flatMap(r => r.items.filter(x => x.match).map(x => x.stock)) });
-    const o = rows.filter(r => open.has(r.name));
-    if(o.length) out.push({ id: 'open', label: 'Expanded industries (' + o.length + ')', stocks: () => o.flatMap(st) });
-    out.push({ id: 'all', label: 'Every stock in the table', stocks: () => rows.flatMap(st) });
-    return out;
-  });
-  setHtml(el, layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + (embed ? moreMenu : expandBtn) + kit.toolbarButton('biz') + '</div></div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + kit.selbarSlot('biz')));
+}
+// What the Refresh button above the table works on: the matched stocks, the stocks of the open industries, or every stock in the table.
+function defineBizToolbar(rows){
+kit.defineToolbar('biz', () => {
+  const st = r => r.items.filter(x => !matchedOnly() || x.match).map(x => x.stock), out = [];
+  if(strategyOn()) out.push({ id: 'matched', label: 'Matched stocks', stocks: () => rows.flatMap(r => r.items.filter(x => x.match).map(x => x.stock)) });
+  const o = rows.filter(r => open.has(r.name));
+  if(o.length) out.push({ id: 'open', label: 'Expanded industries (' + o.length + ')', stocks: () => o.flatMap(st) });
+  out.push({ id: 'all', label: 'Every stock in the table', stocks: () => rows.flatMap(st) });
+  return out;
+});
+}
+
+function draw(el){
+  document.body.classList.toggle('biz-full-open', bizFull);
+  const p = periodOf(period);
+  const rows = visibleRows();
+  const allOpen = rows.length > 0 && rows.every(r => open.has(r.name));
+  const controls = controlsHtml(), moreMenu = moreMenuHtml(allOpen), status = statusHtml(p);
+  const total = rows.reduce((a, r) => a + r.matches, 0);
+  const filterNote = strategyOn() ? '<p class="upload-hint biz-showing">Matched ' + total + ' of ' + stocks.length + ' stocks</p>' : '';
+  const cols = strategyOn() ? 9 : 6;
+  drawnRows = rows; drawnCols = cols;
+  const body = rows.map(r => industryRowHtml(r, cols)).join('');
+  if(view === 'heat'){ setHtml(el, layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + (embed ? moreMenu : matchToggleHtml() + sizeToggleHtml() + fullButtonHtml()) + '</div></div>' + heatMap(rows, p, el))); syncSheets(); return; }
+  defineBizToolbar(rows);
+  setHtml(el, layoutHtml(controls, status + '<div class="biz-toolbar">' + filterNote + '<div class="biz-actions">' + (embed ? moreMenu : expandHtml(allOpen)) + kit.toolbarButton('biz') + '</div></div>' + '<div class="biz-scroll"><table class="biz-table"><thead>' + tableHeadHtml(p) + '</thead><tbody>' + body + '</tbody></table></div>' + kit.selbarSlot('biz')));
   syncSheets();
   const chip = embed ? document.getElementById('analysisFiltersCount') : null;   // a phone shows the count inside the Filters chip (phone.css)
   if(chip) chip.textContent = strategyOn() ? total + ' of ' + stocks.length : '';
@@ -285,60 +318,57 @@ function init(){
   watchFullscreenExit(() => bizFull, () => { bizFull = false; render(); });
   wire(el);
 }
+// What a click does: [selector, handler(node, el)]. The first rule whose selector the click is inside wins.
+/** @type {[string, (n: HTMLElement, el: HTMLElement) => void][]} */
+const CLICK_RULES = [
+  ['[data-biz-open]', (n) => { openIndustryInline(hostSection(), hostLabel(), curBy(), n.dataset.bizOpen); }],
+  ['[data-biz-cols]', () => { detailAllCols = !detailAllCols; render(); }],
+  ['[data-biz-newstoggle]', (n) => { const k = n.dataset.bizNewstoggle; if(newsOpen.has(k)) newsOpen.delete(k); else newsOpen.add(k); render(); }],
+  ['[data-sort-col]', (n) => {   // a column header: sort the industries, or the stocks of the industry whose grid it is in
+    if(n.closest('.biz-detail')) detailSort = nextSort(detailSort, n.dataset.sortCol || ''); else tableSort = nextSort(tableSort, n.dataset.sortCol || '');
+    render();
+  }],
+  ['[data-biz-filters]', () => { bizFiltersOpen = !bizFiltersOpen; rememberFiltersOpen('bFiltersOpen', bizFiltersOpen); render(); }],
+  ['[data-biz-full]', () => { bizFull = !bizFull; browserFullscreen(bizFull); render(); }],
+  ['[data-biz-strat]', (n) => { strategyId = /** @type {string} */ (n.dataset.bizStrat); save(); render(); }],
+  ['[data-biz-rebound]', () => { rebound = !rebound; save(); render(); ensureData(); }],
+  ['[data-biz-show]', (n) => { if(/** @type {HTMLButtonElement} */ (n).disabled) return; showMatched = n.dataset.bizShow === 'matched'; save(); render(); }],
+  ['[data-biz-size]', (n) => { heatSize = n.dataset.bizSize === 'count' ? 'count' : 'chg'; save(); render(); }],
+  ['[data-biz-view]', (n) => { view = /** @type {string} */ (n.dataset.bizView); save(); render(); }],
+  ['[data-biz-heat]', (n, el) => {   // a heat-map tile: back to the table with that industry opened
+    view = 'table'; save(); open.add(n.dataset.bizHeat); render();
+    const row = Array.from(el.querySelectorAll('.biz-row')).find(r => /** @type {HTMLElement} */ (r).dataset.bizName === n.dataset.bizHeat);
+    if(row && row.scrollIntoView) row.scrollIntoView({ block: 'center' });
+  }],
+  ['[data-biz-matched-pick]', (n) => { if(n.hasAttribute('disabled')) return; showMatched = n.dataset.bizMatchedPick === '1'; save(); render(); }],
+  ['[data-biz-period]', (n) => { period = /** @type {string} */ (n.dataset.bizPeriod); save(); open.clear(); render(); ensureData(); }],
+  ['[data-biz-by]', (n) => { by = /** @type {string} */ (n.dataset.bizBy); save(); open.clear(); render(); }],
+  ['[data-biz-newsstop]', () => { stopNewsCollect(); }],
+  ['[data-biz-all]', (n) => {
+    if(n.dataset.bizAll === 'collapse') open.clear();
+    else visibleRows().forEach(r => open.add(r.name));
+    render();
+  }],
+  ['[data-biz-retry]', () => { loadState = 'idle'; ensureData(); }],
+  ['a:not(.stock-link)', () => {}],   // a link is left to do its own thing
+  ['.strat-row', (n) => { openStockFromBusiness(Number(n.dataset.idx)); }],
+  ['.biz-row', (n) => { toggleRow(n); }]
+];
+function onBizClick(e, el){
+  for(const [selector, handler] of CLICK_RULES){
+    const node = closestEl(e, selector);
+    if(node){ handler(node, el); return; }
+  }
+}
+function onBizKey(e){
+  if(e.key === 'Enter'){ const sr = closestEl(e, '.strat-row'); if(sr){ openStockFromBusiness(Number(sr.dataset.idx)); return; } }
+  if(e.key !== 'Enter' && e.key !== ' ') return;
+  const row = closestEl(e, '.biz-row'); if(row){ e.preventDefault(); toggleRow(row); }
+}
 // The clicks and keys of one table (Explorer's own, or the one inside Analysis).
 function wire(el){
-  el.addEventListener('click', (e) => {
-    const io = closestEl(e, '[data-biz-open]');
-    if(io){ openIndustryInline(hostSection(), hostLabel(), curBy(), io.dataset.bizOpen); return; }
-    if(closestEl(e, '[data-biz-cols]')){ detailAllCols = !detailAllCols; render(); return; }
-    const nt = closestEl(e, '[data-biz-newstoggle]');
-    if(nt){ const n = nt.dataset.bizNewstoggle; if(newsOpen.has(n)) newsOpen.delete(n); else newsOpen.add(n); render(); return; }
-    const sh = closestEl(e, '[data-sort-col]');
-    if(sh){   // a column header: sort the industries, or the stocks of the industry whose grid it is in
-      const inDetail = !!sh.closest('.biz-detail');
-      if(inDetail) detailSort = nextSort(detailSort, sh.dataset.sortCol || ''); else tableSort = nextSort(tableSort, sh.dataset.sortCol || '');
-      render(); return;
-    }
-    if(closestEl(e, '[data-biz-filters]')){ bizFiltersOpen = !bizFiltersOpen; rememberFiltersOpen('bFiltersOpen', bizFiltersOpen); render(); return; }
-    if(closestEl(e, '[data-biz-full]')){ bizFull = !bizFull; browserFullscreen(bizFull); render(); return; }
-    const sb = closestEl(e, '[data-biz-strat]');
-    if(sb){ strategyId = /** @type {string} */ (sb.dataset.bizStrat); save(); render(); return; }
-    if(closestEl(e, '[data-biz-rebound]')){ rebound = !rebound; save(); render(); ensureData(); return; }
-    const shw = closestEl(e, '[data-biz-show]');
-    if(shw){ if(/** @type {HTMLButtonElement} */ (shw).disabled) return; showMatched = shw.dataset.bizShow === 'matched'; save(); render(); return; }
-    const sz = closestEl(e, '[data-biz-size]');
-    if(sz){ heatSize = sz.dataset.bizSize === 'count' ? 'count' : 'chg'; save(); render(); return; }
-    const vb = closestEl(e, '[data-biz-view]'), ht = closestEl(e, '[data-biz-heat]');
-    if(vb){ view = /** @type {string} */ (vb.dataset.bizView); save(); render(); return; }
-    if(ht){   // a heat-map tile: back to the table with that industry opened
-      view = 'table'; save(); open.add(ht.dataset.bizHeat); render();
-      const row = Array.from(el.querySelectorAll('.biz-row')).find(r => /** @type {HTMLElement} */ (r).dataset.bizName === ht.dataset.bizHeat);
-      if(row && row.scrollIntoView) row.scrollIntoView({ block: 'center' });
-      return;
-    }
-    const mp = closestEl(e, '[data-biz-matched-pick]');
-    if(mp){ if(!mp.hasAttribute('disabled')){ showMatched = mp.dataset.bizMatchedPick === '1'; save(); render(); } return; }
-    const pb = closestEl(e, '[data-biz-period]'), gb = closestEl(e, '[data-biz-by]');
-    if(pb){ period = /** @type {string} */ (pb.dataset.bizPeriod); save(); open.clear(); render(); ensureData(); return; }
-    if(gb){ by = /** @type {string} */ (gb.dataset.bizBy); save(); open.clear(); render(); return; }
-    if(closestEl(e, '[data-biz-newsstop]')){ stopNewsCollect(); return; }
-    const all = closestEl(e, '[data-biz-all]');
-    if(all){
-      if(all.dataset.bizAll === 'collapse') open.clear();
-      else visibleRows().forEach(r => open.add(r.name));
-      render(); return;
-    }
-    if(closestEl(e, '[data-biz-retry]')){ loadState = 'idle'; ensureData(); return; }
-    if(closestEl(e, 'a:not(.stock-link)')) return;
-    const sr = closestEl(e, '.strat-row');
-    if(sr){ openStockFromBusiness(Number(sr.dataset.idx)); return; }
-    const row = closestEl(e, '.biz-row'); if(row) toggleRow(row);
-  });
-  el.addEventListener('keydown', (e) => {
-    if(e.key === 'Enter'){ const sr = closestEl(e, '.strat-row'); if(sr){ openStockFromBusiness(Number(sr.dataset.idx)); return; } }
-    if(e.key !== 'Enter' && e.key !== ' ') return;
-    const row = closestEl(e, '.biz-row'); if(row){ e.preventDefault(); toggleRow(row); }
-  });
+  el.addEventListener('click', (e) => onBizClick(e, el));
+  el.addEventListener('keydown', onBizKey);
 }
 
 // Whether the page showing this view (Explorer, or Analysis when it is embedded there) is the one on screen.

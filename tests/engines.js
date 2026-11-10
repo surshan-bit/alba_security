@@ -5268,6 +5268,85 @@ test('leaderboard: a column row can be dragged to a new place or moved with the 
   grip('stock').dispatchEvent(ev('keydown', { key: 'a' })); list.dispatchEvent(ev('keydown', { key: 'ArrowUp' })); assert.strictEqual(order(), 'stock,score,rank');
 }));
 
+// ---- Explorer / industries table (src/business/panel.js): the controls, the table and its details, the heat map, and every click
+TV_VALUES.add('PERIODS');
+const bzSetup = async (over) => {
+  const S = [{ name: 'S1', ticker: 'S1', technical: { score: 7.26 }, valuation: {} }, { name: 'S2', ticker: 'S2' }, { name: 'S3', ticker: 'S3' }];
+  const mkRow = (name, items, over2) => Object.assign({ name, count: items.length, mean: 1.5, median: 1, up: 1, down: 1, known: 2, news: [], pos: 0, neg: 0, matches: 1, matchMean: 2, items }, over2);
+  const rows = [mkRow('Autos <b>', [{ stock: S[0], match: true, change: 1 }, { stock: S[1], match: false, change: 2 }], { news: [{ d: '2026-11-01', t: 'Head <i>', url: 'https://n.test/1', s: 'pos', stock: 'S1', src: 'Wire' }, { d: 'bad', t: 'Other', url: 'javascript:1', s: 'neg', stock: 'S2' }], pos: 1, neg: 1 }),
+    mkRow('Banks', [{ stock: S[2], match: true, change: null }], { mean: null, median: null, known: 0, count: 1, matchMean: null, up: 0, down: 0 })];
+  const T = globalThis.__T = { S, rows, prefs: [], opened: [], inds: [], tips: 0, full: [], news: { stops: 0, runs: [] }, heat: [], syncs: 0, kitCalls: [], bars: [], barsOk: true, strat: null, validId: '', newsRun: null,
+    stocks: S, stockIndex: new Map(S.map((s, i) => [s, 20 + i])), appSections: { business: null }, priceHistoryByTicker: {}, PERIODS: [{ key: '1W', label: 'One week' }, { key: '1M', label: 'One month' }, { key: '6M', label: 'Six months' }],
+    kit: { defineToolbar: (n, f) => { T.toolbar = f; }, toolbarButton: (n) => '<kit-tb ' + n + '>', selbarSlot: (n) => '<kit-sel ' + n + '>', barHtml: (...a) => '<div class="kit-bar-stub"></div>', defineScope: (...a) => T.kitCalls.push(['scope', a[0]]), defineChoices: (id, f) => { T.kitCalls.push(['choices', id]); T.choices = f; }, choiceBtn: (id) => '<kit-choice ' + id + '>' },
+    keepScroll: (el, fn) => fn(), escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), ensureAllPriceBars: async () => { T.bars.push(1); return T.barsOk; }, pcTickerKey: (s) => s.name,
+    openIndustryInline: (...a) => T.inds.push(a), openStockInline: (...a) => T.opened.push(a), analysisLbCell: (id, ctx) => '<td>' + id + '</td>', analysisRowContext: (s, i, idx) => ({ s, i, idx, scoreLabel: s.name === 'S1' ? '7.3' : '' }),
+    columnHeaderHtml: (id) => '<th>' + id + '</th>', compareBy: (f, dir) => (a, b) => 0, compareByColumn: () => () => 0, nextSort: (cur, col) => ({ col, dir: 'asc' }), sortHeaderHtml: (id, label) => '<th data-sort-col="' + id + '">' + label + '</th>', stockGridColumnIds: () => ['rank', 'stock', 'industry', 'price', 'pin'],
+    publishedStrategies: () => [{ id: 'q1', name: 'Quality <s>' }], strategyStockSet: (id) => (id === 'q1' ? new Set([S[0], S[1]]) : null), validStrategyId: (id) => (id === 'q1' ? id : ''),
+    getNewsRun: () => T.newsRun, planNews: (list) => ({ stocks: list, again: false, left: 0 }), startNewsCollect: (list, label, cb) => T.news.runs.push([list.length, label, cb]), stopNewsCollect: () => { T.news.stops++; },
+    prefSet: (k, v) => T.prefs.push(JSON.parse(v)), browserFullscreen: (on) => T.full.push(on), fullscreenLabel: (on) => (on ? 'Leave full screen' : 'Full screen'), watchFullscreenExit: (isOn, onExit) => { T.exitHook = onExit; },
+    heatmapHtml: (rws, p, o) => { T.heat.push(o); return '<div class="heat-stub"></div>'; }, sheetFrame: (x) => x, syncSheets: () => { T.syncs++; }, filtersOpenSaved: () => false, rememberFiltersOpen: () => {},
+    industryTable: (list, o) => T.rows.slice(), needsBars: (p) => p === '6M', periodOf: (k) => T.PERIODS.find((x) => x.key === k) || T.PERIODS[1], dropMenuHtml: (o) => '<drop ' + o.extraClass + '>' + o.items.map((i) => i.attrs + (i.current ? '*' : '')).join('|') + '</drop>',
+    isRebound: (s) => s.name === 'S2', insertHtmlAfter: (el, html) => { el.insertAdjacentHTML('afterend', html); }, setHtml: (el, html) => { el.innerHTML = html; } };
+  Object.assign(T, over || {});
+  return { T, S, M: await loadAllStubbed('src/business/panel.js', '', ['../core/evt.js']) };
+};
+const BZ_PAGE = '<div id="analysisFiltersCount"></div><div id="businessBody"></div><div id="analysisPanelBody"><div id="embedHost"></div></div>';
+test('explorer: the page draws its controls, strategy buttons and an industry table whose names are text, and an industry opens in place with its details', () => kcPage(BZ_PAGE, async (win) => {
+  const { T, M } = await bzSetup();
+  const doc = win.document, body = () => doc.getElementById('businessBody'), txt = () => body().textContent.replace(/\s+/g, ' ');
+  T.appSections.business = doc.getElementById('businessBody'); M.init(); M.show();
+  assert.ok(body().querySelector('[data-biz-view="table"].active') && body().querySelector('[data-biz-period="1M"].active') && body().querySelector('[data-biz-by="industry"].active'));
+  assert.ok(body().querySelector('[data-biz-strat=""].active'));
+  assert.ok(txt().includes('Quality <s>') && !body().querySelector('.filter-label s') && body().querySelector('[data-biz-strat="q1"]').title === 'Highlight the stocks that qualify for this strategy today');
+  const names = [...body().querySelectorAll('.biz-row')].map((r) => r.dataset.bizName); assert.deepStrictEqual(names, ['Autos <b>', 'Banks']);
+  assert.ok(!body().querySelector('.biz-name b') && body().querySelector('[data-biz-open="Autos <b>"]') && body().querySelector('kit-tb') && body().querySelector('kit-sel'));
+  assert.ok(txt().includes('+1.50%') && txt().includes('n/a'));   // a missing average says n/a
+  assert.ok(body().querySelector('[data-biz-show="matched"]').disabled);   // no strategy chosen: nothing to match
+  body().querySelector('.biz-row').click();   // the row opens in place
+  assert.ok(body().querySelector('.biz-detail') && body().querySelector('.biz-row').classList.contains('open') && body().querySelector('.biz-row').getAttribute('aria-expanded') === 'true');
+  assert.ok(txt().includes('Fund 7.3 · Tech 7.3') || txt().includes('Fund 7.3'));   // scores under the stock in the lean grid
+  assert.ok(body().querySelector('.biz-detail .strat-row[data-idx="20"]') && !body().querySelector('.biz-detail a[href^="javascript"]'));
+  assert.strictEqual(body().querySelector('[data-biz-all]').dataset.bizAll, 'expand');
+  body().querySelector('.biz-row').click(); assert.ok(!body().querySelector('.biz-detail'));   // closes again
+  body().querySelector('[data-biz-all]').click(); assert.strictEqual(body().querySelectorAll('.biz-detail').length, 2); assert.strictEqual(body().querySelector('[data-biz-all]').dataset.bizAll, 'collapse');
+  body().querySelector('[data-biz-all]').click(); assert.strictEqual(body().querySelectorAll('.biz-detail').length, 0);
+}));
+
+test('explorer: the heat map sizes itself beside the filters and in full screen, and the controls, keys and tiles change what is drawn', () => kcPage(BZ_PAGE, async (win) => {
+  const { T, M } = await bzSetup();
+  const doc = win.document, body = () => doc.getElementById('businessBody'), click = (sel) => { const n = body().querySelector(sel); if(!n) throw new Error('no ' + sel); n.click(); };
+  T.appSections.business = body(); M.init(); M.show();
+  click('[data-biz-view="heat"]'); assert.ok(body().querySelector('.heat-stub'));
+  assert.ok(T.heat.at(-1).width >= 300 && T.heat.at(-1).hRatio === undefined && T.heat.at(-1).size === 'chg');   // beside the filters
+  click('[data-biz-size="count"]'); assert.strictEqual(T.heat.at(-1).size, 'count');
+  click('[data-biz-full]'); assert.deepStrictEqual(T.full, [true]);
+  assert.ok(T.heat.at(-1).hRatio >= .45 && T.heat.at(-1).hRatio <= .95);   // full screen: the height fits the window
+  T.exitHook(); assert.ok(T.heat.at(-1).hRatio === undefined);   // Esc leaves full screen
+  click('[data-biz-view="table"]'); assert.ok(body().querySelector('.biz-table'));
+  click('[data-biz-strat="q1"]'); assert.ok(body().querySelector('.biz-showing') && body().querySelector('[data-biz-show="matched"]'));
+  click('[data-biz-show="matched"]');
+  click('[data-biz-rebound]'); click('[data-biz-period="6M"]'); assert.ok(T.bars.length >= 1);
+  click('[data-biz-by="group"]'); click('[data-biz-filters]');
+  T.newsRun = { state: 'running', label: 'Autos <b>', done: 1, total: 3, added: 2, failed: [] };
+  click('[data-sort-col]'); click('.biz-row'); click('[data-biz-cols]'); click('[data-biz-newstoggle]'); click('.biz-detail [data-sort-col]');
+  click('[data-biz-open]'); assert.strictEqual(T.inds.length, 1);
+  click('.strat-row'); assert.strictEqual(T.opened.length, 1);
+  click('[data-biz-newsstop]'); assert.strictEqual(T.news.stops, 1);
+  const key = (sel, k) => { const e = new win.KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }); body().querySelector(sel).dispatchEvent(e); };
+  key('.strat-row', 'Enter'); assert.strictEqual(T.opened.length, 2);
+  key('.biz-row', ' '); key('.biz-row', 'Enter'); key('.biz-row', 'x');
+  await new Promise((r) => setTimeout(r, 0));   // the first history load finishes
+  T.barsOk = false; click('[data-biz-rebound]'); click('[data-biz-rebound]'); await new Promise((r) => setTimeout(r, 0));
+  assert.ok(body().querySelector('[data-biz-retry]')); T.barsOk = true; click('[data-biz-retry]'); await new Promise((r) => setTimeout(r, 0));
+  doc.dispatchEvent(new win.CustomEvent('alba-batch-done', { detail: { source: 'biz-kit' } }));
+  doc.dispatchEvent(new win.CustomEvent('alba-batch-done', { detail: { source: 'other' } }));
+  const host = doc.getElementById('embedHost'); M.showIn({ el: host, by: 'industry', section: 'analysis', label: 'Analysis', stocksNow: () => new Set(T.S.slice(0, 1)) });
+  assert.ok(host.querySelector('.biz-table') && body().textContent === '');
+  host.querySelector('.biz-row').click(); assert.ok(host.querySelector('.biz-detail'));
+  for(const n of host.querySelectorAll('[data-biz-matched-pick]')) n.click();
+  M.show(); assert.ok(host.textContent === '' && body().querySelector('.biz-table'));
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
