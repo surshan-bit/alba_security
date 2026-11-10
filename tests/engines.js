@@ -5454,6 +5454,11 @@ test('preferences: a change is mirrored in the browser and saved to the signed-i
     M.uiStateSet({ b: 2 }); M.uiStateSet({ c: 3 }, 5); timers.pop()(); assert.deepStrictEqual(JSON.parse(store.get('albaDashboard.uiState.v1')), { a: 1, b: 2, c: 3 });
     store.set('albaDashboard.uiState.v1', 'not json'); assert.deepStrictEqual(M.uiStateGet(), {});
     store.set('albaDashboard.uiState.v1', '7'); assert.deepStrictEqual(M.uiStateGet(), {});
+    store.set('albaDashboard.analysisFilters.v1', '{broken'); store.set('albaDashboard.tradeView.v1', 'raw'); M.prefSet('albaDashboard.business.v1', '{}'); M.flushPrefs(); for(let i = 0; i < 6; i++) await Promise.resolve();
+    assert.ok(writes.at(-1).tradeView === 'raw' && !('analysis' in writes.at(-1)));   // a saved value that does not parse is left out
+    global.localStorage = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem(){} };
+    M.prefSet('k', 'v'); M.flushPrefs(); for(let i = 0; i < 6; i++) await Promise.resolve(); assert.strictEqual(writes.at(-1).v, 1);   // storage blocked: still saved to the record, with nothing from the browser
+    assert.deepStrictEqual(M.uiStateGet(), {});
   } finally { global.localStorage = old; global.setTimeout = realSet; global.clearTimeout = realClear; }
 }));
 
