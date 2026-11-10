@@ -3539,11 +3539,13 @@ test('daily import choice: the strategies with a rule are offered, the tick show
   } finally { globalThis.document = keepDoc; globalThis.window = keepWin; }
 }));
 
+// wlsync.js loads with its two helper modules for real (wlplan.js asks rules.js for qualifyingStocks, which the stand-in must then export too).
+const WL_KEEP = ['./wlplan.js', './wlreport.js'], WL_MORE = { '../strategies/rules.js': ['qualifyingStocks'] };
 // ---- Watchlist sync (src/import/wlsync.js)
 test('watchlist sync: the saved BSE symbols are copied into a plain object that can take new symbols, because the database returns the record locked', () => alone(async () => {
   const keep = globalThis.window; globalThis.window = { addEventListener: () => {} }; globalThis.__T = { stocks: [] };
   try {
-    const W = await loadAllStubbed('src/import/wlsync.js', 'export { bseMapOf };', []);
+    const W = await loadAllStubbed('src/import/wlsync.js', 'export { bseMapOf };', WL_KEEP, WL_MORE);
     const locked = Object.freeze({ 543913: 'AAA' }), map = W.bseMapOf({ exists: true, data: () => locked });
     map['543914'] = 'SWATIPRO';   // adding to the locked record itself throws "object is not extensible"
     assert.deepStrictEqual(map, { 543913: 'AAA', 543914: 'SWATIPRO' }); assert.deepStrictEqual(locked, { 543913: 'AAA' });
@@ -3561,7 +3563,7 @@ test('watchlist sync: BSE symbols found by the lookup are saved and the run carr
       getFiRunning: () => false, getFiOwner: () => true, getFiDb: () => db, getDb: () => ({ collection: () => ({ doc: () => ({ set: async () => {} }) }) }), fiRetry: (fn) => fn(), fiTakeLock: async () => () => {},
       fiShowResult: (...a) => shown.push(a), getFiState: () => null, qualifyingStocks: (u) => u, sanitizeDocId: (x) => x,
       tvCall: async (tool) => { if(tool === 'mcp-tv-search-symbols') return { data: { symbols: [{ exchange: 'BSE', type: 'stock', description: 'Swati Projects Limited', symbol: 'BSE:SWATIPRO' }] } }; throw new Error('TradingView stopped answering'); } };
-    const W = await loadAllStubbed('src/import/wlsync.js', 'export { picked };', []);
+    const W = await loadAllStubbed('src/import/wlsync.js', 'export { picked };', WL_KEEP, WL_MORE);
     W.picked.add('s1');
     await W.wlRunSync();
     assert.deepStrictEqual(updates, [{ 543914: 'SWATIPRO' }]);   // the new symbol was found and saved
@@ -3594,7 +3596,7 @@ async function wlHarness(lists, refused, over){
       return { data: { symbols: args.query === 'BBB' ? [{ exchange: 'BSE', type: 'stock', symbol: 'BSE:BBB' }] : [] } };
     } };
   Object.assign(T, over);
-  const W = await loadAllStubbed('src/import/wlsync.js', 'export { picked };', []); W.picked.add('s1');
+  const W = await loadAllStubbed('src/import/wlsync.js', 'export { picked };', WL_KEEP, WL_MORE); W.picked.add('s1');
   const texts = (i) => shown[i][1].map((l) => l.text).join('\n');
   return { W, T, shown, texts, universe, lists, doc, sync: async () => { await W.wlRunSync(); return texts(shown.length - 1); } };
 }
@@ -3778,11 +3780,11 @@ let fiAskedText = '';
 
 // ---- TradingView watchlist sync (src/import/wlplan.js, wlreport.js, wlsync.js): the plan, the wording, and whole runs against a made-up TradingView and database
 const WL_RULES_STUB = { '../strategies/rules.js': 'export const qualifyingStocks = (u, rules) => u.filter((s) => rules.includes(s.ticker));' };   // a "rule" here is just a ticker that qualifies
-const wlStock = (ticker, name) => ({ ticker, name: name || ticker });
+const wlTk = (ticker, name) => ({ ticker, name: name || ticker });
 
 test('watchlist plan: each ticker gets its TradingView symbol; BSE-only stocks need a saved alpha symbol and are asked for once; odd tickers are noted', () => alone(async () => {
   const W = await loadWithStubs('src/import/wlplan.js', '', WL_RULES_STUB);
-  const universe = [wlStock('AAA'), wlStock('NAM-INDIA'), wlStock('J-K'), wlStock('M&M · NSE'), wlStock('M&M · BSE'), wlStock('500001', 'Beta Ltd'), wlStock('500002', 'Gamma'), wlStock('500003', 'Delta')];
+  const universe = [wlTk('AAA'), wlTk('NAM-INDIA'), wlTk('J-K'), wlTk('M&M · NSE'), wlTk('M&M · BSE'), wlTk('500001', 'Beta Ltd'), wlTk('500002', 'Gamma'), wlTk('500003', 'Delta')];
   const bse = { version: 4, updatedAt: 'x', __version: 1, _version: 1, 500002: 'GAMMA', 500003: 'BSE:DELTA' };
   const first = { name: 'One', rules: universe.map((s) => s.ticker) }, second = { name: 'Two', rules: ['AAA', '500001'] };
   const plan = W.wlBuild(universe, bse, [first, second]);
@@ -3791,9 +3793,9 @@ test('watchlist plan: each ticker gets its TradingView symbol; BSE-only stocks n
   assert.deepStrictEqual(plan.needsLookup, [{ code: '500001', name: 'Beta Ltd' }]);   // asked for once although two strategies hold it
   assert.deepStrictEqual(plan.unverified, ['J-K', 'M&M']);
   assert.deepStrictEqual(plan.notes, ['duplicate symbol skipped: NSE:M_M']);   // the same stock listed on two exchanges
-  const confirmed = W.wlBuild([wlStock('KLBRENG-B'), wlStock('GVT&D')], null, [{ name: 'C', rules: ['KLBRENG-B', 'GVT&D'] }]);
+  const confirmed = W.wlBuild([wlTk('KLBRENG-B'), wlTk('GVT&D')], null, [{ name: 'C', rules: ['KLBRENG-B', 'GVT&D'] }]);
   assert.deepStrictEqual([confirmed.lists.C, confirmed.unverified], [['NSE:KLBRENG_B', 'NSE:GVT&D'], []]);   // confirmed spellings are used as they are and are not flagged
-  assert.throws(() => W.wlBuild([wlStock('500009')], { 500009: '123' }, [{ name: 'X', rules: ['500009'] }]), /refusing to send a raw BSE code \(BSE:123\)/);
+  assert.throws(() => W.wlBuild([wlTk('500009')], { 500009: '123' }, [{ name: 'X', rules: ['500009'] }]), /refusing to send a raw BSE code \(BSE:123\)/);
 }));
 
 test('watchlist plan: company names compare without Ltd / punctuation, lists compare as sets, and dropped symbols are told from ones that landed on the other form', () => alone(async () => {
@@ -3869,7 +3871,7 @@ const wlDb = (over) => {
 };
 const wlSetup = (tv, db, over) => {
   const T = globalThis.__T = { log: [], logs: [], results: [], marked: [], beats: 0, running: [], reset: null, state: { status: {} },
-    stocks: [wlStock('A1', 'Alpha'), wlStock('A2', 'Beta'), wlStock('A3', 'Gamma')],
+    stocks: [wlTk('A1', 'Alpha'), wlTk('A2', 'Beta'), wlTk('A3', 'Gamma')],
     strategies: [{ id: 's1', name: ' Quality ', rules: ['A1', 'A2', 'A3'] }, { id: 's2', name: 'Value', rules: ['A1'] }],
     ruleReady: (r) => r !== 'blank', qualifyingStocks: (u, rules) => u.filter((s) => rules.includes(s.ticker)),
     getFiRunning: () => false, getFiOwner: () => true, getFiDb: () => db, getFiState: () => T.state, setFiRunning: (v) => T.running.push(v),
@@ -3885,7 +3887,7 @@ const wlPage = (fn, html) => withPage(html === undefined ? '<div id="wlStrategyP
   try { await fn(win); } finally { if(had === undefined) delete globalThis.window; else globalThis.window = had; }
 });
 TV_VALUES.add('strategies'); TV_VALUES.add('watchlistSyncLog');
-const wlLoad = () => loadAllStubbed('src/import/wlsync.js', '', ['./wlplan.js', './wlreport.js'], { '../strategies/rules.js': ['qualifyingStocks'] });
+const wlLoad = () => loadAllStubbed('src/import/wlsync.js', '', WL_KEEP, WL_MORE);
 // Opens the page, ticks the strategies (by id) in the picker and presses the button's function.
 const wlRun = async (win, ids) => {
   const M = await wlLoad(); M.renderWlPicker();
@@ -3924,7 +3926,7 @@ test('watchlist sync: a BSE-only stock is found by its exact company name and sa
   const tv = wlTv([], { search: { 'Gamma Industries Limited': [hit('BSE:GAMMAIND', 'GAMMA INDUSTRIES LTD'), { symbol: 'NSE:GAMMAIND', exchange: 'NSE', type: 'stock', description: 'Gamma Industries Ltd' }, null],
     'Beta Works Ltd': [hit('BSE:BETA1', 'Beta Works Ltd'), hit('BSE:BETA2', 'Beta Works Limited')], 'Delta Co': [hit('BSE:DELTAX', 'Delta Corporation')], 'Eps Ltd': new Error('search down') } });
   const db = wlDb({ bse: { version: 1 } });
-  const universe = [wlStock('500001', 'Gamma Industries Limited'), wlStock('500002', 'Beta Works Ltd'), wlStock('500003', 'Delta Co'), wlStock('500004', 'Eps Ltd'), wlStock('A1', 'Alpha')];
+  const universe = [wlTk('500001', 'Gamma Industries Limited'), wlTk('500002', 'Beta Works Ltd'), wlTk('500003', 'Delta Co'), wlTk('500004', 'Eps Ltd'), wlTk('A1', 'Alpha')];
   const T = wlSetup(tv, db, { stocks: universe, strategies: [{ id: 's9', name: 'Mixed', rules: ['500001', '500002', '500003', '500004', 'A1'] }] });
   await wlRun(win, ['s9']);
   assert.deepStrictEqual(db.updates, [['stockMeta/bseAlpha', { 500001: 'GAMMAIND' }]]);
@@ -3939,7 +3941,7 @@ test('watchlist sync: a database that cannot be read or written does not stop th
   await quietErrors(async (seen) => {
     const hit = { symbol: 'BSE:GAMMAIND', exchange: 'BSE', type: 'stock', description: 'Gamma' };
     const tv = wlTv([], { search: { Gamma: [hit] } }), db = wlDb({ getFails: true, updateFails: true });
-    const T = wlSetup(tv, db, { stocks: [wlStock('500001', 'Gamma')], strategies: [{ id: 's9', name: 'B', rules: ['500001'] }] });
+    const T = wlSetup(tv, db, { stocks: [wlTk('500001', 'Gamma')], strategies: [{ id: 's9', name: 'B', rules: ['500001'] }] });
     await wlRun(win, ['s9']);
     assert.deepStrictEqual(tv.byName('B').symbols, ['BSE:GAMMAIND']); assert.strictEqual(T.results[0][0], 'ok');   // the symbol found is used although it could not be saved
     assert.deepStrictEqual(seen, ['Could not read the BSE symbol map', 'Could not save the new BSE symbols']);
@@ -3949,7 +3951,7 @@ test('watchlist sync: a database that cannot be read or written does not stop th
 test('watchlist sync: symbols TradingView dropped are tried on the other exchange and in the other spelling; the ones that stay missing are reported', () => wlPage(async (win) => {
   const tv = wlTv([], { accept: (s) => !['NSE:RESONANCE', 'NSE:M_M', 'NSE:GHOST'].includes(s), search: { RESONANCE: [{ symbol: 'NSE:RESONANCE', exchange: 'NSE', type: 'stock' }, { symbol: 'BSE:RESONANCE', exchange: 'BSE', type: 'stock' }],
     M_M: new Error('search down'), 'M&M': [{ symbol: 'NSE:M&M', exchange: 'NSE', type: 'stock' }] } });
-  const db = wlDb(), T = wlSetup(tv, db, { stocks: ['A1', 'RESONANCE', 'M&M', 'GHOST'].map((t) => wlStock(t)), strategies: [{ id: 's9', name: 'L', rules: ['A1', 'RESONANCE', 'M&M', 'GHOST'] }] });
+  const db = wlDb(), T = wlSetup(tv, db, { stocks: ['A1', 'RESONANCE', 'M&M', 'GHOST'].map((t) => wlTk(t)), strategies: [{ id: 's9', name: 'L', rules: ['A1', 'RESONANCE', 'M&M', 'GHOST'] }] });
   await wlRun(win, ['s9']);
   assert.deepStrictEqual(tv.byName('L').symbols, ['NSE:A1', 'BSE:RESONANCE', 'NSE:M&M']);   // GHOST has no other form, so it stays out
   assert.strictEqual(T.results[0][0], 'warn'); assert.ok(T.results[0][1].includes('TradingView could not resolve: NSE:GHOST.'));
@@ -3959,7 +3961,7 @@ test('watchlist sync: symbols TradingView dropped are tried on the other exchang
 test('watchlist sync: long lists go in chunks, a chunk that failed ambiguously is sent again, and the new list replaces the old one only afterwards', () => wlPage(async (win) => {
   const names = Array.from({ length: 650 }, (_, i) => 'S' + i);
   const tv = wlTv([{ name: 'Big', symbols: ['NSE:OLD'] }], { before: { 'mcp-watchlist-add-to-watchlist': (input, n) => { if(n === 1) throw Object.assign(new Error('upstream'), { code: 'upstream_error' }); } } });
-  const db = wlDb(), T = wlSetup(tv, db, { stocks: names.map((t) => wlStock(t)), strategies: [{ id: 's9', name: 'Big', rules: names }] });
+  const db = wlDb(), T = wlSetup(tv, db, { stocks: names.map((t) => wlTk(t)), strategies: [{ id: 's9', name: 'Big', rules: names }] });
   await wlRun(win, ['s9']);
   assert.strictEqual(tv.byName('Big').symbols.length, 650); assert.strictEqual(tv.count('mcp-watchlist-add-to-watchlist'), 3);   // chunk 2 failed and was not applied, chunk 3 landed, the 300 missing were sent again
   assert.deepStrictEqual(T.results[0], ['ok', ['Sync complete.', 'Big: 650 symbols (+650 / −1)', '1 strategy · 650 added · 1 removed in total.']]);
@@ -3970,7 +3972,7 @@ test('watchlist sync: long lists go in chunks, a chunk that failed ambiguously i
 test('watchlist sync: when TradingView refuses too many symbols the old list is kept, the run stops with the reason and the lock is released as failed', () => wlPage(async (win) => {
   const names = Array.from({ length: 12 }, (_, i) => 'S' + i);
   const tv = wlTv([{ name: 'Big', symbols: ['NSE:OLD'] }], { accept: () => false });
-  const db = wlDb(), T = wlSetup(tv, db, { stocks: names.map((t) => wlStock(t)), strategies: [{ id: 's9', name: 'Big', rules: names }] });
+  const db = wlDb(), T = wlSetup(tv, db, { stocks: names.map((t) => wlTk(t)), strategies: [{ id: 's9', name: 'Big', rules: names }] });
   await quietErrors(() => wlRun(win, ['s9']));
   const why = 'TradingView did not accept 12 of 12 symbols, so the existing "Big" list was left untouched (the new one is saved as "Big (syncing)")';
   assert.deepStrictEqual(T.results, [['err', ['Sync stopped: ' + why]]]);
