@@ -52,31 +52,37 @@ function batchBars(row, kind){
   return ok(cur) && ok(prev) ? { cur, prev } : null;
 }
 const sameNum = (a, b) => Math.abs(a - b) <= 1e-4 * Math.abs(b) + 1e-9;
-// `stored` = the saved bars of one kind (oldest first); returns the bars brought up to date, or null when this stock must be fetched on its own.
-function alignBars(stored, bars, kind, nowS){
-  if(!Array.isArray(stored) || !stored.length || !bars) return null;
+const barRow = (t, b) => [t, b.o, b.h, b.l, b.c, b.v];
+// The saved bars with TradingView's two newest bars taken in, or null when they do not line up with what is saved.
+function mergeNewest(stored, bars, kind, nowS){
   const bucket = kind === 'W' ? weekBucket : monthBucket, L = stored[stored.length - 1];
   const gap = bucket(nowS) - bucket(L[0]);
-  const row = (t, b) => [t, b.o, b.h, b.l, b.c, b.v];
   const head = stored.slice(0, -1);
   // The saved newest bar was still forming when it was saved, so the same bar now can only have a higher high, a lower low and more volume, and the same open.
   const same = b => sameNum(b.o, L[1]) && b.h >= L[2] - 1e-4 && b.l <= L[3] + 1e-4 && b.v >= L[5] * 0.99;
   // When TradingView's "current" bar is the saved bar itself, its "previous" bar must be the one saved before it.
   const prevIsBefore = stored.length < 2 || sameNum(bars.prev.o, stored[stored.length - 2][1]);
-  let out = null;
-  if(gap === 0){ if(same(bars.cur) && prevIsBefore) out = head.concat([row(L[0], bars.cur)]); }
-  else if(gap === 1){
-    const isPrev = same(bars.prev), isCur = same(bars.cur) && prevIsBefore;
-    if(isPrev && !isCur) out = head.concat([row(L[0], bars.prev), row((kind === 'W' ? weekStartS(nowS) : monthStartS(nowS)) + OPEN_S, bars.cur)]);   // the saved bar has finished and a new one has begun
-    else if(isCur && !isPrev) out = head.concat([row(L[0], bars.cur)]);   // the new week or month has no bar yet: the newest bar is still the saved one
-  }
-  if(!out) return null;
+  if(gap === 0) return same(bars.cur) && prevIsBefore ? head.concat([barRow(L[0], bars.cur)]) : null;
+  if(gap !== 1) return null;
+  const isPrev = same(bars.prev), isCur = same(bars.cur) && prevIsBefore;
+  if(isPrev && !isCur) return head.concat([barRow(L[0], bars.prev), barRow((kind === 'W' ? weekStartS(nowS) : monthStartS(nowS)) + OPEN_S, bars.cur)]);   // the saved bar has finished and a new one has begun
+  if(isCur && !isPrev) return head.concat([barRow(L[0], bars.cur)]);   // the new week or month has no bar yet: the newest bar is still the saved one
+  return null;
+}
+// Every bar has real numbers, a high and low that hold its open and close, no negative volume, and the times rise.
+function barsAreSane(out){
   let prevT = -Infinity;
   for(const r of out){
-    if(!r.every(Number.isFinite) || r[0] <= prevT || r[2] < Math.max(r[1], r[4]) - 1e-4 || r[3] > Math.min(r[1], r[4]) + 1e-4 || r[5] < 0) return null;
+    if(!r.every(Number.isFinite) || r[0] <= prevT || r[2] < Math.max(r[1], r[4]) - 1e-4 || r[3] > Math.min(r[1], r[4]) + 1e-4 || r[5] < 0) return false;
     prevT = r[0];
   }
-  return out;
+  return true;
+}
+// `stored` = the saved bars of one kind (oldest first); returns the bars brought up to date, or null when this stock must be fetched on its own.
+function alignBars(stored, bars, kind, nowS){
+  if(!Array.isArray(stored) || !stored.length || !bars) return null;
+  const out = mergeNewest(stored, bars, kind, nowS);
+  return out && barsAreSane(out) ? out : null;
 }
 
 export { planHistory, weekStartS, monthStartS, weekBucket, monthBucket, alignBars, batchBars, BAR_COLUMNS, TOLERANCE };
