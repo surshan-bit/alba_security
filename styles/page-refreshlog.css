@@ -1,9 +1,13 @@
 /* Data Refresh page (class refreshlog-page): button rows, upload rows, job titles and phone spacing. */
-@media (min-width:901px){:root[data-theme="white"] .refreshlog-page .refreshlog-sub-title{margin-top:28px}}
+@media (min-width:901px){
+:root[data-theme="white"] .refreshlog-page .refreshlog-sub-title{margin-top:28px}
+}
 :root[data-theme="white"] .refreshlog-page .refreshlog-manual:has(.refreshlog-wl-picker){display:block}
 :root[data-theme="white"] .refreshlog-page .wl-help{margin:0 0 6px}
 :root[data-theme="white"] .app-section.refreshlog-page .refreshlog-watchlist-btn{display:flex;width:fit-content;margin-left:auto}
-@media (max-width:900px){:root[data-theme="white"] .refreshlog-page :is(.browse-btn,.select-mode-btn){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 18px;font-size:var(--t-sm);font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2}
+@media (max-width:900px){
+:root[data-theme="white"] .refreshlog-page .refreshlog-job:first-of-type .refreshlog-job-title{margin-top:0}
+:root[data-theme="white"] .refreshlog-page :is(.browse-btn,.select-mode-btn){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;height:auto;padding:0 18px;font-size:var(--t-sm);font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;white-space:nowrap;line-height:1.2}
 :root[data-theme="white"] .refreshlog-page :is(.browse-btn,.select-mode-btn:not(.fi-btn-primary)){color:var(--text);background:var(--panel);border:1px solid var(--c-c9cfdf)}
 :root[data-theme="white"] .refreshlog-page .select-mode-btn.fi-btn-primary{color:var(--on-accent);background:var(--accent);border:1px solid var(--accent)}
 :root[data-theme="white"] .refreshlog-page .select-mode-btn.fi-btn-primary:disabled{color:var(--on-accent);background:color-mix(in srgb,var(--accent) 45%,var(--panel));border-color:transparent;cursor:not-allowed}
@@ -11,11 +15,17 @@
 :root[data-theme="white"] .refreshlog-page :is(.browse-btn,.select-mode-btn):hover:not(.fi-btn-primary):not(:disabled){color:var(--accent);border-color:var(--accent)}
 :root[data-theme="white"] .refreshlog-page .upload-row:has(.browse-wrap){display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px}
 :root[data-theme="white"] .refreshlog-page .upload-row:has(.browse-wrap) .upload-text{flex:1 0 100%}
+:root[data-theme="white"] .refreshlog-page .upload-row .browse-wrap{flex:none;width:auto}
 :root[data-theme="white"] .refreshlog-page .upload-row:has(.browse-wrap) .select-mode-btn{flex:none;width:auto}
 :root[data-theme="white"] .refreshlog-page .upload-row:has(.refreshlog-snapshot-btn){display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px}
 :root[data-theme="white"] .refreshlog-page .upload-row:has(.refreshlog-snapshot-btn) .upload-text{flex:1 0 100%}
-:root[data-theme="white"] .refreshlog-page .refreshlog-snapshot-btn{flex:none;width:auto}}
-@media (max-width:640px){.refreshlog-page .refreshlog-job .upload-panel{margin-bottom:10px}
+:root[data-theme="white"] .refreshlog-page .refreshlog-snapshot-btn{flex:none;width:auto}
+:root[data-theme="white"] .app-section.refreshlog-page .refreshlog-watchlist-btn{display:flex;width:fit-content;margin-left:auto}
+}
+@media (max-width:640px){
+.refreshlog-page .refreshlog-job-title{font-size:var(--t-md);margin:0 0 6px}
+.refreshlog-page .refreshlog-job .upload-panel{margin-bottom:10px}
 .refreshlog-page .refreshlog-freshness{margin:10px 0 10px}
 .refreshlog-page .refreshlog-job+.refreshlog-job{margin-top:6px}
-.refreshlog-page .refreshlog-divider{margin:10px 0}}
+.refreshlog-page .refreshlog-divider{margin:10px 0}
+}
