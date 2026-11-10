@@ -5414,6 +5414,49 @@ test('industry page: sorting a column and Show more rebuild the stock rows, and 
   detail.querySelector('[data-sort-col]').click(); assert.strictEqual(rows(), 130);
 }));
 
+// ---- Preferences sync (src/identity/prefs.js): who owns the browser's mirror, and which copy wins when the page opens
+const prefsRun = (opts) => alone(async () => {
+  const store = new Map(Object.entries(opts.store || {})), old = global.localStorage, writes = [];
+  global.localStorage = { getItem: (k) => (opts.storageDown ? (() => { throw new Error('blocked'); })() : (store.has(k) ? store.get(k) : null)), setItem: (k, v) => { if(opts.storageDown) throw new Error('blocked'); store.set(k, v); }, removeItem: (k) => { store.delete(k); } };
+  globalThis.__T = { getUid: () => 'u2', userRef: () => (opts.noRef ? null : { get: async () => { if(opts.getFails) throw new Error('offline'); return { exists: !!opts.saved, data: () => opts.saved }; }, set: async (o) => { writes.push(o); } }) };
+  let errors = []; await quietErrors(async (seen) => { errors = seen; await (await loadAllStubbed('src/identity/prefs.js', '', ['./keys.js'])).syncPrefs(); });
+  global.localStorage = old; return { store, writes, errors };
+});
+test('preferences sync: another person on this browser starts clean; the saved record wins over an older mirror and an unsaved newer mirror is sent up', async () => {
+  const mirror = { 'albaDashboard.tradeView.v1': 'old', 'albaDashboard.prefsOwner.v1': 'u1', 'albaDashboard.strategies.v1': '[]' };
+  let r = await prefsRun({ store: mirror, saved: { v: 1, updatedAt: '2026-11-01T00:00:00Z', tradeView: 'new', analysis: { a: 1 } } });
+  assert.strictEqual(r.store.get('albaDashboard.prefsOwner.v1'), 'u2'); assert.ok(!r.store.has('albaDashboard.strategies.v1'));   // u1's copies are gone
+  assert.deepStrictEqual([r.store.get('albaDashboard.tradeView.v1'), r.store.get('albaDashboard.analysisFilters.v1'), r.store.has('albaDashboard.business.v1'), r.writes.length], ['new', '{"a":1}', false, 0]);
+  r = await prefsRun({ store: { 'albaDashboard.tradeView.v1': 'mine', 'albaDashboard.prefsOwner.v1': 'u2', 'albaDashboard.prefsLocalAt.v1': '2026-11-05T00:00:00Z' }, saved: { v: 1, updatedAt: '2026-11-01T00:00:00Z', tradeView: 'theirs' } });
+  assert.deepStrictEqual([r.store.get('albaDashboard.tradeView.v1'), r.writes.length, r.writes[0].tradeView, typeof r.writes[0].updatedAt], ['mine', 1, 'mine', 'string']);   // the browser's newer copy is kept and saved
+});
+test('preferences sync: a first visit seeds the record from the browser, an empty browser seeds nothing, and storage or database failures are survived', async () => {
+  let r = await prefsRun({ store: { 'albaDashboard.tradeView.v1': 'mine' }, saved: null });
+  assert.deepStrictEqual([r.writes.length, r.writes[0].tradeView], [1, 'mine']);
+  r = await prefsRun({ saved: null }); assert.strictEqual(r.writes.length, 0);
+  r = await prefsRun({ noRef: true, store: { 'albaDashboard.prefsOwner.v1': 'u1' } }); assert.strictEqual(r.store.get('albaDashboard.prefsOwner.v1'), 'u1');   // signed out: nothing touched
+  r = await prefsRun({ storageDown: true, saved: { v: 1, updatedAt: '2026-11-01T00:00:00Z', tradeView: 'x' } }); assert.strictEqual(r.writes.length, 0);
+  r = await prefsRun({ getFails: true }); assert.strictEqual(r.errors.length, 1);
+});
+test('preferences: a change is mirrored in the browser and saved to the signed-in record after a short wait or at once on flush; screen state is merged', () => alone(async () => {
+  const store = new Map(), writes = [], old = global.localStorage, timers = [], realSet = global.setTimeout, realClear = global.clearTimeout;
+  global.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => { store.set(k, v); }, removeItem: (k) => { store.delete(k); } };
+  global.setTimeout = (fn) => { timers.push(fn); return timers.length; }; global.clearTimeout = () => {};
+  let signedIn = false; globalThis.__T = { getUid: () => 'u', userRef: () => (signedIn ? { set: async (o) => { writes.push(o); } } : null) };
+  try {
+    const M = await loadAllStubbed('src/identity/prefs.js', '', ['./keys.js']);
+    M.prefSet('albaDashboard.tradeView.v1', 'v1'); assert.strictEqual(store.get('albaDashboard.tradeView.v1'), 'v1'); assert.strictEqual(timers.length, 0);   // signed out: only the mirror
+    signedIn = true; M.prefSet('albaDashboard.tradeView.v1', 'v2'); assert.strictEqual(timers.length, 1);
+    timers.pop()(); await Promise.resolve(); await Promise.resolve(); assert.deepStrictEqual(writes.map((w) => w.tradeView), ['v2']);
+    M.flushPrefs(); assert.strictEqual(writes.length, 1);   // nothing pending
+    M.prefSet('albaDashboard.tradeView.v1', 'v3'); M.flushPrefs(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); assert.strictEqual(writes.at(-1).tradeView, 'v3');
+    store.set('albaDashboard.uiState.v1', '{"a":1}'); M.flushUiState();   // no pending screen state: nothing to flush
+    M.uiStateSet({ b: 2 }); M.uiStateSet({ c: 3 }, 5); timers.pop()(); assert.deepStrictEqual(JSON.parse(store.get('albaDashboard.uiState.v1')), { a: 1, b: 2, c: 3 });
+    store.set('albaDashboard.uiState.v1', 'not json'); assert.deepStrictEqual(M.uiStateGet(), {});
+    store.set('albaDashboard.uiState.v1', '7'); assert.deepStrictEqual(M.uiStateGet(), {});
+  } finally { global.localStorage = old; global.setTimeout = realSet; global.clearTimeout = realClear; }
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

@@ -53,38 +53,50 @@ function uiStateSet(patch, delay){
   uiTimer = setTimeout(flushUiState, delay == null ? 400 : delay);
 }
 
+// Another person used this browser: their mirrored preferences must not leak into this account. Marks the browser as this person's.
+function claimBrowser(){
+  try {
+    const prev = localStorage.getItem(PREFS_OWNER_KEY);
+    if(prev && prev !== getUid()){ for(const k of Object.keys(PREF_FIELDS)) localStorage.removeItem(k); localStorage.removeItem(PREFS_LOCAL_AT_KEY); localStorage.removeItem(STRAT_KEY); localStorage.removeItem(STRAT_AT_KEY); }
+    localStorage.setItem(PREFS_OWNER_KEY, String(getUid()));
+  } catch(e){ /* storage unavailable: nothing to compare with */ }
+}
+// When this browser last changed a preference (0 when never, or when storage is unavailable).
+function localChangedAt(){
+  try { return Date.parse(localStorage.getItem(PREFS_LOCAL_AT_KEY) || '') || 0; } catch(e){ return 0; }   // storage unavailable: counts as never saved here
+}
+// The saved record replaces this browser's mirror, field by field.
+function mirrorSavedPrefs(d){
+  for(const k of Object.keys(PREF_FIELDS)){
+    const [field, kind] = PREF_FIELDS[k];
+    if(d[field] === undefined) continue;
+    try { localStorage.setItem(k, kind === 'json' ? JSON.stringify(d[field]) : String(d[field])); } catch(e){ /* storage unavailable: the copy in the database still applies */ }
+  }
+}
+// Sends this browser's preferences to the database, stamped now.
+async function saveBrowserPrefs(ref, o){
+  o.updatedAt = new Date().toISOString();
+  await ref.set(o);
+}
+
 // Runs once before the app starts: the saved preferences replace this browser's mirror, so the app's normal
 // load-time reads pick them up. A first-time user with no saved record seeds it from this browser's settings.
 async function syncPrefs(){
   const ref = userRef('data/users/{uid}/prefs');
   if(!ref) return;
-  try {
-    const prev = localStorage.getItem(PREFS_OWNER_KEY);
-    if(prev && prev !== getUid()){ for(const k of Object.keys(PREF_FIELDS)) localStorage.removeItem(k); localStorage.removeItem(PREFS_LOCAL_AT_KEY); localStorage.removeItem(STRAT_KEY); localStorage.removeItem(STRAT_AT_KEY); }  // another person used this browser
-    localStorage.setItem(PREFS_OWNER_KEY, String(getUid()));
-  } catch(e){ /* storage unavailable: nothing to compare with */ }
+  claimBrowser();
   try {
     const snap = await ref.get();
     const d = snap && snap.exists ? snap.data() : null;
-    // If this browser holds a newer change than the saved record (the page was refreshed before the save finished),
-    // keep the browser's copy and send it to the database instead of overwriting it with the older one.
-    let localAt = 0; try { localAt = Date.parse(localStorage.getItem(PREFS_LOCAL_AT_KEY) || '') || 0; } catch(e){ /* storage unavailable: counts as never saved here */ }
-    const dbAt = d ? (Date.parse(d.updatedAt) || 0) : 0;
-    if(d && localAt > dbAt){
-      const o = prefsObject(); o.updatedAt = new Date().toISOString();
-      await ref.set(o);
+    if(!d){
+      const o = prefsObject();
+      if(Object.keys(o).length > 1) await saveBrowserPrefs(ref, o);
       return;
     }
-    if(d){
-      for(const k of Object.keys(PREF_FIELDS)){
-        const [field, kind] = PREF_FIELDS[k];
-        if(d[field] === undefined) continue;
-        try { localStorage.setItem(k, kind === 'json' ? JSON.stringify(d[field]) : String(d[field])); } catch(e){ /* storage unavailable: the copy in the database still applies */ }
-      }
-    } else {
-      const o = prefsObject();
-      if(Object.keys(o).length > 1){ o.updatedAt = new Date().toISOString(); await ref.set(o); }
-    }
+    // If this browser holds a newer change than the saved record (the page was refreshed before the save finished),
+    // keep the browser's copy and send it to the database instead of overwriting it with the older one.
+    if(localChangedAt() > (Date.parse(d.updatedAt) || 0)) await saveBrowserPrefs(ref, prefsObject());
+    else mirrorSavedPrefs(d);
   } catch(e){ console.error('Could not load preferences', e); }
 }
 
