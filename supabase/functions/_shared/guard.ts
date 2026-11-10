@@ -3,6 +3,9 @@ export const DEFAULT_MAX_CALLS = 1000;
 export const DEFAULT_WINDOW_MINUTES = 60;
 const MAX_SETTING = 100_000;   // a larger secret is a typo, not a policy
 
+// The longest one Claude call may take before it is cut off, so a stuck upstream cannot hold the function (and the caller) open.
+export const UPSTREAM_TIMEOUT_MS = 120_000;
+
 export const allowedMethod = (method: string): boolean => method === 'POST';
 
 // Whole numbers from 1 up; anything else (empty, text, zero, negative, fractions, huge) means "use the default".

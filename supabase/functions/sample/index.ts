@@ -1,7 +1,7 @@
 // Asks Claude on the owner's behalf (the Fundamental refresh and news labelling). The Anthropic key lives only in this function's
 // secrets (ANTHROPIC_API_KEY), never in the browser. Replies { text } like the claude.ai runtime did.
 import { callerClient, cors, reply, requireOwner } from '../_shared/owner.ts';
-import { allowedMethod, quotaConfig, quotaDecision } from '../_shared/guard.ts';
+import { UPSTREAM_TIMEOUT_MS, allowedMethod, quotaConfig, quotaDecision } from '../_shared/guard.ts';
 import { readPrompt } from '../_shared/prompt.ts';
 
 const MODELS: Record<string, string> = {
@@ -29,11 +29,17 @@ Deno.serve(async (req) => {
   if (slot === 'unavailable') return reply(req, { code: 'sample_error', message: 'Claude is not available right now.' }, 503);
   const model = MODELS[body.modelTier === 'quick' ? 'quick' : 'default'];
 
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model, max_tokens: 8000, messages: [{ role: 'user', content: prompt }] })
-  });
+  let r: Response;
+  try {
+    r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model, max_tokens: 8000, messages: [{ role: 'user', content: prompt }] }),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+    });
+  } catch {
+    return reply(req, { code: 'sample_error', message: 'Claude did not answer in time.' }, 504);
+  }
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
     const code = r.status === 429 ? 'rate_limited' : r.status === 401 ? 'sampling_disabled' : 'sample_error';

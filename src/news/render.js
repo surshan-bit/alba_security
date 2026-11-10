@@ -1,5 +1,5 @@
 // The News page: a "Global & Macro" tab (market pulse, briefings, economic calendar) and a "Stock events" tab.
-import { escapeHtml, tickerSymbol } from '../core/util.js';
+import { escapeHtml, safeUrl, tickerSymbol } from '../core/util.js';
 import { stockByTickerSymbol, stockIndex, stocks } from '../core/stocks.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { publishedStrategies } from '../strategies/state.js';
@@ -28,7 +28,6 @@ const view = { strategy: '', tab: 'macro', when: 'upcoming', type: 'all', upto: 
 const IST_MS = 19800000;
 const todayIst = () => new Date(Date.now() + IST_MS).toISOString().slice(0, 10);
 const isoDay = (iso) => String(iso || '').slice(0, 10);
-const safeUrl = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : '');
 const link = (label, url, cls) => { const u = safeUrl(url); return u ? `<a class="news-link${cls ? ' ' + cls : ''}" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label || 'Source')} &#8599;</a>` : ''; };
 const impactTag = (v) => (v === 'positive' || v === 'negative' || v === 'mixed' ? `<span class="news-tag news-${v}">${v}</span>` : '');
 // The time of a section's own refresh, said only when it is not the one already shown at the top of the page (same day and minute).

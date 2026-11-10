@@ -32,7 +32,7 @@ These rules apply to every change in this repository. They are requirements, not
 - **Broken access control (A01):** enforce authorisation server-side (Supabase RLS policies, edge functions), never only in the UI. Deny by default; least privilege for every policy and key.
 - **Cryptographic failures / secrets (A02):** no secrets, tokens or keys in code, tests, logs, fixtures or commit history. Use environment/secret storage. Only anon/public keys may reach the browser. Never roll your own crypto.
 - **Insecure design (A04):** think through abuse cases for any new input or endpoint; validate size, type, range and format with allow-lists; apply rate limits on server functions.
-- **Security misconfiguration (A05):** keep the security headers in `platform/_headers` and never loosen them to make a change work. Known gap: no `Content-Security-Policy` is set yet; adding a strict one (no `unsafe-inline`/`unsafe-eval`, which also needs the inline `style=` attributes removed per section 2) is a tracked backlog item. Pin third-party scripts with SRI.
+- **Security misconfiguration (A05):** keep the security headers in `platform/_headers` and never loosen them to make a change work. A strict `Content-Security-Policy` (no `unsafe-inline`/`unsafe-eval`) is set there and every browser suite runs under it: a change must keep it that way. Pin third-party scripts with SRI.
 - **Vulnerable components (A06):** add dependencies only when essential, pinned to exact versions; `npm audit --omit=dev --audit-level=high` must pass. Prefer platform APIs over packages.
 - **Identification / auth failures (A07), integrity (A08):** use the platform's auth, never custom session handling; verify the integrity of imported data and build outputs; GitHub Actions stay pinned by commit SHA with minimal `permissions`.
 - **Logging (A09):** log security-relevant events without personal data or secrets; errors shown to users are generic, details go to the error log.
@@ -62,7 +62,7 @@ These rules apply to every change in this repository. They are requirements, not
 ## 6. Definition of done (run all, report results)
 1. `npm run lint` (no errors; lower ratchets if counts dropped)
 2. `npm run types`
-3. `npm run check` (build + golden + regression harness) and `npm run platform`
+3. `npm run check` (build + golden + regression harness) and `npm run platform`; `npm run rls` when `supabase/` changed
 4. `npm run browser` / `npm run state` where UI or state changed
 5. `npm audit --omit=dev --audit-level=high`
 6. Tests added for every changed module; `npm run coverage` and `npm run coverage -- --changed` pass (changed code at 100%)

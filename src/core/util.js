@@ -83,6 +83,8 @@ function pctChangeSpan(pct){
 // The stock's page on screener.in. The consolidated page is the default (the plain page shows standalone figures, which
 // under-report any company with subsidiaries); s.screenerConsolidated === false marks a company whose consolidated page
 // was checked and is blank (single-entity companies), which links to the plain page instead.
+// A web address that is safe to put in a link: only http and https (never javascript: or data:), otherwise ''.
+const safeUrl = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : '');
 function screenerUrl(s){
   const sym = s.ticker.split('·')[0].trim().toUpperCase();
   const suffix = s.screenerConsolidated === false ? '' : 'consolidated/';
@@ -99,4 +101,4 @@ function daysUntil(str, today){
   return d >= 0 ? d : null;
 }
 
-export { daysSinceDate, daysUntil, escapeHtml, fixedOrNull, formatDate, formatDeepRefreshTimestamp, formatUploadTimestamp, pctChangeSpan, round2OrNull, safeText, sanitizeDocId, screenerUrl, sleep, tickerIndustry, tickerKey, tickerSymbol };
+export { daysSinceDate, daysUntil, escapeHtml, fixedOrNull, formatDate, formatDeepRefreshTimestamp, formatUploadTimestamp, pctChangeSpan, round2OrNull, safeText, safeUrl, sanitizeDocId, screenerUrl, sleep, tickerIndustry, tickerKey, tickerSymbol };

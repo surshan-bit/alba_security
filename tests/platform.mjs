@@ -4,7 +4,7 @@ import { createDocStore, createMemoryBackend } from '../platform/docstore.js';
 import { installPlatform } from '../platform/shim.js';
 import { corsHeaders } from '../supabase/functions/_shared/cors.ts';
 import { readPrompt, MAX_PROMPT_CHARS } from '../supabase/functions/_shared/prompt.ts';
-import { allowedMethod, quotaConfig, quotaDecision, DEFAULT_MAX_CALLS, DEFAULT_WINDOW_MINUTES } from '../supabase/functions/_shared/guard.ts';
+import { allowedMethod, quotaConfig, quotaDecision, DEFAULT_MAX_CALLS, DEFAULT_WINDOW_MINUTES, UPSTREAM_TIMEOUT_MS } from '../supabase/functions/_shared/guard.ts';
 let fails = 0;
 const eq = (name, a, b) => { const ok = JSON.stringify(a) === JSON.stringify(b); if(!ok){ fails++; console.log('FAIL', name, JSON.stringify(a), '!=', JSON.stringify(b)); } };
 const tick = () => new Promise(r => setTimeout(r, 5));
@@ -147,6 +147,7 @@ import { readFileSync } from 'node:fs';
 // Guards in front of the Claude function: method, a per-owner call quota (counted in the database) and what a failed count means
 {
   eq('guard: POST is allowed', allowedMethod('POST'), true);
+  eq('guard: a Claude call is cut off after a bounded time (more than a minute, inside the platform limit of 150 s)', UPSTREAM_TIMEOUT_MS > 60_000 && UPSTREAM_TIMEOUT_MS < 150_000, true);
   for(const m of ['GET', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'post', '']) eq('guard: ' + (m || 'empty method') + ' is refused', allowedMethod(m), false);
   eq('quota: defaults when nothing is set', quotaConfig(undefined, undefined), { maxCalls: DEFAULT_MAX_CALLS, windowMinutes: DEFAULT_WINDOW_MINUTES });
   eq('quota: secrets are read as whole numbers', quotaConfig('50', '10'), { maxCalls: 50, windowMinutes: 10 });
@@ -284,7 +285,7 @@ import { readFileSync } from 'node:fs';
 {
   const { readFileSync } = await import('node:fs');
   const h = readFileSync(new URL('../platform/_headers', import.meta.url), 'utf8');
-  for(const line of ['Strict-Transport-Security: max-age=31536000', 'X-Frame-Options: DENY', 'X-Content-Type-Options: nosniff', 'Referrer-Policy: strict-origin-when-cross-origin']) eq('headers: ' + line, h.includes(line), true);
+  for(const line of ['Strict-Transport-Security: max-age=31536000', 'X-Frame-Options: DENY', 'X-Content-Type-Options: nosniff', 'Referrer-Policy: strict-origin-when-cross-origin', 'Cross-Origin-Opener-Policy: same-origin', 'Cross-Origin-Resource-Policy: same-origin', 'X-Permitted-Cross-Domain-Policies: none']) eq('headers: ' + line, h.includes(line), true);
 }
 
 // Content-Security-Policy: strict (no unsafe-inline / unsafe-eval), and the one allowed inline <style> (the page skeleton on line 1 of index.html)

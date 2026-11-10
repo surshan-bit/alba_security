@@ -2833,7 +2833,7 @@ test('daily MACD for a strategy: only that reading of a saved block changes, and
 
 // ---- Refresh all stocks (src/refresh/tvrefresh.js): the snapshot and bar steps, driven with a made-up TradingView and database
 const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG', 'fundamentalCsvUploadLog', 'tabId', 'strategies', 'watchlistSyncLog', 'TV_SERVER']);
-const TV_DEFAULTS = { tickerSymbol: (s) => s.ticker, sanitizeDocId: (x) => x, sleep: () => Promise.resolve(), sameValue: (a, b) => JSON.stringify(a) === JSON.stringify(b) };   // what the real helpers do, without their imports and waits
+const TV_DEFAULTS = { tickerSymbol: (s) => s.ticker, sanitizeDocId: (x) => x, sleep: () => Promise.resolve(), sameValue: (a, b) => JSON.stringify(a) === JSON.stringify(b), safeUrl: (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : '') };   // what the real helpers do, without their imports and waits
 // `more` names extra exports a kept module needs from a stubbed one: { '../strategies/rules.js': ['qualifyingStocks'] }.
 // A stand-in for an imported function: it calls whatever the running test put in globalThis.__T (looked up at call time) or a default. Made here, not in the stub's text, so it is not counted as source code.
 globalThis.__TVFN = (n) => (...a) => (globalThis.__T[n] ? globalThis.__T[n](...a) : (TV_DEFAULTS[n] || (() => undefined))(...a));
@@ -4872,7 +4872,7 @@ test('pins: a pin or unpin saves the change with where it came from (build, scre
 
 test('stock events panel: coming up and recent events are grouped by day, links only open on http(s), sentiment is tagged, and text stays text', () => alone(async () => {
   const E = await loadWithStubs('src/detail/events.js', '', {
-    '../core/util.js': 'export const escapeHtml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");', './icons.js': 'export const panelIcon = () => "";',
+    '../core/util.js': 'export const escapeHtml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"), safeUrl = (u) => (typeof u === "string" && /^https?:\\/\\//i.test(u) ? u : "");', './icons.js': 'export const panelIcon = () => "";',
     '../news/model.js': 'export const dateNote = (t) => t, shortDate = (d) => d, typeTag = (t) => t.toUpperCase();', '../news/upcoming.js': 'export const upcomingFor = (s) => s.up || [];' });
   const today = new Date(Date.now() + 19800000).toISOString().slice(0, 10), ago = (n) => new Date(Date.parse(today + 'T00:00:00Z') - n * 86400000).toISOString().slice(0, 10);
   const s = { up: [{ date: '2026-12-01T00:00:00', type: 'results', text: 'Q3 <results>', src: 'NSE', url: 'https://x.test/a' }, { date: '2026-12-01', type: 'company', text: '', src: 'BSE', url: 'javascript:alert(1)' }],
@@ -6181,6 +6181,34 @@ test('Technical Score and Valuation panels: every trend label and RSI zone, the 
   assert.ok(bands[0].includes('b-buy') && bands[1].includes('b-mbuy') && bands[2].includes('b-hold') && bands[3].includes('b-avoid') && bands[0].includes('+30.0%') && bands[3].includes('−') && bands[4].includes('Valuation'));
   assert.ok(V.renderValuationPanel({ valuation: { currentPrice: 100 } }).includes('No reliable intrinsic-value source') && V.renderValuationPanel({}) === '');
 }));
+
+// ---- Upload limits (src/import/file-limits.js, src/import/csv-upload.js): a picked file is checked before it is read
+test('upload limits: only a non-empty .csv file up to 10 MB is accepted, with a plain sentence for each refusal', () => {
+  const L = load('src/import/file-limits.js'), ok = (name, size) => L.csvFileProblem({ name, size });
+  assert.strictEqual(ok('export.csv', 1000), ''); assert.strictEqual(ok('EXPORT.CSV', 1), ''); assert.strictEqual(ok("big.csv", 10 * 1048576), '');
+  assert.ok(ok('big.csv', 10 * 1048576 + 1).includes('larger than 10 MB')); assert.ok(ok('a.csv', 0).includes('empty'));
+  for(const bad of [{ name: 'a.exe', size: 5 }, { name: 'a.csv.exe', size: 5 }, { name: 'csv', size: 5 }, { size: 5 }, null, undefined, { name: 5, size: 5 }]) assert.ok(L.csvFileProblem(bad).includes('.csv'));
+  for(const bad of [{ name: 'a.csv' }, { name: 'a.csv', size: -1 }, { name: 'a.csv', size: NaN }, { name: 'a.csv', size: '5' }]) assert.ok(L.csvFileProblem(bad).includes('unreadable'));
+});
+test('CSV upload: a wrong or oversized file is refused with a message and never read', () => withPage('<input id="fundamentalCsvInput" type="file"><div id="fundamentalUploadResult"></div>', async (win) => {
+  globalThis.__T = { stocks: [], escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), setHtml: (el, h) => { el.innerHTML = h; }, parseCSV: () => { throw new Error('should not be read'); }, recordFundamentalCsvUpload: () => { throw new Error('should not be recorded'); } };
+  const input = win.document.getElementById('fundamentalCsvInput'), out = win.document.getElementById('fundamentalUploadResult'); let reads = 0;
+  const M = await loadAllStubbed('src/import/csv-upload.js', '', ['../core/evt.js', './file-limits.js']);
+  const FR = globalThis.FileReader; globalThis.FileReader = class { readAsText(){ reads++; } };
+  try {
+    M.init_import_csv_upload();
+    const pick = (file) => { Object.defineProperty(input, 'files', { configurable: true, value: [file] }); input.dispatchEvent(new win.Event('change', { bubbles: true })); };
+    pick({ name: '<img onerror=x>.exe', size: 10 }); assert.ok(out.textContent.includes('Choose a .csv file') && !out.querySelector('img'));
+    pick({ name: 'huge.csv', size: 50 * 1048576 }); assert.ok(out.textContent.includes('larger than 10 MB'));
+    assert.strictEqual(reads, 0);   // neither file was read
+  } finally { if(FR === undefined) delete globalThis.FileReader; else globalThis.FileReader = FR; }
+}));
+
+test('safeUrl: only http and https addresses become links; scripts, data and relative addresses are dropped', () => {
+  const { safeUrl } = load('src/core/util.js');
+  assert.strictEqual(safeUrl('https://a.test/x?y=1&z=2'), 'https://a.test/x?y=1&z=2'); assert.strictEqual(safeUrl('HTTP://a.test'), 'HTTP://a.test');
+  for(const bad of ['javascript:alert(1)', ' https://a.test', 'data:text/html,x', '//a.test', '/path', 'ftp://a.test', '', null, undefined, 5, {}]) assert.strictEqual(safeUrl(bad), '');
+});
 
 (async () => {
 await Promise.all(pending);
