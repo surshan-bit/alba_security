@@ -6318,6 +6318,41 @@ test('stock page: the stock name is the page\'s level-1 heading and is written a
   assert.strictEqual(M.getShownIndex(), 0);
 }));
 
+test('stock page: the pin star, Share link, help links and Peers rows work, and a peer row opens that stock', () => withPage('<div id="detail"></div><div id="kb-fundamental"></div><div id="glossary-data-proxy"></div>', async (win) => {
+  const S = [{ name: 'A', ticker: 'AAA' }, { name: 'B', ticker: 'BBB' }], log = [];
+  win.HTMLElement.prototype.scrollIntoView = function(){ log.push('scroll:' + this.id); };
+  globalThis.__T = { stocks: S, detailEl: win.document.getElementById('detail'), escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), screenerUrl: () => 'https://www.screener.in/x/', isPinned: () => false, capClass: () => null, CAP_NAME: {}, LINK_ICON: '', setHtml: (el, h) => { el.innerHTML = h; }, keepScroll: (el, fn) => fn(),
+    renderFundamentals: () => '<a href="#" id="howCalculatedLink">How</a>', renderValuationPanel: () => '<a href="#" class="proxy-tag-link">proxy</a>', renderPeersPanel: () => '<div id="peersPanel"><div class="peers-scroll"><table data-cols="a"><tbody><tr data-idx="0" class="peers-self"><td>A</td></tr><tr data-idx="1"><td>B</td></tr></tbody></table></div></div>',
+    togglePin: (t) => log.push('pin:' + t), showSection: (n) => { log.push('section:' + n); return Promise.resolve(); }, copyText: (t) => (globalThis.__T.copyFails ? Promise.reject(new Error('x')) : Promise.resolve()), stockShareLink: (s) => 'https://share/' + s.ticker, syncStockHash: (s) => log.push('hash:' + s.ticker),
+    wireStockGridSort: () => log.push('sort'), bindLiveDataBar: () => {}, initPriceChart: () => {}, loadPriceBarsFor: (s, i) => log.push('bars:' + i), bindDetailJumpNav: () => {}, getRefreshKit: () => ({ stockBtn: (s) => '<button id="kitBtn">' + s.name + '</button>' }) };
+  TV_VALUES.add('CAP_NAME'); TV_VALUES.add('LINK_ICON');
+  const M = await loadAllStubbed('src/detail/render.js', '', []), d = win.document, tick = () => new Promise((r) => setTimeout(r, 0));
+  M.setDetailOpenHook((s) => log.push('open:' + s.ticker)); M.setDetailBackTo(null); M.renderDetail(0);
+  assert.ok(d.getElementById('kitBtn') && !d.querySelector('.detail-back-bar') && log.includes('open:AAA') && log.includes('sort') && log.includes('bars:0'));
+  d.getElementById('detailPinBtn').click(); assert.ok(log.includes('pin:AAA'));
+  d.getElementById('howCalculatedLink').click(); await tick(); assert.ok(log.includes('section:knowledgebase') && log.includes('scroll:kb-fundamental'));
+  d.querySelector('.proxy-tag-link').click(); await tick(); assert.ok(log.includes('section:help') && log.includes('scroll:glossary-data-proxy'));
+  const share = d.getElementById('copyStockLinkBtn'); share.click(); await tick(); await tick(); assert.ok((share.querySelector('.share-link-label') || share).textContent.includes('copied'));
+  globalThis.__T.copyFails = true; d.getElementById('copyStockLinkBtn').click(); await tick(); await tick(); assert.ok((d.getElementById('copyStockLinkBtn').querySelector('.share-link-label') || d.getElementById('copyStockLinkBtn')).textContent.includes('https://share/AAA'));
+  const before = log.length; d.querySelector('tr[data-idx="0"]').click(); assert.strictEqual(log.length, before);   // the open stock's own row does nothing
+  d.querySelector('tr[data-idx="1"]').click(); assert.ok(log.includes('open:BBB') && log.includes('hash:BBB') && M.getShownIndex() === 1);
+  M.rerenderDetail(); assert.ok(d.getElementById('detailPinBtn') && M.getShownIndex() === 1);   // a redraw keeps the open stock
+  let backed = 0; M.setDetailBackTo({ label: 'Explorer <b>x</b>', onBack: () => { backed++; } }); M.renderDetail(1);
+  assert.ok(d.querySelector('.detail-back-bar').textContent.includes('Back to Explorer <b>x</b>') && !d.querySelector('.detail-back-bar b'));   // the label is text
+  d.getElementById('detailBackBtn').dispatchEvent(new win.Event('click', { bubbles: true })); M.detailBackToAnalysis(); assert.ok(backed <= 1);
+}));
+
+test('stock page: with no Peers panel, no help links and no refresh kit the page still draws', () => withPage('<div id="detail"></div>', async (win) => {
+  globalThis.__T = { stocks: [{ name: 'A', ticker: 'AAA' }], detailEl: win.document.getElementById('detail'), escapeHtml: (x) => String(x), screenerUrl: () => 'https://www.screener.in/x/', isPinned: () => true, capClass: () => null, CAP_NAME: {}, LINK_ICON: '', setHtml: (el, h) => { el.innerHTML = h; }, keepScroll: (el, fn) => fn(), getRefreshKit: () => null };
+  TV_VALUES.add('CAP_NAME'); TV_VALUES.add('LINK_ICON');
+  const M = await loadAllStubbed('src/detail/render.js', '', []);
+  M.rerenderDetail(); assert.strictEqual(win.document.getElementById('detail').innerHTML, '');   // nothing open yet: nothing redrawn
+  M.renderDetail(0); const d = win.document;
+  assert.ok(d.getElementById('detailPinBtn').classList.contains('pinned') && d.getElementById('detailPinBtn').getAttribute('aria-pressed') === 'true' && !d.querySelector('.dc-tag') && !d.getElementById('peersPanel'));
+  M.rerenderDetail(); assert.ok(d.querySelector('h1.detail-name'));
+  M.detailBackToAnalysis();   // no back target: nothing happens
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
