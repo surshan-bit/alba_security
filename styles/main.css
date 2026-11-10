@@ -31,6 +31,7 @@
 @import "./page-buttons.css" layer(page);
 @import "./page-trade-log.css" layer(page);
 @import "./page-refreshlog.css" layer(page);
+@import "./page-buttons-phone.css" layer(page);
 @import "./page-analysis.css" layer(page);
 @import "./page-news.css" layer(page);
 @import "./detail.css" layer(detail);
