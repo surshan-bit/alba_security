@@ -5888,6 +5888,46 @@ test('Industry Peers panel: exact peers are ranked, a small industry falls back 
   M.setPeerGroupCache(null); assert.ok(M.renderPeersPanel(S[3], 3).includes('#3 of 13'));   // the groups are rebuilt on demand
 }));
 
+// ---- Fundamental Score panel (src/detail/fundamentals.js, fundsummary.js)
+const fsSetup = async (file, extra) => {
+  const T = globalThis.__T = Object.assign({ escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), fundBusinessSummary: (f) => f.biz || null, isProxyFactor: (f) => f.key === 'moat' || f.key === 'gov' }, extra || {});
+  return { T, M: await loadAllStubbed(file, '', []) };
+};
+const FS_FACTORS = [{ key: 'fin', weight: 2, score: 1.8, biz: { band: 'fs-buy', text: 'Strong <b>' } }, { key: 'prof', weight: 2, score: 1.5, biz: { band: 'fs-mbuy', text: 'Good' } }, { key: 'growth', weight: 2, score: 0.2, biz: { band: 'fs-avoid', text: 'Weak' } },
+  { key: 'moat', weight: 1, score: 0.1, biz: { band: 'fs-avoid', text: 'No moat' } }, { key: 'val', weight: 0, score: 1, biz: { band: 'fs-buy', text: 'no weight' } }, { key: 'gov', weight: 1, score: 0.8, excluded: true, biz: { band: 'fs-buy', text: 'excluded' } }, { key: 'x', weight: 1, score: 0.5, biz: null }];
+const FS_STOCKS = [{ fundamentals: null }, { fundamentals: { factors: [] } }, { fundamentals: { factors: FS_FACTORS } }, { fundamentals: { factors: [FS_FACTORS[1], FS_FACTORS[0]] } }, { fundamentals: { factors: [FS_FACTORS[2]] } }, { fundamentals: { factors: [FS_FACTORS[6]] } },
+  { fundamentals: { factors: FS_FACTORS }, __fundSummary: { strengths: [{ text: ' Cheap <i> ', tone: 'strong' }, { text: 'ok', tone: 'good' }, { text: '', tone: 'good' }, null, { text: 'x', tone: 'weird' }, { text: 'y' }, { text: 'z' }], watchouts: [{ text: 'Debt', tone: 'concern' }, { text: 'Slow', tone: 'caution' }] } },
+  { fundamentals: { factors: FS_FACTORS }, __fundSummary: { strengths: [{ text: 'only' }], watchouts: 'bad' } }, { fundamentals: { factors: FS_FACTORS }, __fundSummary: { strengths: [], watchouts: [] } }, { fundamentals: { factors: FS_FACTORS }, __fundSummary: 'bad' }];
+const FS_FLAT = (h) => h.replace(/\s+/g, ' ');
+test('fundamental summary: Strengths and Watch-outs come from Claude\'s review when it has one, otherwise from the factor headlines; proxies are marked and every text is escaped', () => alone(async () => {
+  const { M } = await fsSetup('src/detail/fundsummary.js'), R = (i) => M.renderFundOverallSummary(FS_STOCKS[i]);
+  assert.strictEqual(R(0), ''); assert.strictEqual(R(1), ''); assert.strictEqual(R(5), '');   // no breakdown, no factors, or no headline to show
+  const mech = FS_FLAT(R(2));
+  assert.ok(mech.includes('Strong &lt;b>') && !mech.includes('<b>') && mech.indexOf('Strong') < mech.indexOf('Good') && mech.includes('Weak') && mech.includes('No moat<sup class="fund-proxy-mark"') && mech.includes('† Moat and/or Governance'));
+  assert.ok(!mech.includes('no weight') && !mech.includes('excluded'));   // a factor with no weight or marked excluded says nothing
+  assert.ok(!FS_FLAT(R(3)).includes('fund-proxy-mark') && FS_FLAT(R(3)).includes('No major red flags this run.') && FS_FLAT(R(4)).includes('No standout strengths this run.'));
+  const rev = FS_FLAT(R(6));
+  assert.ok(rev.includes('Cheap &lt;i>') && !rev.includes('<i>') && rev.includes('fund-pc-dot fs-buy') && rev.includes('fund-pc-dot fs-hold') && rev.includes('fund-pc-dot fs-avoid') && !rev.includes('fund-proxy-mark'));
+  assert.strictEqual((rev.match(/<li><span class="fund-pc-dot fs-(buy|mbuy)/g) || []).length, 4);   // at most four strengths
+  assert.ok(FS_FLAT(R(7)).includes('No major red flags.') && !FS_FLAT(R(7)).includes('this run'));
+  assert.ok(FS_FLAT(R(8)).includes('Strong &lt;b>') && FS_FLAT(R(9)).includes('Strong &lt;b>'));   // an empty or malformed review falls back to the factor headlines
+}));
+const FUND_STUB = () => ({ panelIcon: () => '', verdictLabel: { buy: 'Buy' }, scoreBand: (v) => (v >= 7 ? 'fs-buy' : 'fs-hold'), completenessBadge: (c, w) => '<cb ' + c.complete + w + '>', fundamentalCompleteness: () => ({ complete: 2 }), setFundRenderStock: () => {}, renderFundOverallSummary: () => '<sum/>', fundCellHasPoints: (f) => !!f.pts, renderFundFactorCell: (f, wide) => '<cell ' + f.name + (wide ? ' wide' : '') + '/>' });
+TV_VALUES.add('verdictLabel');
+test('Fundamental Score panel: factors sit in one grid, or under Traditional, Buffett and Valuation with their sub-scores; cards with points take the whole row and a stock with no breakdown says so', () => alone(async () => {
+  const f = (name, category, pts) => ({ name, category, pts }), { M } = await fsSetup('src/detail/fundamentals.js', FUND_STUB()), R = (s) => FS_FLAT(M.renderFundamentals(Object.assign({ score: 7.256, verdict: 'buy' }, s)));
+  assert.ok(R({ fundamentals: null }).includes("hasn't been added"));
+  const flat = R({ fundamentals: { factors: [f('a'), f('b'), f('c', undefined, true)] } });
+  assert.ok(flat.includes('Fundamental Score &middot; 7.26/10') && flat.includes('<span class="badge b-buy">Buy</span>') && flat.includes('<cb 2factors>') && flat.includes('<sum/>') && flat.includes('<cell a/><cell b/><cell c wide/>') && !flat.includes('fund-subsection'));   // a pair of plain cards share a row; the card with points is wide
+  const cat = R({ fundamentals: { scoringBreakdown: { traditionalSubscore: 7.44, buffettSubscore: null }, factors: [f('a', 'Traditional'), f('b', 'Buffett', true), f('c', 'Valuation'), f('d'), f('e', 'Other'), f('g', 'Traditional')] } });
+  assert.ok(cat.includes('data-cat="Traditional"') && cat.includes('Traditional Analysis') && cat.includes('7.4<span class="fund-cell-max">/10</span>') && cat.includes('data-css="--w:74%"'));
+  assert.ok(cat.includes('Buffett-Style Analysis') && cat.includes('Not scored') && cat.indexOf('data-cat="Traditional"') < cat.indexOf('data-cat="Buffett"') && cat.indexOf('data-cat="Buffett"') < cat.indexOf('data-cat="Valuation"'));
+  assert.ok(cat.indexOf('<cell d') > cat.indexOf('data-cat="Valuation"') && cat.includes('<cell e'));   // factors with no known category follow the sections
+  assert.ok(!R({ fundamentals: { factors: [f('a', 'Traditional')] } }).includes('fund-subsection'));   // no scoring breakdown: one grid
+  assert.ok(!R({ fundamentals: { scoringBreakdown: {}, factors: [f('a', 'Nope'), f('b')] } }).includes('fund-subsection'));
+  assert.ok(R({ fundamentals: { scoringBreakdown: { valuationSubscore: 3 }, factors: [f('a', 'Valuation')] } }).includes('fs-hold'));
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
