@@ -5024,6 +5024,75 @@ test('refresh queue: a request becomes one job per kind, stocks already waiting 
   }
 }));
 
+// ---- Price bars (src/prices/refresh.js): fetch weekly and monthly bars, save them, and update the technical score
+TV_VALUES.add('priceHistoryByTicker');
+const prSetup = async (over) => {
+  const docs = new Map(), writes = [], calls = [], jobs = [];
+  const db = { doc: (p) => ({ get: async () => (docs.has(p) ? { exists: true, data: () => docs.get(p) } : { exists: false }), set: async (d) => { writes.push(['set', p, d]); docs.set(p, d); }, update: async (d) => { writes.push(['update', p, d]); docs.set(p, Object.assign({}, docs.get(p), d)); } }) };
+  const bar = (t, c) => [t, c, c, c, c, 1], now = Math.floor(Date.now() / 1000);
+  const T = globalThis.__T = { docs, writes, calls, db, dbCapabilityPromise: Promise.resolve(db), priceHistoryByTicker: {}, pcTickerKey: (s) => s.name, tickerSymbol: (s) => s.name, pillars: 5,
+    tvMcp: async () => true, tvResolveSymbol: async (s) => 'NSE:' + s.name, ensurePriceBars: async () => {}, priceHistoryStatus: () => ({ delta: null }), tvIstDate: (t) => (t ? 'D' + t : 'TODAY'), tvErrorText: (e) => 'TV: ' + e.message, tvValidate: () => {},
+    tvCall: async (tool, a) => { calls.push([a.interval, a.count]); return { iv: a.interval }; }, tvToRows: (p, kind) => (kind === 'weekly' ? [bar(now - 700000, 100), bar(now - 100, 101)] : [bar(now - 2600000, 100), bar(now - 100, 101)]),
+    tvMergeDelta: (old, nw) => old.concat(nw), noteFullSaved: (k, iv) => T.noted.push(k + iv), noted: [], priceApply: (k, b, sym, iso) => T.applied.push([k, Object.keys(b), sym, typeof iso]), applied: [],
+    computeTechnical: () => ({ score: 6.5, provisional: { score: 5.25 } }), jobs, bar, now };
+  Object.assign(T, over || {});
+  const M = await loadAllStubbed('src/prices/refresh.js', '', ['../refresh/historyplan.js']);
+  return { T, M, db };
+};
+const prStock = (over) => Object.assign({ name: 'ABC', pillars: { val: 0.5 } }, over);
+test('price bars: a first fetch asks for the whole history, saves both kinds as new documents, applies them and updates the technical score', () => alone(async () => {
+  const { T, M } = await prSetup(); const s = prStock();
+  await M.refreshOneNow(s, false);
+  assert.deepStrictEqual(T.calls, [['1W', 261], ['1mo', 60]]);
+  assert.deepStrictEqual(T.writes.map((w) => [w[0], w[1]]), [['set', 'priceHistory/NSE_ABC_1W'], ['set', 'priceHistory/NSE_ABC_1M'], ['set', 'stockUpdates/ABC']]);
+  assert.deepStrictEqual([T.writes[0][2].count, T.writes[0][2].interval, T.writes[0][2].symbol, T.writes[1][2].interval, T.writes[2][2].ticker, T.writes[2][2].technical.score], [2, '1W', 'NSE:ABC', '1M', 'ABC', 6.5]);
+  assert.deepStrictEqual([T.noted, T.applied.map((a) => [a[0], a[1], a[2], a[3]])], [['ABC1W', 'ABC1M'], [['ABC', ['1W', '1M'], 'NSE:ABC', 'string']]]);
+  const job = M.priceJobs.get('ABC');
+  assert.strictEqual(job.state, 'ok'); assert.ok(/^Bars to D\d+ \(2 weekly, 2 monthly\); technical score 6\.50 \(completed bars; this week\/month in progress reads 5\.25/.test(job.msg), job.msg);
+}));
+test('price bars: recent bars are merged into what is saved and only the kinds that are out of date are fetched and written; a merge that fails refetches everything', () => alone(async () => {
+  const { T, M } = await prSetup(); const s = prStock(), old = T.now - 5 * 86400 * 7;
+  T.priceHistoryByTicker.ABC = { '1W': [T.bar(old, 100)], '1M': [T.bar(T.now - 100, 100)] };   // weekly is old, monthly is current
+  T.priceHistoryStatus = () => ({ delta: { wkN: 7, moN: 2 } });
+  await M.refreshOneNow(s, true);
+  assert.deepStrictEqual(T.calls, [['1W', 7]]);   // lean: only the weekly bars are asked for
+  assert.deepStrictEqual(T.writes.map((w) => [w[0], w[1]]), [['update', 'priceHistory/NSE_ABC_1W'], ['set', 'stockUpdates/ABC']]);   // only the weekly document changes
+  T.calls.length = 0; T.writes.length = 0;
+  await M.refreshOneNow(s, false);   // not lean: both are asked for
+  assert.deepStrictEqual(T.calls, [['1W', 7], ['1mo', 2]]); assert.deepStrictEqual(T.writes.map((w) => w[0] + ' ' + w[1]), ['update priceHistory/NSE_ABC_1W', 'update priceHistory/NSE_ABC_1M', 'update stockUpdates/ABC']);
+  T.calls.length = 0; T.writes.length = 0; T.tvMergeDelta = () => null;   // prices were adjusted
+  await M.refreshOneNow(s, false);
+  assert.deepStrictEqual(T.calls, [['1W', 7], ['1mo', 2], ['1W', 261], ['1mo', 60]]);
+  assert.ok(/prices were adjusted since the last fetch, so the full history was refetched/.test(M.priceJobs.get('ABC').msg));
+  assert.deepStrictEqual(T.writes.slice(0, 2).map((w) => w[0]), ['set', 'set']);   // the full history replaces both documents
+}));
+test('price bars: the notes say when the closes disagree, when there is no valuation or too little history, and a stock with an earlier technical record updates it', () => alone(async () => {
+  let { T, M } = await prSetup({ tvToRows: (p, kind) => (kind === 'weekly' ? [[1, 1, 1, 1, 100, 1]] : [[1, 1, 1, 1, 110, 1]]), computeTechnical: () => ({ score: null }) }); const s = prStock();
+  T.docs.set('stockUpdates/ABC', { x: 1 });
+  await M.refreshOneNow(s, false);
+  assert.ok(/last weekly and monthly closes differ by more than 0\.3 %/.test(M.priceJobs.get('ABC').msg) && /technical score n\/a/.test(M.priceJobs.get('ABC').msg));
+  assert.strictEqual(T.writes[T.writes.length - 1][0], 'update');
+  ({ T, M } = await prSetup({ computeTechnical: () => null })); await M.refreshOneNow(prStock(), false); assert.ok(/not enough history for a technical score/.test(M.priceJobs.get('ABC').msg));
+  ({ T, M } = await prSetup()); await M.refreshOneNow(prStock({ pillars: {} }), false); assert.ok(/technical score not updated \(no valuation reading\)/.test(M.priceJobs.get('ABC').msg));
+}));
+test('price bars: no database, no connector or a failed fetch end the job with the reason; a listener follows the stages; compaction rewrites both kinds', () => alone(async () => {
+  let { T, M } = await prSetup({ dbCapabilityPromise: Promise.resolve(null) }); await M.refreshOneNow(prStock(), false);
+  assert.deepStrictEqual([M.priceJobs.get('ABC').state, M.priceJobs.get('ABC').msg], ['error', 'The database is not available in this view.']);
+  assert.strictEqual(await M.saveFullBars(prStock(), [[1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1]]), false);
+  ({ T, M } = await prSetup({ tvMcp: async () => false })); await M.refreshOneNow(prStock(), false); assert.strictEqual(M.priceJobs.get('ABC').msg, 'The TradingView connector is not available in this view.');
+  ({ T, M } = await prSetup({ tvCall: async () => { throw new Error('quota'); } })); await M.refreshOneNow(prStock(), false); assert.deepStrictEqual([M.priceJobs.get('ABC').state, M.priceJobs.get('ABC').msg], ['error', 'TV: quota']);
+  ({ T, M } = await prSetup()); const seen = [];
+  M.setPriceJobHook('ABC', (key, state, msg, stage) => seen.push(stage || state)); await M.refreshOneNow(prStock(), false);
+  assert.deepStrictEqual(seen, ['queued', 'symbol', 'history', 'bars', 'technical', 'ok']);
+  M.setPriceJobHook('ABC', () => { throw new Error('listener broke'); });
+  await quietErrors(async (errs) => { await M.refreshOneNow(prStock(), false); assert.ok(errs.includes('A price job listener failed')); });
+  M.setPriceJobHook('ABC', null); T.writes.length = 0;
+  assert.strictEqual(await M.saveFullBars(prStock(), [[1, 1, 1, 1, 1, 1]], [[2, 2, 2, 2, 2, 2]]), true);
+  assert.deepStrictEqual(T.writes.map((w) => w[0] + ' ' + w[1]), ['set priceHistory/NSE_ABC_1W', 'set priceHistory/NSE_ABC_1M']);   // a compaction replaces both
+  T.db.doc = () => ({ set: async () => { throw new Error('full'); }, update: async () => { throw new Error('full'); } });
+  await quietErrors(async (errs) => { assert.strictEqual(await M.saveFullBars(prStock(), [[1, 1, 1, 1, 1, 1]], [[2, 2, 2, 2, 2, 2]]), false); assert.ok(errs.includes('Could not compact the bars of ABC')); });
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
