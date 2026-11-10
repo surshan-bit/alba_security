@@ -4545,6 +4545,23 @@ test('analysis chart geometry: the stocks in range follow the RSI and MoS filter
   Object.assign(globalThis.__AF, { mosLo: null, mosHi: 20 }); assert.strictEqual(names(), 'ac');
 }));
 
+// ---- Stock suggestions (src/ui/suggest.js)
+test('stock suggestions: the symbol is matched first, then the name, a word of the name, any part, then the industry; ties go to the higher score; eight at most', () => alone(async () => {
+  const list = [{ name: 'Tata Motors', ticker: 'TATAMOTORS · Auto', score: 5 }, { name: 'Alpha Tata Co', ticker: 'ALPHA · Retail', score: 9 }, { name: 'Zeta Auto Parts', ticker: 'ZETA · Auto', score: 3 },
+    { name: 'Tatanagar & Sons', ticker: 'TNS · Steel', score: 8 }, { name: 'Metatata Holdings', ticker: 'EHL · Property', score: 7 }, { name: 'Other', ticker: 'OTH · Tata Trading', score: 2 }, { ticker: 'NONAME', score: 1 }, { name: 'No ticker', score: 1 }];
+  globalThis.__SG = [];
+  const S = await loadWithStubs('src/ui/suggest.js', '', { '../core/stocks.js': 'export const stocks = globalThis.__SG;', '../core/util.js': 'export const escapeHtml = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");' });
+  globalThis.__SG.push(...list);
+  assert.deepStrictEqual(S.buildSuggestions('tata').map((s) => s.name), ['Tata Motors', 'Tatanagar & Sons', 'Alpha Tata Co', 'Metatata Holdings', 'Other']);   // 'tata': symbol prefix, name prefix, a word of the name, contained in the name, industry
+  assert.deepStrictEqual(S.buildSuggestions('auto').map((s) => s.name), ['Zeta Auto Parts', 'Tata Motors']);   // 'Auto' is a word of one name and only the industry of the other
+  assert.deepStrictEqual(S.buildSuggestions('zzz'), []);
+  assert.deepStrictEqual(S.buildSuggestions('noname').map((s) => s.ticker), ['NONAME']);   // a stock without a name or a ticker part still works
+  globalThis.__SG.length = 0; globalThis.__SG.push(...Array.from({ length: 12 }, (_, i) => ({ name: 'Stock ' + i, ticker: 'S' + i + ' · X', score: i })));
+  assert.deepStrictEqual(S.buildSuggestions('s').map((s) => s.score), [11, 10, 9, 8, 7, 6, 5, 4]);   // eight at most, best score first among equals
+  assert.strictEqual(S.sgMark('Tata <b>Motors', 'tata'), '<mark>Tata</mark> &lt;b>Motors');   // the match is marked, hostile text stays text
+  assert.strictEqual(S.sgMark('Plain', 'zz'), 'Plain');
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

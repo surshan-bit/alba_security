@@ -5,5 +5,5 @@
   "inlineStyleScriptWrites": 0,
   "functionsOver40Lines": 29,
   "functionsOver4Params": 23,
-  "functionsNestedOver3": 22
+  "functionsNestedOver3": 20
 }
