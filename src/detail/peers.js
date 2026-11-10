@@ -33,44 +33,48 @@ function peerGroups(){
   peerGroupCache = g;
   return g;
 }
+const plural = (n) => (n === 1 ? '' : 's');
+const EMPTY_PEERS = `<div class="tech-panel scope-peers-panel" id="peersPanel"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('peers')}Industry Peers</div></div><div class="peers-empty">Peer group not available for this stock.</div></div>`;
+// The peer rows: one per stock sharing the industry, the open stock marked.
+function peerRowsHtml(members, selfIdx, cols){
+  return members.map((i, k) => {
+    const self = i === selfIdx, ctx = analysisRowContext(stocks[i], k, i);
+    return `<tr data-idx="${i}" class="strat-row${self ? ' peers-self' : ''}" tabindex="0">${cols.map(id => analysisLbCell(id, ctx)).join('')}</tr>`;
+  }).join('');
+}
+// What the Fundamental Score ranked this stock against: its exact peers, the wider group, or all stocks.
+function peersBasis(members, groupMembers, group){
+  if(members.length >= PEER_MIN_GROUP_SIZE) return `The Fundamental Score ranks this stock against these ${members.length} peers.`;
+  if(groupMembers.length >= PEER_MIN_GROUP_SIZE) return `Only ${members.length} stock${plural(members.length)} share${members.length === 1 ? 's' : ''} this exact industry (fewer than ${PEER_MIN_GROUP_SIZE}), so the Fundamental Score ranks against the wider ${escapeHtml(group)} group of ${groupMembers.length} stocks instead.`;
+  return `Both this industry and ${escapeHtml(group)} have fewer than ${PEER_MIN_GROUP_SIZE} stocks, so the Fundamental Score ranks against all stocks instead.`;
+}
+function peersLead(members, rank, industry, group){
+  return members.length > 1
+    ? `Stocks in the same industry (${escapeHtml(industry)}) and group (${escapeHtml(group)}). It sits #${rank} of ${members.length} here. Tap a row to open that stock.`
+    : `No other stock shares the industry ${escapeHtml(industry)} in ${escapeHtml(group)}.`;
+}
 function renderPeersPanel(s, selfIdx){
   const group = s.industryGroup;
   const groupMembers = group ? (peerGroups().get(group) || []) : [];
-  if(!group || groupMembers.length === 0){
-    return `<div class="tech-panel scope-peers-panel" id="peersPanel"><div class="tech-panel-head"><div class="tech-panel-title">${panelIcon('peers')}Industry Peers</div></div><div class="peers-empty">Peer group not available for this stock.</div></div>`;
-  }
+  if(!group || groupMembers.length === 0) return EMPTY_PEERS;
   // Shown peers = exact match on BOTH levels: same Industry Group AND same specific industry
   // (changed 2026-10-06 — previously the whole Industry Group was listed). The score itself still
   // ranks against the wider group, which the note below states.
   const industry = tickerIndustry(s);
   const members = groupMembers.filter(i => tickerIndustry(stocks[i]) === industry);
-  const rank = members.indexOf(selfIdx) + 1;
-  const exactOk = members.length >= PEER_MIN_GROUP_SIZE;
-  const groupOk = groupMembers.length >= PEER_MIN_GROUP_SIZE;
   const cols = stockGridColumnIds().filter(id => id !== 'industry');   // the columns set in Analysis; every peer shares the industry, so that one is left out
-  const rows = members.map((i, k) => {
-    const self = i === selfIdx, ctx = analysisRowContext(stocks[i], k, i);
-    return `<tr data-idx="${i}" class="strat-row${self ? ' peers-self' : ''}" tabindex="0">${cols.map(id => analysisLbCell(id, ctx)).join('')}</tr>`;
-  }).join('');
-  const basis = exactOk
-    ? `The Fundamental Score ranks this stock against these ${members.length} peers.`
-    : groupOk
-      ? `Only ${members.length} stock${members.length === 1 ? '' : 's'} share${members.length === 1 ? 's' : ''} this exact industry (fewer than ${PEER_MIN_GROUP_SIZE}), so the Fundamental Score ranks against the wider ${escapeHtml(group)} group of ${groupMembers.length} stocks instead.`
-      : `Both this industry and ${escapeHtml(group)} have fewer than ${PEER_MIN_GROUP_SIZE} stocks, so the Fundamental Score ranks against all stocks instead.`;
-  const lead = members.length > 1
-    ? `Stocks in the same industry (${escapeHtml(industry)}) and group (${escapeHtml(group)}). It sits #${rank} of ${members.length} here. Tap a row to open that stock.`
-    : `No other stock shares the industry ${escapeHtml(industry)} in ${escapeHtml(group)}.`;
+  const lead = peersLead(members, members.indexOf(selfIdx) + 1, industry, group), basis = peersBasis(members, groupMembers, group);
   return `
     <div class="tech-panel scope-peers-panel" id="peersPanel">
       <div class="tech-panel-head">
         <div class="tech-panel-title">${panelIcon('peers')}Industry Peers &middot; ${escapeHtml(industry)}</div>
-        <span class="completeness-badge complete">${members.length} stock${members.length === 1 ? '' : 's'}</span>
+        <span class="completeness-badge complete">${members.length} stock${plural(members.length)}</span>
       </div>
       <p class="peers-sub">${lead} ${basis}</p>
       <div class="peers-scroll strat-table-wrap">
         <table class="strat-table peers-table" data-cols="${cols.join(',')}">
           <thead><tr>${cols.map(id => columnHeaderHtml(id, NO_SORT)).join('')}</tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody>${peerRowsHtml(members, selfIdx, cols)}</tbody>
         </table>
       </div>
       <div class="peers-hint">Swipe the table sideways to see all columns.</div>

@@ -5867,6 +5867,27 @@ test('Global & Macro panel: unresearched stocks say so, notes and events are tex
   assert.ok(!R({ globalFactors: { positive: [{ text: 'a' }], events: [] } }).includes('global-events') && R({ globalFactors: { negative: [{ text: 'a' }] } }).includes('--n:1'));
 });
 
+// ---- Industry Peers panel (src/detail/peers.js)
+const peersSetup = async (file, count, groupSize) => {
+  const mk = (i, over) => Object.assign({ name: 'P' + i, ticker: 'P' + i, industryGroup: 'Group <b>', ind: i < count ? 'Ind <i>' : 'Other', score: (i % 5) + 1 }, over);
+  const S = Array.from({ length: groupSize }, (_, i) => mk(i));
+  S.push(mk(99, { industryGroup: '', name: 'Loner' }), mk(98, { industryGroup: 'Solo', ind: 'Z', name: 'Solo1', score: null }), mk(97, { industryGroup: 'Group <b>', ind: 'Ind <i>', name: 'NoScore', score: null }));
+  const T = globalThis.__T = { stocks: S, escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), tickerIndustry: (s) => s.ind, panelIcon: () => '', stockGridColumnIds: () => ['rank', 'industry', 'stock'], NO_SORT: { col: '', dir: '' },
+    analysisLbCell: (id, ctx) => '<td>' + id + ctx.idx + '</td>', analysisRowContext: (s, i, idx) => ({ s, i, idx }), columnHeaderHtml: (id) => '<th>' + id + '</th>' };
+  return { T, S, M: await loadAllStubbed(file, '', []) };
+};
+test('Industry Peers panel: exact peers are ranked, a small industry falls back to its group, a small group to all stocks, and names are text', () => alone(async () => {
+  const { S, M } = await peersSetup('src/detail/peers.js', 12, 14), flat = (h) => h.replace(/\s+/g, ' ');
+  const big = M.renderPeersPanel(S[3], 3);
+  assert.ok(flat(big).includes('It sits #3 of 13 here') && big.includes('ranks this stock against these 13 peers') && big.includes('data-cols="rank,stock"') && !big.includes('<i>') && !big.includes('<b>') && big.includes('peers-self'));
+  assert.strictEqual((big.match(/<tr data-idx/g) || []).length, 13);   // the 12 and the unscored one share the industry
+  const small = M.renderPeersPanel(S[13], 13); assert.ok(small.includes('Only 2 stocks share this exact industry') && small.includes('wider Group &lt;b> group of 15 stocks'));   // two stocks in 'Other'
+  assert.ok(M.renderPeersPanel(S[14], 14).includes('Peer group not available'));   // no industry group
+  const solo = M.renderPeersPanel(S[15], 15); assert.ok(flat(solo).includes('No other stock shares the industry Z in Solo') && solo.includes('Both this industry and Solo have fewer than 10 stocks') && solo.includes('1 stock<'));
+  assert.ok(flat(M.renderPeersPanel(S[13], 13)).includes('share this exact industry') && M.renderPeersPanel(S[13], 14).includes('#0 of'));
+  M.setPeerGroupCache(null); assert.ok(M.renderPeersPanel(S[3], 3).includes('#3 of 13'));   // the groups are rebuilt on demand
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
