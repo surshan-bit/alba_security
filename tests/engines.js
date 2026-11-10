@@ -5347,6 +5347,69 @@ test('explorer: the heat map sizes itself beside the filters and in full screen,
   M.show(); assert.ok(host.textContent === '' && body().querySelector('.biz-table'));
 }));
 
+// ---- Industry page (src/industry/render.js): the page for one industry, its charts and the stocks grid
+for(const n of ['detailEl', 'EVENT_GROUPS', 'verdictLabel']) TV_VALUES.add(n);
+const INDUSTRY_PAGE = '<div id="detail"></div><div id="indCharts-host"></div>';
+const indSetup = async (win, over) => {
+  const S = Array.from({ length: 3 }, (_, i) => ({ name: 'S' + i, ticker: 'S' + i, ind: i < 2 ? 'Autos' : 'Banks', industryGroup: i < 2 ? 'Auto group' : '' }));
+  const T = globalThis.__T = Object.assign({ stocks: S, stockIndex: new Map(S.map((s, i) => [s, 10 + i])), detailEl: win.document.getElementById('detail'), priceHistoryByTicker: { S0: { '1W': [], '1M': [] }, S1: { '1W': [], '1M': [] } }, opened: [], jumps: 0, barsOk: true, evCalls: 0,
+    verdictLabel: { buy: 'Buy', mbuy: 'Maybe', hold: 'Hold', avoid: 'Avoid' }, EVENT_GROUPS: [{ id: 'news', label: 'News', glyph: '⚡' }, { id: 'earn', label: 'Results', glyph: 'E' }, { id: 'trade', label: 'Trade', glyph: 'T' }],
+    escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), safeText: (x) => String(x).replace(/</g, '&lt;'), tickerIndustry: (s) => s.ind, panelIcon: () => '', scoreBand: () => 'b-hold', pcTickerKey: (s) => s.name,
+    ensureAllPriceBars: async () => T.barsOk, bindJumpSpy: () => { T.jumps++; }, newsItemHtml: (n, g) => '<li class="news-stub">' + g + n.t + '</li>',
+    industryFactors: (m) => ({ score: 6.5, scoreN: m.length, count: m.length, tech: null, techN: 0, mos: -20, mosN: 1, undervalued: 0, verdicts: { buy: 1, mbuy: 0, hold: 1, avoid: 0 }, factors: [{ name: 'Fin <b>', avg: 7, n: 2 }, { name: 'Moat', avg: null, n: 0 }] }),
+    industryGlobal: () => ({ researched: 1, positive: [{ text: 'Demand <i>', source: 'Wire', url: 'https://g.test/1', stocks: ['S0', 'S1'] }], negative: [{ text: 'Tariff', source: 'Bad', url: 'javascript:1', stocks: ['S0'] }] }),
+    industryNews: () => [{ d: '2026-11-01', k: 'news', t: 'Head <i>', s: 'pos', stock: 'S0' }, { d: '2026-10-20', k: 'earn', t: 'Results', stock: 'S1', src: 'X' }],
+    industrySeries: (lists, k) => (k === 'W' ? Array.from({ length: 40 }, (_, i) => [1760000000 + i * 604800, i % 2 ? 1.2 : -.8, 2]) : [[1760000000, 1, 2]]),
+    eventsByBar: (events, series, span, shown) => { T.evCalls++; return new Map([[series.length - 1, [{ t: 5, group: 'news', s: 'pos', text: 'Head', d: '2026-11-01' }]]]); },
+    analysisLbCell: (id, ctx) => '<td>' + id + ctx.idx + '</td>', analysisRowContext: (s, i, idx) => ({ s, i, idx }), columnHeaderHtml: (id) => '<th data-sort-col="' + id + '">' + id + '</th>', compareByColumn: () => (a, b) => 0,
+    nextSort: (cur, col) => ({ col, dir: 'asc' }), stockGridColumnIds: () => ['rank', 'stock', 'industry'], appendHtml: (el, h) => { el.insertAdjacentHTML('beforeend', h); }, setHtml: (el, h) => { el.innerHTML = h; } }, over || {});
+  win.ResizeObserver = globalThis.ResizeObserver = class { observe(){ T.observed = true; } };
+  return { T, S, M: await loadAllStubbed('src/industry/render.js', '', ['../core/evt.js']) };
+};
+test('industry page: it lists the stocks of one industry, writes names as text, charts the weekly and monthly averages and opens a stock from its row', () => kcPage(INDUSTRY_PAGE, async (win) => {
+  const { T, M } = await indSetup(win), doc = win.document, detail = doc.getElementById('detail'), tick = () => new Promise((r) => setTimeout(r, 0));
+  const host = doc.createElement('div'); host.id = 'indCharts-probe';
+  win.HTMLElement.prototype.scrollIntoView = function(){ T.scrolled = this.id; };
+  M.renderIndustryDetail('industry', 'Autos', 'Explorer <x>', (idx) => T.opened.push(idx));
+  assert.ok(detail.textContent.includes('Back to Explorer <x>') && !detail.querySelector('x') && !detail.querySelector('.detail-name b'));
+  assert.deepStrictEqual([...detail.querySelectorAll('.strat-row')].map((r) => r.dataset.idx), ['10', '11']);   // the two Autos stocks only
+  assert.ok(detail.querySelector('.detail-ticker').textContent.includes('Industry') && T.jumps === 1);
+  assert.ok(!detail.querySelector('.fund-cell-label b') && detail.textContent.includes('Fin <b>'));   // names are text
+  assert.ok(!detail.querySelector('a[href^="javascript"]') && detail.querySelector('a[href="https://g.test/1"]'));
+  await tick();
+  assert.strictEqual(detail.querySelectorAll('.pc-panel').length, 2); assert.ok(T.observed);
+  assert.ok(detail.querySelector('.pc-panel svg').getAttribute('viewBox') && detail.querySelector('.pc-panel .pc-xh'));
+  assert.ok(detail.querySelector('.pc-panels').textContent.includes('Not enough price history'));   // the monthly series has one bar
+  detail.querySelector('.detail-jump a[data-jump]').click(); assert.strictEqual(T.scrolled, 'jump-ind-factors');
+  detail.querySelector('.strat-row').click(); assert.deepStrictEqual(T.opened, [10]);
+  detail.querySelector('.strat-row').dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); assert.deepStrictEqual(T.opened, [10, 10]);
+}));
+test('industry page: the chart range pills, the hover tooltip and the missing-history notice work', () => kcPage(INDUSTRY_PAGE, async (win) => {
+  const { T, M } = await indSetup(win), doc = win.document, detail = doc.getElementById('detail'), tick = () => new Promise((r) => setTimeout(r, 0));
+  M.renderIndustryDetail('group', 'Auto group', 'Explorer', () => {});
+  assert.ok(detail.querySelector('.detail-ticker').textContent.includes('Industry group'));
+  await tick();
+  const panel = detail.querySelector('.pc-panel'), chart = panel.querySelector('.pc-chart'), tip = panel.querySelector('.pc-tip');
+  chart.getBoundingClientRect = () => ({ left: 0, width: 300 });
+  const before = T.evCalls; panel.querySelectorAll('.pc-pill')[0].click(); assert.ok(T.evCalls > before && panel.querySelectorAll('.pc-pill')[0].getAttribute('aria-pressed') === 'true');
+  const ev = (type, x) => { const e = new win.Event(type, { bubbles: true }); Object.defineProperty(e, 'clientX', { value: x }); chart.dispatchEvent(e); };
+  ev('pointermove', 150); assert.ok(tip.classList.contains('is-shown') && tip.textContent.includes('Average change') && !tip.querySelector('b i'));
+  ev('pointerleave', 0); assert.ok(!tip.classList.contains('is-shown'));
+  const shell = new win.Event('pointermove'); chart.dispatchEvent(shell);
+  win.dispatchEvent(new win.Event('resize'));
+  T.barsOk = false; M.renderIndustryDetail('industry', 'Banks', 'Explorer', () => {}); await tick();
+  assert.ok(detail.textContent.includes('Price history is not available'));
+}));
+test('industry page: sorting a column and Show more rebuild the stock rows, and a large industry is drawn in steps', () => kcPage(INDUSTRY_PAGE, async (win) => {
+  const many = Array.from({ length: 130 }, (_, i) => ({ name: 'M' + i, ticker: 'M' + i, ind: 'Big' }));
+  const { T, M } = await indSetup(win, { stocks: many, stockIndex: new Map(many.map((s, i) => [s, i])) }), detail = win.document.getElementById('detail');
+  M.renderIndustryDetail('industry', 'Big', 'Explorer', () => {});
+  const rows = () => detail.querySelectorAll('.strat-row').length;
+  assert.strictEqual(rows(), 100); assert.ok(detail.textContent.includes('Showing the first 100 of 130'));
+  detail.querySelector('[data-ind-more]').click(); assert.strictEqual(rows(), 130); assert.ok(!detail.querySelector('[data-ind-more]'));
+  detail.querySelector('[data-sort-col]').click(); assert.strictEqual(rows(), 130);
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
