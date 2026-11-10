@@ -5814,6 +5814,48 @@ test('top bar search: "/" focuses the box from anywhere except while typing or w
 }));
 test('top bar search: a page without the box starts nothing', () => kcPage('<p>none</p>', async (win) => { await gsSetup(win); }));
 
+// ---- Stock updates overlay (src/overlays/updates.js): what a saved update changes on a stock, which dates win, and how an update is taken off again
+for(const n of ['COLS']) TV_VALUES.add(n);
+const upSetup = async () => {
+  const mk = (name, extra) => Object.assign({ name, ticker: name + ' · NSE', valuation: { currentPrice: 100, asof: '2026-11-01' }, globalFactors: { asof: '2026-10-01', positive: [{ t: 'old' }], negative: [] }, technical: { asof: '2026-10-20', score: 5, raw: { weekPctChange: 1, monthPctChange: 2 } } }, extra);
+  const A = mk('A'), B = mk('B', { technical: undefined, valuation: undefined }), S = [A, B];
+  const T = globalThis.__T = { stocks: S, COLS: ['x', 'change|1W', 'change|1M'], log: [], index: new Map([['A', A], ['B', B]]), merged: null, moves: null,
+    refreshAnalysisSoon: () => T.log.push('analysis'), setPeerGroupCache: (v) => T.log.push('peers'), rerenderDetail: () => T.log.push('detail'), paintFreshness: () => T.log.push('fresh'), stockByDocId: () => T.index,
+    mergedDoc: (s, data, row) => { if(T.mergeFails) throw new Error('bad row'); return T.merged ? T.merged(s, data, row) : data; }, periodStartSec: (k) => (k === 'W' ? 100 : 200), periodMove: (px, bars, start) => (bars ? bars + px : null), checkedMove: (a, b) => a,
+    recentBarsOf: (t) => T.moves && T.moves[t], setRecentFromDocs: (d) => T.log.push('recent'), sanitizeDocId: (x) => x, tickerSymbol: (s) => s.name };
+  return { T, A, B, M: await loadAllStubbed('src/overlays/updates.js', '', []) };
+};
+test('stock updates overlay: newer global factors, live price, liquidity, technical and week/month figures replace the stock\'s own, older ones do not, and removing an update puts the stock back', () => withPage('<section id="section-analysis"></section>', async () => {
+  const { T, A, B, M } = await upSetup(), doc = (id, data) => ({ id, data });
+  M.applyUpdatesOverlay([doc('A', { asof: '2026-11-05', snapAsof: '2026-11-04',
+    globalFactors: { asof: '2026-10-15', positive: [{ t: 'new' }], negative: [] }, valuation: { currentPrice: 120, asof: '2026-11-02', source: 'TV' },
+    liquidity: { avgVolume: 5000, marketCap: 90, nextResults: '2026-12-01', asof: '2026-11-02' }, technical: { asof: '2026-11-03', score: 8, raw: { rsi: 60 }, states: { a: 1 } },
+    pctChange: { asof: '2026-11-04', week: 3.5, month: -1 } })]);
+  assert.deepStrictEqual([A.globalFactors.positive[0].t, A.valuation.currentPrice, A.__livePrice, A.liquidity, A.__snapAsof, A.__updAsof], ['new', 120, { asof: '2026-11-02', source: 'TV' }, { avgVolume: 5000, marketCap: 90, nextResults: '2026-12-01', asof: '2026-11-02' }, '2026-11-04', '2026-11-05']);
+  assert.deepStrictEqual([A.technical.score, A.technical.asof, A.technical.raw.rsi, A.technical.raw.weekPctChange, A.technical.states], [8, '2026-11-03', 60, 3.5, { a: 1 }]);   // raw is merged with the old keys, then the newer week and month figures are laid on top
+  assert.deepStrictEqual(T.log.slice(0, 3), ['peers', 'detail', 'fresh']);
+  M.applyUpdatesOverlay([]); assert.deepStrictEqual([A.globalFactors.positive[0].t, A.valuation.currentPrice, A.technical.score, A.liquidity, A.__updBase, A.__livePrice], ['old', 100, 5, undefined, undefined, undefined]);   // back to the stock's own data
+  M.applyUpdatesOverlay([doc('A', { globalFactors: { asof: '2026-09-01', positive: [{ t: 'older' }] }, valuation: { currentPrice: 70, asof: '2026-10-01' }, technical: { asof: '2026-10-01', score: 1 }, pctChange: { asof: '2026-10-01', week: 9 }, liquidity: { avgVolume: -1, marketCap: 0, nextResults: 'soon' } })]);
+  assert.deepStrictEqual([A.globalFactors.positive[0].t, A.valuation.currentPrice, A.technical.score, A.technical.raw.weekPctChange, A.liquidity], ['old', 100, 5, 1, undefined]);   // older dates and empty liquidity change nothing
+  M.applyUpdatesOverlay([doc('A', { technical: { asof: '2026-11-01', score: 6 }, globalFactors: { positive: 'x' }, valuation: { currentPrice: -1 }, pctChange: { asof: '2026-11-01' } }), doc('B', { technical: { score: 4, asof: '2026-11-01' }, valuation: { currentPrice: 50, asof: '2026-11-01' }, pctChange: { asof: '2026-11-01', week: 1 }, asof: 7 }), doc('Z', { asof: 'x' })]);
+  assert.deepStrictEqual([A.technical.score, A.technical.raw.weekPctChange, A.valuation.currentPrice, B.technical.score, B.valuation, B.__updAsof], [6, 1, 100, 4, undefined, undefined]);   // no number to move, a stock with no valuation, an unknown stock
+}));
+test('stock updates overlay: snapshot rows, technical blocks and recent bars are laid under the stock\'s own update and move the week and month figures', () => withPage('<section id="section-analysis" class="app-section"></section>', async (win) => {
+  const { T, A, B, M } = await upSetup();
+  M.applyTechBlocksOverlay([{ data: { at: '2026-11-01T00:00:00Z', rows: [{ k: 'A', t: { asof: '2026-11-02', score: 9 } }, { k: 5 }, null, { k: 'B', t: 'bad' }] } }, { data: { at: '2026-10-01T00:00:00Z', rows: [{ k: 'A', t: { asof: '2026-11-09', score: 1 } }] } }, { data: null }, { data: { rows: 3 } }]);
+  assert.strictEqual(A.technical.score, 9);   // the later block wins
+  M.applyUpdatesOverlay([{ id: 'A', data: { technical: { asof: '2026-11-10', score: 7 } } }]); assert.strictEqual(A.technical.score, 7);   // the stock's own newer update wins over the block
+  M.applyTechBlocksOverlay([{ data: { at: '2026-11-01T00:00:00Z', rows: [{ k: 'A', t: { asof: '2026-11-12', score: 3 } }] } }]); assert.strictEqual(A.technical.score, 3);
+  T.merged = (s, data, row) => (row ? Object.assign({}, data, { valuation: { currentPrice: row.row.c[0], asof: row.asof } }) : data);
+  M.applySnapshotOverlay([{ data: { asof: '2026-11-11', at: '2026-11-11T10:00:00Z', rows: [{ k: 'A', c: [130, 1, 2] }, { k: 'B', c: [60], d: '2026-11-09', t: '2026-11-09T10:00:00Z' }, { k: 'A', c: [999], t: '2026-11-01T00:00:00Z' }, { k: 7 }, { k: 'C', c: 'x' }] } }, { data: { rows: [] } }, { data: null }]);
+  assert.deepStrictEqual([A.valuation.currentPrice, B.valuation && B.valuation.currentPrice], [130, undefined]);   // a row older than the one already kept is ignored; a stock with no valuation takes no price
+  T.mergeFails = true; assert.strictEqual(await quietErrors(async () => { M.applySnapshotOverlay([{ data: { asof: '2026-11-11', rows: [{ k: 'A', c: [1] }] } }]); }), undefined); T.mergeFails = false;
+  T.moves = { A: { w: 10, m: 20 } }; M.applyRecentBarsOverlay([{ id: 'x' }]);
+  assert.deepStrictEqual([T.log.includes('recent'), A.technical.raw.weekPctChange, A.technical.raw.monthPctChange], [true, 10 + A.valuation.currentPrice, 20 + A.valuation.currentPrice]);   // this week's and month's moves from the recent bars
+  T.log.length = 0; M.applyRecentBarsOverlay([]); assert.ok(!T.log.includes('analysis'));   // Analysis is not on screen
+  win.document.getElementById('section-analysis').classList.add('active'); T.moves = { A: { w: 11, m: 20 } }; M.applyRecentBarsOverlay([]); assert.ok(T.log.includes('analysis'));   // on screen: it redraws
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }

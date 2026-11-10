@@ -38,52 +38,56 @@ function revertUpdates(s){
   delete s.__updBase;
   delete s.__updAsof;
 }
+// A saved block replaces the one already on the stock only when its date is the same or later (or the stock has none).
+const newer = (a, b) => typeof a === 'string' && (typeof b !== 'string' || a >= b);
+const isDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+function mergeGlobalFactors(s, g){
+  if(!(g && typeof g === 'object' && (Array.isArray(g.positive) || Array.isArray(g.negative)))) return;
+  const bg = s.__updBase.globalFactors;
+  if(newer(g.asof, bg && bg.asof)) s.globalFactors = clone(g);
+}
+// Live price from the Refresh Technical Info button: replaces valuation.currentPrice (Margin of Safety is always computed
+// from it and the CSV intrinsic value, so it follows). Skipped when the stored valuation carries a newer date of its own.
+function mergeLivePrice(s, pv){
+  if(!(pv && typeof pv === 'object' && typeof pv.currentPrice === 'number' && pv.currentPrice > 0 && s.valuation)) return;
+  const baseAsof = typeof s.valuation.asof === 'string' ? s.valuation.asof : (typeof s.valuation.priceAsof === 'string' ? s.valuation.priceAsof : null);
+  if(!newer(pv.asof, baseAsof)) return;
+  s.valuation.currentPrice = pv.currentPrice;
+  s.__livePrice = { asof: pv.asof || null, source: pv.source || '' };
+}
+// Average daily volume (30 days) from the TradingView refresh: kept as its own block, so a strategy can skip thinly traded stocks.
+function mergeLiquidity(s, lq){
+  if(!(lq && typeof lq === 'object')) return;
+  const av = typeof lq.avgVolume === 'number' && lq.avgVolume >= 0 ? lq.avgVolume : null, mc = typeof lq.marketCap === 'number' && lq.marketCap > 0 ? lq.marketCap : null;
+  const nr = isDate(lq.nextResults) ? lq.nextResults : null;
+  if(av != null || mc != null || nr != null) s.liquidity = { avgVolume: av, marketCap: mc, nextResults: nr, asof: lq.asof || null };   // marketCap in ₹ crore (v1.286); nextResults the date of the next results (v1.287)
+}
+function mergeTechnical(s, t){
+  if(!(t && typeof t === 'object')) return;
+  if(!newer(t.asof, s.__updBase.technical && s.__updBase.technical.asof)) return;
+  const cur = s.technical ? clone(s.technical) : {};
+  Object.keys(t).forEach(k => {
+    if((k === 'states' || k === 'raw') && t[k] && typeof t[k] === 'object') cur[k] = Object.assign({}, cur[k] || {}, t[k]);
+    else cur[k] = t[k];
+  });
+  s.technical = cur;
+}
+// Week and month move from a snapshot that had no indicators (so no technical block): only the two figures change, never the
+// technical score or its date, and only when the snapshot is not older than the saved reading.
+function mergePctChange(s, pc){
+  if(!(pc && typeof pc === 'object' && typeof pc.asof === 'string' && s.technical && typeof s.technical === 'object' && newer(pc.asof, s.technical.asof))) return;
+  const patch = {};
+  if(typeof pc.week === 'number') patch.weekPctChange = pc.week;
+  if(typeof pc.month === 'number') patch.monthPctChange = pc.month;
+  if(Object.keys(patch).length) s.technical = Object.assign({}, s.technical, { raw: Object.assign({}, s.technical.raw || {}, patch) });
+}
 function applyUpdatesDoc(s, doc){
   snapshotUpdBase(s);
-  const newer = (a, b) => typeof a === 'string' && (typeof b !== 'string' || a >= b);
-  const g = doc && doc.globalFactors;
-  if(g && typeof g === 'object' && (Array.isArray(g.positive) || Array.isArray(g.negative))){
-    const bg = s.__updBase.globalFactors;
-    if(newer(g.asof, bg && bg.asof)) s.globalFactors = clone(g);
-  }
-  // Live price from the Refresh Technical Info button: replaces valuation.currentPrice (Margin of Safety is always computed
-  // from it and the CSV intrinsic value, so it follows). Skipped when the stored valuation carries a newer date of its own.
-  const pv = doc && doc.valuation;
-  if(pv && typeof pv === 'object' && typeof pv.currentPrice === 'number' && pv.currentPrice > 0 && s.valuation){
-    const baseAsof = typeof s.valuation.asof === 'string' ? s.valuation.asof : (typeof s.valuation.priceAsof === 'string' ? s.valuation.priceAsof : null);
-    if(newer(pv.asof, baseAsof)){
-      s.valuation.currentPrice = pv.currentPrice;
-      s.__livePrice = { asof: pv.asof || null, source: pv.source || '' };
-    }
-  }
-  // Average daily volume (30 days) from the TradingView refresh: kept as its own block, so a strategy can skip thinly traded stocks.
-  const lq = doc && doc.liquidity;
-  if(lq && typeof lq === 'object'){
-    const av = typeof lq.avgVolume === 'number' && lq.avgVolume >= 0 ? lq.avgVolume : null, mc = typeof lq.marketCap === 'number' && lq.marketCap > 0 ? lq.marketCap : null;
-    const nr = typeof lq.nextResults === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lq.nextResults) ? lq.nextResults : null;
-    if(av != null || mc != null || nr != null) s.liquidity = { avgVolume: av, marketCap: mc, nextResults: nr, asof: lq.asof || null };   // marketCap in ₹ crore (v1.286); nextResults the date of the next results (v1.287)
-  }
-  const t = doc && doc.technical;
-  if(t && typeof t === 'object'){
-    const bt = s.__updBase.technical;
-    if(newer(t.asof, bt && bt.asof)){
-      const cur = s.technical ? clone(s.technical) : {};
-      Object.keys(t).forEach(k => {
-        if((k === 'states' || k === 'raw') && t[k] && typeof t[k] === 'object') cur[k] = Object.assign({}, cur[k] || {}, t[k]);
-        else cur[k] = t[k];
-      });
-      s.technical = cur;
-    }
-  }
-  // Week and month move from a snapshot that had no indicators (so no technical block): only the two figures change, never the
-  // technical score or its date, and only when the snapshot is not older than the saved reading.
-  const pc = doc && doc.pctChange;
-  if(pc && typeof pc === 'object' && typeof pc.asof === 'string' && s.technical && typeof s.technical === 'object' && newer(pc.asof, s.technical.asof)){
-    const patch = {};
-    if(typeof pc.week === 'number') patch.weekPctChange = pc.week;
-    if(typeof pc.month === 'number') patch.monthPctChange = pc.month;
-    if(Object.keys(patch).length) s.technical = Object.assign({}, s.technical, { raw: Object.assign({}, s.technical.raw || {}, patch) });
-  }
+  mergeGlobalFactors(s, doc && doc.globalFactors);
+  mergeLivePrice(s, doc && doc.valuation);
+  mergeLiquidity(s, doc && doc.liquidity);
+  mergeTechnical(s, doc && doc.technical);
+  mergePctChange(s, doc && doc.pctChange);
   if(doc && typeof doc.snapAsof === 'string') s.__snapAsof = doc.snapAsof;
   const ua = doc && typeof doc.asof === 'string' ? doc.asof : null;
   if(ua) s.__updAsof = ua; else delete s.__updAsof;
