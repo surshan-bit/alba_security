@@ -4665,6 +4665,41 @@ test('tracked picks: a pick is judged against its goal price from the live price
   e = ev({ entry: 100 }, { nowMs: endMs }); assert.strictEqual(e.status, 'miss');   // the time is up and the goal was not reached
   e = ev({ entry: 100 }, { nowMs: endMs - 1 }); assert.strictEqual(e.status, 'open');
   e = ev({ entry: 100 }, { curPrice: -5, weekBars: [] }); assert.deepStrictEqual([e.now, e.changed], [null, false]);   // not a price
+  // a whole run: each pick is judged on its stock's live price and its weekly bars
+  const stockBySym = new Map([['A', { valuation: { currentPrice: 115 } }], ['B', { valuation: { currentPrice: 102 } }], ['C', {}]]);
+  const picks = () => ['A', 'B', 'C', 'D'].map((sym) => ({ sym, entry: 100 }));
+  const priceSet = new Map([['D', { w: [bar(9, 125, 120)] }]]);
+  const r = T.evaluateRun(Object.assign({}, run, { picks: picks() }), priceSet, stockBySym, start + 20 * DAYMS);
+  assert.deepStrictEqual([r.counts, r.rate, r.finished, r.changed, typeof r.medianDays], [{ hit: 2, open: 2, miss: 0 }, 0.5, false, true, 'number']);
+  const over = T.evaluateRun(Object.assign({}, run, { picks: picks() }), priceSet, stockBySym, endMs + DAYMS);
+  assert.deepStrictEqual([over.counts, over.finished, over.endMs], [{ hit: 2, open: 0, miss: 2 }, true, endMs]);
+  const none = T.evaluateRun(Object.assign({}, run, { picks: [] }), new Map(), new Map(), start);
+  assert.deepStrictEqual([none.rate, none.medianDays, none.counts.hit], [null, null, 0]);
+}));
+
+test('suggest rules from past prices: every stock with weekly bars becomes samples, the rules are searched and kept per strategy, and thin or broken history says why', () => withPage('', async () => {
+  const L = lnSeries;
+  globalThis.__LP = { prices: new Map(), bySym: new Map() };
+  const stub = (n) => `export const ${n} = (...a) => globalThis.__LP.${n} ? globalThis.__LP.${n}(...a) : undefined;`;
+  const P = await loadWithStubs('src/strategies/learnpanel.js', 'export { runLearn, results };', {
+    '../core/util.js': 'export const escapeHtml = (t) => String(t);', '../core/stocks.js': 'export const stockByTickerSymbol = globalThis.__LP.bySym, stocks = [];',
+    './goal.js': 'export const horizonWeeks = () => 4, goalText = () => "goal";', './pricedata.js': 'export const loadPriceSet = async () => globalThis.__LP.prices;',
+    './news.js': 'export const newsTimeline = (s) => s.timeline;', './fields.js': 'export const FIELD_BY_ID = new Map();', './rules.js': 'export const describeRule = () => "", qualifyingStocks = () => [1, 2];',
+    './state.js': 'export const saveStrategies = () => {};', './practice.js': 'export const HORIZONS = { short: { label: "Short" }, medium: { label: "Medium" }, long: { label: "Long" } }, applyPractice = () => {}, hasPractice = () => false, practiceHtml = () => "", runPractice = () => {};',
+    '../core/safehtml.js': 'export const setHtml = () => {};' });
+  const st = { id: 's1', goal: { target: 6, days: 28 } };
+  for(let k = 0; k < 14; k++){ const x = L(300 + k * 3, (k % 3 - 1) * 0.002); globalThis.__LP.prices.set('S' + k, { w: x.week, m: x.month }); }
+  globalThis.__LP.bySym.set('S1', { timeline: { first: 0, list: [{ t: 1, s: 'pos' }] } });   // one stock has a news record
+  await P.runLearn(st, () => st);
+  const done = P.results.get('s1');
+  assert.ok(done.res && done.nStocks === 14 && done.key === '6/28' && done.res.suggestions.every((sg) => sg.nowCount === 2) && done.news);
+  globalThis.__LP.prices = new Map([['S0', { w: [], m: [] }]]);   // nothing to read
+  await P.runLearn(st, () => st); assert.ok(/No weekly price history is stored yet/.test(P.results.get('s1').error));
+  globalThis.__LP.prices = new Map([['S0', { w: lnSeries(120, 0).week, m: [] }]]);   // too little to test rules on
+  await P.runLearn(st, () => st); assert.ok(/not enough price history/.test(P.results.get('s1').error));
+  globalThis.__LP.prices = null;   // the price store fails
+  await quietErrors(async () => { await P.runLearn(st, () => st); });
+  assert.ok(/Could not learn rules: /.test(P.results.get('s1').error));
 }));
 test('practice ideas: only rules that fit their field are kept, an idea needs two of them, and the numbers are checked', () => alone(async () => {
   globalThis.__PR = { stocks: [{ n: 1 }, { n: 2 }, { n: 3 }] };
