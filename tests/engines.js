@@ -5182,6 +5182,92 @@ test('analysis filters: last week\'s move needs the weekly bars, which are loade
   assert.deepStrictEqual([failing.T.bars.length, failing.T.rerenders], [2, 0]);   // nothing to redraw, so it asks again
 }));
 
+// ---- Analysis leaderboard (src/analysis/leaderboard.js): the toolbar, the rows, and every click, key and drag
+TV_VALUES.add('stockIndex'); TV_VALUES.add('ANALYSIS_LB_COLUMN_IDS');
+const lbSetup = async (n, over) => {
+  const list = Array.from({ length: n }, (_, i) => ({ name: 'S' + i, ticker: 'S' + i, score: i, pinned: i === 1 }));
+  const af = { sortCol: 'score', sortDir: 'desc', columnOrder: null };
+  const T = globalThis.__T = { stocks: list, stockIndex: new Map(list.map((s, i) => [s, i + 10])), analysisFilters: af, ANALYSIS_LB_COLUMN_IDS: ['rank', 'stock', 'score'], order: ['rank', 'stock', 'score'], calls: [], open: false, kit: null, full: [],
+    isPinned: (s) => !!s.pinned, togglePin: (t) => T.calls.push(['pin', t]), getAnalysisColumnsPanelOpen: () => T.open, setAnalysisColumnsPanelOpen: (v) => { T.open = v; T.calls.push(['panel', v]); }, analysisPersistUi: () => T.calls.push(['persist']),
+    setAnalysisShownIdx: (l) => { T.shown = l; }, saveAnalysisFilters: () => T.calls.push(['save', JSON.stringify(af)]), analysisTakeBatch: (k) => [k + '-batch'], defineAnalysisScope: () => {}, updateAnalysisRefresh: () => T.calls.push(['updateRefresh']),
+    analysisColumnOrder: () => T.order, analysisLbCell: (id, ctx) => '<td>' + id + ':' + ctx.s.name + '</td>', analysisRowContext: (s, i, idx) => ({ s, i, idx }), columnHeaderHtml: (id) => '<th>' + id + '</th>',
+    compareByColumn: () => (a, b) => b.score - a.score, nextSort: (cur, col) => ({ col, dir: cur.col === col && cur.dir === 'desc' ? 'asc' : 'desc' }), renderAnalysisColumnsPanel: () => '<div class="analysis-columns-list"></div>',
+    ldOpenPermissions: () => T.calls.push(['perm']), ldBatchStart: (...a) => T.calls.push(['batch', ...a]), ldBatchStop: () => T.calls.push(['stop']), browserFullscreen: (on) => T.full.push(on), fullscreenLabel: (on) => (on ? 'Exit full screen' : 'Full screen'),
+    watchFullscreenExit: (isOn, onExit) => { T.exitHook = onExit; }, getRefreshKit: () => T.kit, setHtml: (el, html) => { el.innerHTML = html; } };
+  Object.assign(T, over || {});
+  return { T, M: await loadAllStubbed('src/analysis/leaderboard.js', '', ['../core/evt.js']), af };
+};
+test('leaderboard: the toolbar has the Columns, Chart and Full screen buttons with their states, and the refresh kit adds its bar and selection slot when it is there', () => alone(async () => {
+  const { T, M } = await lbSetup(0);
+  const html = M.leaderboardHtml('<CHART>', '<VIEW>');
+  assert.ok(html.includes('<VIEW>') && html.includes('<CHART>') && html.includes('id="analysisColumnsBtn" title="Columns: choose and reorder the grid columns" aria-label="Columns: choose and reorder the grid columns" aria-pressed="false"'));
+  assert.ok(html.includes('id="analysisChartToggle" title="Show chart" aria-label="Show chart" aria-expanded="false"') && html.includes('id="analysisFullscreenBtn" title="Full screen (Esc to leave)" aria-label="Full screen (Esc to leave)" data-analysis-full aria-pressed="false"'));
+  assert.ok(html.includes('<span class="analysis-btn-label">Columns</span>') && html.includes('<th>rank</th><th>stock</th><th>score</th>') && html.includes('id="analysisLeaderboardBody"') && !html.includes('rk-bar'));
+  T.open = true; T.kit = { barHtml: (n) => '<span class="rk-bar">' + n + '</span>', selbarSlot: (n) => '<div class="slot">' + n + '</div>' };
+  const withKit = M.leaderboardHtml('', '');
+  assert.ok(withKit.includes('aria-pressed="true"') && withKit.includes('<span class="rk-bar">analysis</span>') && withKit.includes('<div class="slot">analysis</div>'));
+}));
+test('leaderboard: rows are ranked with pinned stocks first, the count is shown, more rows come in steps, and an empty range says so', () => withPage('<div id="analysisFiltersCount"></div><span id="analysisLeaderboardCount"></span><table><tbody id="analysisLeaderboardBody"></tbody></table><div id="analysisLeaderboardMore" hidden></div>', async (win) => {
+  const { T, M } = await lbSetup(105);
+  const doc = win.document, rows = () => [...doc.querySelectorAll('.analysis-lb-row')];
+  M.renderLeaderboardRows(T.stocks);
+  assert.strictEqual(doc.getElementById('analysisLeaderboardCount').textContent, 'Showing 105 of 105 stocks'); assert.strictEqual(doc.getElementById('analysisFiltersCount').textContent, '105 of 105'); assert.strictEqual(doc.getElementById('analysisLeaderboardCount').dataset.short, '105 of 105');
+  assert.strictEqual(rows().length, 100); assert.ok(rows()[0].classList.contains('pinned') && rows()[0].dataset.idx === '11' && rows()[0].textContent.replace(/\s+/g, '') === 'rank:S1stock:S1score:S1');   // S1 is pinned: first, then by score
+  assert.deepStrictEqual(rows().slice(1, 3).map((r) => r.dataset.idx), ['114', '113']);
+  const more = doc.getElementById('analysisLeaderboardMore'); assert.ok(!more.hidden && more.textContent.includes('Showing the first 100 rows') && more.textContent.includes('Show 5 more'));
+  assert.strictEqual(T.shown.length, 105); assert.ok(T.calls.some((c) => c[0] === 'updateRefresh'));
+  M.renderLeaderboardRows([]); assert.ok(doc.querySelector('.analysis-lb-empty').textContent.includes('No stocks in the current RSI range') && doc.querySelector('.analysis-lb-empty').colSpan === 3 && more.hidden);
+  T.kit = {}; M.renderLeaderboardRows([]); assert.strictEqual(doc.querySelector('.analysis-lb-empty').colSpan, 4);   // the refresh tick column
+  M.renderLeaderboardRows([T.stocks[5]]); assert.strictEqual(rows().length, 1); assert.ok(!rows()[0].classList.contains('pinned'));
+  doc.body.innerHTML = ''; M.renderLeaderboardRows(T.stocks);   // a page without the table: nothing to draw into
+}));
+test('leaderboard: clicks open a stock or pin it, sort by a header, show more, toggle full screen and the Columns panel, and start the refresh cards', () => kcPage('<div id="analysisFiltersCount"></div><div id="analysisToolbar"><button id="analysisColumnsBtn"></button><button id="analysisFullscreenBtn" class="x"></button><button id="analysisColumnsResetBtn"></button><button id="analysisSelFund"></button><button id="analysisSelTech"></button><button id="analysisStop-fund"></button><button id="analysisStop-tech"></button><button id="analysisPerm"></button></div><div class="analysis-leaderboard"><table class="strat-table"><thead><tr><th><button id="sortBtn" data-sort-col="stock">x</button></th><th id="plainTh">y</th></tr></thead><tbody id="analysisLeaderboardBody"><tr class="analysis-lb-row" data-idx="12"><td id="cell">c</td><td><button class="pin-btn" data-ticker="S2" id="pinB">p</button></td></tr></tbody></table></div><div id="analysisLeaderboardMore"><button data-lb-more="1" id="moreB"></button><span id="moreText">t</span></div>', async (win) => {
+  const { T, M, af } = await lbSetup(5), doc = win.document, click = (id) => doc.getElementById(id).click(), cb = { update: 0, rerender: 0, opened: [], tip: 0 };
+  M.wireLeaderboard({ update: () => { cb.update++; }, rerender: () => { cb.rerender++; }, openStock: (i) => cb.opened.push(i), hideTooltip: () => { cb.tip++; } });
+  click('cell'); assert.deepStrictEqual([cb.opened, cb.tip], [[12], 1]);
+  click('pinB'); assert.deepStrictEqual([T.calls.filter((c) => c[0] === 'pin'), cb.update, cb.opened.length], [[['pin', 'S2']], 1, 1]);   // the pin does not open the stock
+  doc.getElementById('analysisLeaderboardBody').click(); assert.strictEqual(cb.opened.length, 1);   // not on a row
+  click('moreB'); assert.strictEqual(cb.update, 2); click('moreText'); assert.strictEqual(cb.update, 2);
+  click('sortBtn'); assert.deepStrictEqual([af.sortCol, af.sortDir, cb.rerender], ['stock', 'desc', 1]); click('sortBtn'); assert.strictEqual(af.sortDir, 'asc'); click('plainTh'); assert.strictEqual(cb.rerender, 2);
+  click('analysisFullscreenBtn');
+  assert.deepStrictEqual([doc.body.classList.contains('lb-full-open'), doc.querySelector('.analysis-leaderboard').classList.contains('lb-full'), T.full, doc.getElementById('analysisFullscreenBtn').getAttribute('aria-pressed'), doc.getElementById('analysisFullscreenBtn').title], [true, true, [true], 'true', 'Exit full screen (Esc to leave)']);
+  M.init_leaderboard_fullscreen(); T.exitHook(); assert.deepStrictEqual([doc.body.classList.contains('lb-full-open'), doc.getElementById('analysisFullscreenBtn').title], [false, 'Full screen (Esc to leave)']);   // Esc leaves it
+  click('analysisFullscreenBtn'); click('analysisFullscreenBtn'); assert.deepStrictEqual(T.full, [true, true, false]);
+  click('analysisColumnsBtn'); assert.deepStrictEqual([T.open, cb.rerender, T.calls.filter((c) => c[0] === 'persist').length], [true, 3, 1]);
+  click('analysisColumnsResetBtn'); assert.deepStrictEqual([af.columnOrder, cb.rerender], [['rank', 'stock', 'score'], 4]);
+  click('analysisSelFund'); click('analysisSelTech'); click('analysisStop-fund'); click('analysisStop-tech'); click('analysisPerm');
+  assert.deepStrictEqual(T.calls.filter((c) => ['batch', 'stop', 'perm'].includes(c[0])), [['batch', 'fund', ['fund-batch'], 'analysis'], ['batch', 'tech', ['tech-batch'], 'analysis'], ['stop'], ['stop'], ['perm']]);
+}));
+const LB_COLS = '<div class="analysis-leaderboard"><table class="strat-table"><thead></thead><tbody id="analysisLeaderboardBody"></tbody></table></div><ul class="analysis-columns-list">' + ['rank', 'stock', 'score'].map((c) => '<li class="analysis-column-row" data-col="' + c + '"><button class="analysis-col-grip" data-col="' + c + '">::</button></li>').join('') + '</ul>';
+test('leaderboard: a column row can be dragged to a new place or moved with the arrow keys, and the new order is saved once on release', () => kcPage(LB_COLS, async (win) => {
+  const { T, M, af } = await lbSetup(2), doc = win.document, scrolls = []; let rerenders = 0;
+  win.scrollBy = (x, y) => scrolls.push(y);
+  M.wireLeaderboard({ update: () => {}, rerender: () => { rerenders++; }, openStock: () => {}, hideTooltip: () => {} });
+  const list = doc.querySelector('.analysis-columns-list'), rowOf = (c) => list.querySelector('[data-col="' + c + '"].analysis-column-row'), order = () => [...list.querySelectorAll('.analysis-column-row')].map((r) => r.dataset.col).join();
+  [...list.querySelectorAll('.analysis-column-row')].forEach((r, i) => { r.getBoundingClientRect = () => ({ top: i * 30, height: 30 }); });   // a row is 30 px high
+  const ev = (type, props) => { const e = new win.Event(type, { bubbles: true, cancelable: true }); for(const k of Object.keys(props || {})) Object.defineProperty(e, k, { value: props[k] }); return e; };
+  const grip = (c) => list.querySelector('.analysis-col-grip[data-col="' + c + '"]');
+  grip('rank').dispatchEvent(ev('pointerdown', { button: 2 })); assert.ok(!rowOf('rank').classList.contains('dragging'));   // not the main button
+  list.dispatchEvent(ev('pointerdown'));   // not on a handle
+  grip('rank').dispatchEvent(ev('pointerdown', { button: 0 })); assert.ok(rowOf('rank').classList.contains('dragging'));
+  doc.dispatchEvent(ev('pointermove', { clientY: 80 })); assert.strictEqual(order(), 'stock,score,rank');   // below the middle of the last row: to the end
+  doc.dispatchEvent(ev('pointermove', { clientY: 80 })); assert.strictEqual(order(), 'stock,score,rank');   // already there
+  doc.dispatchEvent(ev('pointermove', { clientY: 20 })); assert.strictEqual(order(), 'rank,stock,score');   // above the middle of the first row: to the front
+  doc.dispatchEvent(ev('pointermove', { clientY: 5 })); doc.dispatchEvent(ev('pointermove', { clientY: 5 }));
+  doc.dispatchEvent(ev('pointermove', { clientY: 790 })); assert.deepStrictEqual(scrolls.slice(-1), [14]); doc.dispatchEvent(ev('pointermove', { clientY: 30 })); assert.deepStrictEqual(scrolls.length >= 1, true);
+  doc.dispatchEvent(ev('pointermove', { clientY: 85 }));   // back to the end
+  assert.strictEqual(af.columnOrder, null); assert.strictEqual(rerenders, 0);   // nothing is saved while dragging
+  doc.dispatchEvent(ev('pointerup'));
+  assert.deepStrictEqual([af.columnOrder, rerenders, rowOf('rank').classList.contains('dragging')], [['stock', 'score', 'rank'], 1, false]);
+  doc.dispatchEvent(ev('pointermove', { clientY: 0 })); assert.strictEqual(order(), 'stock,score,rank');   // the drag is over: moving does nothing
+  T.order = ['stock', 'score', 'rank'];   // what the saved order now is
+  grip('rank').dispatchEvent(ev('keydown', { key: 'ArrowUp' })); assert.deepStrictEqual([order(), rerenders], ['stock,rank,score', 2]);
+  grip('rank').dispatchEvent(ev('keydown', { key: 'ArrowDown' })); assert.deepStrictEqual([order(), rerenders], ['stock,score,rank', 2]);   // back to the saved order: nothing to save
+  grip('rank').dispatchEvent(ev('keydown', { key: 'ArrowDown' })); assert.deepStrictEqual([order(), rerenders], ['stock,score,rank', 2]);   // already last: nothing moves
+  grip('stock').dispatchEvent(ev('keydown', { key: 'ArrowUp' })); assert.strictEqual(order(), 'stock,score,rank');
+  grip('stock').dispatchEvent(ev('keydown', { key: 'a' })); list.dispatchEvent(ev('keydown', { key: 'ArrowUp' })); assert.strictEqual(order(), 'stock,score,rank');
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
