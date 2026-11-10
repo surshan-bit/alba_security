@@ -5856,6 +5856,17 @@ test('stock updates overlay: snapshot rows, technical blocks and recent bars are
   win.document.getElementById('section-analysis').classList.add('active'); T.moves = { A: { w: 11, m: 20 } }; M.applyRecentBarsOverlay([]); assert.ok(T.log.includes('analysis'));   // on screen: it redraws
 }));
 
+// ---- Global & Macro panel (src/detail/globalfactors.js)
+test('Global & Macro panel: unresearched stocks say so, notes and events are text with safe source links, and unknown impacts read as mixed', () => {
+  const R = load('src/detail/globalfactors.js').renderGlobalFactorsPanel, flat = (h) => h.replace(/\s+/g, ' ');
+  for(const g of [undefined, {}, { positive: [], negative: [] }]) assert.ok(flat(R({ globalFactors: g })).includes('Not yet researched for this stock') && !R({ globalFactors: g }).includes('global-cols'));
+  const html = R({ globalFactors: { positive: [{ text: '<img src=x onerror=1>', source: 'Wire <b>', url: 'https://u.test/?a=1&b=2' }, { text: 'plain' }], negative: [], events: [
+    { impact: 'positive', headline: 'H <b>', why: 'because', source: 'Src', url: 'javascript:alert(1)' }, { impact: 'negative', headline: 'N' }, { impact: 'odd', headline: 'M', why: '' }] } });
+  assert.ok(!html.includes('<img') && !html.includes('<b>') && !html.includes('javascript:') && html.includes('href="https://u.test/?a=1&amp;b=2"') && html.includes('target="_blank" rel="noopener noreferrer"'));
+  assert.ok(html.includes('--n:2') && html.includes('None identified.') && html.includes('ev-positive') && html.includes('Helps') && html.includes('Hurts') && html.includes('ev-mixed'));
+  assert.ok(!R({ globalFactors: { positive: [{ text: 'a' }], events: [] } }).includes('global-events') && R({ globalFactors: { negative: [{ text: 'a' }] } }).includes('--n:1'));
+});
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
