@@ -2847,7 +2847,7 @@ async function loadAllStubbed(file, extra, keep, more){
   }
   return loadWithStubs(file, extra, stubs);
 }
-const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { noteLivePrices, paintHint, rsBars, rsCross, rsDaily, rsFixSymbols, rsReport, rsSnapshot, rsTech2, runSnapshot, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
+const loadTvRefresh = () => loadAllStubbed('src/refresh/tvrefresh.js', 'export { noteLivePrices, paintHint, rsBars, rsCross, rsDaily, rsFillHistory, rsFixSymbols, rsReport, rsSnapshot, rsTech2, runSnapshot, setButtons, skippedReport }; export const __stop = (v) => { stopAsked = v; };',
   ['../overlays/livesnapshot.js', './historyplan.js', './snapshotrows.js', './snapshotcall.js', './finalchunk.js']);
 const tvStock = (name) => ({ name, ticker: name, pillars: { val: 0.5 } });
 const tvRun = (db, names, over) => Object.assign({ db, today: '2026-11-04', stored: new Map(), prevRows: new Map(), todo: names.map((n) => ({ s: tvStock(n), sym: 'N:' + n })), ctx: null, batchLeft: {}, updated: 0, unchanged: 0, reusedFinal: 0, scored: 0, kept: 0, chunksSaved: 0,
@@ -4404,6 +4404,107 @@ test('stock data: no database, no index, a short list or a missing chunk each st
   await fail({ chunks: { c1: [{ t: 'A' }], c2: Object.assign(new Error('x'), { message: '', code: 'permission-denied' }) } }, 'permission-denied');
   await fail({ chunks: { c1: [{ t: 'A' }] } }, 'chunk c2 is missing');   // tried twice, with a pause between
 })));
+
+// ---- Refresh all stocks, history step (src/refresh/tvrefresh.js, rsFillHistory): who gets a full download, in what order, and when the step stops
+TV_VALUES.add('priceJobs'); TV_VALUES.add('stockByTickerSymbol');
+const fillSetup = (names, over) => {
+  const jobs = new Map(), written = [], docs = {}, fails = {};
+  const db = { doc: (p) => ({ get: async () => { if(fails.get) throw new Error('db down'); return docs[p] ? { exists: true, data: () => docs[p] } : { exists: false }; },
+    set: async (d) => { if(fails.set) throw new Error('db down'); written.push([p, JSON.parse(JSON.stringify(d))]); } }) };
+  const stocks = names.map(tvStock);
+  const T = globalThis.__T = { log: [], refreshed: [], fiSet: (...a) => T.log.push(a.slice(0, 3).join('|')), stocks, priceHistoryByTicker: {}, pcTickerKey: (s) => s.name, priceJobs: jobs, stockByTickerSymbol: new Map(),
+    debugHandle: () => ({}), ensureAllPriceBars: async () => {}, loadRuns: async () => [], priorityOrder: (k, l) => l, isinSymbolCached: (s) => 'N:' + s.name, COMPACT_LAG: 1,
+    refreshOneNow: async (s, lean) => { T.refreshed.push(s.name + (lean ? '*' : '')); if(T.outcome) T.outcome(s, jobs); } };
+  Object.assign(T, over || {});
+  return { T, db, jobs, written, docs, stocks, fails };
+};
+const okJob = (s, jobs) => jobs.set(s.name, { state: 'ok' });
+const OLD_BARS = [[1000, 1, 1, 1, 1, 1]];
+
+test('history step: stocks with no history are downloaded tracked picks first, those that failed recently are left out, and a failure is remembered for next time', () => alone(async () => {
+  const x = fillSetup(['S1', 'S2', 'S3', 'S4']);
+  x.docs['stockMeta/histFillTried'] = { S4: new Date().toISOString(), S2: '2020-01-01T00:00:00.000Z' };
+  x.T.loadRuns = async () => [{ picks: [{ sym: 'N:S3' }, { sym: 'N:gone' }] }, {}];
+  x.T.stockByTickerSymbol = new Map([['N:S3', x.stocks[2]]]);
+  x.T.outcome = (s, jobs) => { if(s.name === 'S1') jobs.set('S1', { state: 'error', msg: 'boom' }); else okJob(s, jobs); };
+  const M = await loadTvRefresh(), run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  assert.deepStrictEqual(x.T.refreshed, ['S3', 'S1', 'S2']);   // S3 is tracked; S4 failed lately; S2's old failure is long ago, so it is tried again
+  assert.deepStrictEqual([run.noneBefore, run.staleBefore, run.filled, !!run.stopped, run.histRan], [4, 0, 2, false, true]);
+  assert.deepStrictEqual(run.ctx.failedBars, [{ sym: 'S1', name: 'S1', reason: 'price bars: boom' }]);
+  assert.strictEqual(x.written.length, 1); assert.strictEqual(x.written[0][0], 'stockMeta/histFillTried');
+  assert.deepStrictEqual(Object.keys(x.written[0][1]).sort(), ['S1', 'S4']);   // S1 failed now; S4 stays; S2 and S3 came through
+  assert.ok(Date.now() - Date.parse(x.written[0][1].S1) < 60000);
+  assert.ok(x.T.log.includes('fill|done|2 of 4 downloaded') && x.T.log.includes('fill|running|Looking at the saved bars…'));
+  assert.ok(x.T.log.includes('fill|running|1 of 3 · S3') && x.T.log.includes('fill|running|3 of 3 · S2'));
+}));
+
+test('history step: a refused call (quota, no connection) stops the step without blaming the stocks; many failures in a row stop it too', () => alone(async () => {
+  let x = fillSetup(['S1', 'S2', 'S3']);
+  x.T.outcome = (s, jobs) => jobs.set(s.name, { state: 'error', msg: 'The daily quota is used up' });
+  let M = await loadTvRefresh(), run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  assert.deepStrictEqual([run.stopped, run.runError, run.filled, x.T.refreshed.length], [true, 'The daily quota is used up', 0, 2]);   // two at a time: the third is never started
+  assert.deepStrictEqual(x.written, [['stockMeta/histFillTried', {}]]);   // a refusal says nothing about the stock: not remembered
+  x = fillSetup(Array.from({ length: 12 }, (_, i) => 'F' + i));   // no job comes back at all
+  M = await loadTvRefresh(); run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  assert.deepStrictEqual([run.stopped, run.runError], [true, 'price bars failed 8 times in a row']);
+  assert.ok(run.ctx.failedBars.length >= 8 && run.ctx.failedBars.length < 12 && run.ctx.failedBars[0].reason === 'price bars: did not finish');
+  assert.ok(Object.keys(x.written[0][1]).length >= 8);   // each of those failures is remembered
+  x = fillSetup(['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9']);   // a success in between resets the count
+  x.T.outcome = (s, jobs) => { if(['S4', 'S8'].includes(s.name)) okJob(s, jobs); };
+  M = await loadTvRefresh(); run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  assert.deepStrictEqual([!!run.stopped, run.runError, run.filled, x.T.refreshed.length], [false, undefined, 2, 9]);
+}));
+
+test('history step: stocks one bar behind get a batch job only when they have saved bars and a symbol, and the bar refresh reports progress for the list it is given', () => alone(async () => {
+  const now = Math.floor(Date.now() / 1000), cur = [[now, 1, 1, 1, 1, 1]];
+  const x = fillSetup(['S1', 'S2', 'S3', 'S4']);
+  x.T.priceHistoryByTicker = { S1: { '1W': OLD_BARS, '1M': OLD_BARS }, S2: { '1W': OLD_BARS, '1M': OLD_BARS }, S3: { '1W': cur, '1M': cur }, S4: { '1W': OLD_BARS, '1M': [] } };
+  x.T.isinSymbolCached = (s) => s.name === 'S2' ? null : 'N:' + s.name;   // S2 has no TradingView symbol, S4 no monthly bars
+  x.T.outcome = okJob;
+  const M = await loadTvRefresh(), run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  const ctx = run.ctx;
+  assert.deepStrictEqual([run.noneBefore, run.staleBefore, run.batchLeft.noSymbol, x.written.length, x.T.refreshed.length], [0, 3, 2, 0, 0]);   // nothing to download in full: nothing written, nothing refreshed
+  assert.deepStrictEqual([...ctx.jobs.keys()].map((s) => s.name), ['S1']);
+  assert.deepStrictEqual([ctx.jobs.get(x.stocks[0]).needW, ctx.jobs.get(x.stocks[0]).needM, ctx.ready.size, typeof ctx.nowS, ctx.abort], [true, true, 0, 'number', '']);
+  assert.ok(x.T.log.includes('fill|done|none needed'));
+  x.T.log.length = 0;
+  assert.strictEqual(await ctx.bars([x.stocks[0], x.stocks[1]], { key: 'update', track: false, workers: 2, lean: true, prog: { done: 0, total: 2 } }), 2);
+  assert.deepStrictEqual(x.T.refreshed.sort(), ['S1*', 'S2*']);   // lean: only the new bars
+  assert.ok(x.T.log.includes('update|running|1 of 2 · S1') && x.T.log.includes('update|running|2 of 2 · S2'));
+  x.T.log.length = 0;
+  assert.strictEqual(await ctx.bars([x.stocks[2]], { key: 'update', track: false, workers: 1 }), 1);   // no shared count: it counts its own list
+  assert.ok(x.T.log.includes('update|running|1 of 1 · S3'));
+}));
+
+test('history step: it is skipped when Stop was pressed or the history stage is switched off, and Stop during it ends it after the stock in hand', () => alone(async () => {
+  let x = fillSetup(['S1']), M = await loadTvRefresh(), run = tvRun(x.db, []);
+  M.__stop(true); await M.rsFillHistory(run); M.__stop(false);
+  assert.deepStrictEqual([run.stopped, run.ctx, run.histRan, x.T.log], [true, null, undefined, ['fill|done|skipped']]);
+  x = fillSetup(['S1'], { debugHandle: () => ({ skipHistoryStage: true }) }); M = await loadTvRefresh(); run = tvRun(x.db, []);
+  await M.rsFillHistory(run);
+  assert.deepStrictEqual([!!run.stopped, run.ctx, x.T.log, x.T.refreshed], [false, null, ['fill|done|skipped'], []]);
+  x = fillSetup(['S1', 'S2', 'S3', 'S4', 'S5']); M = await loadTvRefresh(); run = tvRun(x.db, []);
+  x.T.outcome = (s, jobs) => { okJob(s, jobs); M.__stop(true); };
+  await M.rsFillHistory(run); M.__stop(false);
+  assert.deepStrictEqual([run.stopped, run.filled, x.T.refreshed.length], [true, 1, 1]);   // the stock in hand finishes, no other starts
+}));
+
+test('history step: a database that cannot be read or written does not stop the downloads', () => alone(async () => {
+  await quietErrors(async (seen) => {
+    const x = fillSetup(['S1', 'S2']); x.fails.get = true; x.fails.set = true;
+    x.T.loadRuns = async () => { throw new Error('no runs'); };
+    x.T.outcome = okJob;
+    const M = await loadTvRefresh(), run = tvRun(x.db, []);
+    await M.rsFillHistory(run);
+    assert.deepStrictEqual([run.filled, x.T.refreshed.length], [2, 2]);
+    assert.deepStrictEqual(seen, ['Could not read tracked picks', 'Could not save the skipped list']);
+  });
+}));
 
 (async () => {
 await Promise.all(pending);
