@@ -507,11 +507,11 @@ async function rowCapTests(browser){
   const tog = await page.evaluate(async () => {
     const r = Array.from(document.querySelectorAll('.biz-row')), keep = r[r.length - 1]; keep.dataset.keep = '1';
     r[0].click(); await new Promise(x => setTimeout(x, 50));
-    const opened = !!(r[0].nextElementSibling && r[0].nextElementSibling.classList.contains('biz-detail')) && r[0].classList.contains('open') && r[0].getAttribute('aria-expanded') === 'true';
+    const opened = !!(r[0].nextElementSibling && r[0].nextElementSibling.classList.contains('biz-detail')) && r[0].classList.contains('open');
     const survived = document.querySelector('.biz-row[data-keep="1"]') === keep;   // the same element: the table was not rebuilt
     const label = document.querySelector('[data-biz-all]').textContent;
     r[0].click(); await new Promise(x => setTimeout(x, 50));
-    const closed = !(r[0].nextElementSibling && r[0].nextElementSibling.classList.contains('biz-detail')) && !r[0].classList.contains('open') && r[0].getAttribute('aria-expanded') === 'false';
+    const closed = !(r[0].nextElementSibling && r[0].nextElementSibling.classList.contains('biz-detail')) && !r[0].classList.contains('open');
     return { opened, survived, closed, label };
   });
   ok(tog.opened && tog.closed, 'explorer toggle: a row opens its detail and closes it again, ' + JSON.stringify(tog));

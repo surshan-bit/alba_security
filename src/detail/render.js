@@ -51,11 +51,11 @@ function capTagHtml(s){
 // The whole stock page as markup: the Back bar, the header with its links, the jump row and the panels.
 function detailHtml(s, idx, pinned){
   return `
-    ${detailBackTo ? `<div class="detail-back-bar"><button type="button" class="detail-back" id="detailBackBtn" title="Back (Esc)">&larr; Back to ${detailBackTo.label || 'Analysis'}<span class="detail-back-key">Esc</span></button></div>` : ''}
+    ${detailBackTo ? `<div class="detail-back-bar"><button type="button" class="detail-back" id="detailBackBtn" title="Back (Esc)">&larr; Back to ${escapeHtml(detailBackTo.label || 'Analysis')}<span class="detail-back-key">Esc</span></button></div>` : ''}
     <div class="detail-top">
       <div class="detail-title">
         <button type="button" class="detail-star${pinned?' pinned':''}" id="detailPinBtn" aria-pressed="${pinned?'true':'false'}" aria-label="${pinned?'Unpin from top':'Pin to top'}" title="${pinned?'Pinned — click to unpin':'Pin to top'}">${pinned?'★':'☆'}</button>
-        <div class="detail-title-text"><div class="detail-name-row"><div class="detail-name">${escapeHtml(s.name)}</div>${capTagHtml(s)}</div><div class="detail-ticker">${escapeHtml(s.ticker)}</div></div>
+        <div class="detail-title-text"><div class="detail-name-row"><h1 class="detail-name">${escapeHtml(s.name)}</h1>${capTagHtml(s)}</div><div class="detail-ticker">${escapeHtml(s.ticker)}</div></div>
       </div>
     <div class="detail-meta">
      <div class="detail-meta-row detail-meta-links">

@@ -5344,7 +5344,7 @@ test('explorer: the page draws its controls, strategy buttons and an industry ta
   assert.ok(txt().includes('+1.50%') && txt().includes('n/a'));   // a missing average says n/a
   assert.ok(body().querySelector('[data-biz-show="matched"]').disabled);   // no strategy chosen: nothing to match
   body().querySelector('.biz-row').click();   // the row opens in place
-  assert.ok(body().querySelector('.biz-detail') && body().querySelector('.biz-row').classList.contains('open') && body().querySelector('.biz-row').getAttribute('aria-expanded') === 'true');
+  assert.ok(body().querySelector('.biz-detail') && body().querySelector('.biz-row').classList.contains('open') && !body().querySelector('.biz-row').hasAttribute('role') && !body().querySelector('.biz-row').hasAttribute('aria-expanded') && body().querySelector('.biz-detail-box h2.biz-dname'));   // a focusable row, not a nested "button"; the industry name is a level-2 heading
   assert.ok(txt().includes('Fund 7.3 · Tech 7.3') || txt().includes('Fund 7.3'));   // scores under the stock in the lean grid
   assert.ok(body().querySelector('.biz-detail .strat-row[data-idx="20"]') && !body().querySelector('.biz-detail a[href^="javascript"]'));
   assert.strictEqual(body().querySelector('[data-biz-all]').dataset.bizAll, 'expand');
@@ -5364,7 +5364,7 @@ test('explorer: the heat map sizes itself beside the filters and in full screen,
   assert.ok(T.heat.at(-1).hRatio >= .45 && T.heat.at(-1).hRatio <= .95);   // full screen: the height fits the window
   T.exitHook(); assert.ok(T.heat.at(-1).hRatio === undefined);   // Esc leaves full screen
   win.HTMLElement.prototype.scrollIntoView = function(){ T.scrolledTo = this.dataset.bizName; };
-  click('[data-biz-heat]'); assert.ok(body().querySelector('.biz-table') && body().querySelector('.biz-row[aria-expanded="true"]') && T.scrolledTo === 'Banks');   // a tile opens that industry in the table
+  click('[data-biz-heat]'); assert.ok(body().querySelector('.biz-table') && body().querySelector('.biz-row.open') && T.scrolledTo === 'Banks');   // a tile opens that industry in the table
   body().click();   // a click on nothing in particular does nothing
   click('[data-biz-view="heat"]'); click('[data-biz-view="table"]'); assert.ok(body().querySelector('.biz-table'));
   click('[data-biz-strat="q1"]'); assert.ok(body().querySelector('.biz-showing') && body().querySelector('[data-biz-show="matched"]'));
@@ -6305,6 +6305,54 @@ test('News page, Stock events: upcoming and recent events follow the chosen stra
   M.view.when = 'upcoming'; M.view.tab = 'macro';
 }));
 
+// ---- Stock page (src/detail/render.js): the page title is the one level-1 heading
+test('stock page: the stock name is the page\'s level-1 heading and is written as text', () => withPage('<div id="detail"></div>', async (win) => {
+  const S = [{ name: 'Acme <img src=x onerror=1>', ticker: 'AAA · NSE', liquidity: { marketCap: 5000 } }];
+  globalThis.__T = { stocks: S, detailEl: win.document.getElementById('detail'), escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), screenerUrl: () => 'https://www.screener.in/company/AAA/', isPinned: () => false, capClass: () => 'large', CAP_NAME: { large: 'Large cap' },
+    setHtml: (el, h) => { el.innerHTML = h; }, keepScroll: (el, fn) => fn(), LINK_ICON: '' };
+  TV_VALUES.add('CAP_NAME'); TV_VALUES.add('LINK_ICON');
+  const M = await loadAllStubbed('src/detail/render.js', '', []);
+  M.renderDetail(0);
+  const h1s = win.document.querySelectorAll('#detail h1'); assert.strictEqual(h1s.length, 1);
+  assert.ok(h1s[0].classList.contains('detail-name') && h1s[0].textContent === 'Acme <img src=x onerror=1>' && !win.document.querySelector('#detail img') && win.document.querySelector('.dc-tag').textContent === 'Large cap');
+  assert.strictEqual(M.getShownIndex(), 0);
+}));
+
+test('stock page: the pin star, Share link, help links and Peers rows work, and a peer row opens that stock', () => withPage('<div id="detail"></div><div id="kb-fundamental"></div><div id="glossary-data-proxy"></div>', async (win) => {
+  const S = [{ name: 'A', ticker: 'AAA' }, { name: 'B', ticker: 'BBB' }], log = [];
+  win.HTMLElement.prototype.scrollIntoView = function(){ log.push('scroll:' + this.id); };
+  globalThis.__T = { stocks: S, detailEl: win.document.getElementById('detail'), escapeHtml: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'), screenerUrl: () => 'https://www.screener.in/x/', isPinned: () => false, capClass: () => null, CAP_NAME: {}, LINK_ICON: '', setHtml: (el, h) => { el.innerHTML = h; }, keepScroll: (el, fn) => fn(),
+    renderFundamentals: () => '<a href="#" id="howCalculatedLink">How</a>', renderValuationPanel: () => '<a href="#" class="proxy-tag-link">proxy</a>', renderPeersPanel: () => '<div id="peersPanel"><div class="peers-scroll"><table data-cols="a"><tbody><tr data-idx="0" class="peers-self"><td>A</td></tr><tr data-idx="1"><td>B</td></tr></tbody></table></div></div>',
+    togglePin: (t) => log.push('pin:' + t), showSection: (n) => { log.push('section:' + n); return Promise.resolve(); }, copyText: (t) => (globalThis.__T.copyFails ? Promise.reject(new Error('x')) : Promise.resolve()), stockShareLink: (s) => 'https://share/' + s.ticker, syncStockHash: (s) => log.push('hash:' + s.ticker),
+    wireStockGridSort: () => log.push('sort'), bindLiveDataBar: () => {}, initPriceChart: () => {}, loadPriceBarsFor: (s, i) => log.push('bars:' + i), bindDetailJumpNav: () => {}, getRefreshKit: () => ({ stockBtn: (s) => '<button id="kitBtn">' + s.name + '</button>' }) };
+  TV_VALUES.add('CAP_NAME'); TV_VALUES.add('LINK_ICON');
+  const M = await loadAllStubbed('src/detail/render.js', '', []), d = win.document, tick = () => new Promise((r) => setTimeout(r, 0));
+  M.setDetailOpenHook((s) => log.push('open:' + s.ticker)); M.setDetailBackTo(null); M.renderDetail(0);
+  assert.ok(d.getElementById('kitBtn') && !d.querySelector('.detail-back-bar') && log.includes('open:AAA') && log.includes('sort') && log.includes('bars:0'));
+  d.getElementById('detailPinBtn').click(); assert.ok(log.includes('pin:AAA'));
+  d.getElementById('howCalculatedLink').click(); await tick(); assert.ok(log.includes('section:knowledgebase') && log.includes('scroll:kb-fundamental'));
+  d.querySelector('.proxy-tag-link').click(); await tick(); assert.ok(log.includes('section:help') && log.includes('scroll:glossary-data-proxy'));
+  const share = d.getElementById('copyStockLinkBtn'); share.click(); await tick(); await tick(); assert.ok((share.querySelector('.share-link-label') || share).textContent.includes('copied'));
+  globalThis.__T.copyFails = true; d.getElementById('copyStockLinkBtn').click(); await tick(); await tick(); assert.ok((d.getElementById('copyStockLinkBtn').querySelector('.share-link-label') || d.getElementById('copyStockLinkBtn')).textContent.includes('https://share/AAA'));
+  const before = log.length; d.querySelector('tr[data-idx="0"]').click(); assert.strictEqual(log.length, before);   // the open stock's own row does nothing
+  d.querySelector('tr[data-idx="1"]').click(); assert.ok(log.includes('open:BBB') && log.includes('hash:BBB') && M.getShownIndex() === 1);
+  M.rerenderDetail(); assert.ok(d.getElementById('detailPinBtn') && M.getShownIndex() === 1);   // a redraw keeps the open stock
+  let backed = 0; M.setDetailBackTo({ label: 'Explorer <b>x</b>', onBack: () => { backed++; } }); M.renderDetail(1);
+  assert.ok(d.querySelector('.detail-back-bar').textContent.includes('Back to Explorer <b>x</b>') && !d.querySelector('.detail-back-bar b'));   // the label is text
+  d.getElementById('detailBackBtn').dispatchEvent(new win.Event('click', { bubbles: true })); M.detailBackToAnalysis(); assert.ok(backed <= 1);
+}));
+
+test('stock page: with no Peers panel, no help links and no refresh kit the page still draws', () => withPage('<div id="detail"></div>', async (win) => {
+  globalThis.__T = { stocks: [{ name: 'A', ticker: 'AAA' }], detailEl: win.document.getElementById('detail'), escapeHtml: (x) => String(x), screenerUrl: () => 'https://www.screener.in/x/', isPinned: () => true, capClass: () => null, CAP_NAME: {}, LINK_ICON: '', setHtml: (el, h) => { el.innerHTML = h; }, keepScroll: (el, fn) => fn(), getRefreshKit: () => null };
+  TV_VALUES.add('CAP_NAME'); TV_VALUES.add('LINK_ICON');
+  const M = await loadAllStubbed('src/detail/render.js', '', []);
+  M.rerenderDetail(); assert.strictEqual(win.document.getElementById('detail').innerHTML, '');   // nothing open yet: nothing redrawn
+  M.renderDetail(0); const d = win.document;
+  assert.ok(d.getElementById('detailPinBtn').classList.contains('pinned') && d.getElementById('detailPinBtn').getAttribute('aria-pressed') === 'true' && !d.querySelector('.dc-tag') && !d.getElementById('peersPanel'));
+  M.rerenderDetail(); assert.ok(d.querySelector('h1.detail-name'));
+  M.detailBackToAnalysis();   // no back target: nothing happens
+}));
+
 (async () => {
 await Promise.all(pending);
 if(failures.length){ console.error(failures.length + ' engine test(s) FAILED (' + passed + ' passed):\n  ' + failures.join('\n  ')); process.exit(1); }
@@ -6535,7 +6583,7 @@ test('analysis grid columns: every column draws its cell, the headers and the Co
   const cellOf = (s, id) => C.analysisLbCell(id, C.analysisRowContext(s, 0, 0));
   assert.strictEqual(cellOf(stocks[0], 'dayMacdBars'), '<td class="num">4</td>'); assert.strictEqual(cellOf(stocks[1], 'dayMacdBars'), '<td class="num">0</td>'); assert.strictEqual(cellOf(stocks[2], 'dayMacdBars'), '<td class="num"></td>');
   assert.ok(/61\.2/.test(cellOf(stocks[0], 'weekRsi')) && /Buy/.test(cellOf(stocks[1], 'idea')) && /Bullish/.test(cellOf(stocks[0], 'techW')) && /1,234\.5/.test(cellOf(stocks[0], 'price')) && /\+1\.5% W/.test(cellOf(stocks[0], 'industry')));
-  assert.ok(/<th class="num" title="Daily bars in a row[^"]*" aria-sort="none"><button[^>]*data-sort-col="dayMacdBars"/.test(C.columnHeaderHtml('dayMacdBars', { col: 'price', dir: 'asc' })) && /D MACD bars/.test(C.columnHeaderHtml('dayMacdBars')) && C.columnHeaderHtml('pin') === '<th class="pin-col"></th>' && C.columnHeaderHtml('nope') === '');
+  assert.ok(/<th class="num" title="Daily bars in a row[^"]*" aria-sort="none"><button[^>]*data-sort-col="dayMacdBars"/.test(C.columnHeaderHtml('dayMacdBars', { col: 'price', dir: 'asc' })) && /D MACD bars/.test(C.columnHeaderHtml('dayMacdBars')) && C.columnHeaderHtml('pin') === '<th class="pin-col"><span class="sr-only">Pin</span></th>' && C.columnHeaderHtml('nope') === '');
   assert.ok(/aria-sort="descending"/.test(C.columnHeaderHtml('dayMacdBars', { col: 'dayMacdBars', dir: 'desc' })) && !/data-sort-col/.test(C.columnHeaderHtml('tv', { col: 'price', dir: 'asc' })));   // a column that cannot sort has no button
   assert.deepStrictEqual([C.nextSort({ col: 'price', dir: 'desc' }, 'price'), C.nextSort(null, 'stock'), C.nextSort({ col: 'price', dir: 'desc' }, 'dayMacdBars'), C.nextSort({ col: 'stock', dir: 'asc' }, 'stock')],
     [{ col: 'price', dir: 'asc' }, { col: 'stock', dir: 'asc' }, { col: 'dayMacdBars', dir: 'desc' }, { col: 'stock', dir: 'desc' }]);

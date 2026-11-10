@@ -19,9 +19,11 @@
     "refresh": "node tests/refresh.js",
     "types": "node tools/typecheck.js",
     "coverage": "node tools/coverage.js",
-    "screener": "node --test screener-worker/test/worker.test.js"
+    "screener": "node --test screener-worker/test/worker.test.js",
+    "a11y": "node tools/a11y.js"
   },
   "devDependencies": {
+    "axe-core": "4.10.3",
     "c8": "12.0.0",
     "esbuild": "0.28.2",
     "eslint-scope": "9.1.2",

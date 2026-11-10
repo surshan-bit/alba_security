@@ -271,9 +271,9 @@ function tlListHtml(models){
   const returnHead = models.some(m => m.isClosed) ? 'Return' : 'Unrealized';
   const th = (id, label) => sortHeaderHtml(id, label, tlSort);
   return `
-    <div class="help-table-wrap">
+    <div class="help-table-wrap" tabindex="0" role="group" aria-label="Scrollable table">
       <table class="help-table">
-        <thead><tr>${th('name', 'Stock')}${th('buyDate', 'Buy date / price \u00d7 qty')}${th('status', 'Status')}${th('entry', 'Entry score')}${th('data', 'Data at entry')}${th('ret', returnHead)}${th('held', 'Held')}${th('exit', 'Exit score')}${th('call', "Today's call")}<th></th></tr></thead>
+        <thead><tr>${th('name', 'Stock')}${th('buyDate', 'Buy date / price \u00d7 qty')}${th('status', 'Status')}${th('entry', 'Entry score')}${th('data', 'Data at entry')}${th('ret', returnHead)}${th('held', 'Held')}${th('exit', 'Exit score')}${th('call', "Today's call")}<th><span class="sr-only">Actions</span></th></tr></thead>
         <tbody>${models.slice().sort(compareBy(TL_SORT[tlSort.col], tlSort.dir)).map(tlRowHtml).join('')}</tbody>
       </table>
     </div>`;

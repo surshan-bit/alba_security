@@ -39,6 +39,7 @@ step('browser smoke test (Chromium; skipped if Playwright is missing)', 'node', 
 step('state tests in Chromium (pins, Trade Log; skipped if Playwright is missing)', 'node', ['tests/state.js']);
 step('live ticker in Chromium (price, MoS, W% CHG, M% CHG; skipped if Playwright is missing)', 'node', ['tests/ticker.js']);
 step('refresh menus, tiers, resume and Analysis counts in Chromium (skipped if Playwright is missing)', 'node', ['tests/refresh.js']);
+step('accessibility in Chromium (axe-core on every screen and open state, and keyboard focus is visible; skipped if Playwright is missing)', 'node', ['tools/a11y.js']);
 if(PART !== 'main') step('import flows in Chromium (upload, import, backup, restore, watchlist sync; skipped if Playwright is missing)', 'node', ['tests/imports.js']);
 const now = JSON.parse(fs.readFileSync(path.join(out, '_index.json'), 'utf8'));
 

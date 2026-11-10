@@ -1,4 +1,6 @@
 /* The shared parts, used by every screen that needs them (no part belongs to one screen).
+/* Text for screen readers only: it takes no room on screen. */
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
    tabs        a row of two or three headings, the chosen one underlined (News, Trade Log); .tabs-top is the phone-only bar that forms the top of a white card
    choices     a row of small round buttons, one chosen (Upcoming / Recent, Open / Closed)
    day-head    a date heading with a count, above the rows of that date

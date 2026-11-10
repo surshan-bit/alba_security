@@ -5,25 +5,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Alba Securities - Stock Analyzer</title>
-<link rel="stylesheet" href="styles.css?v=737cb364">
+<link rel="stylesheet" href="styles.css?v=b7796f17">
 <!--build:preload-->
-<link rel="modulepreload" href="app.js?v=737cb364">
+<link rel="modulepreload" href="app.js?v=b7796f17">
 <link rel="modulepreload" href="chunks/chunk-Z74VYBHV.js">
 <link rel="modulepreload" href="chunks/chunk-LWDZFE6T.js">
 <link rel="modulepreload" href="chunks/chunk-SBP6MSRT.js">
-<link rel="modulepreload" href="chunks/main-ASITCUMQ.js">
-<link rel="modulepreload" href="chunks/chunk-FOUZS7AZ.js">
-<link rel="modulepreload" href="chunks/chunk-T7HEN3MN.js">
+<link rel="modulepreload" href="chunks/main-TF2HG2BS.js">
+<link rel="modulepreload" href="chunks/chunk-OQBBCB6H.js">
+<link rel="modulepreload" href="chunks/chunk-E66O56IO.js">
 <link rel="modulepreload" href="chunks/chunk-5T5AWJVU.js">
-<link rel="modulepreload" href="chunks/chunk-OEW4VEND.js">
-<link rel="modulepreload" href="chunks/chunk-EKBGBCM4.js">
-<link rel="modulepreload" href="chunks/chunk-NTYY4XBX.js">
+<link rel="modulepreload" href="chunks/chunk-3FFATO4Y.js">
+<link rel="modulepreload" href="chunks/chunk-MHW2QTW3.js">
+<link rel="modulepreload" href="chunks/chunk-SCXZ6WSM.js">
 <link rel="modulepreload" href="chunks/chunk-25QN72MB.js">
 <!--/build:preload-->
 </head>
 <body>
 
-<div class="topbar">
+<header class="topbar">
   <button type="button" class="menu-toggle" id="menuToggle" aria-label="Open menu"><span></span><span></span><span></span></button>
   <div class="topbar-title" aria-label="Current page"><span class="topbar-brand">Alba Securities</span><span class="topbar-sep" aria-hidden="true">&rsaquo;</span><span class="topbar-section" id="topbarSection"></span></div>
   <div class="topbar-search"><input type="text" id="globalSearch" class="topbar-search-input" placeholder="Search a company or ticker, e.g. TCS" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="globalSuggest" aria-label="Search a stock"><button type="button" class="topbar-search-clear" id="globalSearchClear" aria-label="Clear search">&times;</button><div class="search-suggest" id="globalSuggest" role="listbox"></div></div>
@@ -37,7 +37,7 @@
     <div class="activity-panel" id="activityPanel" role="region" aria-label="Notifications" hidden></div>
     <span class="activity-sr" id="activityLive" role="status" aria-live="polite"></span>
   </div>
-</div>
+</header>
 
 <div class="data-integrity-banner" id="dataIntegrityBanner" role="alert" aria-live="assertive" hidden></div>
 
@@ -63,7 +63,7 @@
       </g>
       <circle cx="100" cy="100" r="50" fill="url(#brandSunGrad)"/>
     </svg>
-    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.372 &mdash; tagged 2026-11-10">v1.372</span></div>
+    <div class="brand-title">Alba Securities<span class="brand-version" title="Version 1.373 &mdash; tagged 2026-11-10">v1.373</span></div>
   </div>
   <div class="sidebar-nav">
     <div class="nav-section-label">Menu</div>
@@ -136,7 +136,7 @@
   </div>
 </nav>
 
-<div class="wrap">
+<main class="wrap" id="main">
 
   <!-- Resting place of the shared stock detail panel; it is moved into the page that opens a stock. -->
   <div id="detailHome" hidden><div class="detail" id="detail"></div></div>
@@ -234,13 +234,13 @@
     <div class="settings-panel settings-panel--claude" id="claudeControls"></div>
   </section>
 
-</div>
+</main>
 
 <div id="bootStatus" class="boot-cover" hidden>
   <div class="boot-msg"></div>
   <button type="button" class="boot-retry" hidden>Retry</button>
 </div>
-<script src="js/loader.js" data-entry="app.js?v=737cb364"></script>
+<script src="js/loader.js" data-entry="app.js?v=b7796f17"></script>
 </body>
 </html>
 

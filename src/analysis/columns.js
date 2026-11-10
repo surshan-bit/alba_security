@@ -221,7 +221,7 @@ function sortHeaderHtml(id, label, sort, extra){
 function columnHeaderHtml(id, sort){
   const c = ANALYSIS_LB_COLUMN_MAP.get(id);
   if(!c) return '';
-  if(id === 'pin') return '<th class="pin-col"></th>';
+  if(id === 'pin') return '<th class="pin-col"><span class="sr-only">Pin</span></th>';
   const extra = (c.num ? ' class="num"' : '') + (c.title ? ` title="${escapeHtml(c.title)}"` : '');
   if(!sort || !isSortableColumn(id)) return `<th${extra}>${escapeHtml(c.label)}</th>`;
   return sortHeaderHtml(id, c.label, sort, extra);
