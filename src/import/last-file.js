@@ -1,7 +1,7 @@
 // "Last file loaded" card of the Fundamental section on the Data Refresh page: which file was uploaded last,
 // when, and what became of it (waiting to be imported, imported, or the last attempt failed / was cancelled).
 import { getDb, fundamentalCsvUploadLog } from '../core/store.js';
-import { escapeHtml, formatUploadTimestamp } from '../core/util.js';
+import { escapeHtml, formatUploadTimestamp, IST_ZONE } from '../core/util.js';
 import { lockBusy } from './joblock.js';
 import { pruneLogCollection } from '../joblogs/panels.js';
 import { setHtml } from '../core/safehtml.js';
@@ -19,7 +19,7 @@ function newest(log){
   for(const r of log.values()) if(!best || String(r.uploadedAt) > String(best.uploadedAt)) best = r;
   return best;
 }
-function dayOf(iso){ try { return new Date(iso).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' }); } catch(e){ return ''; } }
+function dayOf(iso){ try { return new Date(iso).toLocaleDateString('en-GB', { timeZone: IST_ZONE, day: 'numeric', month: 'short', year: 'numeric' }); } catch(e){ return ''; } }
 
 /** What the card says about a record: [css class, headline, extra lines]
  * @returns {[string, string, string[]]} */

@@ -37,7 +37,9 @@ tests/check.js                the pre-publish check: build, syntax, lint, harnes
 tests/state.js, browser.js, imports.js   Chromium suites
 tests/golden.json             expected snapshot hashes
 tests/golden-text.json.gz     the text behind each hash, so a mismatch prints the first changed lines
-tools/typecheck.js            TypeScript checkJs over src/; fails only on findings not in tests/types.baseline.txt
+tools/a11y.js                 accessibility audit in Chromium (axe-core, WCAG 2 A/AA, plus a Tab-key focus check); counts per page must not rise above tools/a11y-ratchet.json
+tools/coverage.js             unit-test coverage of src/ (floor in tools/coverage-ratchet.json; `-- --changed` fails if a changed line has no test)
+tools/typecheck.js            TypeScript checkJs over src/; fails only on findings not in tests/types.baseline.txt (now empty: any finding fails)
 tests/fixtures/stocks.json    anonymised sample of the stock list used by the harness
 ```
 
@@ -85,7 +87,10 @@ npm install            once per fresh checkout (needs network); Playwright is a 
 # edit files in src/ and styles/ (and partials/, js/loader.js)
 npm run check          build (app.js, chunks/, styles.css) + syntax + lint + regression harness + browser suites; must print OK before publishing (CI runs `-- --part=main` and `-- --part=imports` as two parallel jobs)
 npm run update-golden  after reviewing an intended change in behaviour, accept the new snapshots (hashes and their text)
-npm run types          type check src/ (also part of npm run check); new findings fail, the 228 known ones are in tests/types.baseline.txt (strict null and function checks are on, so new code must handle a missing element; implicit any is off)
+npm run types          type check src/ (also part of npm run check); any finding fails (tests/types.baseline.txt is empty) (strict null and function checks are on, so new code must handle a missing element; implicit any is off)
+npm run a11y           accessibility audit of every page (needs Chromium); also part of npm run check
+npm run coverage       unit-test coverage of src/ (`-- --changed` for the lines changed against main)
+npm run rls            database rules on a throw-away PostgreSQL (when supabase/ changed)
 ```
 
 If `check` reports differing snapshots, the new ones are written to `tests/out/`. To see what changed, run the harness on the previous version
@@ -116,12 +121,12 @@ The delivery was restructured: one classic `js/loader.js` imports an ES-module `
 
 ## Changing styles
 
-`styles/main.css` lists the files in cascade order: the order is part of the cascade, so a rule moved between files can change which one wins. One file per screen or component (`shell.css`, `analysis.css`, `strategies.css` ...), then `phone.css` (narrow screens), `theme-light.css` (everything the Light theme changes), `refresh-kit.css` and `late-global.css` (global rules that must come after the components). Put a new rule in the file of the screen it belongs to; do not add a "fixes" file at the end.
+`styles/main.css` lists the files in cascade order inside `@layer`s (`legacy, page, detail, phone, type, override, phone-last`; `node tools/lint.js` checks the list): a layer beats selector specificity, and within a layer the order is part of the cascade, so a rule moved between files can change which one wins. Colours, spacing and type sizes are tokens in `styles/tokens.css`; shared button rules are in `styles/page-buttons.css`, and `styles/css-ratchet.json` counts what must not grow. One file per screen or component (`shell.css`, `analysis.css`, `strategies.css` ...), then `phone.css` (narrow screens), `theme-light.css` (everything the Light theme changes), `refresh-kit.css` and `late-global.css` (global rules that must come after the components). Put a new rule in the file of the screen it belongs to; do not add a "fixes" file at the end.
 
 `npm run check` does not look at CSS, so prove a styles change with the snapshot tool (about 6 minutes for the quick run):
 
 ```
-node tools/css-snapshot.js snap /tmp/before --quick --states      # on the unchanged code
+node tools/css-snapshot.js snap /tmp/before --quick --states      # on the unchanged code (drop --states if it stops with a pseudo-state error)
 # change styles/, then: npm run build
 node tools/css-snapshot.js snap /tmp/after --quick --states
 node tools/css-snapshot.js compare /tmp/before /tmp/after          # no difference = nothing visible changed

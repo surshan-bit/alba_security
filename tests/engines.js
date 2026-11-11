@@ -2832,10 +2832,11 @@ test('daily MACD for a strategy: only that reading of a saved block changes, and
 });
 
 // ---- Refresh all stocks (src/refresh/tvrefresh.js): the snapshot and bar steps, driven with a made-up TradingView and database
-const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG', 'fundamentalCsvUploadLog', 'tabId', 'strategies', 'watchlistSyncLog', 'TV_SERVER']);
+const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG', 'fundamentalCsvUploadLog', 'tabId', 'strategies', 'watchlistSyncLog', 'TV_SERVER', 'IST_ZONE']);
 const TV_DEFAULTS = { tickerSymbol: (s) => s.ticker, sanitizeDocId: (x) => x, sleep: () => Promise.resolve(), sameValue: (a, b) => JSON.stringify(a) === JSON.stringify(b), safeUrl: (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : '') };   // what the real helpers do, without their imports and waits
 // `more` names extra exports a kept module needs from a stubbed one: { '../strategies/rules.js': ['qualifyingStocks'] }.
 // A stand-in for an imported function: it calls whatever the running test put in globalThis.__T (looked up at call time) or a default. Made here, not in the stub's text, so it is not counted as source code.
+globalThis.__T = globalThis.__T || {}; globalThis.__T.IST_ZONE = 'Asia/Kolkata';
 globalThis.__TVFN = (n) => (...a) => (globalThis.__T[n] ? globalThis.__T[n](...a) : (TV_DEFAULTS[n] || (() => undefined))(...a));
 // Loads a src module with every import replaced by a stand-in, except the modules named in `keep` (which load for real). A stand-in function calls whatever the
 // running test put in globalThis.__T (or a default); the stand-ins for values are read from globalThis.__T when the module loads.
@@ -4891,7 +4892,7 @@ test('last file card: a failed or cancelled import is written on the upload reco
   globalThis.__LF = { puts: [], sets: [], pruned: [] };
   const L = await loadWithStubs('src/import/last-file.js', '', {
     '../core/store.js': 'export const getDb = () => null, fundamentalCsvUploadLog = { put: (k, v) => globalThis.__LF.puts.push([k, v]), values: () => [] };',
-    '../core/util.js': 'export const escapeHtml = (t) => String(t), formatUploadTimestamp = (t) => String(t);', './joblock.js': 'export const lockBusy = () => false;',
+    '../core/util.js': 'export const escapeHtml = (t) => String(t), formatUploadTimestamp = (t) => String(t), IST_ZONE = "Asia/Kolkata";', './joblock.js': 'export const lockBusy = () => false;',
     '../joblogs/panels.js': 'export const pruneLogCollection = async (db, col) => { globalThis.__LF.pruned.push(col); };', '../core/safehtml.js': 'export const setHtml = () => {};' });
   const db = { collection: (c) => ({ doc: (id) => ({ set: async (r) => { globalThis.__LF.sets.push([c, id, r]); } }) }) };
   const rec = { uploadedAt: '2026-11-10T01:00:00Z', filename: 'f.csv', status: 'uploaded' };
@@ -6615,4 +6616,109 @@ test('analysis grid columns: every column draws its cell, the headers and the Co
   assert.ok(/rs-none/.test(cellOf(aged(null), 'triggered')));   // a trigger time that cannot be read counts as never triggered
   const queued = []; T.priceLoaded.clear(); T.analysisQueuePriceLoad = (x) => queued.push(x.name); T.getResearchTriggers = () => new Map([['R', ago(0)]]);
   assert.ok(/rs-fresh[^>]*>Today/.test(cellOf(aged(null), 'triggered')) && queued.length === 1);   // the price history is fetched lazily, and the cell is not marked pending meanwhile
+}));
+
+// ---- Opening a stock or an industry in place (src/ui/inlinedetail.js): the detail panel moves into the page and comes back on close
+test('inline detail: a stock or industry opens in place, one host is reused, Back closes it and restores the scroll', () => withPage('<section id="section-analysis"></section><div id="home"><div id="detail"></div></div><button id="detailBackBtn"></button>', async (win) => {
+  const log = [];
+  globalThis.__ID = { log, detailEl: win.document.getElementById('detail') };
+  const hadWindow = globalThis.window, hadRaf = globalThis.requestAnimationFrame;
+  globalThis.window = Object.assign(win, { scrollY: 120, scrollTo: (x, y) => log.push(['scrollTo', y]), focus() {} });
+  globalThis.requestAnimationFrame = (fn) => fn();
+  try {
+    const M = await loadWithStubs('src/ui/inlinedetail.js', '', {
+      '../core/dom.js': 'export const detailEl = globalThis.__ID.detailEl;', '../core/stocks.js': 'export const stocks = [{ ticker: "AAA" }];',
+      '../detail/render.js': 'export const renderDetail = (i) => globalThis.__ID.log.push(["detail", i]); export const setDetailBackTo = (b) => { globalThis.__ID.back = b; };',
+      '../industry/render.js': 'export const renderIndustryDetail = (by, name, label, open) => { globalThis.__ID.log.push(["industry", by, name, label]); globalThis.__ID.open = open; };',
+      './deeplink.js': 'export const syncStockHash = (s) => globalThis.__ID.log.push(["hash", s && s.ticker]);',
+      '../core/util.js': 'export const tickerSymbol = (s) => s.ticker;', './viewstack.js': 'export const recordView = (v) => globalThis.__ID.log.push(["view", v]);' });
+    const section = win.document.getElementById('section-analysis');
+    M.openStockInline(section, 'Analysis', 5);   // no such stock: nothing happens
+    assert.strictEqual(M.inlineOpenIn(), null);
+    M.openStockInline(section, 'Analysis', 0);
+    assert.strictEqual(M.inlineOpenIn(), 'analysis');
+    assert.ok(section.classList.contains('inline-detail-open'));
+    assert.strictEqual(section.querySelectorAll('.inline-detail-host').length, 1);
+    M.openIndustryInline(section, 'Back to Analysis', 'industry', 'Steel');   // already open: the same host is reused
+    assert.strictEqual(section.querySelectorAll('.inline-detail-host').length, 1);
+    assert.deepStrictEqual(log.filter((l) => l[0] === 'industry'), [['industry', 'industry', 'Steel', 'Back to Analysis']]);
+    globalThis.__ID.open(0);   // a stock inside the industry page opens in the same place
+    globalThis.__ID.back.onBack();   // Back: closes and records the page it returns to
+    assert.strictEqual(M.inlineOpenIn(), null);
+    assert.ok(!section.classList.contains('inline-detail-open'));
+    assert.strictEqual(win.document.getElementById('home').contains(globalThis.__ID.detailEl), true);
+    assert.deepStrictEqual(log.filter((l) => l[0] === 'scrollTo'), [['scrollTo', 0], ['scrollTo', 0], ['scrollTo', 0], ['scrollTo', 120]]);
+    M.closeInlineDetail(true);   // nothing open: harmless
+    await new Promise((r) => setTimeout(r, 450));   // the focus grabs scheduled by the opens run while the page still exists
+  } finally {
+    if(hadWindow === undefined) delete globalThis.window; else globalThis.window = hadWindow;
+    if(hadRaf === undefined) delete globalThis.requestAnimationFrame; else globalThis.requestAnimationFrame = hadRaf;
+  }
+}));
+
+test('last file card: an imported file says its date as an India-time day; Analysis ideas stamps are India time and blank for a bad date', () => withPage('<div id="fundamentalLastFile"></div>', async () => {
+  globalThis.__LF2 = { html: '' };
+  const rec = { uploadedAt: '2026-11-09T20:00:00Z', processedAt: '2026-11-10T01:00:00Z', filename: 'f.csv', status: 'processed' };   // 20:00 UTC is already the 10th in India
+  const L = await loadWithStubs('src/import/last-file.js', '', {
+    '../core/store.js': 'export const getDb = () => null, fundamentalCsvUploadLog = { put: () => {}, values: () => [globalThis.__LF2.rec] };',
+    '../core/util.js': 'export const escapeHtml = (t) => String(t), formatUploadTimestamp = (t) => String(t), IST_ZONE = "Asia/Kolkata";', './joblock.js': 'export const lockBusy = () => false;',
+    '../joblogs/panels.js': 'export const pruneLogCollection = async () => {};', '../core/safehtml.js': 'export const setHtml = (el, h) => { globalThis.__LF2.html = h; };' });
+  globalThis.__LF2.rec = rec;
+  L.renderAllLastFiles();
+  assert.ok(globalThis.__LF2.html.includes('set to 10 Nov 2026 for every stock'), globalThis.__LF2.html);
+  const I = await loadWithStubs('src/analysis/ideasfilter.js', '', {
+    '../core/stocks.js': 'export const stockByTickerSymbol = () => null;', '../core/util.js': 'export const IST_ZONE = "Asia/Kolkata", tickerSymbol = (s) => s.ticker;',
+    '../identity/ideasresults.js': 'export const ideasResultsGet = () => null;', '../strategies/state.js': 'export const publishedStrategies = () => [];' });
+  assert.strictEqual(I.ideasWhen({ at: '2026-11-09T20:00:00Z' }), '10 Nov 2026, 1:30 am');
+  assert.strictEqual(I.ideasWhen({ at: 'nonsense' }), '');
+}));
+
+test('inline detail: a stock opened from a link has no Back target, focus problems are ignored, and closing leaves a panel that was moved away', () => withPage('<section id="section-news"></section><div id="home"><div id="detail"></div></div><div id="elsewhere"></div><button id="detailBackBtn"></button>', async (win) => {
+  const log = [];
+  globalThis.__ID = { log, detailEl: win.document.getElementById('detail') };
+  const hadWindow = globalThis.window, hadFocus = win.document.hasFocus;
+  globalThis.window = Object.assign(win, { scrollY: 0, scrollTo() {}, focus() { throw new Error('no focus'); } });
+  win.document.hasFocus = () => false;
+  try {
+    const M = await loadWithStubs('src/ui/inlinedetail.js', '', {
+      '../core/dom.js': 'export const detailEl = globalThis.__ID.detailEl;', '../core/stocks.js': 'export const stocks = [{ ticker: "AAA" }];',
+      '../detail/render.js': 'export const renderDetail = () => {}; export const setDetailBackTo = (b) => { globalThis.__ID.back = b; };',
+      '../industry/render.js': 'export const renderIndustryDetail = () => {};', './deeplink.js': 'export const syncStockHash = () => {};',
+      '../core/util.js': 'export const tickerSymbol = (s) => s.ticker;', './viewstack.js': 'export const recordView = () => {};' });
+    const section = win.document.getElementById('section-news');
+    M.openStockInline(section, '', 0);
+    assert.strictEqual(globalThis.__ID.back, null);
+    win.document.getElementById('detailBackBtn').focus = () => { throw new Error('no focus'); };
+    /** @type {any} */ (win.document.activeElement).blur();   // the next focus grab finds the button unfocused, and its focus() fails
+    win.document.getElementById('elsewhere').appendChild(globalThis.__ID.detailEl);   // the panel was moved by something else
+    M.closeInlineDetail(false);
+    assert.strictEqual(win.document.getElementById('elsewhere').contains(globalThis.__ID.detailEl), true);
+    await new Promise((r) => setTimeout(r, 450));
+  } finally {
+    win.document.hasFocus = hadFocus;
+    if(hadWindow === undefined) delete globalThis.window; else globalThis.window = hadWindow;
+  }
+}));
+
+test('last file card: each state of the upload record is worded, and a running or interrupted import is said first', () => withPage('<div id="fundamentalLastFile"></div>', async () => {
+  globalThis.__LF3 = { html: '', rec: null, busy: false };
+  const L = await loadWithStubs('src/import/last-file.js', '', {
+    '../core/store.js': 'export const getDb = () => ({ doc: () => ({ get: async () => globalThis.__LF3.job }) }), fundamentalCsvUploadLog = { put: () => {}, values: () => (globalThis.__LF3.rec ? [globalThis.__LF3.rec] : []) };',
+    '../core/util.js': 'export const escapeHtml = (t) => String(t), formatUploadTimestamp = (t) => String(t), IST_ZONE = "Asia/Kolkata";', './joblock.js': 'export const lockBusy = () => globalThis.__LF3.busy;',
+    '../joblogs/panels.js': 'export const pruneLogCollection = async () => {};', '../core/safehtml.js': 'export const setHtml = (el, h) => { globalThis.__LF3.html = h; };' });
+  const draw = async (rec, job, busy) => { Object.assign(globalThis.__LF3, { rec, job, busy: !!busy }); await L.refreshLastFiles(); return globalThis.__LF3.html; };
+  const up = { uploadedAt: '2026-11-09T00:00:00Z', filename: 'f.csv', rowCount: 1200, status: 'uploaded' };
+  assert.ok((await draw(null)).includes('No file has been uploaded yet'));
+  assert.ok((await draw(up)).includes('Uploaded, not imported yet'));
+  assert.ok((await draw({ ...up, rowCount: undefined, filename: '' })).includes('>file<'));
+  assert.ok((await draw({ ...up, lastAttempt: { at: '2026-11-10T00:00:00Z', outcome: 'cancelled' } })).includes('Not imported (cancelled)'));
+  assert.ok((await draw({ ...up, lastAttempt: { at: '2026-11-10T00:00:00Z', outcome: 'failed' } })).includes('unknown error'));
+  assert.ok((await draw({ ...up, lastAttempt: { at: '2026-11-01T00:00:00Z', outcome: 'failed' } })).includes('Uploaded, not imported yet'));   // an attempt on an older file is not shown
+  assert.ok((await draw({ ...up, status: 'processed', processedAt: '2026-11-10T00:00:00Z', processedNote: 'Two rows skipped' })).includes('Two rows skipped'));
+  assert.ok((await draw({ ...up, status: 'processed' })).includes('Imported'));
+  const job = { status: 'running', startedAt: '2026-11-10T00:00:00Z' };
+  assert.ok((await draw(up, { exists: true, data: () => job }, true)).includes('An import is running'));
+  assert.ok((await draw(up, { exists: true, data: () => job }, false)).includes('interrupted'));
+  assert.ok(!(await draw(up, { exists: true, data: () => ({ status: 'done' }) })).includes('interrupted'));
+  assert.ok(!(await draw(up, { exists: false })).includes('interrupted'));
 }));

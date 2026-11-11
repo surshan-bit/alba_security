@@ -41,17 +41,20 @@ function takeKeyboardFocus(){
   grab(); setTimeout(grab, 60); setTimeout(grab, 400);
 }
 
+// Moves the detail page into a host inside the section (once), remembering the scroll position to restore on close.
+function mountDetailHost(section){
+  if(current) return;
+  const scroll = window.scrollY, host = document.createElement('div');
+  host.className = 'inline-detail-host';
+  section.appendChild(host);
+  section.classList.add('inline-detail-open');
+  host.appendChild(/** @type {HTMLElement} */ (detailEl));
+  current = { section, host, scroll };
+}
+
 function openStockInline(section, label, idx){
   if(!stocks[idx]) return;
-  const scroll = current ? current.scroll : window.scrollY;
-  if(!current){
-    const host = document.createElement('div');
-    host.className = 'inline-detail-host';
-    section.appendChild(host);
-    section.classList.add('inline-detail-open');
-    host.appendChild(/** @type {HTMLElement} */ (detailEl));
-    current = { section, host, scroll };
-  }
+  mountDetailHost(section);
   // No label (a stock opened from a link, e.g. in a new tab): there is no page to go back to, so no Back button.
   // Back / Esc closes the detail and shows the page again, whatever the browser history holds (it does not depend on the history working inside the frame).
   setDetailBackTo(label ? { label, onBack: () => { const key = section.id.replace(/^section-/, ''); closeInlineDetail(true); recordView({ s: key }); } } : null);
@@ -64,15 +67,7 @@ function openStockInline(section, label, idx){
 
 // Opens an industry's (or industry group's) detail page the same way: in place of the page's content, with Back / Esc to return.
 function openIndustryInline(section, label, by, name){
-  const scroll = current ? current.scroll : window.scrollY;
-  if(!current){
-    const host = document.createElement('div');
-    host.className = 'inline-detail-host';
-    section.appendChild(host);
-    section.classList.add('inline-detail-open');
-    host.appendChild(/** @type {HTMLElement} */ (detailEl));
-    current = { section, host, scroll };
-  }
+  mountDetailHost(section);
   setDetailBackTo({ label, onBack: () => { const key = section.id.replace(/^section-/, ''); closeInlineDetail(true); recordView({ s: key }); } });
   renderIndustryDetail(by, name, label, (idx) => openStockInline(section, label, idx));
   window.scrollTo(0, 0);

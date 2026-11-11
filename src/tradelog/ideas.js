@@ -3,7 +3,7 @@
 import { keepScroll } from '../ui/scrollkeep.js';
 import { stockByTickerSymbolAny, stocks } from '../core/stocks.js';
 import { allTrades } from '../core/store.js';
-import { escapeHtml, safeUrl, tickerSymbol } from '../core/util.js';
+import { escapeHtml, IST_ZONE, safeUrl, tickerSymbol } from '../core/util.js';
 import { publishedStrategies } from '../strategies/state.js';
 import { qualifyingStocks } from '../strategies/rules.js';
 import { appSections } from '../ui/navigation.js';
@@ -121,7 +121,7 @@ function snapshotOf(list){
 function stampText(snap){
   const d = new Date(snap.at);
   if(isNaN(d.getTime())) return '';
-  const tz = { timeZone: 'Asia/Kolkata' };
+  const tz = { timeZone: IST_ZONE };
   const day = d.toLocaleDateString('en-IN', { ...tz, day: 'numeric', month: 'short', year: 'numeric' }), time = d.toLocaleTimeString('en-IN', { ...tz, hour: 'numeric', minute: '2-digit', hour12: true });
   const days = Math.round((Date.parse(tvIstDate()) - Date.parse(snap.today)) / 864e5);
   return `${day}, ${time}` + (days <= 0 ? ' (today)' : days === 1 ? ' (1 day ago)' : ' (' + days + ' days ago)');
@@ -130,7 +130,7 @@ function stampText(snap){
 function shortStamp(snap){
   const d = new Date(snap.at);
   if(isNaN(d.getTime())) return '';
-  const tz = { timeZone: 'Asia/Kolkata' }, days = Math.round((Date.parse(tvIstDate()) - Date.parse(snap.today)) / 864e5);
+  const tz = { timeZone: IST_ZONE }, days = Math.round((Date.parse(tvIstDate()) - Date.parse(snap.today)) / 864e5);
   const day = days <= 0 ? 'today' : days === 1 ? 'yesterday' : d.toLocaleDateString('en-IN', { ...tz, day: 'numeric', month: 'short' });
   return day + ', ' + d.toLocaleTimeString('en-IN', { ...tz, hour: 'numeric', minute: '2-digit', hour12: true });
 }
