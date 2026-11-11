@@ -259,12 +259,21 @@ import { readFileSync } from 'node:fs';
   const npmPackages = Object.entries(lock.npm || {});
   eq('lock: supabase-js is recorded at the version package.json pins', Object.keys(lock.npm || {}).includes('@supabase/supabase-js@' + pinned), true);
   eq('lock: every package has a hash', npmPackages.length > 1 && npmPackages.every(([, p]) => /^sha512-/.test(p.integrity)), true);
-  for(const file of ['ci.yml', 'functions.yml']){
+  for(const file of ['ci.yml', 'functions.yml', 'security.yml']){
     const wf = readFileSync(new URL('../.github/workflows/' + file, import.meta.url), 'utf8');
     eq(file + ': Deno is installed by an action pinned to a commit', /uses: denoland\/setup-deno@[0-9a-f]{40} # v\d+\.\d+\.\d+/.test(wf), true);
     eq(file + ': Deno itself is pinned to an exact version', /deno-version: \d+\.\d+\.\d+/.test(wf), true);
     eq(file + ': the function is checked against the lock without being allowed to change it', /deno check --frozen --node-modules-dir=none --lock=supabase\/deno\.lock supabase\/functions\/sample\/index\.ts/.test(wf), true);
   }
+}
+
+// The security checks also run on a schedule, so a new vulnerability or a changed rule is found without a pull request.
+{
+  const { readFileSync } = await import('node:fs');
+  const wf = readFileSync(new URL('../.github/workflows/security.yml', import.meta.url), 'utf8');
+  eq('security.yml: runs on a daily schedule and on demand', /schedule:\s*\n\s*- cron: '[^']+'/.test(wf) && /workflow_dispatch:/.test(wf), true);
+  eq('security.yml: audits the shipped packages and runs the database rules (a missing server fails)', /npm audit --omit=dev --audit-level=high/.test(wf) && /npm run rls/.test(wf) && /RLS_REQUIRED: '1'/.test(wf), true);
+  eq('security.yml: has read-only permissions', /permissions:\s*\n\s*contents: read/.test(wf), true);
 }
 
 // Playwright 1.56 does not support ubuntu-latest (now Ubuntu 26.04), so every job runs on a pinned runner. functions.yml was missed once: its check
