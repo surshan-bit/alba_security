@@ -1,9 +1,0 @@
-/* Analysis, Strategies and Explorer pages: small page-level touches (filter buttons, strategy buttons, tables). */
-.analysis-strategy-filter .filter-btn{white-space:nowrap}
-.analysis-global-filters:empty{display:none}
-.lm-pane .strat-learn-run{margin-top:8px}
-.strat-side .strat-new,.strat-side .strat-restore{color:var(--accent)}
-.strat-side .strat-restore{color:var(--muted)}
-:root[data-theme="white"] .strat-layout .strat-main .strat-total .strat-track-btn{border:1px solid var(--c-c9cfdf);background:var(--panel);color:var(--text);min-height:40px;border-radius:6px}
-:root[data-theme="white"] .strat-layout .strat-main .strat-total .strat-track-btn:disabled{opacity:.5}
-:root[data-theme="white"] .strat-layout .strat-main .strat-dup.strat-btn:not(.pub):not(.on):hover{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,var(--panel))}
