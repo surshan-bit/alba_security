@@ -1,0 +1,24 @@
+# Runs the security checks on a schedule (and on demand), not only on pull requests: a new vulnerability in a package the site ships, or a
+# changed database rule, is found within a day even when nobody opens a pull request. A red run emails the repository's watchers.
+name: security
+on:
+  schedule:
+    - cron: '17 3 * * *'   # every day, 08:47 India time
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  security:
+    runs-on: ubuntu-24.04   # Playwright 1.56 does not support ubuntu-latest (26.04) yet
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high   # a known high-severity problem in a package the site ships
+      - run: npm run rls   # the database rules on a throw-away PostgreSQL; RLS_REQUIRED makes a missing server a failure, never a skip
+        env: { RLS_REQUIRED: '1' }
+      - run: npm run platform
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with: { deno-version: 2.9.6 }
+      - run: deno check --frozen --node-modules-dir=none --lock=supabase/deno.lock supabase/functions/sample/index.ts
