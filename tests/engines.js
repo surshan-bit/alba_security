@@ -2832,10 +2832,11 @@ test('daily MACD for a strategy: only that reading of a saved block changes, and
 });
 
 // ---- Refresh all stocks (src/refresh/tvrefresh.js): the snapshot and bar steps, driven with a made-up TradingView and database
-const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG', 'fundamentalCsvUploadLog', 'tabId', 'strategies', 'watchlistSyncLog', 'TV_SERVER']);
+const TV_VALUES = new Set(['stocks', 'priceHistoryByTicker', 'COMPACT_LAG', 'fundamentalCsvUploadLog', 'tabId', 'strategies', 'watchlistSyncLog', 'TV_SERVER', 'IST_ZONE']);
 const TV_DEFAULTS = { tickerSymbol: (s) => s.ticker, sanitizeDocId: (x) => x, sleep: () => Promise.resolve(), sameValue: (a, b) => JSON.stringify(a) === JSON.stringify(b), safeUrl: (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : '') };   // what the real helpers do, without their imports and waits
 // `more` names extra exports a kept module needs from a stubbed one: { '../strategies/rules.js': ['qualifyingStocks'] }.
 // A stand-in for an imported function: it calls whatever the running test put in globalThis.__T (looked up at call time) or a default. Made here, not in the stub's text, so it is not counted as source code.
+globalThis.__T = globalThis.__T || {}; globalThis.__T.IST_ZONE = 'Asia/Kolkata';
 globalThis.__TVFN = (n) => (...a) => (globalThis.__T[n] ? globalThis.__T[n](...a) : (TV_DEFAULTS[n] || (() => undefined))(...a));
 // Loads a src module with every import replaced by a stand-in, except the modules named in `keep` (which load for real). A stand-in function calls whatever the
 // running test put in globalThis.__T (or a default); the stand-ins for values are read from globalThis.__T when the module loads.
@@ -4891,7 +4892,7 @@ test('last file card: a failed or cancelled import is written on the upload reco
   globalThis.__LF = { puts: [], sets: [], pruned: [] };
   const L = await loadWithStubs('src/import/last-file.js', '', {
     '../core/store.js': 'export const getDb = () => null, fundamentalCsvUploadLog = { put: (k, v) => globalThis.__LF.puts.push([k, v]), values: () => [] };',
-    '../core/util.js': 'export const escapeHtml = (t) => String(t), formatUploadTimestamp = (t) => String(t);', './joblock.js': 'export const lockBusy = () => false;',
+    '../core/util.js': 'export const escapeHtml = (t) => String(t), formatUploadTimestamp = (t) => String(t), IST_ZONE = "Asia/Kolkata";', './joblock.js': 'export const lockBusy = () => false;',
     '../joblogs/panels.js': 'export const pruneLogCollection = async (db, col) => { globalThis.__LF.pruned.push(col); };', '../core/safehtml.js': 'export const setHtml = () => {};' });
   const db = { collection: (c) => ({ doc: (id) => ({ set: async (r) => { globalThis.__LF.sets.push([c, id, r]); } }) }) };
   const rec = { uploadedAt: '2026-11-10T01:00:00Z', filename: 'f.csv', status: 'uploaded' };

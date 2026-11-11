@@ -2,7 +2,7 @@
 // made in the Trade Log, so the header Refresh button works on just that shortlist. It reads the saved Process result (identity/ideasresults.js)
 // of the strategy chosen in Analysis, or the newest result when no strategy is chosen. No result saved yet means no stock to show.
 import { stockByTickerSymbol } from '../core/stocks.js';
-import { tickerSymbol } from '../core/util.js';
+import { IST_ZONE, tickerSymbol } from '../core/util.js';
 import { ideasResultsGet } from '../identity/ideasresults.js';
 import { publishedStrategies } from '../strategies/state.js';
 
@@ -48,7 +48,7 @@ const ideasBoth = new Map();
 function ideasWhen(snap){
   const d = new Date(snap && snap.at);
   if(isNaN(d.getTime())) return '';
-  const tz = { timeZone: 'Asia/Kolkata' };
+  const tz = { timeZone: IST_ZONE };
   return d.toLocaleDateString('en-IN', { ...tz, day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + d.toLocaleTimeString('en-IN', { ...tz, hour: 'numeric', minute: '2-digit', hour12: true });
 }
 

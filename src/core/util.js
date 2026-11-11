@@ -27,11 +27,14 @@ function tickerIndustry(s){
   return parts.length > 1 ? parts[1].trim() : '—';
 }
 
+// The app's calendar: every date and time shown, and every "today", is on India time.
+const IST_ZONE = 'Asia/Kolkata';
+
 function formatDeepRefreshTimestamp(iso){
   if(!iso) return '';
   const d = new Date(iso);
   if(isNaN(d.getTime())) return iso;
-  return d.toLocaleString('en-IN', {day:'numeric', month:'short', hour:'numeric', minute:'2-digit', timeZone:'Asia/Kolkata'}) + ' IST';
+  return d.toLocaleString('en-IN', {day:'numeric', month:'short', hour:'numeric', minute:'2-digit', timeZone: IST_ZONE}) + ' IST';
 }
 
 function daysSinceDate(str){
@@ -70,7 +73,7 @@ function formatUploadTimestamp(iso){
   if(!iso) return '';
   const d = new Date(iso);
   if(isNaN(d.getTime())) return iso;
-  return d.toLocaleString('en-IN', {day:'numeric', month:'short', year:'numeric', hour:'numeric', minute:'2-digit', timeZone:'Asia/Kolkata'}) + ' IST';
+  return d.toLocaleString('en-IN', {day:'numeric', month:'short', year:'numeric', hour:'numeric', minute:'2-digit', timeZone: IST_ZONE}) + ' IST';
 }
 
 
@@ -101,4 +104,4 @@ function daysUntil(str, today){
   return d >= 0 ? d : null;
 }
 
-export { daysSinceDate, daysUntil, escapeHtml, fixedOrNull, formatDate, formatDeepRefreshTimestamp, formatUploadTimestamp, pctChangeSpan, round2OrNull, safeText, safeUrl, sanitizeDocId, screenerUrl, sleep, tickerIndustry, tickerKey, tickerSymbol };
+export { IST_ZONE, daysSinceDate, daysUntil, escapeHtml, fixedOrNull, formatDate, formatDeepRefreshTimestamp, formatUploadTimestamp, pctChangeSpan, round2OrNull, safeText, safeUrl, sanitizeDocId, screenerUrl, sleep, tickerIndustry, tickerKey, tickerSymbol };

@@ -9,7 +9,7 @@ import { fiCheck, fiPrevInfo, fiSym } from './fund-check.js';
 import { fundColumnsError, importNote, importResultLines, newWithoutValue, thinFileWarning } from './fundreport.js';
 import { wlRunSync } from './wlsync.js';
 import { registerBusy } from '../core/busy.js';
-import { sanitizeDocId as fiSid, sleep } from '../core/util.js';
+import { IST_ZONE, sanitizeDocId as fiSid, sleep } from '../core/util.js';
 import { paintLastRuns } from '../refresh/runlog.js';
 import { uploadsSettled } from './upload-history.js';
 import { recordScoreHistory } from '../history/scorehistory.js';
@@ -24,7 +24,7 @@ import { recordScoreHistory } from '../history/scorehistory.js';
 const FI = { HARD: 240000, SOFT: 200000 };
 const FI_PUBLISHED = 'The new data had already been saved when this failed, so it is live. Check the stock list; if it looks wrong, import a corrected file.';
 const fiSize = o => new TextEncoder().encode(JSON.stringify(o)).length;
-const fiDay = iso => { try { return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); } catch(e){ return new Date().toISOString().slice(0, 10); } };
+const fiDay = iso => { try { return new Date(iso).toLocaleDateString('en-CA', { timeZone: IST_ZONE }); } catch(e){ return new Date().toISOString().slice(0, 10); } };
 function fiCanon(o){
   if(Array.isArray(o)) return '[' + o.map(fiCanon).join(',') + ']';
   if(o && typeof o === 'object') return '{' + Object.keys(o).sort().filter(k => o[k] !== undefined).map(k => JSON.stringify(k) + ':' + fiCanon(o[k])).join(',') + '}';
