@@ -1,4 +1,4 @@
-/* Rules that still need the page layer because they override a shared rule that outranks them (each one is marked with what it overrides). Folding these needs the shared rule itself changed. */
+/* The few White-theme rules that must beat a shared rule of higher specificity. They sit in the page layer (the project's layer order, checked by tools/lint.js) instead of using the important flag or a specificity hack. Everything else moved into the shared sheets (white-screens.css). */
 .analysis-page table th,.analysis-page table td,.strat-page table th,.strat-page table td,.doc-page table th,.doc-page table td,.tl-page table th,.tl-page table td{border-color:transparent}
 @media (min-width:901px){:root[data-theme="white"] .settings-page .settings-subhead{margin-top:0}}
 @media (max-width:900px){:root[data-theme="white"] :is(h2[data-icon],.settings-page .settings-panel:not(.settings-panel--claude) .settings-row-title){font-size:var(--t-lg);gap:10px;margin-top:26px;margin-bottom:12px;padding-bottom:10px}

@@ -266,6 +266,10 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.377 &middot; 2026-11-12</h3>
+            <ul>
+              <li><strong>Page stylesheets folded into the shared styles:</strong> the seven per-page stylesheets are gone. Rules that did not need special treatment (about 50 of the 65) now live with the White theme&rsquo;s shared screen styles, and the 10 that must outrank a shared rule sit together in one small file. A comparison of every element on every screen, open state and width before and after found no difference, so nothing looks different.</li>
+            </ul>
             <h3>v1.376 &middot; 2026-11-11</h3>
             <ul>
               <li><strong>Daily security check:</strong> the package audit, the database-rule tests and the server-function type check now also run every morning, not only when someone changes the code. A new vulnerability in a package the site ships is found within a day. Nothing changes in the app itself.</li>
