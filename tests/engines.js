@@ -7558,3 +7558,124 @@ test('stock list: inactive stocks are left out of the lists, scores count only r
   assert.ok(list[2].fundamentals.model.startsWith('9-factor model') && list[2].fundamentals.scoringBreakdown.note.startsWith('9-factor model') && list[3].fundamentals.model === 'own' && list[3].fundamentals.scoringBreakdown.note === 'own note');
   assert.strictEqual(S.verdictLabel.pending, 'Pending Research');
 }));
+
+// ---- UI helpers: ui/scrollkeep, viewstack, historyrestore, dropmenu, confirm, gridsort, analysis/selectbar
+test('scroll keeping: scroll positions of the known scroll areas survive a redraw, and a redraw waits for the page to stop scrolling', () => withPage('<div id="root"><div class="strat-table-wrap" id="a"></div><div class="strat-table-wrap" id="b"></div><div class="biz-scroll" id="c"></div></div>', async (win) => {
+  const K = load('src/ui/scrollkeep.js'), root = win.document.getElementById('root'), [a, b, c] = ['a', 'b', 'c'].map((id) => win.document.getElementById(id));
+  const redrawn = []; K.keepScroll(null, () => redrawn.push('no root')); assert.deepStrictEqual(redrawn, ['no root']);
+  b.scrollLeft = 5; b.scrollTop = 7; c.scrollTop = 9;   // jsdom keeps assigned scroll offsets
+  const seen = []; K.keepScroll(root, () => { seen.push([a.scrollLeft, b.scrollLeft, b.scrollTop, c.scrollTop]); b.scrollLeft = 0; b.scrollTop = 0; c.scrollTop = 0; });
+  assert.deepStrictEqual([seen, b.scrollLeft, b.scrollTop, c.scrollTop], [[[0, 5, 7, 9]], 5, 7, 9]);   // put back after the redraw
+  b.scrollLeft = 3; assert.throws(() => K.keepScroll(root, () => { b.scrollLeft = 0; throw new Error('draw failed'); }), /draw failed/); assert.strictEqual(b.scrollLeft, 3);   // even when it fails
+  const marks = []; b.remove(); K.keepScroll(root, () => marks.push('ok')); assert.deepStrictEqual(marks, ['ok']);   // an area that is gone is skipped
+  // redrawWhenIdle: the real timers are held, so the waits are checked, not waited for
+  const real = globalThis.setTimeout, held = [], quietErr = console.error, errs = [];
+  globalThis.setTimeout = (f, ms) => { held.push({ f, ms }); return held.length; }; console.error = (m) => errs.push(String(m));
+  try {
+    const log = []; K.redrawWhenIdle('k', () => log.push('first')); K.redrawWhenIdle('k', () => log.push('same key')); assert.strictEqual(held.length, 1);   // one redraw per key
+    assert.ok(held[0].ms === 2500 || held[0].ms === 60);   // longer right after launch
+    held[0].f(); assert.deepStrictEqual(log, ['first']);   // nothing was scrolling: it ran at once
+    K.redrawWhenIdle('k', () => log.push('again')); win.document.dispatchEvent(new win.Event('scroll')); held.length = 0;
+    K.redrawWhenIdle('s', () => log.push('scroll')); const first = held.pop(); first.f();   // a scroll just happened: it waits again
+    assert.deepStrictEqual([log.length, held.length, held[0].ms > 0 && held[0].ms <= 370], [1, 1, true]);
+    held.length = 0;
+    held.length = 0; K.redrawWhenIdle('e', () => { throw new Error('bad draw'); }); held[0].f(); assert.ok(errs.some((e) => e.includes('Could not redraw after an update')));
+  } finally { globalThis.setTimeout = real; console.error = quietErr; }
+}));
+
+test('view history: moves between pages are pushed once per turn, the same view replaces instead of pushing, Back restores through the registered function, and nothing is recorded while restoring', () => alone(async () => {
+  const hist = [], listeners = {};
+  const names = ['window', 'history'], saved = names.map((k) => [k, Object.getOwnPropertyDescriptor(globalThis, k)]);
+  Object.defineProperty(globalThis, 'window', { value: { addEventListener: (t, f) => { listeners[t] = f; } }, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'history', { value: { replaceState: (s) => hist.push(['replace', s.alba]), pushState: (s) => hist.push(['push', s.alba]) }, configurable: true, writable: true });
+  try {
+    const V = load('src/ui/viewstack.js'); V.recordView({ s: 'a' }); await Promise.resolve(); await Promise.resolve(); assert.deepStrictEqual(hist, []);   // before init: nothing is recorded
+    V.init_ui_viewstack({ s: 'analysis' }); assert.deepStrictEqual(hist, [['replace', { s: 'analysis' }]]);
+    V.recordView({ s: 'business' }); V.recordView({ s: 'business', t: 'AAA' }); await Promise.resolve(); await Promise.resolve();   // two in one turn: the last wins
+    assert.deepStrictEqual(hist.slice(1), [['push', { s: 'business', t: 'AAA' }]]);
+    V.recordView({ s: 'business', t: 'AAA', i: null }); await Promise.resolve(); await Promise.resolve(); assert.deepStrictEqual(hist.at(-1), ['replace', { s: 'business', t: 'AAA', i: null }]);   // the same view: replaced, not pushed
+    const calls = []; listeners.popstate({ state: { alba: { s: 'x' } } }); assert.deepStrictEqual(calls, []);   // no restorer yet
+    V.setViewRestorer((v, cur) => { calls.push([v, cur]); V.recordView({ s: 'ignored' }); });
+    listeners.popstate({ state: null }); listeners.popstate({ state: {} });
+    listeners.popstate({ state: { alba: { s: 'analysis' } } }); await Promise.resolve(); await Promise.resolve();
+    assert.deepStrictEqual([calls.length, calls[0][0], hist.every((h) => h[1].s !== 'ignored')], [1, { s: 'analysis' }, true]);
+    Object.defineProperty(globalThis, 'history', { value: { replaceState() { throw new Error('no history'); } }, configurable: true, writable: true });
+    const V2 = load('src/ui/viewstack.js'); V2.init_ui_viewstack({ s: 'x' }); V2.recordView({ s: 'y' }); await Promise.resolve(); await Promise.resolve();   // history unavailable: nothing breaks
+    Object.defineProperty(globalThis, 'history', { value: { replaceState() {}, pushState() { throw new Error('quota'); } }, configurable: true, writable: true });
+    const V3 = load('src/ui/viewstack.js'); V3.init_ui_viewstack({ s: 'x' }); V3.recordView({ s: 'z' }); await Promise.resolve(); await Promise.resolve();
+  } finally { saved.forEach(([k, d]) => { if(d) Object.defineProperty(globalThis, k, d); else delete globalThis[k]; }); }
+}));
+
+test('page restore: the last page opens for a signed-in user, a stock link opens Explorer, and Back goes to the page, the stock or closes the inline detail', () => alone(async () => {
+  const log = []; let restorer = null, link = null, uid = 'u1', saved = { section: 'strategies' }, open = null;
+  TV_VALUES.add('stocks'); TV_VALUES.add('appSections');
+  globalThis.__T = { stocks: [{ s: 'AAA' }, { s: 'BBB' }], tickerSymbol: (s) => s.s, appSections: { analysis: 'A', strategies: 'S', business: 'B' }, showSection: (k) => log.push(['show', k]), closeInlineDetail: (r) => log.push(['close', r]), inlineOpenIn: () => open,
+    openStockInline: (sec, label, idx) => log.push(['open', sec, label, idx]), stockCodeFromAddress: () => link, uiStateGet: () => { if(saved === 'boom') throw new Error('storage'); return saved; }, getUid: () => uid,
+    init_ui_viewstack: (v) => log.push(['init', v]), setViewRestorer: (f) => { restorer = f; } };
+  const H = await loadAllStubbed('src/ui/historyrestore.js', '', []);
+  H.init_ui_historyrestore(); assert.deepStrictEqual(log.splice(0), [['show', 'strategies'], ['init', { s: 'strategies' }]]);
+  uid = null; H.init_ui_historyrestore(); assert.deepStrictEqual(log.splice(0), [['show', 'analysis'], ['init', { s: 'analysis' }]]);   // not signed in: the default
+  uid = 'u1'; saved = { section: 'gone' }; H.init_ui_historyrestore(); assert.deepStrictEqual(log.splice(0)[0], ['show', 'analysis']);
+  await quietErrors(async () => { saved = 'boom'; H.init_ui_historyrestore(); }); log.length = 0;
+  link = 'AAA'; H.init_ui_historyrestore(); assert.deepStrictEqual(log.splice(0), [['init', { s: 'business' }]]);   // a stock link: Explorer, and its own code opens the stock
+  restorer({ s: 'analysis' }); assert.deepStrictEqual(log.splice(0), [['show', 'analysis']]);
+  open = 'analysis'; restorer({ s: 'analysis' }); assert.deepStrictEqual(log.splice(0), [['close', true]]);   // the inline detail is open on that page: close it
+  open = null; restorer({ s: 'business', t: 'BBB', i: 'Explorer' }); assert.deepStrictEqual(log.splice(0), [['show', 'business'], ['open', 'B', 'Explorer', 1]]);
+  open = 'business'; restorer({ s: 'business', t: 'AAA' }); assert.deepStrictEqual(log.splice(0), [['open', 'B', '', 0]]);   // already on that page: only the stock changes
+  restorer({ s: 'analysis', t: 'ZZZ' }); assert.deepStrictEqual(log.splice(0), [['show', 'analysis']]);   // the stock is gone: just the page
+  restorer({ s: 'nowhere', t: 'AAA' }); assert.deepStrictEqual(log.splice(0), [['show', 'nowhere']]);
+}));
+
+test('drop-down menus: the button list is escaped, one menu is open at a time, a click elsewhere or Escape closes it and returns focus', () => withPage('<div id="host"></div><div id="elsewhere"></div>', async (win) => {
+  globalThis.__T = { escapeHtml: (x) => String(x).replace(/</g, '&lt;') };
+  const D = await loadAllStubbed('src/ui/dropmenu.js', '', []), doc = win.document;
+  const html = D.dropMenuHtml({ btnHtml: '<b>x</b>', label: 'Menu <', right: true, extraClass: 'wide', items: [{ attrs: 'data-a="1"', title: 'One <i>', desc: 'first', current: true, cls: 'x' }, { attrs: '', title: 'Two' }] });
+  assert.ok(html.includes('dm-right wide') && html.includes('One &lt;i&gt;'.replace('&lt;i&gt;', '&lt;i>')) || html.includes('One &lt;i>'), html.slice(0, 300)); assert.ok(html.includes('current x') && html.includes('data-dm-toggle'));
+  assert.ok(!D.dropMenuHtml({ btnHtml: 'b', items: [] }).includes('dm-right'));
+  doc.getElementById('host').innerHTML = D.dropMenuHtml({ btnHtml: 'one', items: [{ attrs: '', title: 'A' }] }) + D.dropMenuHtml({ btnHtml: 'two', items: [{ attrs: '', title: 'B' }] }) + '<div class="dm"><button class="dm-btn" data-dm-toggle>nopop</button></div>';
+  D.init_ui_dropmenu();
+  const [m1, m2, m3] = doc.querySelectorAll('.dm'), pop = (m) => m.querySelector('.dm-pop'), btn = (m) => m.querySelector('.dm-btn'), click = (el) => el.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  click(btn(m1)); assert.deepStrictEqual([pop(m1).hidden, btn(m1).getAttribute('aria-expanded')], [false, 'true']);
+  click(btn(m2)); assert.deepStrictEqual([pop(m1).hidden, pop(m2).hidden, btn(m1).getAttribute('aria-expanded')], [true, false, 'false']);
+  click(btn(m3)); assert.strictEqual(pop(m2).hidden, true);   // a menu with no pop-up: nothing opens, the others close
+  click(btn(m1)); click(doc.getElementById('elsewhere')); assert.strictEqual(pop(m1).hidden, true);
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' }));   // nothing open: nothing happens
+  click(btn(m1)); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a' })); assert.strictEqual(pop(m1).hidden, false);
+  btn(m1).blur(); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.deepStrictEqual([pop(m1).hidden, doc.activeElement === btn(m1)], [true, true]);
+}));
+
+test('confirm box: OK resolves true, Cancel, Escape or a click outside resolve false, a notice has one button, and the message is text only', () => withPage('', async (win) => {
+  globalThis.__T = { closestEl: (e, sel) => (e.target.closest ? e.target.closest(sel) : null), setHtml: (el, h) => { el.innerHTML = h; } };
+  const C = await loadAllStubbed('src/ui/confirm.js', '', []), doc = win.document, box = () => doc.getElementById('albaConfirm'), click = (sel) => doc.querySelector(sel).dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  let p = C.askConfirm('Delete <img src=x onerror=alert(1)>?', 'Delete'); assert.ok(box().querySelector('.alba-confirm-msg').textContent.includes('<img') && !box().querySelector('img') && doc.activeElement.id === 'albaConfirmOk' && doc.getElementById('albaConfirmOk').textContent === 'Delete');
+  click('#albaConfirmOk'); assert.strictEqual(await p, true); assert.strictEqual(box(), null);
+  p = C.askConfirm('Sure?'); assert.strictEqual(doc.getElementById('albaConfirmOk').textContent, 'OK'); click('#albaConfirmNo'); assert.strictEqual(await p, false);
+  p = C.askConfirm('Sure?'); const stopped = []; doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a' })); assert.ok(box()); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.strictEqual(await p, false);
+  p = C.askConfirm('Sure?'); box().dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.strictEqual(await p, false);   // the backdrop
+  p = C.askConfirm('Again?'); const old = box(); const p2 = C.askConfirm('Newer?'); assert.strictEqual(doc.querySelectorAll('#albaConfirm').length, 1); click('#albaConfirmOk'); assert.strictEqual(await p2, true); old.remove();
+  p = C.tellUser('Heads up'); assert.strictEqual(doc.getElementById('albaConfirmNo').hidden, true); click('#albaConfirmOk'); assert.strictEqual(await p, true);
+  p = C.askConfirm('Sure?'); const inner = doc.querySelector('.alba-confirm-card'); inner.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.ok(box()); click('#albaConfirmNo'); await p;   // a click inside the card does nothing
+}));
+
+test('stock grid sort: a click on a header sorts the rows, renumbers the ranks and redraws the headers; a table without columns is left alone', () => withPage('<table id="t" data-cols="score,name"><thead><tr><th data-sort-col="score">S</th><th>plain</th></tr></thead><tbody><tr data-idx="0"><td class="analysis-lb-rank">1</td></tr><tr data-idx="1"><td class="analysis-lb-rank">2</td></tr><tr data-idx="2"><td class="analysis-lb-rank">3</td></tr></tbody></table><table id="n"><thead><tr></tr></thead><tbody></tbody></table>', async (win) => {
+  TV_VALUES.add('stocks');
+  globalThis.__T = { stocks: [{ v: 2 }, { v: 3 }, { v: 1 }], nextSort: (cur, id) => ({ col: id, dir: 'asc' }), compareByColumn: (col, dir) => (a, b) => a.v - b.v, columnHeaderHtml: (id, sort) => `<th data-sort-col="${id}">${id}:${sort.col}</th>`, setHtml: (el, h) => { el.innerHTML = h; } };
+  const G = await loadAllStubbed('src/ui/gridsort.js', '', []), doc = win.document, t = doc.getElementById('t');
+  G.wireStockGridSort(doc.getElementById('n')); G.wireStockGridSort(t);
+  t.querySelector('thead tr').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));   // not on a sort button
+  assert.deepStrictEqual([...t.querySelectorAll('tbody tr')].map((r) => r.dataset.idx), ['0', '1', '2']);
+  t.querySelector('[data-sort-col]').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.deepStrictEqual([[...t.querySelectorAll('tbody tr')].map((r) => r.dataset.idx), [...t.querySelectorAll('.analysis-lb-rank')].map((c) => c.textContent), t.querySelector('thead tr').textContent, G.NO_SORT], [['2', '0', '1'], ['1', '2', '3'], 'score:scorename:score', { col: '', dir: 'desc' }]);
+}));
+
+test('Analysis refresh scope: the shown stocks are the scope of the refresh buttons, drawn when the kit exists, and a batch is taken for the shown stocks in order', () => alone(async () => {
+  const calls = []; let kit = null, shown = [2, 0, 9];
+  TV_VALUES.add('stocks'); TV_VALUES.add('analysisFilters');
+  globalThis.__T = { stocks: [{ n: 'A' }, { n: 'B' }, { n: 'C' }], analysisFilters: { sortCol: 'score', sortDir: 'desc', view: 'all' }, getAnalysisShownIdx: () => shown, getRefreshKit: () => kit,
+    createBatchRounds: () => ({ take: (kind, list, key) => { calls.push([kind, list.map((s) => s.n), key]); return 'batch'; } }) };
+  const S = await loadAllStubbed('src/analysis/selectbar.js', '', []);
+  S.defineAnalysisScope(); S.updateAnalysisRefresh();   // no kit yet: nothing happens
+  assert.strictEqual(S.analysisTakeBatch('fund'), 'batch'); assert.deepStrictEqual(calls, [['fund', ['C', 'A'], '3:scoredesc:all']]);   // an index with no stock is skipped
+  const defs = [], repaints = []; kit = { defineScope: (id, def) => defs.push([id, def]), repaint: () => repaints.push(1) };
+  S.updateAnalysisRefresh(); assert.deepStrictEqual([defs[0][0], defs[0][1].label, defs[0][1].selName, defs[0][1].stocks().length, repaints.length], ['analysis', 'shown stocks', 'analysis', 2, 1]);
+}));
