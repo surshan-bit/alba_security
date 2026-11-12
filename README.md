@@ -31,7 +31,7 @@ app.js, chunks/*.js           BUILD OUTPUT (ES modules, code-split, hashed chunk
 tools/build.js                bundles src/ and styles/ with esbuild and stamps index.html
 tools/release-prep.js         `--since <last published commit>`, after a merge and a build: writes publish/index.html, publish/publish.json (files for the Artifact tool) and publish/release.json (for appMeta/release)
 tools/css-snapshot.js         proves a styles/ change did not change the page (see "Changing styles" below)
-tools/lint.js                 structure checks (undefined names, start-up order, unused code, mutable exports, import graph)
+tools/lint.js                 structure checks (undefined names, start-up order, unused code, mutable exports, import graph); also the quality ratchet (tools/quality-ratchet.json: unsafe HTML, eval, inline styles, long or deep functions, and delays written as bare numbers instead of named constants may only go down)
 tests/run.js                  regression harness (jsdom; bundles the same sources into one script, as jsdom cannot run ES modules)
 tests/check.js                the pre-publish check: build, syntax, lint, harness vs tests/golden.json, Chromium suites
 tests/state.js, browser.js, imports.js   Chromium suites

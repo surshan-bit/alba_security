@@ -9,6 +9,9 @@ import { priceApply, pcTickerKey, priceHistoryByTicker, priceSymbolByTicker } fr
 import { noteRecentSaved, recentRow } from '../prices/recent.js';
 import { computeTechnical, techCarryDaily, techLiveCrossState } from '../engine/technical.js';
 
+// A failed bar-chunk save is tried once more after this pause.
+const SAVE_RETRY_PAUSE_MS = 1500;
+
 const CHUNK = 50;          // stocks per record
 const WORKERS = 6;         // records saved at the same time
 // Compares two saved values by content, whatever order their keys are in.
@@ -23,7 +26,7 @@ async function readChunks(db, collection){
 }
 async function saveDoc(db, path, doc){
   for(let attempt = 0; attempt < 2; attempt++){
-    try { await db.doc(path).set(doc); return true; } catch(e){ if(attempt === 0) await sleep(1500); else console.error('Could not save ' + path, e); }
+    try { await db.doc(path).set(doc); return true; } catch(e){ if(attempt === 0) await sleep(SAVE_RETRY_PAUSE_MS); else console.error('Could not save ' + path, e); }
   }
   return false;
 }

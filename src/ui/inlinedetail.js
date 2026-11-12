@@ -9,6 +9,9 @@ import { syncStockHash } from './deeplink.js';
 import { tickerSymbol } from '../core/util.js';
 import { recordView } from './viewstack.js';
 
+// The frame may still be taking focus when the page opens, so the grab is tried again after these delays.
+const FOCUS_RETRY_MS = [60, 400];
+
 // Where the detail panel rests (a hidden holder in the page) when no stock is open; it is handed back here when a detail view closes.
 const detailHome = /** @type {HTMLElement} */ (detailEl).parentNode;
 /** @type {{ section: any, host: any, scroll: any } | null} */
@@ -38,7 +41,7 @@ function takeKeyboardFocus(){
     const b = document.getElementById('detailBackBtn');
     if(b && document.activeElement !== b){ try { b.focus({ preventScroll: true }); } catch(e){ /* focus is only a convenience */ } }
   };
-  grab(); setTimeout(grab, 60); setTimeout(grab, 400);
+  grab(); FOCUS_RETRY_MS.forEach((ms) => setTimeout(grab, ms));
 }
 
 // Moves the detail page into a host inside the section (once), remembering the scroll position to restore on close.

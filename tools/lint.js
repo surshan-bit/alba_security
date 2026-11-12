@@ -141,13 +141,15 @@ for(const f of require('fs').readdirSync('styles').filter(x => x.endsWith('.css'
     // CLAUDE.md section 1: functions of at most 40 lines, 4 parameters and 3 levels of nesting (tools/complexity.js)
     functionsOver40Lines: sizes.tooLong,
     functionsOver4Params: sizes.tooManyParams,
-    functionsNestedOver3: sizes.tooDeep
+    functionsNestedOver3: sizes.tooDeep,
+    // CLAUDE.md section 1: no magic numbers inline. A timer delay or pause is a named constant (SAVE_DEBOUNCE_MS), not a bare 300 (0 is allowed: it yields to the event loop).
+    unnamedTimerDelays: count(/\b(?:setTimeout|setInterval)\([^;\n]*?,\s*[1-9][\d_.]*\s*\)/g, srcText) + count(/\bsleep\(\s*[1-9][\d_.]*\s*[),*+]|\bsleep\([^;\n]*Math\.random\(\)\s*\*\s*[1-9]/g, srcText)
   };
   let saved = null;
   try { saved = JSON.parse(read(file)); } catch(e){ /* first run: nothing recorded yet */ }
   if(process.argv.includes('--ratchet') || !saved){ fs.writeFileSync(file, JSON.stringify(now, null, 2) + '\n'); console.log('quality ratchet written: ' + JSON.stringify(now)); }
   else for(const k of Object.keys(now)){
-    if(now[k] > (saved[k] ?? 0)) err('quality: ' + k + ' went up (' + (saved[k] ?? 0) + ' -> ' + now[k] + '). ' + (k.startsWith('functions') ? 'See CLAUDE.md section 1: keep functions short (40 lines), at most 4 parameters (else an options object) and 3 levels of nesting (early returns).' : 'See CLAUDE.md: use safe DOM APIs and shared CSS classes.'));
+    if(now[k] > (saved[k] ?? 0)) err('quality: ' + k + ' went up (' + (saved[k] ?? 0) + ' -> ' + now[k] + '). ' + (k.startsWith('functions') ? 'See CLAUDE.md section 1: keep functions short (40 lines), at most 4 parameters (else an options object) and 3 levels of nesting (early returns).' : k === 'unnamedTimerDelays' ? 'See CLAUDE.md section 1: name the delay as a constant (for example SAVE_DEBOUNCE_MS = 300) instead of writing the number in the call.' : 'See CLAUDE.md: use safe DOM APIs and shared CSS classes.'));
     else if(now[k] < (saved[k] ?? 0)) warn('quality: ' + k + ' is down to ' + now[k] + ' (was ' + saved[k] + '): run node tools/lint.js --ratchet to lock it in');
   }
 }

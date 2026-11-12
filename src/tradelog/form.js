@@ -13,6 +13,9 @@ import { openStockInline } from '../ui/inlinedetail.js';
 import { closestEl, targetEl } from '../core/evt.js';
 import { setHtml } from '../core/safehtml.js';
 
+// The stock suggestions stay this long after the field loses focus, so a click on one still lands.
+const SUGGEST_HIDE_DELAY_MS = 120;
+
 // ---- Trade Log: add / sell / remove from this page (added 2026-10-06) ----
 function tlToday(){
   const d = new Date();
@@ -224,7 +227,7 @@ function wireFormHost(host){
   host.addEventListener('click', onFormClick);
   host.addEventListener('input', onStockInput);
   host.addEventListener('focusin', (e) => { if(targetEl(e).id === 'tlStock') tlShowSugg(); });
-  host.addEventListener('focusout', (e) => { if(targetEl(e).id === 'tlStock') setTimeout(tlHideSugg, 120); });
+  host.addEventListener('focusout', (e) => { if(targetEl(e).id === 'tlStock') setTimeout(tlHideSugg, SUGGEST_HIDE_DELAY_MS); });
   host.addEventListener('keydown', onStockKey);
   host.addEventListener('mousedown', (e) => {
     const it = closestEl(e, '.sg-item'); if(!it) return;

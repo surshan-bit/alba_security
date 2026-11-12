@@ -11,6 +11,9 @@ import { claudeAnyOn } from './claudegate.js';
 import { activityEnd, activityNotify, activityRun } from '../ui/activity.js';
 import { getRefreshKit } from '../refresh/hook.js';
 
+const SAVED_REACH_MS = 1200;   // the saved numbers reach the stock list a moment after the save
+const SAVED_REDRAW_MS = 1500;   // the screen is drawn once more after this, to catch what arrived late
+
 var ldBatch = null;   // { kind, source, total, done, active: Map(key -> ticker), workers, slow, running, stop, failed[], skipped, note, perm }
 // The last finished run of each kind on each screen: { state, pct, text, perm }. Kept so a card still shows its result
 // after the screen redraws and after the other kind has been run.
@@ -146,7 +149,7 @@ async function batchWorker(w, run){
     if(j && j.state === 'error' && ldBatch.stop && /Stopped/.test(j.msg)){ ldBatch.done++; continue; }
     noteStockResult(sym, j, run);
     ldBatch.done++;
-    if(source !== 'strat') setTimeout(batchStockSaved, 1200);   // the saved numbers reach the stock list a moment after the save
+    if(source !== 'strat') setTimeout(batchStockSaved, SAVED_REACH_MS);   // the saved numbers reach the stock list a moment after the save
     ldBatchPaint();
   }
 }
@@ -182,8 +185,8 @@ async function ldBatchStart(kind, list, source = 'strat'){
   try { refreshAnalysisSoon(); } catch(e){ /* the leaderboard repaints on its next render */ }
   // the refreshed numbers reach the stock list through the live subscription, a moment after the last save, so redraw twice
   const redraw = () => { try { const sec = document.getElementById('section-strategies'); if(sec && sec.classList.contains('active') && !(ldBatch && ldBatch.running)) redrawWhenIdle('strategies', () => renderLoadedPart('strategies')); } catch(e){ /* repaints when opened again */ } };
-  if(source === 'strat'){ redraw(); setTimeout(redraw, 1500); }
-  else { batchStockSaved(); setTimeout(batchStockSaved, 1500); }
+  if(source === 'strat'){ redraw(); setTimeout(redraw, SAVED_REDRAW_MS); }
+  else { batchStockSaved(); setTimeout(batchStockSaved, SAVED_REDRAW_MS); }
   ldBatchPaint();
 }
 

@@ -6,6 +6,8 @@
 // Code that learns of new data while the part may not have loaded yet calls renderLoadedPart(): it redraws the page if the
 // part is there and does nothing otherwise (opening the page later draws it from the same data).
 
+const IDLE_TIMEOUT_MS = 4000, IDLE_FALLBACK_MS = 1500;   // how long the background download of parts may wait for an idle moment (and the wait where the browser has no idle callback)
+
 const parts = new Map();   // key -> { load, before, module, promise, fetched }
 
 // spec.load: () => import('...')  (the part's module)      spec.before: optional () => Promise, run before the module loads
@@ -31,7 +33,7 @@ function openPart(key){
 // v1.323: downloads the parts' code one after another while the page is idle, so the first visit to each page draws at once, like every later visit,
 // instead of showing it blank or as "Loading…" until the download ends (which looked like flicker). Only downloads: nothing starts until the page is opened.
 function warmParts(keys){
-  const queue = keys.filter(k => parts.has(k)), idle = window.requestIdleCallback ? (fn) => window.requestIdleCallback(fn, { timeout: 4000 }) : (fn) => setTimeout(fn, 1500);
+  const queue = keys.filter(k => parts.has(k)), idle = window.requestIdleCallback ? (fn) => window.requestIdleCallback(fn, { timeout: IDLE_TIMEOUT_MS }) : (fn) => setTimeout(fn, IDLE_FALLBACK_MS);
   const next = () => {
     const key = queue.shift(); if(!key) return;
     const p = parts.get(key);

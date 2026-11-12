@@ -17,6 +17,8 @@ import { getLdBatch } from '../livedata/batch.js';
 import { analysisRowContext } from '../analysis/columns.js';
 import { setHtml } from '../core/safehtml.js';
 
+const TICK_RETRY_MS = 4000;   // the live prices are asked for again this long after the last answer
+
 const INTERVAL_MS = 20000, BACKOFF_MS = 120000, MAX_ROWS = 50, PARALLEL = 3;
 // Always starts off, on every load: live prices call TradingView, so they run only after the button is pressed, and only until the page is closed or reloaded.
 let enabled = false, timer = null, busy = false, fails = 0, btn = null, lastAt = 0, lastCount = 0;
@@ -190,7 +192,7 @@ function init_live_ticker(){
   document.addEventListener('click', () => { setTimeout(() => { if(enabled && !busy && marketOpen()) tick(); }, 1500); });
   paintButton();
   schedule();
-  setTimeout(tick, 4000);
+  setTimeout(tick, TICK_RETRY_MS);
 }
 
 export { init_live_ticker };
