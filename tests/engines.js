@@ -7973,3 +7973,40 @@ test('News collection: headlines are read from TradingView a few stocks at a tim
     N2.stopNewsCollect();
   } finally { if(hadClaude) Object.defineProperty(globalThis, 'claude', hadClaude); else delete globalThis.claude; }
 }));
+
+// ---- prices/store
+test('price store: recent bars and each stock\'s bars are read once, joined with the recent bars, shared between callers, and redrawn on the stock page when they arrive', () => alone(async () => {
+  const realErr = console.error, errs = []; console.error = (m) => errs.push(String(m));
+  TV_VALUES.add('stocks'); TV_VALUES.add('priceFetchedAt'); TV_VALUES.add('dbCapabilityPromise');
+  const calls = { recent: 0, history: 0, where: [], all: 0, set: [], rendered: [] }; let shown = 0; const fetchedAt = new Map();
+  const docsFor = (key) => key === 'K1' ? [{ exists: true, data: () => ({ interval: '1W', bars: [1, 2], symbol: 'NSE:K1', fetchedAt: '2026-11-01T00:00:00Z' }) }, { exists: true, data: () => ({ interval: '1M', bars: [3], fetchedAt: '2026-11-05T00:00:00Z' }) }, { exists: false }, { exists: true, data: () => ({ interval: '1D', bars: 'x' }) }, { exists: true, data: () => null }] : [];
+  const mk = async (db) => {
+    globalThis.__T = { stocks: [{ k: 'K1' }, { k: 'K2' }], tickerKey: (s) => s.k, dbCapabilityPromise: Promise.resolve(db), priceFetchedAt: fetchedAt, getShownIndex: () => shown, renderDetail: (i) => calls.rendered.push(i),
+      setRecentFromDocs: (docs) => calls.set.push(docs.map((d) => d.id)), withRecent: (key, bars, fetched) => ({ bars: Object.assign({ recent: true }, bars), fetched: fetched ? 'r-' + fetched : null }) };
+    return loadAllStubbed('src/prices/store.js', '', []);
+  };
+  try {
+    let P = await mk(null);
+    assert.deepStrictEqual([await P.loadRecentBars(), await P.ensurePriceBars({ k: 'K1' }), await P.ensureAllPriceBars(), await P.ensurePriceBars({ k: '' })], [[], false, false, false]);
+    const db = { collection: (c) => ({ get: async () => { if(c === 'barsRecent'){ calls.recent++; return { docs: [{ id: 'c1', exists: true, data: () => ({}) }, { id: 'gone', exists: false }] }; } calls.all++; return { docs: [{ exists: true, data: () => ({ ticker: 'K1', interval: '1W', bars: [1], symbol: 'S', fetchedAt: '2026-11-01' }) }, { exists: true, data: () => ({ ticker: 'K1', interval: '1M', bars: [2], fetchedAt: '2026-11-09' }) }, { exists: true, data: () => ({ ticker: 'K2', interval: '1W', bars: [4] }) }, { exists: true, data: () => ({ ticker: 'K3' }) }, { exists: false }, { exists: true, data: () => null }] }; },
+      where: (f, op, v) => ({ get: async () => { calls.history++; calls.where.push([f, op, v]); if(v === 'BAD') throw new Error('read failed'); return { docs: docsFor(v) }; } }) }) };
+    P = await mk(db);
+    const first = P.loadRecentBars(); assert.ok(first === P.loadRecentBars()); assert.deepStrictEqual((await first).map((d) => d.id), ['c1']); await P.loadRecentBars(true); assert.deepStrictEqual([calls.recent, calls.set.length], [2, 2]);
+    const a = P.ensurePriceBars({ k: 'K1' }), b = P.ensurePriceBars({ k: 'K1' }); assert.ok(a === b);   // in-flight: one read
+    assert.strictEqual(await a, true); assert.strictEqual(calls.history, 1); assert.deepStrictEqual(calls.where[0], ['ticker', '==', 'K1']);
+    assert.deepStrictEqual([P.priceHistoryByTicker.K1, P.priceSymbolByTicker.K1, fetchedAt.get('K1'), P.priceLoaded.has('K1')], [{ recent: true, '1W': [1, 2], '1M': [3] }, 'NSE:K1', 'r-2026-11-05T00:00:00Z', true]);   // the newest fetch time wins
+    assert.strictEqual(await P.ensurePriceBars({ k: 'K1' }), false);   // already loaded
+    assert.strictEqual(await P.ensurePriceBars({ k: 'BAD' }), false); assert.ok(errs.some((e) => e.includes('Price history unavailable')) && !P.priceLoaded.has('BAD'));
+    assert.strictEqual(await P.ensurePriceBars({ k: 'NONE' }), true); assert.deepStrictEqual(P.priceHistoryByTicker.NONE, { recent: true });
+    // all stocks at once: stocks already loaded are kept, the rest come from the one big read; a failure can be retried
+    P = await mk(db); await P.ensurePriceBars({ k: 'K2' });
+    const all = P.ensureAllPriceBars(); assert.ok(all === P.ensureAllPriceBars()); assert.strictEqual(await all, true); assert.strictEqual(calls.all, 1);
+    assert.deepStrictEqual([P.priceHistoryByTicker.K1['1M'], P.priceSymbolByTicker.K1, P.priceHistoryByTicker.K2], [[2], 'S', { recent: true }]);   // K2 was loaded first and is not overwritten
+    P = await mk({ collection: () => ({ get: async () => { throw new Error('all failed'); } }) }); assert.strictEqual(await P.ensureAllPriceBars(), false); assert.strictEqual(await P.ensureAllPriceBars(), false);
+    // loading for the stock page
+    P = await mk(db); calls.rendered.length = 0; shown = 0; const [st0, st1] = globalThis.__T.stocks; P.loadPriceBarsFor(st0, 0); P.loadPriceBarsFor(null, 0); await new Promise((r) => setTimeout(r, 20)); assert.deepStrictEqual(calls.rendered, [0]);
+    P.loadPriceBarsFor(st0, 0); await new Promise((r) => setTimeout(r, 10)); assert.deepStrictEqual(calls.rendered, [0]);   // loaded already: nothing
+    P = await mk(db); P.loadPriceBarsFor(globalThis.__T.stocks[1], 1); shown = 0; await new Promise((r) => setTimeout(r, 20)); assert.deepStrictEqual(calls.rendered, [0]);   // another stock is on screen now
+    P = await mk(null); P.loadPriceBarsFor(globalThis.__T.stocks[0], 0); await new Promise((r) => setTimeout(r, 10)); assert.deepStrictEqual(calls.rendered, [0]);   // nothing loaded: no redraw
+  } finally { console.error = realErr; }
+}));
