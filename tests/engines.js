@@ -8255,3 +8255,49 @@ test('track record panel clicks: Try again, open or close a list, delete with a 
   body().innerHTML = '<button id="stratTrackRetry"></button>'; click(doc.getElementById('stratTrackRetry')); await settle(); assert.ok(body().textContent.includes('Goal for this strategy'));
   strategy = null; log.length = 0; click(doc.getElementById('stratTrackBtn')); await settle(); assert.deepStrictEqual(log, []);
 }));
+
+// ---- industry/calc and analysis/ideasfilter (the rest of their lines)
+test('industry figures: averages, verdict counts and per-factor averages over the members, news and global notes pooled and ordered, and the average daily move by week or month', async () => {
+  const C = await loadWithStubs('src/industry/calc.js', '', { '../prices/events.js': 'export const eventTime = (d) => { const t = Date.parse(d); return Number.isFinite(t) ? t : null; };' });
+  const fac = (key, score, weight, extra) => Object.assign({ key, name: 'F' + key, score, weight }, extra);
+  const m = (name, score, tech, factors, val) => ({ name, ticker: name.toUpperCase() + '·X', score, technical: tech === null ? undefined : { score: tech }, fundamentals: factors ? { factors } : undefined, valuation: val });
+  const members = [m('a', 8.5, 6, [fac('fin', 1, 2), fac('moat', 0.5, 1, { excluded: true }), fac('bad', NaN, 1), fac('zero', 1, 0)], { intrinsicValue: 150, currentPrice: 100 }), m('b', 4, null, [fac('fin', 2, 2)], { intrinsicValue: 80, currentPrice: 100 }), m('c', NaN, 7, null, undefined), m('d', 6, 5, [], undefined), m('e', 5.5, 5, undefined, undefined)];
+  const f = C.industryFactors(members);
+  assert.deepStrictEqual([f.count, f.score, f.scoreN, f.tech, f.techN, f.mosN, f.undervalued, f.verdicts, f.factors], [5, (8.5 + 4 + 6 + 5.5) / 4, 4, 23 / 4, 4, 2, 1, { buy: 1, mbuy: 1, hold: 1, avoid: 1 }, [{ key: 'fin', name: 'Ffin', avg: 7.5, n: 2 }]]);
+  assert.deepStrictEqual([C.industryFactors([]).score, C.industryFactors([]).tech, C.industryFactors([]).mos, C.industryFactors([]).factors], [null, null, null, []]);
+  const ev = (k, d, t, extra) => Object.assign({ k, d, t }, extra);
+  const news = C.industryNews([{ name: 'A', ticker: 'A·X', __events: [ev('news', '2026-11-05T10:00:00Z', 'Order', { src: 'W', url: 'u', s: 'pos' }), ev('earn', '2026-11-07', 'Results'), ev('other', '2026-11-08', 'x'), ev('news', 'garbage', 'bad date'), ev('news', '2026-11-09', ''), null] }, { name: 'B', ticker: 'B·X', __events: 'no' }, { name: 'C', ticker: 'C·X' }, { name: 'D', ticker: 'D·X', __events: [ev('corp', '2026-11-06', 'Split')] }]);
+  assert.deepStrictEqual(news.map((n) => [n.d, n.k, n.stock, n.src, n.s]), [['2026-11-07', 'earn', 'A', '', ''], ['2026-11-06', 'corp', 'D', '', ''], ['2026-11-05', 'news', 'A', 'W', 'pos']]);
+  const g = (positive, negative) => ({ name: 'S', globalFactors: { positive, negative } });
+  const glob = C.industryGlobal([g([{ text: 'Rupee falls', source: 'RBI', url: 'x' }, { text: '  ' }, null, { text: 5 }], [{ text: 'Oil up' }]), { name: 'T', globalFactors: { positive: [{ text: 'RUPEE FALLS' }, { text: 'Gas' }], negative: 'x' } }, { name: 'U' }]);
+  assert.deepStrictEqual([glob.positive.map((p) => [p.text, p.stocks, p.source]), glob.negative.map((p) => p.text), glob.researched], [[['Rupee falls', ['S', 'T'], 'RBI'], ['Gas', ['T'], '']], ['Oil up'], 2]);
+  const day = 86400, t0 = 1700000000 - (1700000000 % (7 * day)) + 3 * day;   // a day inside a week
+  const bars = (closes, start) => closes.map((c, i) => [start + i * day, c, c, c, c, 1]);
+  const week = C.industrySeries([bars([100, 110, 121], t0), bars([100, 90], t0), 'bad', bars([0, 5, 10], t0)], 'W');
+  assert.deepStrictEqual(week.map((x) => [Math.round(x[1] * 100) / 100, x[2]]), [[27.5, 4]]);   // +10, +10, -10 and +100 (5 to 10; the move from a zero close is skipped), averaged over four moves in one week
+  const month = C.industrySeries([bars([100, 110], Date.UTC(2026, 9, 20) / 1000), bars([100, 120], Date.UTC(2026, 10, 15) / 1000)], 'M');
+  assert.deepStrictEqual(month.map((x) => x[2]), [1, 1]); assert.ok(month[0][0] < month[1][0]);   // two months, ordered
+});
+
+test('Buy / Sell ideas filter: the lists of the chosen strategy or the newest result, remembered until the result changes, the stamp and the rank column', () => alone(async () => {
+  const A = { name: 'A', ticker: 'AAA·X' }, B = { name: 'B', ticker: 'BBB·X' }, C = { name: 'C', ticker: 'CCC·X' };
+  let all = {}; const strategies = [{ id: 's1', name: 'First' }, { id: 's2', name: 'Second' }];
+  TV_VALUES.add('stockByTickerSymbol');
+  globalThis.__T = { stockByTickerSymbol: new Map([['AAA', A], ['BBB', B], ['CCC', C]]), tickerSymbol: (s) => s.ticker.split('·')[0], ideasResultsGet: () => all, publishedStrategies: () => strategies, IST_ZONE: 'Asia/Kolkata' };
+  TV_VALUES.add('IST_ZONE');
+  const I = await loadAllStubbed('src/analysis/ideasfilter.js', '', []);
+  const snap = (at, up, early, extra) => Object.assign({ at, lists: { up: up.map((sym) => ({ sym })), early: early.map((sym) => ({ sym })) } }, extra);
+  all = { s1: snap('2026-11-01T00:00:00Z', ['AAA'], ['BBB']), s2: snap('2026-11-05T00:00:00Z', ['CCC', 'ZZZ'], []), gone: snap('2026-11-09T00:00:00Z', ['AAA'], []), nolists: { at: '2026-11-10T00:00:00Z' } };
+  assert.strictEqual(I.ideasStockSet([], 's1').set, null); assert.strictEqual(I.ideasStockSet(['nonsense'], 's1').set, null);   // nothing chosen: All
+  assert.deepStrictEqual([...I.ideasStockSet('up', 's1').set], [A]); assert.deepStrictEqual([...I.ideasStockSet(['early'], 's1').set], [B]);
+  const both = I.ideasStockSet(['up', 'early'], 's1'); assert.deepStrictEqual([...both.set], [A, B]); assert.ok(I.ideasStockSet(['up', 'early'], 's1').set === both.set && both.source.name === 'First');   // kept while nothing changed
+  const newest = I.ideasStockSet('up', ''); assert.deepStrictEqual([[...newest.set], newest.source.sid, newest.source.name], [[C], 's2', 'Second']);   // no strategy: the newest result that has lists, of a published strategy
+  assert.deepStrictEqual([I.ideasStockSet('up', 'unknown').set.size, I.ideasStockSet('up', 'unknown').source.snap], [0, null]);
+  all = { s1: snap('2026-11-01T00:00:00Z', ['BBB'], ['AAA']) }; assert.deepStrictEqual([...I.ideasStockSet(['up', 'early'], 's1').set], [B, A]);   // a new result: the sets are rebuilt
+  all = {}; assert.deepStrictEqual([I.ideasStockSet('up', '').set.size, I.ideasStockSet('up', '').source.sid], [0, '']);
+  assert.ok(/^\d{1,2} Nov 2026, \d{1,2}:\d{2} (am|pm)$/.test(I.ideasWhen({ at: '2026-11-09T04:30:00Z' })) && I.ideasWhen({ at: '2026-11-09T04:30:00Z' }).endsWith('10:00 am'));
+  all = { s1: snap('2026-11-01T00:00:00Z', ['AAA'], [], { up: 3, ranksUp: { AAA: [1, 'Strong', true], BBB: [2, 'Ok', false] } }) };
+  assert.deepStrictEqual(I.ideaRankOf(A, 's1'), { rank: 1, n: 3, label: 'Strong', held: true, snap: all.s1 }); assert.strictEqual(I.ideaRankOf(B, 's1').held, false);
+  assert.deepStrictEqual([I.ideaRankOf(C, 's1'), I.ideaRankOf(A, 'unknown'), I.ideaRankOf(A)], [null, null, I.ideaRankOf(A, '')]);   // not in the ranks; no result; the newest result when no strategy
+  all = { s1: snap('2026-11-01T00:00:00Z', ['AAA'], []) }; assert.strictEqual(I.ideaRankOf(A, 's1'), null);   // saved before ranks existed
+}));
