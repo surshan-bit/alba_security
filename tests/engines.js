@@ -8337,3 +8337,31 @@ test('strategy practice ideas: Claude\'s reply is checked rule by rule, an appro
     assert.strictEqual(P.applyPractice(st, 'short', 1) && st.learned, 'Short term approach "Bare".'); assert.deepStrictEqual([P.applyPractice(st, 'short', 5), P.applyPractice(st, 'nothing', 0), P.applyPractice(st, 'medium', 0)], [false, false, false]);
   } finally { if(hadClaude) Object.defineProperty(globalThis, 'claude', hadClaude); else delete globalThis.claude; }
 }));
+
+// ---- analysis/controls (the sliders and toggles above the Analysis chart)
+test('Analysis chart controls: the sliders and the axis and colour toggles show the saved filters, dragging only redraws the dots, releasing saves once, and the two axes never show the same timeframe', () => withPage('', async (win) => {
+  TV_VALUES.add('analysisFilters');
+  const f = { weekMin: 20, weekMax: 80, monthMin: 10, monthMax: 90, mosLo: null, mosHi: null, xAxis: 'week', yAxis: 'month', colorBy: 'week' }; const log = [];
+  globalThis.__T = { analysisFilters: f, saveAnalysisFilters: (x) => log.push('save:' + (x === f)) };
+  const C = await loadAllStubbed('src/analysis/controls.js', '', []), doc = win.document;
+  const html = C.analysisControlsHtml(-50, 150); doc.body.innerHTML = html;
+  assert.ok(html.includes('W RSI range') && html.includes('20&ndash;80') && html.includes('10&ndash;90') && html.includes('id="mosMinInput"') && html.includes('min="-50" max="150"') && html.includes('value="-50"') && html.includes('value="150"'));
+  assert.deepStrictEqual(['xAxisWeekBtn', 'yAxisMonthBtn', 'colorByWeekBtn'].map((id) => doc.getElementById(id).classList.contains('active')), [true, true, true]);
+  f.mosLo = -200; f.mosHi = 500; assert.ok(C.analysisControlsHtml(-50, 150).includes('value="-50"') && C.analysisControlsHtml(-50, 150).includes('value="150"'));   // a saved range outside the data is clamped
+  f.mosLo = 10; f.mosHi = 90; doc.body.innerHTML = C.analysisControlsHtml(-50, 150); f.mosLo = null; f.mosHi = null; doc.body.innerHTML = C.analysisControlsHtml(-50, 150);
+  const calls = []; C.wireAnalysisControls({ mosBoundLo: -50, mosBoundHi: 150, update: () => calls.push('update'), schedule: () => calls.push('schedule'), rerender: () => calls.push('rerender'), onRelease: () => calls.push('release') });
+  const id = (x) => doc.getElementById(x), input = (el, v) => { el.value = String(v); el.dispatchEvent(new win.Event('input')); }, change = (el) => el.dispatchEvent(new win.Event('change'));
+  assert.strictEqual(id('mosRangeLabel').textContent, 'All (-50% to 150%)');
+  input(id('weekRsiMinInput'), 30); assert.deepStrictEqual([f.weekMin, id('weekRsiRangeLabel').textContent, calls.splice(0)], [30, '30–80', ['schedule']]);
+  input(id('weekRsiMinInput'), 95); assert.strictEqual(f.weekMin, 80); input(id('weekRsiMaxInput'), 40); assert.strictEqual(f.weekMax, 80); input(id('weekRsiMaxInput'), 99); assert.strictEqual(f.weekMax, 99);   // the handles never cross
+  input(id('monthRsiMinInput'), 5); input(id('monthRsiMinInput'), 99); input(id('monthRsiMaxInput'), 10); input(id('monthRsiMaxInput'), 70); assert.deepStrictEqual([f.monthMin, f.monthMax, id('monthRsiRangeLabel').textContent], [90, 90, '90–90']);
+  assert.ok(!log.length); change(id('weekRsiMinInput')); assert.deepStrictEqual([log.splice(0), calls.filter((c) => c === 'release').length], [['save:true'], 1]);   // saved on release only
+  calls.length = 0; input(id('mosMinInput'), 0); assert.deepStrictEqual([f.mosLo, f.mosHi, id('mosRangeLabel').textContent], [0, null, '0% to 150%']);
+  input(id('mosMaxInput'), 100); assert.deepStrictEqual([f.mosHi, id('mosRangeLabel').textContent], [100, '0% to 100%']);
+  input(id('mosMinInput'), -50); assert.strictEqual(f.mosLo, null); input(id('mosMaxInput'), 150); assert.deepStrictEqual([f.mosHi, id('mosRangeLabel').textContent], [null, 'All (-50% to 150%)']);
+  input(id('mosMaxInput'), 20); input(id('mosMinInput'), 60); assert.deepStrictEqual([f.mosLo, f.mosHi], [20, 20]);   // the handles never cross
+  change(id('mosMinInput')); change(id('mosMaxInput')); assert.deepStrictEqual(log.splice(0), ['save:true', 'save:true']);
+  calls.length = 0; id('colorByMonthBtn').click(); assert.deepStrictEqual([f.colorBy, id('colorByMonthBtn').classList.contains('active'), id('colorByWeekBtn').classList.contains('active'), calls, log.splice(0)], ['month', true, false, ['update'], ['save:true']]);
+  calls.length = 0; id('xAxisMonthBtn').click(); assert.deepStrictEqual([f.xAxis, f.yAxis, calls, log.splice(0)], ['month', 'week', ['rerender'], ['save:true']]);   // the Y axis moved to the other timeframe
+  id('yAxisMonthBtn').click(); assert.deepStrictEqual([f.xAxis, f.yAxis], ['week', 'month']); id('yAxisMonthBtn').click(); assert.deepStrictEqual([f.xAxis, f.yAxis], ['week', 'month']);
+}));
