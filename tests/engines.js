@@ -6729,3 +6729,150 @@ test('last file card: each state of the upload record is worded, and a running o
   assert.ok(!(await draw(up, { exists: true, data: () => ({ status: 'done' }) })).includes('interrupted'));
   assert.ok(!(await draw(up, { exists: false })).includes('interrupted'));
 }));
+
+// ---- Parts that load on first use (src/core/lazy.js), and the two debounced identity saves (identity/strategies.js, identity/ideasresults.js)
+// Runs fn with a stand-in `window`, `localStorage` and `setTimeout` that only records the delay it was given (so the 300 ms and 1.5 s waits are checked, not waited for).
+const withBrowser = (over, fn) => alone(async () => {
+  const names = ['window', 'localStorage'], saved = names.map((k) => [k, Object.getOwnPropertyDescriptor(globalThis, k)]);
+  const events = [], timers = [], store = memoryStorage();
+  const win = Object.assign({ dispatchEvent: (e) => { events.push(e.type); return true; } }, over || {});
+  Object.defineProperty(globalThis, 'window', { value: win, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'localStorage', { value: store, configurable: true, writable: true });
+  // Holds the real timer only for one synchronous call, so tests running at the same time are not affected.
+  const timed = (call) => { const real = globalThis.setTimeout; globalThis.setTimeout = (f, ms) => { timers.push({ f, ms }); return timers.length; }; try { return call(); } finally { globalThis.setTimeout = real; } };
+  try { await fn({ events, timers, store, win, timed }); }
+  finally { saved.forEach(([k, d]) => { if(d) Object.defineProperty(globalThis, k, d); else delete globalThis[k]; }); }
+});
+const settle = () => new Promise((r) => setImmediate(r));
+
+test('lazy parts: a part loads once, runs init once, can be retried after a failure, and only a loaded part is redrawn', () => withBrowser({}, async () => {
+  const L = await loadWithStubs('src/core/lazy.js', '', {});
+  const calls = [];
+  const mod = { init: () => calls.push('init'), render: () => calls.push('render') };
+  L.definePart('a', { load: async () => { calls.push('load'); return mod; }, before: async () => { calls.push('before'); } });
+  assert.deepStrictEqual([L.isPart('a'), L.isPart('zz'), L.loadedPart('a'), L.loadedPart('zz')], [true, false, null, null]);
+  L.renderLoadedPart('a'); assert.deepStrictEqual(calls, []);   // not loaded yet: nothing is drawn
+  await assert.rejects(L.openPart('zz'), /unknown part zz/);
+  const [m1, m2] = await Promise.all([L.openPart('a'), L.openPart('a')]);
+  assert.ok(m1 === mod && m2 === mod);
+  assert.deepStrictEqual(calls, ['before', 'load', 'init']);
+  L.renderLoadedPart('a'); assert.strictEqual(calls[calls.length - 1], 'render');
+  let tries = 0;
+  L.definePart('b', { load: async () => { tries++; if(tries === 1) throw new Error('offline'); return mod; } });
+  await assert.rejects(L.openPart('b'), /offline/);
+  assert.strictEqual(await L.openPart('b'), mod);   // the failed load is tried again
+}));
+
+test('lazy parts: warming downloads the parts one after another while idle, waits 4 s for an idle moment, and falls back to a 1.5 s timer', () => withBrowser({}, async ({ win, timed, timers }) => {
+  const L = await loadWithStubs('src/core/lazy.js', '', {});
+  const seen = [], idleWaits = [];
+  const part = (name, fail) => ({ load: async () => { seen.push(name); if(fail) throw new Error('x'); return { init() {}, render() {} }; } });
+  L.definePart('p1', part('p1')); L.definePart('p2', part('p2', true)); L.definePart('p3', part('p3'));
+  win.requestIdleCallback = (fn, opts) => { idleWaits.push(opts.timeout); Promise.resolve().then(fn); };
+  L.warmParts(['p1', 'nope', 'p2', 'p3']);
+  await settle(); await settle();
+  assert.deepStrictEqual(seen, ['p1', 'p2', 'p3']);   // a failing part does not stop the rest
+  assert.ok(idleWaits.length > 0 && idleWaits.every((t) => t === 4000));
+  await L.openPart('p1');
+  seen.length = 0; L.definePart('p4', part('p4')); await L.openPart('p4'); seen.length = 0;
+  L.warmParts(['p4']); await settle(); assert.deepStrictEqual(seen, []);   // an already loaded part is not fetched again
+  delete win.requestIdleCallback;
+  timed(() => L.warmParts(['p3']));
+  assert.deepStrictEqual(timers.map((t) => t.ms), [1500]);
+}));
+
+const strategyStubs = (ref, uid) => ({
+  './keys.js': 'export const STRAT_KEY = "k.strat", STRAT_AT_KEY = "k.strat.at";',
+  './session.js': 'export const getUid = () => globalThis.__ST.uid, userRef = () => globalThis.__ST.ref;' });
+
+test('strategies save: the browser keeps a copy, the saved record is written once 0.3 s after the last change, and the status follows', () => withBrowser({}, async ({ events, timers, store, timed }) => {
+  const sets = [];
+  globalThis.__ST = { uid: 'u1', ref: null };
+  const S = await loadWithStubs('src/identity/strategies.js', '', strategyStubs());
+  S.strategiesSave('{"a":1}');   // not signed in: this browser only
+  assert.strictEqual(S.getStrategiesStatus(), 'browser'); assert.strictEqual(store.getItem('k.strat'), '{"a":1}');
+  globalThis.__ST.ref = { set: async (d) => { sets.push(d); } };
+  timed(() => { S.strategiesSave('{"a":2}'); S.strategiesSave('{"a":3}'); });
+  assert.strictEqual(S.getStrategiesStatus(), 'saving');
+  assert.deepStrictEqual(timers.map((t) => t.ms), [300, 300]);   // the second change restarts the wait
+  S.flushStrategies(); await settle();
+  assert.deepStrictEqual(sets.map((d) => d.json), ['{"a":3}']); assert.strictEqual(S.getStrategiesStatus(), 'saved');
+  assert.ok(events.includes('alba-strategies-status'));
+  S.flushStrategies(); await settle(); assert.strictEqual(sets.length, 1);   // nothing waiting: nothing written
+  globalThis.__ST.ref = { set: async () => { throw new Error('refused'); } };
+  await quietErrors(async () => { timed(() => S.strategiesSave('{"a":4}')); S.flushStrategies(); await settle(); });
+  assert.strictEqual(S.getStrategiesStatus(), 'failed');
+  globalThis.__ST.ref = null; timed(() => S.strategiesSave('{"a":5}')); S.flushStrategies();   // signed out before the write: nothing is sent
+}));
+
+test('strategies sync: the saved copy replaces an older browser copy, a newer browser copy is saved up, and a missing sign-in or a failure is shown', () => withBrowser({}, async ({ events, store }) => {
+  globalThis.__ST = { uid: null, ref: null };
+  const S = await loadWithStubs('src/identity/strategies.js', '', strategyStubs());
+  await S.syncStrategies(); assert.strictEqual(S.getStrategiesStatus(), 'browser');
+  globalThis.__ST.uid = 'u1'; await S.syncStrategies(); assert.strictEqual(S.getStrategiesStatus(), 'failed');   // signed in but no record to read
+  const sets = [], snap = (d) => ({ exists: !!d, data: () => d });
+  globalThis.__ST.ref = { get: async () => snap({ json: '{"remote":1}', updatedAt: '2026-11-10T00:00:00Z' }), set: async (d) => { sets.push(d); } };
+  store.setItem('k.strat', '{"old":1}'); store.setItem('k.strat.at', '2026-11-01T00:00:00Z');
+  await S.syncStrategies();
+  assert.strictEqual(store.getItem('k.strat'), '{"remote":1}'); assert.ok(events.includes('alba-strategies-synced')); assert.strictEqual(S.getStrategiesStatus(), 'saved');
+  store.setItem('k.strat', '{"newer":1}'); store.setItem('k.strat.at', '2026-11-11T00:00:00Z');
+  await S.syncStrategies();
+  assert.deepStrictEqual(sets.map((d) => d.json), ['{"newer":1}']);   // the browser copy is newer: it is saved, not replaced
+  globalThis.__ST.ref = { get: async () => snap(null), set: async (d) => { sets.push(d); } };
+  await S.syncStrategies(); assert.strictEqual(sets.length, 2);   // no saved record yet: the browser copy is saved
+  globalThis.__ST.ref = { get: async () => { throw new Error('down'); } };
+  await quietErrors(() => S.syncStrategies()); assert.strictEqual(S.getStrategiesStatus(), 'failed');
+}));
+
+test('Buy / Sell ideas results: kept in the browser, only the newest 20, saved 0.3 s after the last change, and merged with the saved record (the newer result of each strategy wins)', () => withBrowser({}, async ({ events, timers, store, timed }) => {
+  const sets = [];
+  globalThis.__ST = { ref: null };
+  const R = await loadWithStubs('src/identity/ideasresults.js', '', { './session.js': 'export const userRef = () => globalThis.__ST.ref;' });
+  assert.deepStrictEqual(R.ideasResultsGet(), {});
+  R.ideasResultsSave('s1', { at: '2026-11-01T00:00:00Z', n: 1 });
+  assert.deepStrictEqual(Object.keys(R.ideasResultsGet()), ['s1']); assert.strictEqual(timers.length, 0);   // not signed in: no save is scheduled
+  for(let i = 0; i < 25; i++) R.ideasResultsSave('x' + i, { at: '2026-11-02T00:' + String(i).padStart(2, '0') + ':00Z' });
+  assert.strictEqual(Object.keys(R.ideasResultsGet()).length, 20); assert.ok(!('s1' in R.ideasResultsGet()) && 'x24' in R.ideasResultsGet());
+  store.setItem('albaDashboard.ideasResults.v1', 'not json'); assert.deepStrictEqual(R.ideasResultsGet(), {});
+  store.setItem('albaDashboard.ideasResults.v1', '[1]'); assert.deepStrictEqual(R.ideasResultsGet(), {});   // a list is not a map
+  store.setItem('albaDashboard.ideasResults.v1', '{}');
+  globalThis.__ST.ref = { set: async (d) => { sets.push(d); } };
+  timed(() => { R.ideasResultsSave('a', { at: '2026-11-03T00:00:00Z' }); R.ideasResultsSave('b', { at: '2026-11-04T00:00:00Z' }); });
+  assert.deepStrictEqual(timers.map((t) => t.ms), [300, 300]);
+  timers[1].f(); await settle();
+  assert.deepStrictEqual(sets.map((d) => Object.keys(JSON.parse(d.json)).sort()), [['a', 'b']]);
+  globalThis.__ST.ref = null; timers[1].f(); await settle(); assert.strictEqual(sets.length, 1);   // signed out before the write
+  // sync
+  await R.syncIdeasResults();   // no record to read: nothing happens
+  const snap = (d) => ({ exists: !!d, data: () => d });
+  const remote = { b: { at: '2026-11-05T00:00:00Z', from: 'remote' }, c: { at: '2026-11-06T00:00:00Z' } };
+  globalThis.__ST.ref = { get: async () => snap({ json: JSON.stringify(remote) }), set: async (d) => { sets.push(d); } };
+  await R.syncIdeasResults();
+  const merged = R.ideasResultsGet();
+  assert.deepStrictEqual([merged.b.from, 'a' in merged, 'c' in merged], ['remote', true, true]);
+  assert.ok(events.includes('alba-ideas-synced')); assert.strictEqual(sets.length, 2);   // a is only here, so the record is written back
+  globalThis.__ST.ref = { get: async () => snap({ json: 'broken' }), set: async (d) => { sets.push(d); } };
+  await R.syncIdeasResults(); assert.strictEqual(sets.length, 3);
+  globalThis.__ST.ref = { get: async () => { throw new Error('down'); } };
+  await quietErrors(() => R.syncIdeasResults());
+}));
+
+test('fund import retry: a failed read is tried again with a growing pause, a refused one is not, and the last error is raised after five tries', () => alone(async () => {
+  const M = await loadAllStubbed('src/import/fund-import.js', '', ['./fundreport.js']);
+  const pauses = [];
+  globalThis.__T = Object.assign(globalThis.__T || {}, { sleep: (ms) => { pauses.push(ms); return Promise.resolve(); } });
+  try {
+    let n = 0;
+    assert.strictEqual(await M.fiRetry(async () => { if(++n < 3) throw new Error('flaky'); return 'ok'; }), 'ok');
+    assert.strictEqual(pauses.length, 2);
+    assert.ok(pauses[0] >= 700 && pauses[0] < 1100 && pauses[1] >= 1400 && pauses[1] < 1800, pauses.join());   // 0.7 s then 1.4 s, plus a random spread of up to 0.4 s
+    for(const code of ['invalid_argument', 'not_granted', 'too_large', 'quota_exceeded', 'quota_or_state']){
+      pauses.length = 0;
+      await assert.rejects(M.fiRetry(async () => { throw Object.assign(new Error(code), { code }); }), new RegExp(code));
+      assert.strictEqual(pauses.length, 0);   // a refusal is not tried again
+    }
+    n = 0; pauses.length = 0;
+    await assert.rejects(M.fiRetry(async () => { n++; throw new Error('always'); }), /always/);
+    assert.deepStrictEqual([n, pauses.length], [5, 5]);
+  } finally { delete globalThis.__T.sleep; }
+}));

@@ -14,6 +14,9 @@ import { paintLastRuns } from '../refresh/runlog.js';
 import { uploadsSettled } from './upload-history.js';
 import { recordScoreHistory } from '../history/scorehistory.js';
 
+const BACKOFF_BASE_MS = 700, BACKOFF_JITTER_MS = 400;   // a failed call is retried after 0.7 s, 1.4 s, ... plus a random spread
+const PAINT_PAUSE_MS = 30;   // lets the step label show before the slow work of that step starts
+
 // ====================================================================================================
 // FUNDAMENTAL IMPORT, IN THE PAGE (added 2026-10-09; backups and Restore removed in v1.199). "Import data" no longer opens a Claude chat:
 // the uploaded CSV (kept in the asset store + fundamentalCsvUploadLog) is scored here with the same
@@ -38,7 +41,7 @@ async function fiRetry(fn){
       err = e;
       const c = e && e.code;
       if(c === 'invalid_argument' || c === 'not_granted' || c === 'too_large' || c === 'quota_exceeded' || c === 'quota_or_state') throw e;
-      await sleep(700 * Math.pow(2, a) + Math.random() * 400);
+      await sleep(BACKOFF_BASE_MS * Math.pow(2, a) + Math.random() * BACKOFF_JITTER_MS);
     }
   }
   throw err;
@@ -277,7 +280,7 @@ async function fiStepLoad(run){
 
 // 3. Scoring the file against the stored list (in place). Returns the engine's result and what the list looked like before.
 async function fiStepScore(run, raw, csvText){
-  run.current = 'score'; fiSet('score', 'running', '', 0.3); await sleep(30);
+  run.current = 'score'; fiSet('score', 'running', '', 0.3); await sleep(PAINT_PAUSE_MS);
   const prev = fiPrevInfo(raw.stocks), before = {};
   for(const s of raw.stocks) before[s.verdict] = (before[s.verdict] || 0) + 1;
   const res = applyFundamental(csvText, raw.stocks, fiDay(run.rec.uploadedAt));
@@ -287,7 +290,7 @@ async function fiStepScore(run, raw, csvText){
 
 // 4. The integrity checks: hard failures stop the import, warnings are put to the person.
 async function fiStepCheck(run, raw, scored){
-  run.current = 'check'; fiSet('check', 'running', '', 0.5); await sleep(30);
+  run.current = 'check'; fiSet('check', 'running', '', 0.5); await sleep(PAINT_PAUSE_MS);
   const chk = fiCheck(raw.stocks, scored.prev), thin = thinFileWarning(scored.res.rescored, raw.stocks.length);
   if(thin) chk.soft.unshift(thin);
   fiThrowHard(chk);

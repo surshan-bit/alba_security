@@ -3,6 +3,9 @@
 import { STRAT_AT_KEY, STRAT_KEY } from './keys.js';
 import { getUid, userRef } from './session.js';
 
+// A burst of edits is saved once, this long after the last one.
+const SAVE_DEBOUNCE_MS = 300;
+
 let stratTimer = null, stratPending = null, stratChain = Promise.resolve();
 let status = '';   // '' | 'browser' | 'saving' | 'saved' | 'failed' (shown in the Strategies list)
 
@@ -22,7 +25,7 @@ function strategiesSave(json){
   try { localStorage.setItem(STRAT_KEY, json); localStorage.setItem(STRAT_AT_KEY, new Date().toISOString()); } catch(e){ /* storage unavailable */ }
   if(!userRef('data/users/{uid}/strategies')){ setStatus('browser'); return; }
   stratPending = json; setStatus('saving');
-  clearTimeout(stratTimer); stratTimer = setTimeout(stratWrite, 300);
+  clearTimeout(stratTimer); stratTimer = setTimeout(stratWrite, SAVE_DEBOUNCE_MS);
 }
 // Runs before the app starts (and may finish late): the saved strategies replace this browser's copy.
 async function syncStrategies(){

@@ -6,6 +6,9 @@
 import { dbCapabilityPromise } from '../core/store.js';
 import { anyBusy } from '../core/busy.js';
 
+const RELOAD_DELAY_MS = 1200;   // the notice of a new version is shown this long before the page reloads
+const CHECK_INTERVAL_MS = 5000;   // how often the page asks whether a new version was published
+
 const KEY = 'albaAutoReload';
 const myBuild = () => {
   const s = document.querySelector('script[data-entry]');
@@ -46,7 +49,7 @@ function init_boot_autoreload(){
     if(anyBusy() || typing()){ notice('A new version is ready. It loads when the current work finishes.', false); return; }
     markTried(latest);
     notice('Updating to the new version…', false);
-    setTimeout(() => window.location.reload(), 1200);
+    setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
   };
   (async () => {
     let db = null;
@@ -59,7 +62,7 @@ function init_boot_autoreload(){
         check();
       }, () => {});
     } catch(e){ return; }
-    timer = setInterval(check, 5000);
+    timer = setInterval(check, CHECK_INTERVAL_MS);
     document.addEventListener('visibilitychange', () => { if(!document.hidden) check(); });
   })();
   void timer;

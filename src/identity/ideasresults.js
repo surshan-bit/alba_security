@@ -3,6 +3,9 @@
 // instant first paint and for use without a sign-in; the saved record is merged in when the page opens (the newer result of each strategy wins).
 import { userRef } from './session.js';
 
+// A burst of edits is saved once, this long after the last one.
+const SAVE_DEBOUNCE_MS = 300;
+
 const KEY = 'albaDashboard.ideasResults.v1', MAX_KEPT = 20;
 let timer = null, chain = Promise.resolve();
 
@@ -35,7 +38,7 @@ function ideasResultsSave(sid, snapshot){
   const map = readLocal(); map[sid] = snapshot;
   try { localStorage.setItem(KEY, JSON.stringify(trim(map))); } catch(e){ /* storage unavailable: the saved record still keeps it */ }
   if(!userRef('data/users/{uid}/ideasResults')) return;
-  clearTimeout(timer); timer = setTimeout(write, 300);
+  clearTimeout(timer); timer = setTimeout(write, SAVE_DEBOUNCE_MS);
 }
 // Runs while the page starts (and may finish late): the saved record is merged with this browser's copy, the newer result of each strategy winning.
 async function syncIdeasResults(){
