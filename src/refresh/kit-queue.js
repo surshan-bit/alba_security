@@ -17,12 +17,6 @@ const CHUNK = Math.min(50, LD_BATCH_MAX.fund, LD_BATCH_MAX.tech);   // stocks pe
 const CAP = { fund: Infinity, tech: 1000 };                         // most stocks one press may queue (no limit on Fundamental since v1.297)
 const CONFIRM_OVER = { fund: 50, tech: 100 };                       // above this the user is asked first
 const LS_KEY = "albaDashboard.refreshQueue.v1";
-const PERSIST_DELAY_MS = 5000;   // the saved queue is written this long after the first change in a burst
-const ENGINE_POLL_MS = 500;   // how often a busy refresh engine is asked whether it is free
-const BATCH_RETRY_MS = 800;   // pause before a batch the engine did not take is offered again
-const NEXT_JOB_PAUSE_MS = 1000;   // pause between one job finishing and the next starting
-const RESUME_PAUSE_MS = 1500;   // pause after a saved queue is taken over, before it carries on
-const TAKEOVER_POLL_MS = 5000, TAKEOVER_WAIT_MAX_MS = 70000, TAKEOVER_JITTER_MS = 3000;   // waiting for another tab to go quiet (and a random spread so two tabs do not take over together)
 const HEARTBEAT_MS = 15000, TAKEOVER_MS = 45000;
 const tabId = Math.random().toString(36).slice(2, 10);
 
@@ -89,7 +83,7 @@ async function writeNow() {
     lastWriteAt = Date.now();
   } catch (e) { console.error("Could not save the refresh queue", e); }
 }
-function persistSoon() { if (!persistTimer) persistTimer = setTimeout(writeNow, PERSIST_DELAY_MS); }
+function persistSoon() { if (!persistTimer) persistTimer = setTimeout(writeNow, 5000); }
 function persistNow() { clearTimeout(persistTimer); persistTimer = null; return writeNow(); }
 async function loadSaved() {
   const ref = userRef("data/users/{uid}/refreshQueue");
@@ -187,7 +181,7 @@ async function pump() {
   try {
     while (queue.length) {
       const job = queue[0];
-      while (engineBusy()) await sleep(ENGINE_POLL_MS);
+      while (engineBusy()) await sleep(500);
       if (!queue.length) break;
       if (stopPending) {   // Stop was pressed on another device between two batches
         stopPending = false; queue.shift(); activeJob = null; activityEnd("rk-q-" + job.id);
@@ -200,7 +194,7 @@ async function pump() {
       const before = getLdBatch();
       await ldBatchStart(job.kind, list, job.source || "strat");
       const b = getLdBatch();
-      if (b === before) { await sleep(BATCH_RETRY_MS); continue; }     // the engine did not take the batch (busy or refused): try again
+      if (b === before) { await sleep(800); continue; }     // the engine did not take the batch (busy or refused): try again
       batchNoticeDone(job, list.length, b);
     }
   } finally {
@@ -373,7 +367,7 @@ async function takeOver() {
   if (taking || queue.length) return;
   taking = true;
   try {
-    await sleep(Math.random() * TAKEOVER_JITTER_MS);
+    await sleep(Math.random() * 3000);
     const again = await loadSaved();
     if (!again || again.v !== 1 || queue.length || hbAge(again) < TAKEOVER_MS) return;
     const jobs = liveJobs(again);
@@ -386,7 +380,7 @@ async function takeOver() {
     queue.slice(1).forEach(queuedItem);
     showResuming();
     await persistNow();   // claims the run: the other dashboards see a fresh heartbeat from this one
-    setTimeout(pump, NEXT_JOB_PAUSE_MS);
+    setTimeout(pump, 1000);
   } finally { taking = false; }
 }
 function watchRemote() {
@@ -419,8 +413,8 @@ async function resumeSaved(saved) {
   // A fresh heartbeat from another tab usually means this page was reloaded while a refresh was running:
   // wait a moment, and carry on from where it stopped once that tab has gone quiet.
   let waited = 0;
-  while (saved && saved.owner && saved.owner !== tabId && hbAge(saved) < TAKEOVER_MS && waited < TAKEOVER_WAIT_MAX_MS) {
-    await sleep(TAKEOVER_POLL_MS); waited += TAKEOVER_POLL_MS;
+  while (saved && saved.owner && saved.owner !== tabId && hbAge(saved) < TAKEOVER_MS && waited < 70000) {
+    await sleep(5000); waited += 5000;
     const again = await loadSaved();
     if (!again || again.v !== 1) return;
     saved = again; jobs = liveJobs(saved);
@@ -435,7 +429,7 @@ async function resumeSaved(saved) {
   clearRemote();
   queue.slice(1).forEach(queuedItem);
   showResuming();
-  setTimeout(pump, RESUME_PAUSE_MS);
+  setTimeout(pump, 1500);
 }
 
 // What the controls read about the queue.

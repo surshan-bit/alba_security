@@ -6856,3 +6856,23 @@ test('Buy / Sell ideas results: kept in the browser, only the newest 20, saved 0
   globalThis.__ST.ref = { get: async () => { throw new Error('down'); } };
   await quietErrors(() => R.syncIdeasResults());
 }));
+
+test('fund import retry: a failed read is tried again with a growing pause, a refused one is not, and the last error is raised after five tries', () => alone(async () => {
+  const M = await loadAllStubbed('src/import/fund-import.js', 'export { fiRetry };', ['./fundreport.js']);
+  const pauses = [];
+  globalThis.__T = Object.assign(globalThis.__T || {}, { sleep: (ms) => { pauses.push(ms); return Promise.resolve(); } });
+  try {
+    let n = 0;
+    assert.strictEqual(await M.fiRetry(async () => { if(++n < 3) throw new Error('flaky'); return 'ok'; }), 'ok');
+    assert.strictEqual(pauses.length, 2);
+    assert.ok(pauses[0] >= 700 && pauses[0] < 1100 && pauses[1] >= 1400 && pauses[1] < 1800, pauses.join());   // 0.7 s then 1.4 s, plus a random spread of up to 0.4 s
+    for(const code of ['invalid_argument', 'not_granted', 'too_large', 'quota_exceeded', 'quota_or_state']){
+      pauses.length = 0;
+      await assert.rejects(M.fiRetry(async () => { throw Object.assign(new Error(code), { code }); }), new RegExp(code));
+      assert.strictEqual(pauses.length, 0);   // a refusal is not tried again
+    }
+    n = 0; pauses.length = 0;
+    await assert.rejects(M.fiRetry(async () => { n++; throw new Error('always'); }), /always/);
+    assert.deepStrictEqual([n, pauses.length], [5, 5]);
+  } finally { delete globalThis.__T.sleep; }
+}));
