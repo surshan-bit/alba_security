@@ -7575,11 +7575,11 @@ test('scroll keeping: scroll positions of the known scroll areas survive a redra
     const log = []; K.redrawWhenIdle('k', () => log.push('first')); K.redrawWhenIdle('k', () => log.push('same key')); assert.strictEqual(held.length, 1);   // one redraw per key
     assert.ok(held[0].ms === 2500 || held[0].ms === 60);   // longer right after launch
     held[0].f(); assert.deepStrictEqual(log, ['first']);   // nothing was scrolling: it ran at once
+    held.length = 0; K.redrawWhenIdle('e', () => { throw new Error('bad draw'); }); held[0].f(); assert.ok(errs.some((e) => e.includes('Could not redraw after an update')));   // a failing redraw is reported, not thrown
     K.redrawWhenIdle('k', () => log.push('again')); win.document.dispatchEvent(new win.Event('scroll')); held.length = 0;
     K.redrawWhenIdle('s', () => log.push('scroll')); const first = held.pop(); first.f();   // a scroll just happened: it waits again
     assert.deepStrictEqual([log.length, held.length, held[0].ms > 0 && held[0].ms <= 370], [1, 1, true]);
     held.length = 0;
-    held.length = 0; K.redrawWhenIdle('e', () => { throw new Error('bad draw'); }); held[0].f(); assert.ok(errs.some((e) => e.includes('Could not redraw after an update')));
   } finally { globalThis.setTimeout = real; console.error = quietErr; }
 }));
 
