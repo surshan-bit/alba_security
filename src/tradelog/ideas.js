@@ -18,6 +18,7 @@ import { ideasResultsGet, ideasResultsSave } from '../identity/ideasresults.js';
 import { setHtml } from '../core/safehtml.js';
 
 const TOP_N = 5;
+const PAINT_PAUSE_MS = 60;   // lets the progress bar show its last step before the lists are worked out
 function openTradeByStock(){
   const m = new Map();
   for(const t of allTrades()){
@@ -70,7 +71,7 @@ async function runIdeas(){
   try { await Promise.all(Array.from({ length: Math.min(BARS_PARALLEL, need.length) }, worker)); }
   catch(e){ console.error('Processing the ideas failed', e); }
   stage = 'rank'; refreshIdeasBody();
-  await new Promise(r => setTimeout(r, 60));   // lets the bar show the last step before the lists are worked out
+  await new Promise(r => setTimeout(r, PAINT_PAUSE_MS));   // lets the bar show the last step before the lists are worked out
   const list = ideasFor(sid);
   if(list) ideasResultsSave(sid, snapshotOf(list));
   phase = 'done'; refreshIdeasBody();

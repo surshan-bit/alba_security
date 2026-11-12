@@ -7055,3 +7055,23 @@ test('refresh queue runner: a saved queue resumes after a reload, waits for a ta
     } finally { h6.restore(); }
   }
 }));
+
+test('Trade Log ideas: Process reads the weekly prices of the chosen strategy a few at a time, shows its progress, tolerates a failed read, and saves the result', () => kcPage('<select id="tradeIdeasStrategy"></select><button id="tradeIdeasRun"></button><div id="tradeIdeasBody"></div>', async (win) => {
+  const list = Array.from({ length: 7 }, (_, i) => ({ name: 'S' + i, ticker: 'T' + i })), read = [], saved = [], errors = [];
+  TV_VALUES.add('stockByTickerSymbolAny'); TV_VALUES.add('RESULTS_DAYS'); TV_VALUES.add('THIN_LAKH');
+  globalThis.__T = { stocks: list, publishedStrategies: () => [{ id: 's1', name: 'Q', rules: [] }], qualifyingStocks: () => list, priceLoaded: new Set(['S0']), priceHistoryByTicker: {}, pcTickerKey: (s) => s.name,
+    ensurePriceBars: async (s) => { read.push(s.name); if(s.name === 'S3') throw new Error('no bars'); }, allTrades: () => [], stockByTickerSymbolAny: new Map(), tvIstDate: () => '2026-11-10',
+    nextWeekRead: () => null, rankReads: (a) => a.map(() => null), trendOf: () => null, ideaCall: () => ({ label: '' }), rankIdeas: (l) => l, snapshotOf: (l) => ({ n: l.length }),
+    topBuys: () => [], topEarly: () => [], RESULTS_DAYS: 30, THIN_LAKH: 1, newsCounts: () => ({ total: 0 }), recentNews: () => [],
+    ideasResultsGet: () => ({}), ideasResultsSave: (id, snap) => saved.push([id, snap]), keepScroll: (el, fn) => fn(), setHtml: (el, h) => { el.innerHTML = h; }, escapeHtml: (x) => String(x), CAP_NAME: {}, BUY_TOP: 90 };
+  const keep = console.error; console.error = (m) => errors.push(String(m));
+  try {
+    const M = await loadAllStubbed('src/tradelog/ideas.js', '', ['../core/evt.js']), d = win.document, sel = d.getElementById('tradeIdeasStrategy'), run = d.getElementById('tradeIdeasRun');
+    M.init_ideas(); M.renderIdeas(); sel.value = 's1'; sel.dispatchEvent(new win.Event('change'));
+    run.click(); run.click();   // a second press while it runs does nothing
+    for(let i = 0; i < 100 && !saved.length; i++) await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual(read.slice().sort(), ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']);   // S0 was already loaded
+    assert.deepStrictEqual([saved.length, saved[0][0], saved[0][1].v, saved[0][1].today], [1, 's1', 1, '2026-11-10']);   // one result, kept under the strategy, stamped with the day
+    assert.ok(errors.some((e) => e.includes('Price history unavailable')));
+  } finally { console.error = keep; }
+}));
