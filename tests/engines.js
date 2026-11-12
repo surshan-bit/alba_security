@@ -7679,3 +7679,107 @@ test('Analysis refresh scope: the shown stocks are the scope of the refresh butt
   const defs = [], repaints = []; kit = { defineScope: (id, def) => defs.push([id, def]), repaint: () => repaints.push(1) };
   S.updateAnalysisRefresh(); assert.deepStrictEqual([defs[0][0], defs[0][1].label, defs[0][1].selName, defs[0][1].stocks().length, repaints.length], ['analysis', 'shown stocks', 'analysis', 2, 1]);
 }));
+
+// ---- Small logic modules: ui/errorlog, import/joblock, livedata/symbols, panel, claudegate, tv/links, boot/partials
+test('error log: page errors are recorded once each, noise is ignored, the first one is announced, and a batch is saved to the user\'s record', () => withPage('<section class="app-section active" id="section-news"></section><span class="brand-version">v9.9</span>', async (win) => {
+  const listeners = {}, sets = [], notes = [], held = [], real = globalThis.setTimeout;
+  const hadWin = Object.getOwnPropertyDescriptor(globalThis, 'window'); Object.defineProperty(globalThis, 'window', { value: { addEventListener: (t, f) => { listeners[t] = f; } }, configurable: true, writable: true });
+  let ref = { get: async () => ({ exists: true, data: () => ({ errors: Array.from({ length: 19 }, (_, i) => ({ msg: 'old' + i })) }) }), set: async (d) => { sets.push(d); } };
+  globalThis.__T = { userRef: () => ref, activityNotify: (n) => notes.push(n) };
+  globalThis.setTimeout = (f, ms) => { held.push({ f, ms }); return held.length; };
+  try {
+    const E = await loadAllStubbed('src/ui/errorlog.js', '', []); E.init_ui_errorlog();
+    listeners.error({ message: 'Boom', filename: 'https://x/app.js', lineno: 7 }); listeners.error({ message: 'Boom', filename: 'https://x/app.js', lineno: 7 });   // the same error twice: once
+    listeners.error({ message: 'ResizeObserver loop limit exceeded' }); listeners.error({ message: 'Script error.' }); listeners.error({ message: '' }); listeners.error({ error: { message: 'From error object' } });
+    listeners.unhandledrejection({ reason: new Error('nope') }); listeners.unhandledrejection({ reason: 'plain text' }); listeners.unhandledrejection({ reason: null });
+    assert.strictEqual(notes.length, 1); assert.deepStrictEqual([notes[0].tone, notes[0].title, notes[0].text.startsWith('Boom')], ['warn', 'Something went wrong on this page', true]);
+    assert.deepStrictEqual(held.map((h) => h.ms), [3000]);   // one save timer for the batch
+    held[0].f(); await new Promise((r) => real(r, 10));
+    const saved = sets[0]; assert.deepStrictEqual([saved.v, saved.errors.length, saved.errors.at(-1).msg, saved.errors.at(-1).page, saved.errors.at(-1).version, saved.errors.filter((e) => e.where === 'app.js:7').length], [1, 20, 'Unhandled rejection: null', 'news', 'v9.9', 1]);   // the newest 20 are kept
+    for(let i = 0; i < 40; i++) listeners.error({ message: 'e' + i }); assert.ok(sets.length === 1);   // at most 30 per page
+    held.at(-1).f(); await new Promise((r) => real(r, 10));
+    ref = null; listeners.error({ message: 'late' }); held.at(-1).f(); await new Promise((r) => real(r, 10));   // signed out: dropped quietly
+    ref = { get: async () => { throw new Error('offline'); } }; listeners.error({ message: 'again' }); held.at(-1).f(); await new Promise((r) => real(r, 10));   // best effort
+    listeners.error({ message: 'x'.repeat(500) });
+    Object.defineProperty(globalThis, 'document', { value: null, configurable: true, writable: true }); listeners.error({ message: 'document gone' });   // the log never raises an error of its own
+  } finally { globalThis.setTimeout = real; if(hadWin) Object.defineProperty(globalThis, 'window', hadWin); else delete globalThis.window; }
+}));
+
+test('job lock: another tab\'s running job blocks until it goes quiet, the tab id is kept for the session, and the heartbeat updates the record until stopped', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'window'), store = memoryStorage(), real = { si: globalThis.setInterval, ci: globalThis.clearInterval };
+  Object.defineProperty(globalThis, 'window', { value: { sessionStorage: store, crypto: { getRandomValues: (a) => a.fill(7) } }, configurable: true, writable: true });
+  try {
+    globalThis.__T = { formatUploadTimestamp: (t) => 'T(' + t + ')' };
+    let J = await loadAllStubbed('src/import/joblock.js', '', []);
+    assert.strictEqual(J.tabId, store.getItem('albaJobTab'));
+    const J2 = await loadAllStubbed('src/import/joblock.js', '', []); assert.strictEqual(J2.tabId, J.tabId);   // the same tab keeps its id
+    const ago = (ms) => new Date(Date.now() - ms).toISOString();
+    assert.deepStrictEqual([J.lockBusy(null), J.lockBusy({ status: 'done', owner: 'x' }), J.lockBusy({ status: 'running', owner: J.tabId, heartbeatAt: ago(0) }), J.lockBusy({ status: 'running', owner: 'other', heartbeatAt: ago(60000) }), J.lockBusy({ status: 'running', owner: 'other', heartbeatAt: ago(200000) }), J.lockBusy({ status: 'running', owner: 'other', startedAt: ago(1000) }), J.lockBusy({ status: 'running', owner: 'other' })], [false, false, false, true, false, true, false]);
+    assert.strictEqual(J.lockText({ startedAt: 'S' }), 'started T(S)'); assert.strictEqual(J.lockText({ startedAt: 'S', heartbeatAt: 'H' }), 'started T(S), last active T(H)');
+    let fn = null, cleared = 0; globalThis.setInterval = (f, ms) => { fn = f; assert.strictEqual(ms, 20000); return 5; }; globalThis.clearInterval = (t) => { assert.strictEqual(t, 5); cleared++; };
+    const updates = []; const stop = J.startBeat({ update: (d) => { updates.push(Object.keys(d)); return Promise.resolve(); } }); fn(); assert.deepStrictEqual(updates, [['heartbeatAt']]);
+    const stop2 = J.startBeat({ update: () => { throw new Error('sync fail'); } }); fn(); stop(); stop2(); assert.strictEqual(cleared, 2);
+    const stop3 = J.startBeat({ update: () => Promise.reject(new Error('async fail')) }); fn(); await Promise.resolve();
+    // storage and crypto unavailable
+    Object.defineProperty(globalThis, 'window', { value: { sessionStorage: { getItem() { throw new Error('blocked'); } } }, configurable: true, writable: true });
+    const J3 = await loadAllStubbed('src/import/joblock.js', '', []); assert.ok(/^tab-/.test(J3.tabId));
+  } finally { globalThis.setInterval = real.si; globalThis.clearInterval = real.ci; if(had) Object.defineProperty(globalThis, 'window', had); else delete globalThis.window; }
+}));
+
+test('TradingView quote and symbol check: only a positive price counts, a verified symbol is remembered, and an unusable price is an error', () => alone(async () => {
+  const calls = []; let price = '123.4';
+  globalThis.__T = { pcTickerKey: (s) => s.k, tvCall: async (tool, args) => { calls.push([tool, args.symbol]); return price === 'none' ? null : { data: { close: price } }; }, tvResolveSymbol: async (s) => 'NSE:' + s.k };
+  const L = await loadAllStubbed('src/livedata/symbols.js', '', []);
+  assert.deepStrictEqual(await L.ldQuote('NSE:A'), { price: 123.4 });
+  for(const bad of ['0', '-1', '', 'abc', 'none']){ price = bad; assert.deepStrictEqual(await L.ldQuote('NSE:A'), { price: null }, bad); }
+  price = '10'; const v = await L.ldVerifiedSymbol({ k: 'A' }); assert.deepStrictEqual(v, { sym: 'NSE:A', price: 10 }); calls.length = 0;
+  assert.ok(await L.ldVerifiedSymbol({ k: 'A' }) === v && calls.length === 0 && L.ldSymOk.has('A'));   // remembered
+  price = '0'; await assert.rejects(L.ldVerifiedSymbol({ k: 'B' }), /no usable price for NSE:B/); assert.ok(!L.ldSymOk.has('B'));
+}));
+
+test('batch rounds: each kind walks the list one batch at a time, starts again when the list changes or ends', () => {
+  const R = load('src/livedata/panel.js').createBatchRounds({ fund: 2, tech: 3 }), list = ['a', 'b', 'c', 'd', 'e'];
+  assert.deepStrictEqual(R.plan('fund', list, 'k'), { list: ['a', 'b'], from: 0, to: 2, all: 5 });
+  assert.deepStrictEqual([R.take('fund', list, 'k'), R.take('fund', list, 'k'), R.take('fund', list, 'k'), R.take('fund', list, 'k')], [['a', 'b'], ['c', 'd'], ['e'], ['a', 'b']]);   // after the last batch it starts over
+  R.take('fund', list, 'k'); assert.deepStrictEqual(R.take('fund', list, 'other'), ['a', 'b']);   // a new plan key starts at the top
+  assert.deepStrictEqual(R.take('tech', list, 'k'), ['a', 'b', 'c']); assert.deepStrictEqual(R.take('fund', [], 'z'), []); assert.deepStrictEqual(R.take('tech', ['x'], 'k'), ['x']);
+  const D = load('src/livedata/panel.js').createBatchRounds(); assert.strictEqual(D.take('fund', Array.from({ length: 60 }, (_, i) => i), 'k').length, 50);
+});
+
+test('Claude controls: the master switch and each step default to on, turning one off is saved, and a damaged saved value is ignored', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'localStorage'), store = memoryStorage(), saved = [];
+  Object.defineProperty(globalThis, 'localStorage', { value: store, configurable: true, writable: true });
+  try {
+    globalThis.__T = { prefSet: (k, v) => { saved.push([k, v]); store.setItem(k, v); } };
+    const C = await loadAllStubbed('src/livedata/claudegate.js', '', []);
+    assert.deepStrictEqual([C.claudeMasterOn(), C.claudeStepOn('strengths'), C.claudeAnyOn(), C.CLAUDE_STEPS.length], [true, true, true, 9]);
+    C.setClaudeStep('strengths', false); assert.deepStrictEqual([saved.at(-1), C.claudeStepOn('strengths'), C.claudeStepOn('newsLabels')], [['albaDashboard.claudeControls.v1', '{"strengths":false}'], false, true]);
+    C.setClaudeStep('strengths', true); assert.strictEqual(saved.at(-1)[1], '{}');
+    store.setItem('albaDashboard.claudeControls.v1', '{"all":false}'); assert.deepStrictEqual([C.claudeMasterOn(), C.claudeStepOn('strengths'), C.claudeAnyOn()], [false, false, false]);
+    for(const bad of ['not json', 'null', '5']){ store.setItem('albaDashboard.claudeControls.v1', bad); assert.strictEqual(C.claudeMasterOn(), true, bad); }
+  } finally { if(had) Object.defineProperty(globalThis, 'localStorage', had); else delete globalThis.localStorage; }
+}));
+
+test('TradingView chart links: NSE codes link to NSE, numeric BSE codes use the saved alpha symbol when there is one, and the saved map is read once', () => alone(async () => {
+  TV_VALUES.add('dbCapabilityPromise');
+  const mk = async (db) => { globalThis.__T = { LINK_ICON: '<i></i>', dbCapabilityPromise: Promise.resolve(db) }; return loadAllStubbed('src/tv/links.js', '', []); };
+  let L = await mk({ doc: () => ({ get: async () => ({ exists: true, data: () => ({ '500100': 'TCS', '1': 5, '2': null }) }) }) }); L.init_tv_links(); await new Promise((r) => setTimeout(r, 10));
+  assert.deepStrictEqual([L.tvUrlFor({ ticker: 'tcs·IT' }), L.tvUrlFor({ ticker: '500100·X' }), L.tvUrlFor({ ticker: '999·X' }), L.tvUrlFor({ ticker: 'M&M·Auto' })], ['https://www.tradingview.com/chart/?symbol=NSE%3ATCS', 'https://www.tradingview.com/chart/?symbol=BSE%3ATCS', 'https://www.tradingview.com/chart/?symbol=BSE%3A999', 'https://www.tradingview.com/chart/?symbol=NSE%3AM%26M']);
+  assert.ok(L.renderTvChart({ ticker: 'TCS·IT' }).includes('rel="noopener noreferrer"') && L.renderTvChart({ ticker: 'TCS·IT' }).includes('<i></i>'));
+  for(const db of [null, { doc: () => ({ get: async () => ({ exists: false }) }) }, { doc: () => ({ get: async () => { throw new Error('x'); } }) }]){ L = await mk(db); L.init_tv_links(); await new Promise((r) => setTimeout(r, 10)); assert.ok(L.tvUrlFor({ ticker: '500100' }).includes('BSE%3A500100')); }
+}));
+
+test('page text loading: a section\'s page text is fetched once, inserted, its progress panels are filled in, and a failed fetch can be tried again', () => withPage('<div id="s" data-partial="p.html"></div><div id="done" data-partial="x.html" data-partial-loaded="1"></div><div id="full" data-partial="y.html">text</div><div id="none"></div>', async (win) => {
+  const realFetch = globalThis.fetch, urls = []; let ok = true;
+  globalThis.fetch = async (u) => { urls.push(u); await Promise.resolve(); return { ok, status: 503, text: async () => '<p>Hi</p><div data-import-panel="fd" data-title="Import <b>" data-label="Progress"></div>' }; };
+  globalThis.__T = { replaceWithHtml: (el, h) => { el.outerHTML = h; }, setHtml: (el, h) => { el.innerHTML = h; } };
+  try {
+    const P = await loadAllStubbed('src/boot/partials.js', '', []), doc = win.document, el = doc.getElementById('s');
+    await P.ensurePartial(null); await P.ensurePartial(doc.getElementById('none')); await P.ensurePartial(doc.getElementById('done')); await P.ensurePartial(doc.getElementById('full')); assert.deepStrictEqual(urls, []);
+    const a = P.ensurePartial(el), b = P.ensurePartial(el); await Promise.all([a, b]); assert.deepStrictEqual(urls, ['p.html']);   // two requests, one fetch
+    assert.ok(el.dataset.partialLoaded === '1' && el.querySelector('#fdfundImportPanel') && el.querySelector('#fdfiTitle').textContent === 'Import <b>' ? true : el.innerHTML.includes('fdfundImportPanel'), el.innerHTML);
+    await P.ensurePartial(el); assert.strictEqual(urls.length, 1);   // loaded: nothing again
+    const bad = doc.createElement('div'); bad.dataset.partial = 'q.html'; ok = false; await assert.rejects(P.ensurePartial(bad), /could not load q.html \(503\)/);
+    ok = true; await P.ensurePartial(bad); assert.strictEqual(urls.length, 3);   // tried again after the failure
+  } finally { globalThis.fetch = realFetch; }
+}));
