@@ -6288,6 +6288,13 @@ test('News page, variations: stamps are not repeated, calendar rows without impo
   assert.ok(odd.includes('Updated') && odd.includes('Gold') && odd.includes('$80') && odd.includes('4.20%'));   // an unreadable time shows no stamp; a tile with no change shows none
   M.view.openGroups.clear(); M.view.calAll = false;
 }));
+test('News page: a saved time is said in India time with am or pm, whatever time of day the test runs', () => alone(async () => {
+  const { T, M, day } = await newsSetup({}), flat = (h) => h.replace(/\s+/g, ' ');
+  T.news.pulse = { at: '2026-11-09T01:00:00Z', tiles: [] };   // far from the stamps below, so they are not hidden as "the same time"
+  T.news.macro = { asof: day(0), briefingsAt: '2026-11-09T04:00:00Z', calendarAt: '2026-11-09T10:00:00Z', briefings: [{ headline: 'Morning' }], calendar: [] };
+  const h = flat(M.newsHtml());
+  assert.ok(h.includes('9:30 am from TradingView headlines') && h.includes('updated ') && h.includes('3:30 pm from TradingView'), h.slice(0, 400));
+}));
 test('News page, Stock events: upcoming and recent events follow the chosen strategy, mark held and pinned stocks, and keep links to http(s)', () => alone(async () => {
   const { T, M } = await newsSetup(), flat = (h) => h.replace(/\s+/g, ' ');
   M.view.tab = 'events'; M.view.strategy = '';

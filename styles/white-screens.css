@@ -1,0 +1,54 @@
+/* The White theme's screen-level spacing and type (Help, Knowledge Base, Settings, Data Refresh, Trade Log, News, Analysis, Strategies). They belong with theme-white.css but must follow the shared parts loaded after it, so they sit at the end of the shared (legacy) layer. */
+/* Help and Knowledge Base pages (class doc-page): their type and spacing in the White theme. */
+.doc-page .sub{max-width:none}
+.doc-page a{color:var(--accent)}
+@media (min-width:901px){:root[data-theme="white"] :is(.doc-page) :is(li,p,td){line-height:1.6}
+:root[data-theme="white"] :is(.doc-page) .glossary-def{font-size:var(--t-md);line-height:1.55}
+:root[data-theme="white"] :is(.doc-page) th{font-size:var(--t-md);letter-spacing:.04em}
+:root[data-theme="white"] :is(.doc-page) h3{font-size:var(--t-lg);font-weight:700;color:var(--text)}}
+:root[data-theme="white"] :is(.tl-page,.doc-page)>header .sub{display:none}
+:root[data-theme="white"] :is(.tl-page,.doc-page)>header{margin:0}
+@media (min-width:901px){:root[data-theme="white"] :is(.doc-page) h3{margin-top:28px}
+:root[data-theme="white"] :is(.doc-page) h3:first-child{margin-top:0}}
+@media (max-width:900px){:root[data-theme="white"] .doc-page h3{font-size:var(--t-md);font-weight:700;color:var(--text);margin-top:22px}}
+/* Settings page (class settings-page) in the White theme: row spacing, panel titles with their icons. */
+.settings-panel--claude{display:flex;flex-direction:column;gap:8px}
+:root[data-theme="white"] .settings-page .settings-row{padding-top:18px;padding-bottom:18px}
+:root[data-theme="white"] .settings-page .settings-subhead{margin-top:28px}
+:root[data-theme="white"] .settings-page>header:first-child{margin:0}
+:root[data-theme="white"] .settings-page>header:first-child .sub{display:none}
+/* The White theme's buttons that the shared button rules (theme-white.css) leave out: the filled primary buttons at every width, and the secondary ones (with Browse) on a phone. */
+@media (max-width:640px){.refreshlog-page :is(.browse-btn,.refresh-btn,.strat-btn,.select-mode-btn){font-size:var(--t-sm);min-height:var(--ph-ctl-lg);box-sizing:border-box}}
+/* Trade Log page (tl-page and the tl-* panels) in the White theme: headers, tables, cards and signal text. */
+.tl-panel-body .chg-up{color:var(--buy);font-weight:700}
+.tl-panel-body .chg-down{color:var(--avoid);font-weight:700}
+.tl-ideas-run:disabled{opacity:.55;cursor:not-allowed}
+:root[data-theme="white"] .tl-page .analysis-panel-head .analysis-panel-title{display:flex;align-items:center;gap:10px;font-size:var(--t-lg);font-weight:700;letter-spacing:.06em;color:var(--text)}
+:root[data-theme="white"] .tl-page .analysis-panel-head .analysis-panel-title::before{content:"";width:26px;height:26px;flex:none;background:var(--accent);-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+:root[data-theme="white"] .tl-page .analysis-panel:not(.tl-ideas) .analysis-panel-title{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='7' width='20' height='14' rx='2'/%3E%3Cpath d='M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2'/%3E%3Cline x1='2' y1='13' x2='22' y2='13'/%3E%3C/svg%3E")}
+:root[data-theme="white"] .tl-page .tl-ideas .analysis-panel-title{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6'/%3E%3Cpath d='M10 22h4'/%3E%3Cpath d='M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z'/%3E%3C/svg%3E")}
+@media (min-width:901px){:root[data-theme="white"] .tl-page .tl-card-grid dt{font-size:var(--t-sm);letter-spacing:.06em}
+:root[data-theme="white"] .tl-page .tl-signal{font-size:var(--t-md);line-height:1.55}
+:root[data-theme="white"] .tl-page .tl-signal-why{font-size:var(--t-md)}
+:root[data-theme="white"] .tl-page .help-table :is(th,td){vertical-align:middle}}
+/* Data Refresh page (class refreshlog-page): button rows, upload rows, job titles and phone spacing. */
+@media (min-width:901px){:root[data-theme="white"] .refreshlog-page .refreshlog-sub-title{margin-top:28px}}
+:root[data-theme="white"] .refreshlog-page .refreshlog-manual:has(.refreshlog-wl-picker){display:block}
+:root[data-theme="white"] .refreshlog-page .wl-help{margin:0 0 6px}
+@media (max-width:900px){:root[data-theme="white"] .refreshlog-page .upload-row:has(.browse-wrap){display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px}
+:root[data-theme="white"] .refreshlog-page .upload-row:has(.browse-wrap) .upload-text{flex:1 0 100%}
+:root[data-theme="white"] .refreshlog-page .upload-row:has(.browse-wrap) .select-mode-btn{flex:none;width:auto}
+:root[data-theme="white"] .refreshlog-page .upload-row:has(.refreshlog-snapshot-btn){display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px}
+:root[data-theme="white"] .refreshlog-page .upload-row:has(.refreshlog-snapshot-btn) .upload-text{flex:1 0 100%}
+:root[data-theme="white"] .refreshlog-page .refreshlog-snapshot-btn{flex:none;width:auto}}
+/* Analysis, Strategies and Explorer pages: small page-level touches (filter buttons, strategy buttons, tables). */
+.analysis-strategy-filter .filter-btn{white-space:nowrap}
+.analysis-global-filters:empty{display:none}
+.lm-pane .strat-learn-run{margin-top:8px}
+:root[data-theme="white"] .strat-layout .strat-main .strat-total .strat-track-btn{border:1px solid var(--c-c9cfdf);background:var(--panel);color:var(--text);min-height:40px;border-radius:6px}
+:root[data-theme="white"] .strat-layout .strat-main .strat-total .strat-track-btn:disabled{opacity:.5}
+:root[data-theme="white"] .strat-layout .strat-main .strat-dup.strat-btn:not(.pub):not(.on):hover{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,var(--panel))}
+/* News page bodies: wrapping of long headlines and event rows. */
+.news-body{padding:0 0 12px;min-width:0;max-width:100%;box-sizing:border-box}
+.news-body *{box-sizing:border-box;max-width:100%}
+.news-body :is(.news-text,.news-card,.news-why,.news-hint,.news-status,.news-empty,.news-watch,.news-link){overflow-wrap:anywhere;min-width:0}

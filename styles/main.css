@@ -26,13 +26,8 @@
 @import "./refresh-kit.css" layer(legacy);
 @import "./late-global.css" layer(legacy);
 @import "./filters-ondemand.css" layer(legacy);
-@import "./page-docs.css" layer(page);
-@import "./page-settings.css" layer(page);
-@import "./page-buttons.css" layer(page);
-@import "./page-trade-log.css" layer(page);
-@import "./page-refreshlog.css" layer(page);
-@import "./page-analysis.css" layer(page);
-@import "./page-news.css" layer(page);
+@import "./white-screens.css" layer(legacy);
+@import "./page.css" layer(page);
 @import "./detail.css" layer(detail);
 @import "./phone-boost.css" layer(phone);
 @import "./white-type.css" layer(type);
