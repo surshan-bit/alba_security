@@ -8194,3 +8194,64 @@ test('navigation: sections switch and remember the page, parts load on first use
     doc.getElementById('section-refreshlog').remove(); N.showSection('refreshlog');   // a section that is not on the page is skipped
   } finally { if(hadRaf === undefined) delete globalThis.requestAnimationFrame; else globalThis.requestAnimationFrame = hadRaf; if(hadMo === undefined) delete globalThis.MutationObserver; else globalThis.MutationObserver = hadMo; }
 }));
+
+// ---- strategies/trackpanel (the track record of tracked pick lists)
+test('track record panel: no lists, running and finished lists with their picks and summary, a price-history failure noted, a load failure with Try again, and the stale-render guard', () => withPage('<div id="stratTrackBody"></div>', async (win) => {
+  TV_VALUES.add('stocks');
+  const st = { id: 's1', goal: { target: 5, days: 30 }, rules: [] }, dayMs = 86400000, hit = { status: 'hit', hitMs: Date.UTC(2026, 10, 3), now: 105, retNow: 5, retBest: 6 }, open = { status: 'open', now: 99, retNow: -1, retBest: 2 }, miss = { status: 'miss', now: 0, retNow: 0, retBest: 0.5 };
+  const mkRun = (id, finished, items, extra) => ({ run: { id, startedAt: '2026-10-01 <b>', target: 5, days: 30, strategyId: 's1' }, items, finished, rate: 0.5, endMs: Date.UTC(2026, 10, 30), medianDays: finished ? 1 : null, counts: { hit: items.filter((i) => i.ev.status === 'hit').length, open: items.filter((i) => i.ev.status === 'open').length, miss: items.filter((i) => i.ev.status === 'miss').length }, changed: false });
+  const pick = (name, np, nn) => ({ name, sym: name.toUpperCase(), entry: 100, np, nn });
+  let runs = [], evals = [], priceFails = false, loadFails = false, saved = [], gate = null;
+  globalThis.__T = { stocks: [], stockByTickerSymbol: new Map(), loadRuns: async () => { if(gate) await gate; if(loadFails) throw new Error('db down <i>'); return runs; }, loadPriceSet: async () => { if(priceFails) throw new Error('no history'); return new Map(); }, evaluateRun: (r) => evals.find((e) => e.run.id === r.id), saveRun: async (r) => { saved.push(r.id); return true; },
+    savesToAccount: () => true, makeRun: () => ({ id: 'new', picks: [] }), deleteRun: async () => true, qualifyingStocks: () => [], askConfirm: async () => true, tellUser: async () => {}, setHtml: (el, h) => { el.innerHTML = h; }, deleteRunFlag: 0 };
+  const hadErr = console.error, errs = []; console.error = (m) => errs.push(String(m));
+  try {
+    const T = await loadAllStubbed('src/strategies/trackpanel.js', '', ['../core/util.js']), body = () => win.document.getElementById('stratTrackBody');
+    await T.renderTrackPanel(null); await T.renderTrackPanel(st); assert.ok(body().innerHTML === '' || body().textContent.includes('Nothing tracked yet'));
+    runs = []; await T.renderTrackPanel(st); assert.ok(body().textContent.includes('Nothing tracked yet') && body().textContent.includes('gain at least 5% within 30 days'));
+    runs = [{ id: 'r1', strategyId: 's1' }, { id: 'r2', strategyId: 's1' }, { id: 'rx', strategyId: 'other' }];
+    evals = [mkRun('r1', false, [{ pick: pick('Up', 1, 0), ev: hit }, { pick: pick('Flat', 0, 0), ev: open }, { pick: pick('Down', 0, 0), ev: miss }]), mkRun('r2', true, [{ pick: pick('A', 2, 0), ev: hit }, { pick: pick('B', 0, 2), ev: miss }, { pick: pick('C', 0, 0), ev: miss }, { pick: pick('D', undefined, 0), ev: miss }])];
+    evals[0].changed = true; evals[1].medianDays = 3;
+    await T.renderTrackPanel(st);
+    let text = body().textContent; assert.ok(text.includes('Goal for this strategy:') && text.includes('Running until 2026-11-30') && text.includes('Finished') && text.includes('hit rate 50%') && text.includes('median 3 days to hit') && text.includes('Finished lists: 25% of 4 picks reached the goal (1 list).') && text.includes('By news when saved') && text.includes('negative news: 0%') && text.includes('positive news only: 100%') && text.includes('no news: 0%'), text.slice(0, 700));
+    assert.deepStrictEqual(saved, ['r1']); assert.ok(body().innerHTML.includes('2026-10-01 &lt;b&gt;') && !body().innerHTML.includes('2026-10-01 <b>'));   // escaped; only the run with a new best is saved
+    assert.deepStrictEqual([...body().querySelectorAll('.trk-run')].map((r) => r.dataset.run), ['r1', 'r2']);
+    // failures
+    priceFails = true; await T.renderTrackPanel(st); assert.ok(body().textContent.includes('could not be read') && errs.some((e) => e.includes('Could not load the price history'))); priceFails = false;
+    loadFails = true; await T.renderTrackPanel(st); assert.ok(body().textContent.includes('could not be loaded (while reading your saved lists: db down <i>)') && body().querySelector('#stratTrackRetry') && !body().innerHTML.includes('<i>)')); loadFails = false;
+    // a slower, older render does not overwrite a newer one
+    let release; gate = new Promise((r) => { release = r; }); const slow = T.renderTrackPanel(st); gate = null; await T.renderTrackPanel(st); const newest = body().innerHTML; release(); await slow; assert.strictEqual(body().innerHTML, newest);
+    assert.ok(T.trackPanelHtml().includes('stratTrackBody') && !T.trackPanelHtml().includes('not signed in'));
+    globalThis.__T.savesToAccount = () => false; const T2 = await loadAllStubbed('src/strategies/trackpanel.js', '', ['../core/util.js']); assert.ok(T2.trackPanelHtml().includes('not signed in'));
+  } finally { console.error = hadErr; }
+}));
+
+test('track record panel clicks: Try again, open or close a list, delete with a confirmation, and save the ticked picks as a tracked list', () => withPage('<div id="root"><div id="stratTrackBody"></div><button id="stratTrackBtn"></button></div>', async (win) => {
+  TV_VALUES.add('stocks');
+  const st = { id: 's1', goal: { target: 5, days: 30 }, rules: [] }, stockList = [{ name: 'AAA', ticker: 'AAA·X' }, { name: 'BBB', ticker: 'BBB·X' }, { name: 'CCC', ticker: 'CCC·X' }];
+  const log = []; let confirmAnswer = true, saveOk = true, deleteOk = true, run = { id: 'r1', strategyId: 's1' }, made = { id: 'new', picks: [{}, {}] };
+  const ev = { run, items: [{ pick: { name: 'A', sym: 'A', entry: 10 }, ev: { status: 'open', now: 9, retNow: -1, retBest: 1 } }], finished: false, endMs: 0, medianDays: null, counts: { hit: 0, open: 1, miss: 0 }, changed: false, rate: 0 };
+  globalThis.__T = { stocks: stockList, stockByTickerSymbol: new Map(), loadRuns: async () => [run], loadPriceSet: async () => new Map(), evaluateRun: () => ev, saveRun: async (r) => { log.push('save:' + r.id); return saveOk; }, savesToAccount: () => true, makeRun: (s, matches) => { log.push('make:' + matches.map((m) => m.name)); return made; },
+    deleteRun: async (r) => { log.push('delete:' + r.id); return deleteOk; }, qualifyingStocks: () => stockList, askConfirm: async (m, ok) => { log.push('ask:' + m); return confirmAnswer; }, tellUser: async (m) => { log.push('tell:' + m); }, setHtml: (el, h) => { el.innerHTML = h; } };
+  const T = await loadAllStubbed('src/strategies/trackpanel.js', '', ['../core/util.js']), doc = win.document, root = doc.getElementById('root'), body = () => doc.getElementById('stratTrackBody'); let strategy = st, ticked = new Set();
+  T.wireTrackPanel(root, () => strategy, () => ticked);
+  const click = (el) => el.dispatchEvent(new win.MouseEvent('click', { bubbles: true })), settle = () => new Promise((r) => setTimeout(r, 15));
+  await T.renderTrackPanel(st); log.length = 0;
+  click(body().querySelector('.trk-toggle')); await settle(); assert.ok(body().querySelector('.trk-legend') && body().textContent.includes('Success') && body().querySelector('table'));   // opened: legend and the picks
+  click(body().querySelector('.trk-toggle')); await settle(); assert.ok(!body().querySelector('.trk-legend'));
+  click(body().querySelector('.trk-del')); await settle(); assert.deepStrictEqual(log.splice(0), ['ask:Delete this tracked list?', 'delete:r1']);
+  confirmAnswer = false; click(body().querySelector('.trk-del')); await settle(); assert.deepStrictEqual(log.splice(0), ['ask:Delete this tracked list?']);
+  confirmAnswer = true; deleteOk = false; click(body().querySelector('.trk-del')); await settle(); assert.deepStrictEqual(log.splice(0), ['ask:Delete this tracked list?', 'delete:r1', 'tell:Could not delete this list. Please try again.']);
+  body().innerHTML = '<div class="trk-run" data-run="gone"><button class="trk-toggle"></button></div>'; click(body().querySelector('.trk-toggle')); await settle(); assert.deepStrictEqual(log.splice(0), []);   // a list that no longer exists
+  click(doc.getElementById('root')); await settle();
+  // tracking the picks
+  deleteOk = true; made = { id: 'new', picks: [{}, {}] }; click(doc.getElementById('stratTrackBtn')); await settle(); assert.deepStrictEqual(log.splice(0).map((l) => l.split(':')[0] + ':' + (l.startsWith('ask') ? '' : l.split(':')[1])), ['make:AAA,BBB,CCC', 'ask:', 'save:new']);
+  ticked = new Set(['AAA', 'CCC']); click(doc.getElementById('stratTrackBtn')); await settle(); const logs = log.splice(0); assert.ok(logs[0] === 'make:AAA,CCC' && logs[1].includes('the 2 ticked picks') && logs[1].includes('30 days') && logs[2] === 'save:new');
+  confirmAnswer = false; click(doc.getElementById('stratTrackBtn')); await settle(); assert.deepStrictEqual(log.splice(0).map((l) => l.split(':')[0]), ['make', 'ask']);
+  confirmAnswer = true; saveOk = false; click(doc.getElementById('stratTrackBtn')); await settle(); assert.ok(log.splice(0).some((l) => l.startsWith('tell:Could not save these picks')));
+  made = { id: 'none', picks: [] }; click(doc.getElementById('stratTrackBtn')); await settle(); assert.deepStrictEqual(log.splice(0), ['make:AAA,CCC']);   // nothing has a price: nothing to track
+  made = { id: 'part', picks: [{}] }; saveOk = true; ticked = new Set(); click(doc.getElementById('stratTrackBtn')); await settle(); assert.ok(log.splice(0)[1].includes('2 without a price'));
+  // Try again, and no strategy chosen
+  body().innerHTML = '<button id="stratTrackRetry"></button>'; click(doc.getElementById('stratTrackRetry')); await settle(); assert.ok(body().textContent.includes('Goal for this strategy'));
+  strategy = null; log.length = 0; click(doc.getElementById('stratTrackBtn')); await settle(); assert.deepStrictEqual(log, []);
+}));
