@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-24.04   # Playwright 1.56 does not support ubuntu-latest (26.04) yet
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
+      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
         with: { version: 2.121.0 }
       - run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then echo "No SUPABASE_ACCESS_TOKEN secret yet: skipping the deploy."; exit 0; fi
