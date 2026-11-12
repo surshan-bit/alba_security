@@ -266,6 +266,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.380 &middot; 2026-11-12</h3>
+            <ul>
+              <li><strong>Refresh queue tested:</strong> the part that runs your queued refreshes (finishing a job, stopping, halting on a usage limit, retrying a refused batch, resuming after a reload, and taking over a run that went quiet) and the Buy / Sell &ldquo;Process&rdquo; step now have tests. Unit coverage rose from 78.3% to 79.4% of lines.</li>
+              <li><strong>Waiting times all named:</strong> the last nine pauses and timers written as bare numbers now have names too, so none are left; the checks keep it that way. The values are unchanged.</li>
+            </ul>
             <h3>v1.379 &middot; 2026-11-12</h3>
             <ul>
               <li><strong>Waiting times named:</strong> 16 pauses and timers that were written as bare numbers (save after 0.3 s, retry after 1.5 s, check for a new version every 5 s and so on) now have named settings with a note saying what each is for. The values are unchanged, and the checks now stop a new bare number from being added. Nine remain, in the refresh queue, the Buy / Sell processing and the TradingView retry; they get names when those parts get tests.</li>

@@ -6876,3 +6876,202 @@ test('fund import retry: a failed read is tried again with a growing pause, a re
     assert.deepStrictEqual([n, pauses.length], [5, 5]);
   } finally { delete globalThis.__T.sleep; }
 }));
+
+// ---- Refresh queue runner (src/refresh/kit-queue.js): jobs run in batches, finish with a notice, stop, halt, resume after a reload and are taken over
+const kqHarness = async (over) => {
+  const realInterval = globalThis.setInterval, realTimeout = globalThis.setTimeout, savedLs = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const timers = [], sleeps = [], log = { notices: [], runs: [], ends: [], starts: [], stops: 0, sets: [] };
+  const eng = { batch: { running: false }, plan: [] }, H = { ref: null, Q: null };
+  globalThis.setInterval = () => 0;
+  globalThis.setTimeout = (f, ms, ...a) => (ms > 100 ? (timers.push({ f, ms }), timers.length) : realTimeout(f, ms, ...a));   // long waits are recorded, never left running
+  Object.defineProperty(globalThis, 'localStorage', { value: memoryStorage(), configurable: true, writable: true });
+  const T = globalThis.__T = Object.assign({ LD_BATCH_MAX: { fund: 50, tech: 80 }, dbCapabilityPromise: Promise.resolve(null), getLdBatch: () => eng.batch,
+    sleep: async (ms) => { sleeps.push(ms); }, pcTickerKey: (s) => s.name, needs: () => true, priorityOrder: (k, l) => l, userRef: () => H.ref, sectionOf: (src) => 'sec-' + src,
+    activityNotify: (n) => log.notices.push(n), registerBusy: () => {}, selKeys: () => new Set(), isExternalSelection: () => false, stockByKey: (k) => ({ name: k }),
+    activityRun: (id, info) => log.runs.push([id, info]), activityEnd: (id) => log.ends.push(id), activityDropWhere: () => {}, setNoticeDismissHandler: () => {}, tvMcp: async () => ({}),
+    ldBatchStart: async (kind, list, source) => {
+      log.starts.push([kind, list.length, source]);
+      const step = eng.plan.shift() || {};
+      if(step.skip) return;   // the engine did not take the batch
+      eng.batch = Object.assign({ running: false, total: list.length, done: list.length, failed: [], skipped: 0, note: 'Finished', stop: false, perm: false }, step);
+      H.Q.batchNotice();
+    }, ldBatchStop: () => { log.stops++; } }, over);
+  H.Q = await loadAllStubbed('src/refresh/kit-queue.js', '', []);
+  const idle = async (until) => { for(let i = 0; i < 200 && !until(); i++) await new Promise((r) => realTimeout(r, 1)); };
+  const stocks = (n, pre = 'S') => Array.from({ length: n }, (_, i) => ({ name: pre + i }));
+  const ask = (n, over2) => H.Q.request(Object.assign({ list: stocks(n), kinds: ['fund'], only: false, source: 'strat', label: 'Picks' }, over2), null);
+  const restore = () => { globalThis.setInterval = realInterval; globalThis.setTimeout = realTimeout; if(savedLs) Object.defineProperty(globalThis, 'localStorage', savedLs); else delete globalThis.localStorage; };
+  return { Q: H.Q, T, log, eng, H, timers, sleeps, idle, stocks, ask, restore, titles: () => log.notices.map((n) => n.title) };
+};
+
+test('refresh queue runner: a job runs in batches and ends with one notice saying how many were refreshed, which failed, and whether it stopped early', () => withPage('', async () => {
+  const h = await kqHarness();
+  try {
+    h.ask(3); await h.idle(() => h.Q.queuedJobs().length === 0);
+    assert.deepStrictEqual(h.log.starts, [['fund', 3, 'strat']]);
+    let n = h.log.notices.at(-1); assert.deepStrictEqual([n.tone, n.title, n.text], ['ok', 'Fundamental refresh finished · Picks', '3 of 3 refreshed.']);
+    h.eng.plan.push({ failed: ['A: bad'] }); h.ask(3, { list: h.stocks(3, 'B') }); await h.idle(() => h.Q.queuedJobs().length === 0);
+    n = h.log.notices.at(-1); assert.deepStrictEqual([n.tone, n.text], ['warn', '2 of 3 refreshed. Failed: A: bad']);
+    h.eng.plan.push({ failed: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] , total: 7, skipped: 1 }); h.ask(7, { list: h.stocks(7, 'C') }); await h.idle(() => h.Q.queuedJobs().length === 0);
+    n = h.log.notices.at(-1); assert.ok(n.tone === 'error' && n.text.includes('1 not run.') && n.text.endsWith('a; b; c; d; e; …'), n.text);
+    h.eng.plan.push({ note: 'Out of quota' }); h.ask(3, { list: h.stocks(3, 'D') }); await h.idle(() => h.Q.queuedJobs().length === 0);
+    n = h.log.notices.at(-1); assert.deepStrictEqual([n.tone, n.title, n.text.startsWith('Out of quota 3 of 3')], ['warn', 'Fundamental refresh ended early · Picks', true]);
+    h.eng.plan.push({ stop: true, note: 'Stopped' }); h.ask(3, { list: h.stocks(3, 'E'), label: '' }); await h.idle(() => h.Q.queuedJobs().length === 0);
+    n = h.log.notices.at(-1); assert.deepStrictEqual([n.title, n.tone], ['Fundamental refresh stopped', 'warn']);
+    h.log.starts.length = 0; h.ask(120, { list: h.stocks(120, 'F'), confirmed: true }); await h.idle(() => h.Q.queuedJobs().length === 0);
+    assert.deepStrictEqual(h.log.starts.map((s) => s[1]), [50, 50, 20]);   // one engine batch at a time
+    assert.strictEqual(h.log.notices.at(-1).text, '120 of 120 refreshed.');
+    assert.ok(h.timers.some((t) => t.ms === 5000));   // the saved queue is written soon after progress
+  } finally { h.restore(); }
+}));
+
+test('refresh queue runner: a halted job removes the queued jobs of its kind, a batch the engine refuses is offered again, a busy engine is waited for, and unknown stocks are dropped', () => withPage('', async () => {
+  const h = await kqHarness();
+  try {
+    h.eng.plan.push({ note: 'Stopped early: usage limit', stop: false, failed: [], total: 2 });
+    h.ask(2, { list: h.stocks(2, 'H') }); h.ask(2, { list: h.stocks(2, 'I'), label: 'Second' }); h.ask(2, { list: h.stocks(2, 'J'), kinds: ['tech'], label: 'Tech' });
+    assert.ok(h.log.runs.some(([id]) => id.startsWith('rk-q-')));   // the second and third jobs are shown as queued
+    await h.idle(() => h.Q.queuedJobs().length === 0);
+    assert.ok(h.titles().includes('Queued Fundamental refreshes removed') && !h.titles().includes('Fundamental refresh finished · Second'));
+    assert.ok(h.titles().includes('Technical refresh finished · Tech'));   // other kinds carry on
+    h.log.starts.length = 0; h.sleeps.length = 0; h.eng.plan.push({ skip: true });
+    h.ask(2, { list: h.stocks(2, 'K') }); await h.idle(() => h.Q.queuedJobs().length === 0);
+    assert.strictEqual(h.log.starts.length, 2); assert.ok(h.sleeps.includes(800));   // refused once, then taken
+    h.sleeps.length = 0; h.eng.batch = { running: true };
+    h.T.sleep = async (ms) => { h.sleeps.push(ms); h.eng.batch = { running: false }; };
+    h.ask(2, { list: h.stocks(2, 'L') }); await h.idle(() => h.Q.queuedJobs().length === 0);
+    assert.strictEqual(h.sleeps[0], 500);   // waited for the engine to be free
+    h.log.starts.length = 0; h.T.stockByKey = () => null;
+    h.ask(2, { list: h.stocks(2, 'M') }); await h.idle(() => h.Q.queuedJobs().length === 0);
+    assert.strictEqual(h.log.starts.length, 0);   // stocks that no longer exist are not refreshed
+  } finally { h.restore(); }
+}));
+
+test('refresh queue runner: the bell shows progress of the running job and the jobs queued behind it, a queued job can be removed, and a Stop from another device ends the job between batches', () => withPage('', async () => {
+  const sets = [];
+  let snap = null;
+  const h = await kqHarness({ });
+  try {
+    h.H.ref = { get: async () => ({ exists: false }), set: async (d) => { sets.push(d); }, update: async () => {}, onSnapshot: (cb) => { snap = cb; } };
+    await h.Q.initQueue();
+    h.Q.activity({ title: 'Idle card' }); assert.deepStrictEqual(h.log.runs.at(-1), ['batch', { title: 'Idle card' }]);   // no job: passed through
+    let proceed = null, release = null;
+    h.T.ldBatchStart = async (kind, list) => {
+      h.log.starts.push([kind, list.length]);
+      h.eng.batch = { running: true, total: list.length, done: 1, failed: [], skipped: 0, note: '', stop: false, perm: false };
+      await new Promise((r) => { proceed = r; });
+      h.Q.activity({ pct: 50, text: 'Reading' });
+      await new Promise((r) => { release = r; });
+      h.eng.batch = { running: false, total: list.length, done: list.length, failed: [], skipped: 0, note: 'Finished', stop: false, perm: false }; h.Q.batchNotice();
+    };
+    const step = async () => { await h.idle(() => proceed); proceed(); proceed = null; await h.idle(() => release); };
+    h.ask(3, { list: h.stocks(3, 'N') }); h.ask(2, { list: h.stocks(2, 'O'), label: 'Later' }); h.Q.enqueueOne({ name: 'P1' }, 'tech');
+    await step();
+    const shown = h.log.runs.filter(([id]) => id === 'batch').at(-1)[1];
+    assert.ok(shown.title === 'Refreshing Fundamental Info · 1 of 3 done · 2 more queued' && shown.pct === Math.round((0 + 0.5 * 3) / 3 * 100), shown.title + ' ' + shown.pct);
+    assert.deepStrictEqual([h.Q.getActiveJob().total, h.Q.queuedJobs().length], [3, 3]);
+    const queuedRun = h.log.runs.find(([id, info]) => id.startsWith('rk-q-') && info.text.startsWith('Later'));
+    queuedRun[1].onStop(); assert.strictEqual(h.Q.queuedJobs().length, 2); assert.ok(h.log.ends.includes(queuedRun[0]));   // removed from the queue
+    queuedRun[1].onStop(); assert.strictEqual(h.Q.queuedJobs().length, 2);   // already gone: nothing happens
+    h.Q.persistIfRunning(); h.Q.flushQueue(); await h.idle(() => sets.length > 0);
+    const owner = sets.at(-1).owner; assert.ok(owner);
+    release(); release = null; await h.idle(() => h.Q.queuedJobs().length === 1 && proceed);   // the first job is done; the single-stock Technical job is running
+    assert.strictEqual(h.Q.getActiveJob().keys.length, 1);
+    h.ask(2, { list: h.stocks(2, 'Q'), label: 'Next' });   // a job behind it, so the runner looks at the Stop request between the two
+    proceed(); proceed = null; await h.idle(() => release);
+    h.eng.batch = { running: false };   // between two batches
+    snap({ exists: true, data: () => ({ v: 1, owner, heartbeatAt: new Date().toISOString(), jobs: [{ id: 'z', kind: 'tech', keys: ['P1'], done: 0, total: 1 }], stopRequest: Date.now() + 5000 }) });
+    release(); release = null;
+    await h.idle(() => h.Q.queuedJobs().length === 0);
+    assert.ok(h.titles().includes('Fundamental refresh stopped · Next'), h.titles().join('|'));
+  } finally { h.restore(); }
+}));
+
+test('refresh queue runner: a saved queue resumes after a reload, waits for a tab that is still working, and a quiet run is taken over by the first dashboard that can reach TradingView', () => withPage('', async () => {
+  const h = await kqHarness();
+  const LS = 'albaDashboard.refreshQueue.v1', saved = (extra) => JSON.stringify(Object.assign({ v: 1, jobs: [{ id: 'r1', kind: 'fund', keys: ['A', 'B', 'C'], done: 1, total: 4, source: 'strat', label: 'Picks' }, { id: 'r2', kind: 'tech', keys: ['T'], done: 0, total: 1, source: '', label: '' }], notices: [{ title: 'Old', tone: 'ok', text: 'x', at: 1 }], dismissed: [] }, extra));
+  const fresh = () => new Date().toISOString(), old = () => new Date(Date.now() - 120000).toISOString();
+  try {
+    localStorage.setItem(LS, saved());
+    await h.Q.initQueue();
+    assert.deepStrictEqual(h.Q.queuedJobs().map((j) => j.id), ['r1', 'r2']);
+    const card = h.log.runs.find(([id]) => id === 'batch')[1];
+    assert.ok(card.title === 'Refreshing Fundamental Info · 1 of 4 done · 1 more queued' && card.text === 'Starting again where it stopped (4 stocks left)…', card.title + card.text);
+    const pumpTimer = h.timers.find((t) => t.ms === 1500); assert.ok(pumpTimer);
+    card.onStop();   // Stop before the first batch: the whole queue is cleared
+    assert.strictEqual(h.Q.queuedJobs().length, 0);
+  } finally { h.restore(); }
+  const h2 = await kqHarness();
+  try {
+    localStorage.setItem(LS, saved());
+    await h2.Q.initQueue(); h2.timers.find((t) => t.ms === 1500).f();
+    await h2.idle(() => h2.Q.queuedJobs().length === 0);
+    assert.deepStrictEqual(h2.log.starts.map((s) => s[0]), ['fund', 'tech']);   // resumed from where it stopped
+  } finally { h2.restore(); }
+  const h3 = await kqHarness();
+  try {
+    localStorage.setItem(LS, saved({ owner: 'other-tab', heartbeatAt: fresh() }));
+    let calls = 0;
+    h3.T.sleep = async (ms) => { h3.sleeps.push(ms); if(++calls === 2) localStorage.setItem(LS, saved({ owner: 'other-tab', heartbeatAt: old() })); };
+    await h3.Q.initQueue();
+    assert.deepStrictEqual(h3.sleeps, [5000, 5000]);   // waited while the other tab was working, then carried on when it went quiet
+    assert.strictEqual(h3.Q.queuedJobs().length, 2);
+  } finally { h3.restore(); }
+  for(const [label, setup] of [
+    ['a tab that never goes quiet', (h4) => { localStorage.setItem(LS, saved({ owner: 'other-tab', heartbeatAt: fresh() })); h4.T.sleep = async (ms) => { h4.sleeps.push(ms); localStorage.setItem(LS, saved({ owner: 'other-tab', heartbeatAt: fresh() })); }; }],
+    ['a record that disappears', (h4) => { localStorage.setItem(LS, saved({ owner: 'other-tab', heartbeatAt: fresh() })); h4.T.sleep = async () => { localStorage.removeItem(LS); }; }],
+    ['jobs that finish elsewhere', (h4) => { localStorage.setItem(LS, saved({ owner: 'other-tab', heartbeatAt: fresh() })); h4.T.sleep = async () => { localStorage.setItem(LS, saved({ owner: 'other-tab', heartbeatAt: fresh(), jobs: [] })); }; }],
+    ['no jobs saved', () => { localStorage.setItem(LS, saved({ jobs: [] })); }],
+    ['no TradingView', (h4) => { localStorage.setItem(LS, saved()); h4.T.tvMcp = async () => null; }],
+    ['a TradingView error', (h4) => { localStorage.setItem(LS, saved()); h4.T.tvMcp = async () => { throw new Error('offline'); }; }],
+    ['a wrong version', () => { localStorage.setItem(LS, saved({ v: 2 })); }]
+  ]){
+    const h4 = await kqHarness();
+    try { setup(h4); await h4.Q.initQueue(); assert.strictEqual(h4.Q.queuedJobs().length, 0, label); } finally { h4.restore(); }
+  }
+  // a quiet run on another device is taken over once the page has started
+  const h5 = await kqHarness(); let snap = null;
+  try {
+    const stale = { v: 1, owner: 'gone-tab', heartbeatAt: old(), jobs: [{ id: 'q1', kind: 'tech', keys: ['Q'], done: 0, total: 1, source: '', label: '' }, { id: 'q2', kind: 'fund', keys: ['R'], done: 0, total: 1, source: '', label: '' }] };
+    let current = null;   // nothing saved when the page starts
+    h5.H.ref = { get: async () => ({ exists: !!current, data: () => current }), set: async () => {}, update: async () => {}, onSnapshot: (cb) => { snap = cb; } };
+    await h5.Q.initQueue(); current = stale;
+    snap({ exists: true, data: () => stale });
+    await h5.idle(() => h5.Q.queuedJobs().length === 2);
+    assert.deepStrictEqual(h5.Q.queuedJobs().map((j) => j.id), ['q1', 'q2']);
+    await h5.idle(() => h5.timers.some((t) => t.ms === 1000));
+    assert.ok(h5.sleeps.length > 0 && h5.timers.some((t) => t.ms === 1000));
+    h5.timers.find((t) => t.ms === 1000).f(); await h5.idle(() => h5.Q.queuedJobs().length === 0);
+  } finally { h5.restore(); }
+  for(const [label, mutate] of [['record gone', (hh) => { hh.cur = null; }], ['someone else got there first', (hh) => { hh.cur = { v: 1, owner: 'x', heartbeatAt: fresh(), jobs: hh.stale.jobs }; }], ['jobs finished', (hh) => { hh.cur = { v: 1, owner: 'x', heartbeatAt: old(), jobs: [] }; }], ['no TradingView', (hh, h6) => { h6.T.tvMcp = async () => null; }]]){
+    const h6 = await kqHarness(); let cb = null;
+    const hh = { stale: { v: 1, owner: 'gone-tab', heartbeatAt: old(), jobs: [{ id: 'q1', kind: 'tech', keys: ['Q'], done: 0, total: 1 }] } };
+    hh.cur = null;   // nothing saved when the page starts
+    try {
+      h6.H.ref = { get: async () => ({ exists: !!hh.cur, data: () => hh.cur }), set: async () => {}, update: async () => {}, onSnapshot: (c) => { cb = c; } };
+      await h6.Q.initQueue(); hh.cur = hh.stale; mutate(hh, h6);
+      cb({ exists: true, data: () => hh.stale }); await new Promise((r) => setTimeout(r, 20));
+      assert.strictEqual(h6.Q.queuedJobs().length, 0, label);
+    } finally { h6.restore(); }
+  }
+}));
+
+test('Trade Log ideas: Process reads the weekly prices of the chosen strategy a few at a time, shows its progress, tolerates a failed read, and saves the result', () => kcPage('<select id="tradeIdeasStrategy"></select><button id="tradeIdeasRun"></button><div id="tradeIdeasBody"></div>', async (win) => {
+  const list = Array.from({ length: 7 }, (_, i) => ({ name: 'S' + i, ticker: 'T' + i })), read = [], saved = [], errors = [];
+  TV_VALUES.add('stockByTickerSymbolAny'); TV_VALUES.add('RESULTS_DAYS'); TV_VALUES.add('THIN_LAKH');
+  globalThis.__T = { stocks: list, publishedStrategies: () => [{ id: 's1', name: 'Q', rules: [] }], qualifyingStocks: () => list, priceLoaded: new Set(['S0']), priceHistoryByTicker: {}, pcTickerKey: (s) => s.name,
+    ensurePriceBars: async (s) => { read.push(s.name); if(s.name === 'S3') throw new Error('no bars'); }, allTrades: () => [], stockByTickerSymbolAny: new Map(), tvIstDate: () => '2026-11-10',
+    nextWeekRead: () => null, rankReads: (a) => a.map(() => null), trendOf: () => null, ideaCall: () => ({ label: '' }), rankIdeas: (l) => l, snapshotOf: (l) => ({ n: l.length }),
+    topBuys: () => [], topEarly: () => [], RESULTS_DAYS: 30, THIN_LAKH: 1, newsCounts: () => ({ total: 0 }), recentNews: () => [],
+    ideasResultsGet: () => ({}), ideasResultsSave: (id, snap) => saved.push([id, snap]), keepScroll: (el, fn) => fn(), setHtml: (el, h) => { el.innerHTML = h; }, escapeHtml: (x) => String(x), CAP_NAME: {}, BUY_TOP: 90 };
+  const keep = console.error; console.error = (m) => errors.push(String(m));
+  try {
+    const M = await loadAllStubbed('src/tradelog/ideas.js', '', ['../core/evt.js']), d = win.document, sel = d.getElementById('tradeIdeasStrategy'), run = d.getElementById('tradeIdeasRun');
+    M.init_ideas(); M.renderIdeas(); sel.value = 's1'; sel.dispatchEvent(new win.Event('change'));
+    run.click(); run.click();   // a second press while it runs does nothing
+    for(let i = 0; i < 100 && !saved.length; i++) await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual(read.slice().sort(), ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']);   // S0 was already loaded
+    assert.deepStrictEqual([saved.length, saved[0][0], saved[0][1].v, saved[0][1].today], [1, 's1', 1, '2026-11-10']);   // one result, kept under the strategy, stamped with the day
+    assert.ok(errors.some((e) => e.includes('Price history unavailable')));
+  } finally { console.error = keep; }
+}));
