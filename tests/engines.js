@@ -8079,3 +8079,61 @@ test('Live Data Refresh bar on a page: toggling, running a refresh to done or fa
     Object.defineProperty(globalThis, 'claude', { value: { use: async () => null }, configurable: true, writable: true }); await B.ldOpenPermissions();
   } finally { console.error = hadErr; if(hadClaude) Object.defineProperty(globalThis, 'claude', hadClaude); else delete globalThis.claude; }
 }));
+
+// ---- overlays/research (saved research laid over the stock list)
+test('research overlay: saved research is laid over a stock, then taken off again when the document goes, and the pages that show it are redrawn', () => withPage('<section id="section-analysis" class="active"></section><section id="section-strategies" class="active"></section>', async (win) => {
+  TV_VALUES.add('stocks'); TV_VALUES.add('dbCapabilityPromise');
+  const fac = (key, weight, score) => ({ key, weight, score, note: 'old note', metrics: [['ROE', '10%'], ['D/E', '1x']], research: undefined });
+  const mkStock = (name) => ({ name, ticker: name + '·X', score: 6, verdict: 'hold', changeNote: undefined, fundamentals: { scoringBreakdown: { note: 'n' }, factors: [fac('fin', 2, 1), fac('moat', 1, 0.4)] } });
+  const A = mkStock('AAA'), B = mkStock('BBB'), C = { name: 'CCC', ticker: 'CCC·X' }; const stockList = [A, B, C];
+  const log = [], held = []; const realTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (f, ms) => { if(ms >= 1000){ held.push({ f, ms }); return held.length; } return realTimeout(f, ms); };
+  let idb = null;
+  globalThis.__T = { stocks: stockList, dbCapabilityPromise: Promise.resolve(null), openKvDb: async () => idb, renderLoadedPart: (k) => log.push('part:' + k), applyFundamentalConfidence: (s) => { s.recomputed = (s.recomputed || 0) + 1; }, sanitizeDocId: (x) => x, tickerSymbol: (s) => s.name,
+    refreshAnalysisSoon: () => log.push('analysis'), redrawWhenIdle: (k, fn) => { log.push('idle:' + k); fn(); }, setPeerGroupCache: (v) => log.push('peers:' + v), rerenderDetail: () => log.push('detail'), setDetailOpenHook: (f) => { globalThis.__hook = f; } };
+  try {
+    const R = await loadAllStubbed('src/overlays/research.js', '', []);
+    const idx = R.stockByDocId(); assert.ok(idx.get('AAA') === A && idx === R.stockByDocId()); stockList.push({ name: 'DDD', ticker: 'DDD·X' }); assert.ok(R.stockByDocId().has('DDD') && R.stockByDocId() !== idx); stockList.pop(); R.stockByDocId();
+    const doc = { asof: undefined, summary: { s: 1 }, events: [{ k: 'news' }], changeNote: 'Re-scored', factors: { fin: { score: 99, note: 'Fresh note', research: { asof: '2026-11-02', headline: 'h' }, metrics: { ROE: '25%' }, metricsTv: [['TV', '1']] }, moat: { score: -5 }, ghost: { score: 1 }, empty: null } };
+    R.applyResearchOverlay([]); assert.strictEqual(log.length, 0);   // nothing applied and nothing sent: nothing to redraw
+    R.applyResearchOverlay([{ id: 'AAA', data: doc }, { id: 'ZZZ', data: doc }]);
+    const fin = A.fundamentals.factors[0], moat = A.fundamentals.factors[1];
+    assert.deepStrictEqual([fin.score, fin.note, fin.research.headline, fin.metrics, fin.metricsTv, moat.score, A.__researchAsof, A.__fundSummary, A.__events.length, A.changeNote, A.recomputed], [2, 'Fresh note', 'h', [['ROE', '25%'], ['D/E', '1x']], [['TV', '1']], 0, '2026-11-02', { s: 1 }, 1, 'Re-scored', 1]);   // the score is kept within 0 and its weight
+    assert.ok(log.includes('detail') && log.includes('analysis') && log.includes('peers:null')); assert.strictEqual(held.filter((h) => h.ms === 1200).length, 1); held.find((h) => h.ms === 1200).f(); assert.ok(log.includes('idle:strategies') && log.includes('part:strategies'));
+    assert.strictEqual(held.some((h) => h.ms === 3000), true);   // the cache write is scheduled
+    // another round: AAA's document is gone (taken off), BBB arrives with a bare document
+    log.length = 0; R.applyResearchOverlay([{ id: 'BBB', data: { factors: { fin: { metrics: 'x', score: 'bad' } } } }]);
+    assert.deepStrictEqual([A.__researchAsof, A.__fundSummary, A.__events, A.changeNote, fin.score, fin.note, fin.research, fin.metricsTv, A.__researchBase, B.fundamentals.factors[0].score, B.__researchAsof, A.recomputed], [undefined, undefined, undefined, undefined, 1, 'old note', undefined, undefined, undefined, 1, undefined, 2]);
+    // the same document again re-applies cleanly, a stock without factors is tolerated, and an unrelated empty list keeps everything
+    R.applyResearchOverlay([{ id: 'CCC', data: { summary: 5, events: 'x' } }, { id: 'BBB', data: doc }]); assert.strictEqual(B.__researchAsof, '2026-11-02'); assert.strictEqual(C.__researchBase !== undefined, true);
+    log.length = 0; R.applyResearchOverlay([]); assert.deepStrictEqual(log, []);
+    C.fundamentals = { factors: 'nope' }; R.applyResearchOverlay([{ id: 'CCC', data: { factors: { fin: {} } } }, { id: 'BBB', data: doc }]);
+    win.document.getElementById('section-analysis').classList.remove('active'); win.document.getElementById('section-strategies').classList.remove('active'); log.length = 0; held.length = 0; R.applyResearchOverlay([{ id: 'BBB', data: { asof: '2026-11-09' } }]);
+    assert.deepStrictEqual([log.includes('analysis'), held.filter((h) => h.ms === 1200).length, B.__researchAsof], [false, 0, '2026-11-09']);   // pages that are not on screen are not redrawn
+  } finally { globalThis.setTimeout = realTimeout; delete globalThis.__hook; }
+}));
+
+test('research overlay: a stock opened on its own asks for its document once, the cache is written and read back, and the cache is optional', () => withPage('<section id="section-strategies" class="active"></section>', async (win) => {
+  TV_VALUES.add('stocks'); TV_VALUES.add('dbCapabilityPromise');
+  const A = { name: 'AAA', ticker: 'AAA·X', score: 6, fundamentals: { factors: [{ key: 'fin', weight: 2, score: 1, metrics: [['ROE', '1']] }] } }, B = { name: 'BBB', ticker: 'BBB·X' };
+  const docs = new Map([['stockResearch/AAA', { asof: '2026-11-03' }]]), reads = [], held = [], puts = []; const realTimeout = globalThis.setTimeout; let idbMode = 'ok', stored = '{"BBB":{"asof":"2026-10-01"}}', hook = null, db = { doc: (p) => ({ get: async () => { reads.push(p); if(p.includes('ERR')) throw new Error('read failed'); return docs.has(p) ? { exists: true, data: () => docs.get(p) } : { exists: false }; } }) };
+  globalThis.setTimeout = (f, ms) => { if(ms >= 1000){ held.push({ f, ms }); return held.length; } return realTimeout(f, ms); };
+  const fakeIdb = () => ({ transaction: (store, mode) => { const tx = {}; if(idbMode === 'txThrows') throw new Error('tx'); return Object.assign(tx, { objectStore: () => ({ get: () => { const q = {}; Promise.resolve().then(() => { if(idbMode === 'error') return q.onerror(); q.result = stored; q.onsuccess(); }); return q; }, put: (v, k) => { puts.push([v, k]); Promise.resolve().then(() => tx.oncomplete()); } }) }); } });
+  const mk = async () => { globalThis.__T = { stocks: [A, B], dbCapabilityPromise: Promise.resolve(db), openKvDb: async () => (idbMode === 'none' ? null : fakeIdb()), renderLoadedPart: () => {}, applyFundamentalConfidence: () => {}, sanitizeDocId: (x) => x, tickerSymbol: (s) => s.name, refreshAnalysisSoon: () => {}, redrawWhenIdle: (k, fn) => fn(), setPeerGroupCache: () => {}, rerenderDetail: () => {}, setDetailOpenHook: (f) => { hook = f; } }; return loadAllStubbed('src/overlays/research.js', '', []); };
+  try {
+    let R = await mk(); R.init_overlays_research(); await new Promise((r) => realTimeout(r, 20));
+    assert.strictEqual(B.__researchBase !== undefined, true);   // the cache was read and applied (BBB has no factors, but its research date is noted)
+    await hook(A); await hook(A); assert.deepStrictEqual(reads, ['stockResearch/AAA']); assert.strictEqual(A.__researchAsof, '2026-11-03');   // asked once, applied
+    await hook({ name: 'BBB' }); assert.strictEqual(reads.length, 1);   // already applied from the cache
+    await hook({ name: 'MISSING' }); assert.strictEqual(reads.length, 2); await hook({ name: 'ERR' }); await hook({ name: 'ERR' }); assert.deepStrictEqual(reads, ['stockResearch/AAA', 'stockResearch/MISSING', 'stockResearch/ERR', 'stockResearch/ERR']);   // a failed read can be tried again
+    db = null; R = await mk(); R.init_overlays_research(); await hook({ name: 'NODB' }); assert.strictEqual(reads.length, 4); db = { doc: () => ({ get: async () => null }) }; R = await mk(); R.init_overlays_research(); await hook({ name: 'NULLSNAP' });
+    // the cache: written after the overlay, skipped without storage, and tolerant of broken storage or content
+    R = await mk(); R.applyResearchOverlay([{ id: 'AAA', data: { asof: '2026-11-04' } }]); R.applyResearchOverlay([{ id: 'AAA', data: { asof: '2026-11-04' } }]);
+    assert.strictEqual(held.filter((h) => h.ms === 3000).length >= 2, true); await held.filter((h) => h.ms === 3000).at(-1).f(); assert.strictEqual(JSON.parse(puts.at(-1)[0]).AAA.asof, '2026-11-04'); assert.strictEqual(puts.at(-1)[1], 'docs');
+    const circular = { id: 'AAA', data: {} }; circular.data.me = circular.data; R.applyResearchOverlay([circular]); await held.filter((h) => h.ms === 3000).at(-1).f();   // content that cannot be saved is skipped
+    idbMode = 'none'; R.applyResearchOverlay([{ id: 'AAA', data: {} }]); await held.filter((h) => h.ms === 3000).at(-1).f();
+    idbMode = 'txThrows'; R.applyResearchOverlay([{ id: 'AAA', data: {} }]); await held.filter((h) => h.ms === 3000).at(-1).f();
+    for(const [mode, content] of [['ok', 'not json'], ['ok', 5], ['error', ''], ['txThrows', ''], ['none', '']]){ idbMode = mode; stored = content; R = await mk(); R.init_overlays_research(); await new Promise((r) => realTimeout(r, 15)); }   // every broken cache reads as empty
+    idbMode = 'ok'; stored = '{"AAA":{"asof":"2026-11-07"}}'; A.__researchAsof = undefined; R = await mk(); R.applyResearchOverlay([{ id: 'AAA', data: { asof: '2026-11-08' } }]); R.init_overlays_research(); await new Promise((r) => realTimeout(r, 20)); assert.strictEqual(A.__researchAsof, '2026-11-08');   // the live data arrived first: the old cache is not applied over it
+  } finally { globalThis.setTimeout = realTimeout; }
+}));
