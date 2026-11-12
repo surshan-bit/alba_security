@@ -8010,3 +8010,72 @@ test('price store: recent bars and each stock\'s bars are read once, joined with
     P = await mk(null); P.loadPriceBarsFor(globalThis.__T.stocks[0], 0); await new Promise((r) => setTimeout(r, 10)); assert.deepStrictEqual(calls.rendered, [0]);   // nothing loaded: no redraw
   } finally { console.error = realErr; }
 }));
+
+// ---- livedata/bar (the Live Data Refresh bar on the stock page)
+test('Live Data Refresh bar: text helpers, the bar markup (hidden when the refresh kit takes over), the idle notes and the money and margin formats', () => withPage('', async () => {
+  TV_VALUES.add('stocks');
+  let kit = null; const busy = [];
+  globalThis.__T = { stocks: [{ name: 'Acme', k: 'K<1>', __researchAsof: '2026-11-01', valuation: { currentPrice: 1234.567 } }], getShownIndex: () => 0, pcTickerKey: (s) => s.k, fundamentalPendingItems: (s) => (s.pend || [{ missing: ['a', 'b'] }, { missing: [] }]), globalPendingInfo: (s) => (s.g === undefined ? 'not yet researched' : s.g), priceHistoryStatus: () => ({ text: 'up to date' }),
+    ldRunFundamental: async () => 'f', ldRunTechnical: async () => 't', ldErrText: (e) => e.message, ldIsClaudeError: () => false, getLdBatch: () => null, ldBatchPaint: () => {}, activityEnd: () => {}, activityNotify: () => {}, activityRun: () => {}, getRefreshKit: () => kit, registerBusy: (f) => busy.push(f), setHtml: (el, h) => { el.innerHTML = h; } };
+  const B = await loadAllStubbed('src/livedata/bar.js', '', ['../core/util.js']);
+  assert.deepStrictEqual([B.ldRupees(1234.567), B.ldRupees(5), B.ldMosText(12.34), B.ldMosText(-3), B.ldMosText(null), B.ldMosText(NaN), B.ldMosText(Infinity)], ['₹1,234.57', '₹5', '+12.3%', '-3.0%', 'n/a', 'n/a', 'n/a']);
+  const circular = {}; circular.me = circular;
+  assert.deepStrictEqual([B.ldJson({ a: 1 }, 100), B.ldJson('x'.repeat(30), 10), B.ldJson(undefined, 10), B.ldJson(circular, 100)], ['{"a":1}', '"xxxxxxxxx…[truncated]', 'null', '[object Object]']);
+  kit = {}; assert.strictEqual(B.renderLiveDataBar({ k: 'a' }), ''); kit = null;
+  const html = B.renderLiveDataBar(globalThis.__T.stocks[0]);
+  assert.ok(html.includes('id="liveRefresh"') && html.includes('data-key="K&lt;1&gt;"') && html.includes('ldBtn-fund') && html.includes('ldBtn-tech') && html.includes('data-ld-stop="fund"') && html.includes('Researched 2026-11-01 · 2 metrics missing · Global &amp; Macro: not yet researched.') && html.includes('Price history: up to date.') && html.includes(' hidden>'), html.slice(0, 200));
+  assert.ok(html.includes('Price ₹1,234.57') === false);   // no live price on file
+  const live = B.renderLiveDataBar(Object.assign({}, globalThis.__T.stocks[0], { __livePrice: { asof: '2026-11-10' }, pend: [{ missing: ['x'] }], g: null, __researchAsof: undefined }));
+  assert.ok(live.includes('Price ₹1,234.57 as of 2026-11-10') && live.includes('Not researched yet · 1 metric missing.'));
+  assert.strictEqual(busy[0](), false);
+}));
+
+test('Live Data Refresh bar on a page: toggling, running a refresh to done or failed, the progress and chip, Stop, the permissions button, and the notice when the panel is not on screen', () => withPage('<div id="host"></div>', async (win) => {
+  TV_VALUES.add('stocks');
+  const stock = { name: 'Acme', k: 'K1', valuation: { currentPrice: 10 } }, other = { name: 'Other', k: 'K2' }, notes = [], runs = [], ends = [], enq = [], painted = [];
+  let kit = null, batch = null, shown = 0, perms = [], failure = null, gate = null;
+  globalThis.__T = { stocks: [stock, other], getShownIndex: () => shown, pcTickerKey: (s) => s.k, fundamentalPendingItems: () => [], globalPendingInfo: () => null, priceHistoryStatus: () => ({ text: 'ok' }),
+    ldRunFundamental: async () => { if(gate) await gate; if(failure) throw failure; return 'Filled 3 metrics'; }, ldRunTechnical: async () => 'Price updated', ldErrText: (e) => 'E:' + e.message, ldIsClaudeError: (e) => /claude/.test(e.message), getLdBatch: () => batch, ldBatchPaint: () => painted.push(1),
+    activityEnd: (id) => ends.push(id), activityNotify: (n) => notes.push(n), activityRun: (id, info) => runs.push([id, info]), getRefreshKit: () => kit, registerBusy: () => {}, setHtml: (el, h) => { el.innerHTML = h; } };
+  const B = await loadAllStubbed('src/livedata/bar.js', '', ['../core/util.js']), doc = win.document, host = doc.getElementById('host');
+  const draw = () => { host.innerHTML = B.renderLiveDataBar(stock); B.bindLiveDataBar(stock); };
+  const hadClaude = Object.getOwnPropertyDescriptor(globalThis, 'claude'); Object.defineProperty(globalThis, 'claude', { value: { use: async (n) => ({ manage: async () => { perms.push(n); } }) }, configurable: true, writable: true });
+  const hadErr = console.error, errs = []; console.error = (m) => errs.push(String(m));
+  try {
+    draw(); const tg = doc.getElementById('ldToggle'), grid = doc.getElementById('ldGrid');
+    assert.deepStrictEqual([grid.hidden, tg.getAttribute('aria-expanded')], [true, 'false']); tg.click(); assert.deepStrictEqual([grid.hidden, tg.getAttribute('aria-expanded'), tg.querySelector('.live-refresh-caret').innerHTML], [false, 'true', '▾']); tg.click(); assert.strictEqual(grid.hidden, true);
+    const st = (k) => doc.getElementById('ldStatus-' + k).textContent, btn = (k) => doc.getElementById('ldBtn-' + k);
+    assert.ok(st('fund').startsWith('Not researched yet') && st('tech').includes('Price ₹10') === false);
+    // a successful run; the panel is not on screen (offsetParent is null), so a notice is shown
+    let release; gate = new Promise((r) => { release = r; }); btn('fund').click();
+    assert.deepStrictEqual([btn('fund').textContent, btn('fund').disabled, btn('tech').disabled, doc.getElementById('ldStop-fund').hidden, doc.getElementById('ldChip').textContent, painted.length > 0], ['Refreshing…', true, true, false, 'Refreshing… 1%', false]);   // the batch card is only painted while a batch runs
+    assert.ok(runs.at(-1)[0] === 'one|K1|fund' && runs.at(-1)[1].title === 'Refreshing Fundamental Info · Acme' && runs.at(-1)[1].text.startsWith('Starting…') && typeof runs.at(-1)[1].onStop === 'function');
+    btn('fund').click();   // a second press while running does nothing
+    release(); await new Promise((r) => setTimeout(r, 10)); assert.ok(st('fund').startsWith('Done: Filled 3 metrics') && doc.getElementById('ldFill-fund').classList.contains('is-ok') && !btn('fund').disabled && doc.getElementById('ldBar-fund').getAttribute('aria-valuenow') === '100');
+    assert.deepStrictEqual([notes.at(-1).tone, notes.at(-1).title, notes.at(-1).text], ['ok', 'Fundamental refresh finished · Acme', 'Filled 3 metrics']); gate = null;
+    // failure with a Claude permission problem shows the permissions button; it opens the permissions
+    failure = new Error('claude not allowed'); btn('fund').click(); await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual([st('fund'), doc.getElementById('ldPerm').hidden, doc.getElementById('ldChip').textContent, doc.getElementById('ldChip').classList.contains('is-error'), notes.at(-1).tone, errs.length], ['Failed: E:claude not allowed', false, 'Last refresh failed', true, 'error', 1]);
+    doc.getElementById('ldPerm').click(); await new Promise((r) => setTimeout(r, 5)); assert.deepStrictEqual(perms, ['permissions']);
+    // stopped by the user
+    failure = Object.assign(new Error('x'), { code: 'cancelled' }); btn('fund').click(); await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual([st('fund'), notes.at(-1).tone, notes.at(-1).title, errs.length, doc.getElementById('ldPerm').hidden], ['Failed: Stopped. Anything already saved was kept.', 'warn', 'Fundamental refresh stopped · Acme', 1, true]);
+    // technical run, then the Stop button aborts a running job through its controller
+    btn('tech').click(); await new Promise((r) => setTimeout(r, 10)); assert.ok(st('tech').startsWith('Done: Price updated') && doc.getElementById('ldPerm').hidden);
+    const ctl = new AbortController(); B.ldAbort.set('K1|fund', ctl); B.ldSet('K1', 'fund', { state: 'running', pct: 40, msg: 'Working' });
+    assert.ok(doc.getElementById('ldChip').textContent === 'Refreshing… 40%' && !doc.getElementById('ldStop-fund').hidden); doc.getElementById('ldStop-fund').click(); assert.strictEqual(ctl.signal.aborted, true);
+    runs.at(-1)[1].onStop(); B.ldAbort.delete('K1|fund'); runs.at(-1)[1].onStop(); B.ldSet('K1', 'tech', { state: 'running', pct: 5, msg: 'T' }); assert.strictEqual(runs.at(-1)[1].onStop, null);   // a Technical refresh cannot be stopped
+    B.ldSet('K1', 'fund', { state: 'ok', pct: 100, msg: 'done' }); B.ldSet('K1', 'tech', { state: 'idle', pct: 0, msg: '' }); assert.ok(ends.includes('one|K1|fund')); assert.strictEqual(B.ldRunning('K1'), false);
+    assert.strictEqual(B.ldGet('zz', 'fund'), null);
+    // while the panel is on screen there is no bell item and no notice; inside a batch neither
+    Object.defineProperty(doc.getElementById('liveRefresh'), 'offsetParent', { value: doc.body, configurable: true }); notes.length = 0; runs.length = 0;
+    B.ldSet('K1', 'fund', { state: 'running', pct: 10, msg: 'x' }); assert.strictEqual(runs.length, 0); B.ldSet('K1', 'fund', { state: 'ok', pct: 100, msg: 'y' });
+    Object.defineProperty(doc.getElementById('liveRefresh'), 'offsetParent', { value: null, configurable: true }); batch = { running: true }; B.ldSet('K1', 'fund', { state: 'running', pct: 10, msg: 'x' }); assert.strictEqual(runs.length, 0);
+    batch = null; B.ldSet('K2', 'fund', { state: 'running', pct: 1, msg: 'x' }); B.ldSet('NOPE', 'fund', { state: 'running', pct: 1, msg: 'x' }); assert.strictEqual(runs.filter((r) => r[0] === 'one|K2|fund').length, 1);   // another stock's job is shown in the bell; an unknown one is not
+    // with the refresh kit, the buttons queue the stock instead
+    B.ldSet('K1', 'fund', { state: 'ok', pct: 100, msg: 'again' }); draw(); kit = { enqueueOne: (s, k) => enq.push([s.name, k]) }; B.bindLiveDataBar(stock); btn('fund').click(); btn('tech').click(); assert.deepStrictEqual(enq, [['Acme', 'fund'], ['Acme', 'tech']]);
+    host.innerHTML = ''; B.bindLiveDataBar(stock); B.ldSet('K1', 'fund', { state: 'idle', pct: 0, msg: '' });   // no bar on the page: nothing to paint
+    await B.ldOpenPermissions(); Object.defineProperty(globalThis, 'claude', { value: { use: async () => { throw new Error('none'); } }, configurable: true, writable: true }); await B.ldOpenPermissions();
+    Object.defineProperty(globalThis, 'claude', { value: { use: async () => null }, configurable: true, writable: true }); await B.ldOpenPermissions();
+  } finally { console.error = hadErr; if(hadClaude) Object.defineProperty(globalThis, 'claude', hadClaude); else delete globalThis.claude; }
+}));
