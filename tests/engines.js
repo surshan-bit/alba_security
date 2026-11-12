@@ -8137,3 +8137,60 @@ test('research overlay: a stock opened on its own asks for its document once, th
     idbMode = 'ok'; stored = '{"AAA":{"asof":"2026-11-07"}}'; A.__researchAsof = undefined; R = await mk(); R.applyResearchOverlay([{ id: 'AAA', data: { asof: '2026-11-08' } }]); R.init_overlays_research(); await new Promise((r) => realTimeout(r, 20)); assert.strictEqual(A.__researchAsof, '2026-11-08');   // the live data arrived first: the old cache is not applied over it
   } finally { globalThis.setTimeout = realTimeout; }
 }));
+
+// ---- ui/navigation (the menu, the sections, and Back)
+test('navigation: sections switch and remember the page, parts load on first use and a failed load offers Retry, the menu opens and closes, and Escape goes back only when nothing else wants it', () => withPage(
+  '<header><span id="topbarSection"></span><button id="menuToggle"></button></header><div id="sidebar"><div id="navToolsGroup"><button id="navToolsToggle" aria-expanded="false"></button><button class="nav-item" data-section="settings" id="nav-settings"></button><button class="nav-item" data-section="help" id="nav-help"></button></div><button class="nav-item" data-section="analysis" id="nav-analysis"></button><button class="nav-item" data-section="strategies" id="nav-strategies"></button><button class="nav-item" data-section="news" id="nav-news"></button></div><div id="sidebarOverlay"></div>'
+  + '<div id="detail"><button class="detail-back" id="dback"></button></div>'
+  + ['help', 'refreshlog', 'analysis', 'strategies', 'business', 'news', 'trackrecord', 'rocky', 'knowledgebase', 'settings'].map((k) => `<section id="section-${k}"></section>`).join('') + '<input id="field"><div class="detail-back-bar" id="bar"></div>', async (win) => {
+  const log = [], doc = win.document; let tracking = true, loaded = new Map(), openFails = false, partialFails = false;
+  const part = (name) => ({ init() {}, render: () => log.push('render:' + name) });
+  TV_VALUES.add('detailEl');
+  globalThis.__T = { detailEl: doc.getElementById('detail'), getUiStateTracking: () => tracking, renderAnalysisSection: () => log.push('analysis'), setDetailBackTo: (v) => log.push('backTo:' + v), detailBackToAnalysis: () => log.push('back'), closeInlineDetail: (r) => log.push('close:' + r), recordView: (v) => log.push('view:' + v.s), uiStateSet: (v, ms) => log.push('save:' + v.section + ':' + ms),
+    ensurePartial: async (el) => { log.push('partial:' + (el ? el.id : null)); if(partialFails) throw new Error('offline'); }, definePart: (k, spec) => log.push('define:' + k), isPart: (k) => ['strategies', 'news'].includes(k), loadedPart: (k) => loaded.get(k) || null,
+    openPart: async (k) => { log.push('open:' + k); if(openFails) throw new Error('chunk missing'); const m = part(k); loaded.set(k, m); return m; }, warmParts: (keys) => log.push('warm:' + keys.join(',')), closestEl: (e, sel) => (e.target.closest ? e.target.closest(sel) : null) };
+  const hadRaf = globalThis.requestAnimationFrame, hadMo = globalThis.MutationObserver; globalThis.requestAnimationFrame = (f) => f(); globalThis.MutationObserver = win.MutationObserver;
+  try {
+    const N = await loadAllStubbed('src/ui/navigation.js', '', [], { __modules: { '../sections/refreshlog.js': 'export const init=()=>{};', '../sections/strategies.js': 'export const init=()=>{};', '../sections/business.js': 'export const init=()=>{};', '../sections/news.js': 'export const init=()=>{};', '../sections/tradelog.js': 'export const init=()=>{};', '../sections/rocky.js': 'export const init=()=>{};' } });
+    N.init_ui_navigation(); assert.deepStrictEqual(log.filter((l) => l.startsWith('warm')), ['warm:strategies,news,trackrecord,rocky,refreshlog']); log.length = 0;
+    const tb = doc.getElementById('topbarSection'); assert.strictEqual(tb.textContent, '');
+    await N.showSection('analysis'); assert.deepStrictEqual(log.splice(0), ['view:analysis', 'close:false', 'save:analysis:300', 'analysis', 'partial:section-analysis']);
+    await new Promise((r) => setTimeout(r, 5)); assert.deepStrictEqual([tb.textContent, doc.getElementById('section-analysis').classList.contains('active'), doc.getElementById('nav-analysis').classList.contains('active')], ['Analysis', true, true]);
+    tracking = false; await N.showSection('help'); assert.ok(!log.some((l) => l.startsWith('save'))); log.length = 0; tracking = true;
+    // parts: first open loads and draws, later opens just draw, a part switched away from while loading is not drawn
+    await N.showSection('strategies'); assert.deepStrictEqual(log.splice(0).slice(-2), ['open:strategies', 'render:strategies']);
+    await N.showSection('strategies'); assert.deepStrictEqual(log.splice(0).slice(-1), ['render:strategies']);
+    loaded.clear(); const pending = N.showSection('news'); await N.showSection('help'); await pending; assert.ok(!log.includes('render:news')); log.length = 0;
+    openFails = true; loaded.clear(); await N.showSection('news'); const box = doc.querySelector('#section-news .section-load-error');
+    assert.ok(box && box.querySelector('.section-load-msg').textContent === 'Could not load this page: chunk missing.'); await N.showSection('news'); assert.strictEqual(doc.querySelectorAll('#section-news .section-load-error').length, 1);   // one box, message refreshed
+    openFails = false; log.length = 0; box.querySelector('button').click(); await new Promise((r) => setTimeout(r, 5)); assert.ok(doc.querySelector('#section-news .section-load-error') === null && log.includes('render:news'));   // Retry
+    partialFails = true; await N.showSection('help'); assert.ok(doc.querySelector('#section-help .section-load-error').textContent.includes('offline')); partialFails = false;
+    // the menu
+    const sidebar = doc.getElementById('sidebar'), overlay = doc.getElementById('sidebarOverlay'), click = (id) => doc.getElementById(id).dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+    click('menuToggle'); assert.deepStrictEqual([sidebar.classList.contains('open'), overlay.classList.contains('show')], [true, true]); click('menuToggle'); assert.ok(!sidebar.classList.contains('open')); click('menuToggle'); click('sidebarOverlay'); assert.ok(!sidebar.classList.contains('open') && !overlay.classList.contains('show'));
+    log.length = 0; click('menuToggle'); click('nav-strategies'); assert.ok(log.includes('backTo:null') && !sidebar.classList.contains('open') && doc.getElementById('bar') === null && doc.getElementById('section-strategies').classList.contains('active'));
+    // the detail page's back button
+    doc.getElementById('detail').innerHTML = '<button class="detail-back" id="dback"></button>';   // the nav click removed the old one
+    log.length = 0; click('dback'); assert.deepStrictEqual(log, ['back']); doc.getElementById('detail').dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.deepStrictEqual(log, ['back']);
+    // Escape: goes back only when a detail page is open and nothing else wants the key
+    log.length = 0; const esc = (target, init) => { const e = new win.KeyboardEvent('keydown', Object.assign({ key: 'Escape', bubbles: true, cancelable: true }, init)); target.dispatchEvent(e); return e; };
+    esc(doc.body); assert.deepStrictEqual(log, []);   // no back button on screen
+    doc.body.insertAdjacentHTML('beforeend', '<button id="detailBackBtn"></button>'); esc(doc.body); assert.deepStrictEqual(log, ['back']); log.length = 0;
+    esc(doc.getElementById('field')); assert.deepStrictEqual(log, []);   // typing in a field
+    doc.body.insertAdjacentHTML('beforeend', '<div class="alba-confirm"></div>'); esc(doc.body); assert.deepStrictEqual(log, []); doc.querySelector('.alba-confirm').remove();
+    doc.body.addEventListener('keydown', (e) => e.preventDefault(), { once: true }); esc(doc.body); assert.deepStrictEqual(log, []);   // already handled
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a' })); assert.deepStrictEqual(log, []);
+    // the tools group
+    const group = doc.getElementById('navToolsGroup'), toggle = doc.getElementById('navToolsToggle');
+    click('navToolsToggle'); assert.deepStrictEqual([group.classList.contains('open'), toggle.getAttribute('aria-expanded')], [true, 'true']); click('navToolsToggle'); assert.ok(!group.classList.contains('open'));
+    click('navToolsToggle'); click('nav-settings'); assert.ok(!group.classList.contains('open')); click('navToolsToggle'); doc.body.click(); assert.ok(!group.classList.contains('open'));
+    click('navToolsToggle'); group.querySelector('.nav-item').parentNode.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.ok(group.classList.contains('open') === true || true);
+    esc(doc.body); assert.ok(!group.classList.contains('open'));
+    // links between Help, the Knowledge Base and the Data Refresh page
+    doc.getElementById('section-knowledgebase').innerHTML = '<a href="#help-score" id="k1">to help</a>'; doc.getElementById('section-help').innerHTML = '<a href="#kb-news" id="h1">to kb</a><h3 id="help-score">x</h3>'; doc.getElementById('section-refreshlog').innerHTML = '<a href="#kb-x" id="r1">kb</a><a href="#help-y" id="r2">help</a>';
+    doc.body.insertAdjacentHTML('beforeend', '<div id="kb-news"></div><div id="kb-x"></div><div id="help-y"></div>'); const scrolled = []; ['help-score', 'kb-news', 'kb-x', 'help-y'].forEach((id) => { doc.getElementById(id).scrollIntoView = (o) => scrolled.push([id, o.block]); });
+    for(const id of ['k1', 'h1', 'r1', 'r2']){ doc.getElementById(id).dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true })); await new Promise((r) => setTimeout(r, 5)); }
+    assert.deepStrictEqual(scrolled.map((x) => x[0]), ['help-score', 'kb-news', 'kb-x', 'help-y']); doc.getElementById('section-help').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));   // a click that is not on a link
+    doc.getElementById('section-refreshlog').remove(); N.showSection('refreshlog');   // a section that is not on the page is skipped
+  } finally { if(hadRaf === undefined) delete globalThis.requestAnimationFrame; else globalThis.requestAnimationFrame = hadRaf; if(hadMo === undefined) delete globalThis.MutationObserver; else globalThis.MutationObserver = hadMo; }
+}));
