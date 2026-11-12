@@ -7075,3 +7075,85 @@ test('Trade Log ideas: Process reads the weekly prices of the chosen strategy a 
     assert.ok(errors.some((e) => e.includes('Price history unavailable')));
   } finally { console.error = keep; }
 }));
+
+// ================= Unit tests for modules that had none (one release, v1.381) =================
+// ---- Pure helpers: list/metrics, strategies/goal, core/industrystats, detail/fundmetrics, fundtext, completeness
+test('list metrics: the score band, the margin-of-safety rating and its sort key follow their cut-offs', () => {
+  const M = load('src/list/metrics.js');
+  assert.deepStrictEqual([null, undefined, 9, 8, 7.99, 6, 5.5, 5, 4.99, 0].map(M.scoreBand), ['fs-pending', 'fs-pending', 'fs-buy', 'fs-buy', 'fs-mbuy', 'fs-mbuy', 'fs-hold', 'fs-hold', 'fs-avoid', 'fs-avoid']);
+  const v = (iv, cp) => ({ valuation: { intrinsicValue: iv, currentPrice: cp } });
+  assert.deepStrictEqual([M.mosRatingAny(v(150, 100)), M.mosRatingAny(v(100, 100)), M.mosRatingAny(v(100, 110)), M.mosRatingAny(v(100, 140)), M.mosRatingAny({}), M.mosRatingAny(v(0, 100))], ['green', 'green', 'orange', 'red', null, null]);
+  assert.strictEqual(M.mosPct({}), -Infinity);   // no valuation: last in a highest-first list
+  assert.ok(M.mosPct(v(200, 100)) > 0);
+});
+
+test('strategy goal: a bad goal falls back to +5% in 30 days, values are clamped, and the horizon is whole weeks', () => {
+  const G = load('src/strategies/goal.js');
+  assert.deepStrictEqual(G.cleanGoal(null), G.DEFAULT_GOAL); assert.deepStrictEqual(G.cleanGoal({ target: 'x', days: NaN }), { target: 5, days: 30 });
+  assert.deepStrictEqual(G.cleanGoal({ target: 500, days: 1000 }), { target: 100, days: 120 }); assert.deepStrictEqual(G.cleanGoal({ target: 0, days: 1 }), { target: 0.5, days: 7 });
+  assert.deepStrictEqual(G.cleanGoal({ target: 12.5, days: 44.6 }), { target: 12.5, days: 45 });
+  assert.deepStrictEqual([G.horizonWeeks({ days: 3 }), G.horizonWeeks({ days: 30 }), G.horizonWeeks({ days: 45 })], [1, 4, 6]);
+  assert.strictEqual(G.goalText({ target: 5, days: 30 }), '+5% within 30 days');
+});
+
+test('industry median weekly change: the middle of the industry\'s figures, the mean of the two middle ones for an even count, null when none', () => alone(async () => {
+  const mk = (ind, w) => ({ ticker: 'X·' + ind, technical: { raw: { weekPctChange: w } } });
+  globalThis.__S = [mk('Steel', 1), mk('Steel', 5), mk('Steel', 3), mk('Gold', 2), mk('Gold', 4), mk('Gold', NaN), { ticker: 'Y·Oil' }, mk('Cash', null)];
+  const M = await loadWithStubs('src/core/industrystats.js', '', { './stocks.js': 'export const stocks = globalThis.__S;', './util.js': 'export const tickerIndustry = (s) => String(s.ticker).split("·")[1];' });
+  assert.deepStrictEqual([M.industryMedianW(mk('Steel')), M.industryMedianW(mk('Gold')), M.industryMedianW({ ticker: 'Y·Oil' }), M.industryMedianW(mk('Cash'))], [3, 3, null, null]);
+}));
+
+test('fund metric chips: percentile wording counts the peers in the same scope, labels and notes are tidied, and values are read or dropped when missing', () => alone(async () => {
+  const ind = (name, group, has) => ({ ticker: 'T·' + name, industryGroup: group, fundamentals: { factors: [{ metrics: [['Piotroski F-Score percentile', has ? '90th (x)' : 'n/a'], 'junk'] }] } });
+  globalThis.__S = [ind('Steel', 'G1', true), ind('Steel', 'G1', true), ind('Alloy', 'G1', true), ind('Steel', 'G2', true), ind('Steel', 'G1', false), { ticker: 'NoSep', fundamentals: null }];
+  const F = await loadWithStubs('src/detail/fundmetrics.js', '', { '../core/stocks.js': 'export const stocks = globalThis.__S;' });
+  const k = 'Piotroski F-Score percentile', me = globalThis.__S[0];
+  assert.strictEqual(F.fundMetricDisplay(k, '90th (Steel)'), '90th (Steel)'.replace('90th (Steel)', '90th percentile of — peers · Steel'));   // no stock being drawn: no peer count
+  F.setFundRenderStock(me);
+  assert.strictEqual(F.fundMetricDisplay(k, '90th (Steel)'), '90th percentile of 2 peers · Steel');
+  assert.strictEqual(F.fundMetricDisplay(k, '90th (G1 group)'), '90th percentile of 3 peers · G1 group');
+  assert.strictEqual(F.fundMetricDisplay(k, '90th (all stocks)'), '90th percentile of 4 peers · all stocks');
+  assert.strictEqual(F.fundMetricDisplay(k, 'n/a'), 'n/a'); assert.strictEqual(F.fundMetricDisplay('ROE', '12%'), '12%');
+  assert.strictEqual(F.FUND_METRIC_LABEL.ROCE, 'Return on Capital Employed'); assert.ok(F.PERCENTILE_METRIC_KEYS.has(k));
+  const f = { metrics: [['ROE', '14%'], ['ROCE', 'n/a'], ['D/E', '0.5x'], ['P/E', 'abc']] };
+  assert.deepStrictEqual([F.fundMetricVal(f, 'ROE'), F.fundMetricVal(f, 'ROCE'), F.fundMetricVal(f, 'zz'), F.fundMetricVal({}, 'ROE')], ['14%', null, null, null]);
+  assert.deepStrictEqual([F.fundMetricNum(f, 'ROE'), F.fundMetricNum(f, 'ROCE'), F.fundMetricNum(f, 'P/E'), F.fundMetricNum({}, 'ROE')], [14, null, null, null]);
+  assert.strictEqual(F.fundNoteExtra(''), null); assert.strictEqual(F.fundNoteExtra('One sentence only'), null);
+  assert.strictEqual(F.fundNoteExtra('Lead. Not a substitute for researched moat analysis.'), null);
+  assert.strictEqual(F.fundNoteExtra('Lead. Mechanically scored vs industry: debt is low, 3yr growth TTM good'), 'Compared with industry peers — debt is low, 3-year growth last 12 months good');
+  assert.strictEqual(F.fundNoteExtra('Lead. Data-driven mechanical proxy (pending individual research): small'), 'Estimated from industry-wide data (not yet individually researched) — small');
+  assert.strictEqual(F.fundNoteExtra('Lead. Mechanically scored from screener.in data: other'), 'Other');
+}));
+
+test('fund business text: one plain line per factor by score band, the researched headline wins and is escaped, and pending or unknown factors have none', () => alone(async () => {
+  globalThis.__S = [];
+  const T = await loadWithStubs('src/detail/fundtext.js', '', { '../core/stocks.js': 'export const stocks = globalThis.__S;' });
+  const fac = (key, score, extra) => Object.assign({ key, score, weight: 1, metrics: [['D/E', '0.2x'], ['ROCE', '18%'], ['Profit growth TTM', '25%'], ['P/E', '12'], ['Margin of safety', '30%']] }, extra);
+  for(const key of ['fin', 'prof', 'growth', 'val', 'moat', 'gov', 'predict', 'reinvest', 'dcf']){
+    const lines = [0.9, 0.7, 0.55, 0.2].map((x) => T.fundBusinessSummary(fac(key, x * 1)).text);
+    assert.strictEqual(new Set(lines).size, 4, key);   // four bands, four different lines
+  }
+  assert.ok(T.fundBusinessSummary(fac('fin', 0.9)).text.includes('(D/E 0.2x)') && T.fundBusinessSummary(fac('dcf', 0.9)).text.includes('margin of safety 30%'));
+  assert.ok(!T.fundBusinessSummary(fac('fin', 0.9, { metrics: [] })).text.includes('D/E'));
+  assert.strictEqual(T.fundBusinessSummary(fac('fin', 0.9, { research: { headline: 'Strong <b>' } })).text, 'Strong &lt;b&gt;');
+  assert.strictEqual(T.fundBusinessSummary(fac('fin', 0, { weight: 0 })), null);   // no weight: pending
+  assert.strictEqual(T.fundBusinessSummary(fac('nope', 0.9)), null);
+  assert.deepStrictEqual([T.isProxyFactor({ key: 'moat' }), T.isProxyFactor({ key: 'gov', research: {} }), T.isProxyFactor({ key: 'fin' }), T.isProxyFactor(null)], [true, false, false, false]);
+}));
+
+test('data completeness: factors with n/a figures or excluded are incomplete, technical states count the non-null ones, and the badge names what is missing', () => alone(async () => {
+  globalThis.__S = [];
+  const C = await loadWithStubs('src/detail/completeness.js', '', { '../core/stocks.js': 'export const stocks = globalThis.__S;' });
+  const f = (name, m, extra) => Object.assign({ name, metrics: m }, extra);
+  const s = { fundamentals: { factors: [f('A', [['ROE', '10%']]), f('B', [['ROCE', 'n/a']]), f('C', [['D/E', 'n/a']], { research: {} }), f('D', [], { excluded: true }), f('E', undefined), { name: 'F', excluded: true, metrics: undefined }] } };
+  const c = C.fundamentalCompleteness(s);
+  assert.deepStrictEqual([c.complete, c.total, c.incompleteNames, c.researchedGapNames, c.excludedNames], [2, 9, ['B', 'C'], ['C'], ['D', 'F']]);
+  assert.deepStrictEqual(C.fundamentalCompleteness({}), { complete: 0, total: 9, incompleteNames: [], researchedGapNames: [], excludedNames: [] });
+  assert.deepStrictEqual(C.fundMissingMetrics({ metrics: [['ROCE', 'n/a'], ['xx', 'n/a'], ['ROE', '1'], 'bad'] }), ['Return on Capital Employed', 'xx']); assert.deepStrictEqual(C.fundMissingMetrics({}), []);
+  assert.deepStrictEqual(C.technicalCompleteness({}), { complete: 0, total: 5 });
+  assert.deepStrictEqual(C.technicalCompleteness({ technical: { states: { monthMacd: 1, weekMacd: null, monthRsi: 0, weekRsi: undefined, valuation: 'x' } } }), { complete: 3, total: 5 });
+  const full = C.completenessBadge({ complete: 9, total: 9 }, 'factors');
+  assert.ok(full.includes('class="completeness-badge complete"') && full.includes('9/9 factors'));
+  const gaps = C.completenessBadge(c, 'factors');
+  assert.ok(gaps.includes('incomplete') && gaps.includes('not scored (not 100% reliable): D, F') && gaps.includes('missing data in: B') && gaps.includes('researched, but the figures are not available') && gaps.includes('1 researched, data unavailable'));
+}));
