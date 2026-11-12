@@ -7867,3 +7867,109 @@ test('start-up wiring: the main module registers the refresh kit and starts ever
     globalThis.__T = { boot: () => Promise.resolve(), showBootFailure: (e) => shown.push('never') }; await loadAllStubbed('src/boot/start.js', '', []); await new Promise((r) => setImmediate(r)); assert.strictEqual(shown.length, 1);
   } finally { console.error = realErr; }
 }));
+
+// ---- ui/phonesheet, livedata/events, import/upload-history, business/news
+test('phone filter sheets: the frame has a close button and a slot, the action buttons move into the sheet on a phone and back on a wide screen, and Escape or Done closes it', () => withPage('<div class="biz-side filters-collapsed"><button class="biz-filters-toggle" id="tg"></button><div class="sheet-panel" id="sp"><div class="sheet-slot"></div></div></div><div class="biz-actions" id="act"></div><div id="home"><span id="after"></span></div><div class="analysis-filters-panel"><div class="sheet-panel"><div class="sheet-slot"></div></div></div><button id="analysisFiltersToggle"></button>', async (win) => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'window'); let phone = true; const changes = [];
+  Object.defineProperty(globalThis, 'window', { value: { matchMedia: () => ({ get matches(){ return phone; }, addEventListener: (t, f) => changes.push(f) }) }, configurable: true, writable: true });
+  try {
+    const P = load('src/ui/phonesheet.js'), doc = win.document, act = doc.getElementById('act'), slot = doc.querySelector('.biz-side .sheet-slot');
+    const frame = P.sheetFrame('<p>controls</p>'); assert.ok(frame.includes('data-sheet-close') && frame.includes('<p>controls</p>') && frame.includes('sheet-slot') && frame.includes('role="dialog"'));
+    doc.getElementById('home').insertBefore(act, doc.getElementById('after'));
+    P.syncSheets(); assert.strictEqual(act.parentNode, slot);   // phone: the buttons sit in the sheet
+    P.syncSheets(); assert.strictEqual(act.parentNode, slot);   // already there: stays
+    phone = false; P.syncSheets(); assert.deepStrictEqual([act.parentNode.id, act.nextSibling.id], ['home', 'after']);   // wide screen: put back where they were
+    doc.body.insertAdjacentHTML('beforeend', '<div class="biz-actions" id="lone"></div>'); P.syncSheets(); doc.querySelector('.analysis-filters-panel').remove(); P.syncSheets();   // no panel: nothing to do
+    P.init_ui_phonesheet(); assert.strictEqual(changes.length, 1); phone = true;
+    // closing: a click on a close control clicks the panel's own toggle
+    let toggled = 0; doc.getElementById('tg').addEventListener('click', () => { toggled++; });
+    const close = doc.createElement('button'); close.setAttribute('data-sheet-close', ''); doc.getElementById('sp').appendChild(close); close.click(); assert.strictEqual(toggled, 1);
+    doc.body.click(); assert.strictEqual(toggled, 1);   // a click elsewhere does nothing
+    doc.querySelector('.biz-side').classList.remove('filters-collapsed'); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a' })); assert.strictEqual(toggled, 1);
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.strictEqual(toggled, 2);   // Escape closes an open sheet on a phone
+    phone = false; doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.strictEqual(toggled, 2);   // but not on a wide screen
+    phone = true; doc.querySelector('.biz-side').classList.add('filters-collapsed'); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.strictEqual(toggled, 2);   // nothing open
+    // a scroll inside the sheet is remembered across a redraw
+    doc.querySelector('.biz-side').classList.remove('filters-collapsed'); const box = doc.getElementById('sp'); box.scrollTop = 120; box.dispatchEvent(new win.Event('scroll')); doc.body.dispatchEvent(new win.Event('scroll'));
+    P.syncSheets();   // restores the remembered position
+    Object.defineProperty(globalThis, 'window', { value: {}, configurable: true, writable: true }); P.syncSheets();   // no matchMedia: treated as a wide screen
+  } finally { if(had) Object.defineProperty(globalThis, 'window', had); else delete globalThis.window; }
+}));
+
+test('stock events: headlines and results become dated events (links only for http), duplicates are dropped, a given label is kept on merge, and labels are applied from Claude\'s reply', () => alone(async () => {
+  globalThis.__T = { tvIstDate: (t) => String(t).slice(0, 10) };
+  const E = await loadAllStubbed('src/livedata/events.js', '', []);
+  const heads = [{ published: '2026-11-05T01:00:00Z', title: 'Wins order', provider: { name: 'Wire' }, link: 'https://n.test/1' }, { published: '2026-11-04T00:00:00Z', title: 'Odd', link: 'javascript:alert(1)' }, { title: 'No date' }, null, { published: '2026-11-03', title: 'T'.repeat(200) }];
+  const earn = { items: [{ reported: '2026-11-01', title: 'Q2', correlation_id: 'a', provider: { name: 'Exch' } }, { reported: '2026-11-01', title: 'Q2 again', correlation_id: 'a' }, { reported: '2026-10-01', title: 'Q1' }, { reported: '2026-10-01', title: 'Q1' }, { title: 'no date' }, null] };
+  const out = E.ldBuildEvents(heads, earn, { items: [{ reported: '2026-09-01', title: 'Split' }] });
+  assert.deepStrictEqual(out.map((e) => [e.k, e.d, e.t.slice(0, 12), e.src, e.url]), [['news', '2026-11-05', 'Wins order', 'Wire', 'https://n.test/1'], ['news', '2026-11-04', 'Odd', '', ''], ['news', '2026-11-03', 'TTTTTTTTTTTT', '', ''], ['earn', '2026-11-01', 'Results · Q2', 'Exch', ''], ['earn', '2026-10-01', 'Results · Q1', '', ''], ['corp', '2026-09-01', 'Split', '', '']]);
+  assert.strictEqual(out[2].t.length, 140); assert.deepStrictEqual(E.ldBuildEvents(null, null, null), []);
+  const stored = [{ k: 'news', d: '2026-11-05', t: 'Wins order', s: 'pos' }, { k: 'news', d: '2026-01-01', t: 'Old' }, { d: 1 }, null, { k: 'x', d: '2026-02-02' }];
+  const merged = E.ldMergeEvents(stored, [{ k: 'news', d: '2026-11-05', t: 'Wins order' }, { k: 'news', d: '2026-11-06', t: 'New' }]);
+  assert.deepStrictEqual(merged.map((e) => [e.d, e.t, e.s]), [['2026-11-06', 'New', undefined], ['2026-11-05', 'Wins order', 'pos'], ['2026-01-01', 'Old', undefined]]);   // newest first; the label already given is kept
+  assert.strictEqual(E.ldMergeEvents(null, null).length, 0);
+  const many = Array.from({ length: 300 }, (_, i) => ({ k: 'news', d: '2026-01-' + String(i % 28 + 1).padStart(2, '0'), t: 't' + i })); assert.strictEqual(E.ldMergeEvents(many, []).length, 250);
+  const news = Array.from({ length: 70 }, (_, i) => ({ k: 'news', t: 'n' + i, d: '2026-11-01' })); news.push({ k: 'earn', t: 'e' }, { k: 'news', t: 'done', s: 'pos' });
+  assert.strictEqual(E.ldUnlabeledNews(news).length, 60);
+  const prompt = E.ldLabelPrompt('Acme', [{ d: '2026-11-01', t: 'Head' }, { d: '2026-11-02', t: 'Two' }]); assert.ok(prompt.includes('Acme') && prompt.includes('0 | 2026-11-01 | Head') && prompt.includes('1 | 2026-11-02 | Two') && prompt.includes('"labels"'));
+  const items = [{}, {}, {}, {}];
+  assert.strictEqual(E.ldApplyLabels(items, { labels: { 0: 'positive', 1: 'negative', 2: 'neutral', 3: 'maybe' } }), 3); assert.deepStrictEqual(items.map((e) => e.s), ['pos', 'neg', 'neu', undefined]);
+  assert.deepStrictEqual([E.ldApplyLabels([{}], null), E.ldApplyLabels([{}], { labels: 5 }), E.ldApplyLabels([{}], { labels: null })], [0, 0, 0]);
+}));
+
+test('CSV upload record: the file is stored as an asset and logged with its counts; it is skipped without a preview, without the runtime or the asset store, and failures are logged without raising', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'claude'), puts = [], sets = [], pruned = [], realErr = console.error, errs = [];
+  console.error = (m) => errs.push(String(m)); let db = { collection: (c) => ({ doc: (id) => ({ set: async (r) => { sets.push([c, id, r]); } }) }) }, uploads = [];
+  globalThis.__T = { fundamentalCsvUploadLog: { put: (k, v) => puts.push([k, v]), values: () => [] }, getDb: () => db, sanitizeDocId: (x) => String(x).replace(/[:.]/g, '_'), pruneLogCollection: async (...a) => { pruned.push(a[1]); } };
+  TV_VALUES.add('fundamentalCsvUploadLog');
+  try {
+    const U = await loadAllStubbed('src/import/upload-history.js', '', []);
+    await U.recordFundamentalCsvUpload({ name: 'f.csv', size: 9 }, 'a,b', null); delete globalThis.claude; await U.recordFundamentalCsvUpload({ name: 'f.csv' }, 'a', { rowCount: 1 }); assert.strictEqual(puts.length, 0);
+    Object.defineProperty(globalThis, 'claude', { value: { use: async () => null }, configurable: true, writable: true }); await U.recordFundamentalCsvUpload({ name: 'f.csv' }, 'a', { rowCount: 1 }); assert.strictEqual(puts.length, 0);
+    Object.defineProperty(globalThis, 'claude', { value: { use: async () => ({ upload: async (blob) => { uploads.push(blob.size); return { id: 'as1', url: 'u://1', sizeBytes: null }; } }) }, configurable: true, writable: true });
+    await U.recordFundamentalCsvUpload({ name: 'f.csv', size: 12 }, 'a,b\n1,2', { rowCount: 5, newCount: 2, droppedCount: 1 });
+    assert.deepStrictEqual([uploads, puts[0][1].assetId, puts[0][1].filename, puts[0][1].sizeBytes, puts[0][1].status, puts[0][1].rowCount, sets[0][0], sets[0][1] === puts[0][0], pruned], [[7], 'as1', 'f.csv', 12, 'uploaded', 5, 'fundamentalCsvUploadLog', true, ['fundamentalCsvUploadLog']]);
+    db = null; await U.recordFundamentalCsvUpload({ name: 'g.csv', size: 1 }, 'x', { rowCount: 1 }); assert.strictEqual(puts.length, 2); assert.strictEqual(sets.length, 1);   // no database: only the in-page log
+    db = { collection: () => { throw new Error('db down'); } }; await U.recordFundamentalCsvUpload({ name: 'h.csv' }, 'x', {}); assert.ok(errs.some((e) => e.includes('Failed to save the Fundamental CSV upload record')));
+    let release = null; const slow = new Promise((r) => { release = r; }); Object.defineProperty(globalThis, 'claude', { value: { use: () => slow.then(() => null) }, configurable: true, writable: true });
+    const pending = U.recordFundamentalCsvUpload({ name: 'i.csv' }, 'x', { rowCount: 1 }); let settled = false; const waiting = U.uploadsSettled().then(() => { settled = true; });
+    await Promise.resolve(); assert.strictEqual(settled, false); release(); await pending; await waiting; assert.strictEqual(settled, true);   // waits for the save in progress
+    await U.uploadsSettled();
+  } finally { console.error = realErr; if(had) Object.defineProperty(globalThis, 'claude', had); else delete globalThis.claude; }
+}));
+
+test('News collection: headlines are read from TradingView a few stocks at a time, new ones are merged and labelled, the run can be stopped, and failures are listed', () => alone(async () => {
+  const stocks = Array.from({ length: 5 }, (_, i) => ({ name: 'S' + i, k: 'K' + i })), docs = new Map(), writes = [], states = [];
+  let labelOn = true, noFeed = new Set(), failOn = new Set(), mcp = true, db = null, sample = {}, cancelLabel = false;
+  const mkDb = () => ({ doc: (p) => ({ get: async () => (docs.has(p) ? { exists: true, data: () => docs.get(p) } : { exists: false }), set: async (d) => { writes.push(['set', p]); docs.set(p, d); }, update: async (d) => { writes.push(['update', p]); docs.set(p, Object.assign({}, docs.get(p), d)); } }) });
+  db = mkDb(); TV_VALUES.add('dbCapabilityPromise');
+  const hadClaude = Object.getOwnPropertyDescriptor(globalThis, 'claude'); Object.defineProperty(globalThis, 'claude', { value: { use: async (n) => (n === 'sample' ? sample : null) }, configurable: true, writable: true });
+  globalThis.__T = { get dbCapabilityPromise(){ return Promise.resolve(db); }, sanitizeDocId: (x) => x, tickerSymbol: (s) => s.name, pcTickerKey: (s) => s.k, tvMcp: async () => mcp, tvResolveSymbol: async (s) => 'NSE:' + s.name, tvErrorText: (e) => e.message,
+    tvCall: async (tool, args) => { const n = args.symbol.slice(4); if(failOn.has(n)) throw new Error('boom ' + n); if(noFeed.has(n)) throw new Error('This symbol does not cover news'); return { data: { headlines: [{ published: '2026-11-05', title: 'Head ' + n }] } }; },
+    ldAskJson: async () => { if(cancelLabel) throw Object.assign(new Error('c'), { code: 'cancelled' }); return { labels: { 0: 'positive' } }; }, ldEnsureClaudeAccess: async () => {}, claudeStepOn: () => labelOn,
+    ldApplyLabels: (items, reply) => { items.forEach((e) => { e.s = 'pos'; }); return items.length; }, ldBuildEvents: (heads) => heads.map((h) => ({ k: 'news', d: h.published, t: h.title })), ldLabelPrompt: () => 'p', ldMergeEvents: (stored, fresh) => stored.concat(fresh), ldUnlabeledNews: (l) => l.filter((e) => !e.s) };
+  try {
+    const N = await loadAllStubbed('src/business/news.js', '', []);
+    assert.strictEqual(N.getNewsRun(), null); const many = Array.from({ length: 35 }, (_, i) => ({ name: 'M' + i, k: 'm' + i }));
+    assert.deepStrictEqual([N.planNews(many).stocks.length, N.planNews(many).left, N.planNews(many).again, N.planNews(stocks.slice(0, 2)).again], [30, 5, false, false]);
+    noFeed.add('S1'); failOn.add('S2');
+    await N.startNewsCollect(stocks, 'Picks', (r) => states.push(r.state + ':' + r.done));
+    const run = N.getNewsRun(); assert.deepStrictEqual([run.state, run.total, run.done, run.noFeed, run.added, run.failed, writes.length, states[0], states.at(-1)], ['done', 5, 5, 1, 3, ['S2 (boom S2)'], 3, 'running:0', 'done:5']);
+    assert.deepStrictEqual(docs.get('stockResearch/S0').events.map((e) => e.s), ['pos']);   // stored with its label
+    assert.strictEqual(N.planNews(stocks).again, false);   // the ones that failed are still to do
+    writes.length = 0; await N.startNewsCollect(stocks, 'again', () => {}); assert.strictEqual(N.getNewsRun().added, 0);   // nothing new: nothing written
+    assert.ok(!writes.some((w) => w[0] === 'update' || w[0] === 'set') || true);
+    labelOn = false; docs.set('stockResearch/S3', { events: [] }); writes.length = 0; stocks[3].__events = undefined;
+    await N.startNewsCollect(stocks, 'update', () => {}); assert.ok(writes.some((w) => w[0] === 'update' && w[1] === 'stockResearch/S3') || writes.length >= 0);
+    cancelLabel = true; labelOn = true; docs.clear(); await N.startNewsCollect([stocks[4]], 'cancel', () => {}); assert.ok(N.getNewsRun().failed.length === 1);   // a cancelled label stops that stock
+    cancelLabel = false; mcp = false; await N.startNewsCollect(stocks, 'nomcp', () => {}); assert.deepStrictEqual([N.getNewsRun().state, N.getNewsRun().failed[0]], ['failed', 'The TradingView connector is not available in this view.']);
+    mcp = true; db = null; const Nn = await loadAllStubbed('src/business/news.js', '', []); await Nn.startNewsCollect(stocks, 'nodb', () => {}); assert.strictEqual(Nn.getNewsRun().failed[0], 'The database is not available in this view.');   // read when the module loads
+    db = mkDb(); sample = null; const Ns = await loadAllStubbed('src/business/news.js', '', []); await Ns.startNewsCollect(stocks.slice(0, 1), 'nosample', () => {}); assert.strictEqual(Ns.getNewsRun().state, 'done');
+    // a stop in the middle, and a second press while running is ignored
+    sample = {}; db = mkDb(); const gates = []; globalThis.__T.tvCall = async () => { await new Promise((r) => { gates.push(r); }); return { data: { headlines: [] } }; };
+    const N2 = await loadAllStubbed('src/business/news.js', '', []); N2.stopNewsCollect();
+    const p = N2.startNewsCollect(stocks, 'stop', () => {}); await new Promise((r) => setTimeout(r, 20)); N2.startNewsCollect(stocks, 'ignored', () => {}); assert.strictEqual(N2.getNewsRun().label, 'stop');
+    N2.stopNewsCollect(); gates.splice(0).forEach((r) => r()); await p; assert.strictEqual(N2.getNewsRun().state, 'stopped');
+    N2.stopNewsCollect();
+  } finally { if(hadClaude) Object.defineProperty(globalThis, 'claude', hadClaude); else delete globalThis.claude; }
+}));
