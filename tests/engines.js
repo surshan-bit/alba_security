@@ -6858,7 +6858,7 @@ test('Buy / Sell ideas results: kept in the browser, only the newest 20, saved 0
 }));
 
 test('fund import retry: a failed read is tried again with a growing pause, a refused one is not, and the last error is raised after five tries', () => alone(async () => {
-  const M = await loadAllStubbed('src/import/fund-import.js', 'export { fiRetry };', ['./fundreport.js']);
+  const M = await loadAllStubbed('src/import/fund-import.js', '', ['./fundreport.js']);
   const pauses = [];
   globalThis.__T = Object.assign(globalThis.__T || {}, { sleep: (ms) => { pauses.push(ms); return Promise.resolve(); } });
   try {
