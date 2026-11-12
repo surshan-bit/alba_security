@@ -8301,3 +8301,39 @@ test('Buy / Sell ideas filter: the lists of the chosen strategy or the newest re
   assert.deepStrictEqual([I.ideaRankOf(C, 's1'), I.ideaRankOf(A, 'unknown'), I.ideaRankOf(A)], [null, null, I.ideaRankOf(A, '')]);   // not in the ranks; no result; the newest result when no strategy
   all = { s1: snap('2026-11-01T00:00:00Z', ['AAA'], []) }; assert.strictEqual(I.ideaRankOf(A, 's1'), null);   // saved before ranks existed
 }));
+
+// ---- strategies/practice (rule sets Claude suggests for a holding period)
+test('strategy practice ideas: Claude\'s reply is checked rule by rule, an approach needs two valid rules, errors are explained, and a chosen approach replaces the strategy\'s rules', () => alone(async () => {
+  const fields = [{ id: 'score', type: 'num', label: 'Score', unit: ' pts' }, { id: 'rsi', type: 'num', label: 'RSI' }, { id: 'trend', type: 'enum', label: 'Trend', options: [['up', 'Up'], ['down', 'Down']], noneLabel: 'No reading' }, { id: 'name', type: 'text', label: 'Name' }, { id: 'industry', type: 'enum', label: 'Industry', options: [] }];
+  TV_VALUES.add('FIELDS'); TV_VALUES.add('FIELD_BY_ID'); TV_VALUES.add('stocks'); TV_VALUES.add('OPS');
+  let reply, stepOn = true, access = null, saves = 0, asked = [];
+  const hadClaude = Object.getOwnPropertyDescriptor(globalThis, 'claude'); let sampleOk = true;
+  Object.defineProperty(globalThis, 'claude', { value: { use: async () => (sampleOk ? {} : null) }, configurable: true, writable: true });
+  globalThis.__T = { FIELDS: fields, FIELD_BY_ID: new Map(fields.map((f) => [f.id, f])), stocks: [1, 2, 3], OPS: { num: [['>=', 'a'], ['<=', 'b'], ['>', 'c'], ['<', 'd'], ['between', 'e']] }, describeRule: (r) => r.field + r.op + JSON.stringify(r.value), qualifyingStocks: (list, rules) => list.slice(0, rules.length),
+    ldAskJson: async (sample, prompt, opts) => { asked.push([prompt, opts]); if(reply instanceof Error) throw reply; return reply; }, ldEnsureClaudeAccess: async () => { if(access) throw access; }, ldErrText: (e) => 'E:' + (e.message || e.code), claudeStepOn: () => stepOn, saveStrategies: () => { saves++; } };
+  try {
+    const P = await loadAllStubbed('src/strategies/practice.js', '', ['../core/util.js']), calls = [];
+    const run = async (key, refresh) => { await P.runPractice(key, () => calls.push(key), refresh); };
+    assert.deepStrictEqual([Object.keys(P.HORIZONS), P.hasPractice('short'), P.practiceHtml('short')], [['short', 'medium', 'long'], false, '']);
+    reply = [{ name: 'Momentum <b>', why: 'Buy strength', rules: [{ field: 'score', op: '>=', value: 6 }, { field: 'rsi', op: 'between', value: [50, 70] }, { field: 'trend', op: 'in', value: ['up', 'sideways', 'up'] }, { field: 'name', op: 'contains', value: 'x' }, { field: 'industry', op: 'in', value: ['a'] }, { field: 'rsi', op: '!=', value: 1 }, { field: 'nope', op: '>=', value: 1 }, null] }, { name: 'One rule only', rules: [{ field: 'score', op: '>', value: 1 }] }, 'junk', { rules: 'x' }, { name: 'N', why: 5, rules: [{ field: 'trend', op: 'in', value: ['none'] }, { field: 'score', op: '<', value: 3 }, { field: 'rsi', op: 'between', value: ['a', 2] }, { field: 'trend', op: 'in', value: 'up' }] }];
+    const p = run('short'); assert.ok(P.practiceHtml('short').includes('Asking Claude for common short term approaches')); await p; assert.deepStrictEqual(calls, ['short', 'short']);
+    assert.ok(asked[0][0].includes('short term') && asked[0][0].includes('- score (Score): number in pts') && asked[0][0].includes('trend (Trend): choice') && !asked[0][0].includes('industry') && JSON.stringify(asked[0][1]) === '{"cache":{"gcTime":3600000}}');
+    let html = P.practiceHtml('short');
+    for(const needle of ['Momentum &lt;b&gt;', 'score&gt;=6', 'rsibetween[50,70]', 'trendin[&quot;up&quot;]', '<b>3</b> stocks qualify today', '<b>2</b> stocks qualify today', 'data-k="1"', 'Ask again']) assert.ok(html.includes(needle), needle);
+    assert.ok(!html.includes('sideways') && !html.includes('One rule only'));
+    assert.ok(html.includes('data-refresh="1"')); assert.strictEqual(P.hasPractice('short'), true);
+    reply = []; await run('short', true); assert.deepStrictEqual(asked.at(-1)[1], { cache: { gcTime: 3600000, refresh: true } }); html = P.practiceHtml('short'); assert.ok(html.includes('no usable rules') && html.includes('Try again') && html.includes('pr-ask'));
+    reply = 'not an array'; await run('medium'); assert.ok(P.practiceHtml('medium').includes('no usable rules'));
+    reply = new Error('boom'); await run('long'); assert.ok(P.practiceHtml('long').includes('E:boom'));
+    access = new Error('no access'); await run('long'); assert.ok(P.practiceHtml('long').includes('E:no access')); access = null;
+    sampleOk = false; await run('long'); assert.ok(P.practiceHtml('long').includes('E:Claude is not available here.')); sampleOk = true;
+    stepOn = false; await run('medium'); assert.ok(P.practiceHtml('medium').includes('turned off in Settings')); stepOn = true;
+    // a run in progress ignores a second press
+    let release; globalThis.__T.ldAskJson = () => new Promise((r) => { release = r; }); reply = null; const first = run('medium'); await new Promise((r) => setTimeout(r, 5)); const callsBefore = calls.length; await run('medium'); assert.strictEqual(calls.length, callsBefore); release([]); await first;
+    // apply
+    globalThis.__T.ldAskJson = async () => [{ name: 'Value', why: 'Cheap and good', rules: [{ field: 'score', op: '>=', value: 7 }, { field: 'rsi', op: '<', value: 40 }] }, { name: 'Bare', rules: [{ field: 'score', op: '>=', value: 5 }, { field: 'rsi', op: '>', value: 1 }] }];
+    await run('short'); const st = { rules: [], learned: '' };
+    assert.deepStrictEqual([P.applyPractice(st, 'short', 0), st.rules.length, st.learned, saves], [true, 2, 'Short term approach "Value": Cheap and good', 1]); assert.ok(st.rules !== P.applyPractice && JSON.stringify(st.rules[0]) === '{"field":"score","op":">=","value":7}');
+    assert.strictEqual(P.applyPractice(st, 'short', 1) && st.learned, 'Short term approach "Bare".'); assert.deepStrictEqual([P.applyPractice(st, 'short', 5), P.applyPractice(st, 'nothing', 0), P.applyPractice(st, 'medium', 0)], [false, false, false]);
+  } finally { if(hadClaude) Object.defineProperty(globalThis, 'claude', hadClaude); else delete globalThis.claude; }
+}));
