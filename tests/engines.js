@@ -7462,3 +7462,99 @@ test('page sections: each one starts its parts and draws them, and the refresh k
   finally { if(win === undefined) delete globalThis.document; else globalThis.document = win; delete globalThis.__rocky; }
   const K = await loadAllStubbed('src/refresh/kit.js', '', []); await K.init(); assert.deepStrictEqual(log.splice(0), ['controls', 'queue']); assert.ok(K.kit && typeof K.kit === 'object');
 }));
+
+// ---- Data stores and lookups: core/store, rocky/store, news/store, refresh/kit-lookup, strategies/pricedata, overlays/techscore2, core/stocks
+test('shared store: the database handles, pinned tickers and the trade log are read and replaced through functions, and the upload logs keep their records', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'claude');
+  try {
+    delete globalThis.claude; let S = load('src/core/store.js'); assert.strictEqual(await S.dbCapabilityPromise, null);   // no runtime: no database
+    Object.defineProperty(globalThis, 'claude', { value: { use: (n) => Promise.resolve({ n }) }, configurable: true, writable: true }); S = load('src/core/store.js'); assert.deepStrictEqual(await S.dbCapabilityPromise, { n: 'db' });
+    Object.defineProperty(globalThis, 'claude', { value: { use: () => Promise.reject(new Error('refused')) }, configurable: true, writable: true }); S = load('src/core/store.js'); assert.strictEqual(await S.dbCapabilityPromise, null);
+    assert.deepStrictEqual([S.getDb(), S.getTradeDb()], [null, null]); const db = {}; S.attachDb(db); S.attachTradeDb(db); assert.ok(S.getDb() === db && S.getTradeDb() === db);
+    S.togglePinnedTicker('AAA'); assert.strictEqual(S.isPinnedTicker('AAA'), true); S.togglePinnedTicker('AAA'); assert.strictEqual(S.isPinnedTicker('AAA'), false);
+    assert.deepStrictEqual([S.replacePinnedTickers(['A', 'B']), S.replacePinnedTickers(['B', 'A']), S.replacePinnedTickers(['A']), S.isPinnedTicker('B')], [true, false, true, false]);   // only a real change reports true
+    assert.deepStrictEqual([S.allTrades(), S.getTrade('x')], [[], undefined]); S.replaceTradeLog(new Map([['x', { _id: 'x' }], ['y', { _id: 'y' }]]));
+    assert.deepStrictEqual([S.allTrades().length, S.getTrade('y')._id], [2, 'y']);
+    const log = S.watchlistSyncLog; log.put('a', 1); log.put('b', 2); log.put('a', 3);
+    assert.deepStrictEqual([log.entries(), log.values()], [[['a', 3], ['b', 2]], [3, 2]]); log.remove('a'); assert.deepStrictEqual(log.values(), [2]);
+    S.fundamentalCsvUploadLog.put('u', 9); assert.deepStrictEqual(S.fundamentalCsvUploadLog.values(), [9]); assert.deepStrictEqual(S.watchlistSyncLog.values(), [2]);   // the two logs are separate
+  } finally { if(had) Object.defineProperty(globalThis, 'claude', had); else delete globalThis.claude; }
+}));
+
+for(const [name, file, coll, ids, hook] of [['Rocky', 'src/rocky/store.js', 'rocky', ['state', 'picks', 'weights', 'learn', 'log'], 'rocky'], ['News', 'src/news/store.js', 'news', ['pulse', 'macro', 'events'], 'news']]){
+  test(name + ' sync: no database is said plainly, a snapshot fills the known documents and clears the rest, and a failure or a silent listener is retried a few times', () => alone(async () => {
+    const realTimeout = globalThis.setTimeout, timers = [], redraws = [], realErr = console.error, errs = [];
+    globalThis.setTimeout = (f, ms) => { if(ms >= 1000){ timers.push({ f, ms }); return timers.length; } return realTimeout(f, ms); }; console.error = (m) => errs.push(String(m));
+    try {
+      let db = null, unsubs = 0, handlers = null;
+      TV_VALUES.add('dbCapabilityPromise');
+      const mk = async () => { globalThis.__T = { dbCapabilityPromise: Promise.resolve(db), renderLoadedPart: (k) => redraws.push(k) }; return loadAllStubbed(file, '', []); };
+      let M = await mk(); const store = M[hook]; await M['start' + name + 'Sync']();
+      assert.deepStrictEqual([store.noDb, store.ready, redraws], [true, true, [hook]]);
+      await M['start' + name + 'Sync'](); assert.strictEqual(redraws.length, 1);   // already started: nothing again
+      db = { collection: (c) => { assert.strictEqual(c, coll); return { onSnapshot: (ok, bad) => { handlers = { ok, bad }; return () => { unsubs++; }; } }; } };
+      M = await mk(); const s2 = M[hook]; redraws.length = 0; await M['start' + name + 'Sync']();
+      const doc = (id, data, exists = true) => ({ id, exists, data: () => data });
+      handlers.ok({ docs: [doc(ids[0], { v: 1 }), doc('other', { v: 2 }), doc(ids[1], null, false)] });
+      assert.deepStrictEqual([s2[ids[0]], s2[ids[1]], s2.other, s2.ready, redraws], [{ v: 1 }, null, undefined, true, [hook]]);
+      handlers.ok({ docs: [] }); assert.strictEqual(s2[ids[0]], null);   // a document that is gone is cleared
+      await M['start' + name + 'Sync'](true); assert.strictEqual(unsubs, 1);   // the old listener is closed before a new one
+      handlers.bad(new Error('denied')); assert.ok(errs.some((e) => e.includes('sync error')) && timers.some((t) => t.ms === 3000));
+      timers.length = 0; for(let i = 0; i < 6; i++){ await M['start' + name + 'Sync'](true); handlers.bad(new Error('x')); }
+      assert.ok(timers.filter((t) => t.ms % 3000 === 0).length <= 5, 'no more than five retries');
+      timers.length = 0; handlers = null; await M['start' + name + 'Sync'](true); assert.ok(timers.some((t) => t.ms === 8000));   // never heard anything: retry
+      const eight = timers.find((t) => t.ms === 8000); eight.f();
+      db = { collection: () => { throw new Error('boom'); } }; M = await mk(); redraws.length = 0; await M['start' + name + 'Sync'](); assert.ok(errs.some((e) => e.includes('unavailable')) && redraws.length === 1);
+      db = { collection: () => ({ onSnapshot: () => () => { throw new Error('gone'); } }) }; M = await mk(); await M['start' + name + 'Sync'](); await M['start' + name + 'Sync'](true);   // an old listener that fails to close is ignored
+      if(name === 'News'){ let n = 0; M.setNewsChangeHook(() => { n++; }); M.newsChanged(); M.setNewsChangeHook(null); M.newsChanged(); assert.strictEqual(n, 1); }
+    } finally { globalThis.setTimeout = realTimeout; console.error = realErr; }
+  }));
+}
+
+test('refresh lookup: stocks are found by key, sections follow where a refresh came from, and scopes, toolbars and selections are kept by name', () => alone(async () => {
+  const list = [{ name: 'A' }, { name: 'B' }]; TV_VALUES.add('stocks');
+  globalThis.__T = { stocks: list, pcTickerKey: (s) => s.name };
+  const L = await loadAllStubbed('src/refresh/kit-lookup.js', '', []);
+  assert.deepStrictEqual([L.stockByKey('A'), L.stockByKey('Z')], [list[0], null]); list.push({ name: 'C' }); assert.strictEqual(L.stockByKey('C').name, 'C');   // the list grew: the map is rebuilt
+  assert.deepStrictEqual(['analysis', 'strat', 'biz-industry', 'detail', '', undefined].map(L.sectionOf), ['analysis', 'strategies', 'business', '', '', '']);
+  L.defineScope('s1', { label: 'L', stocks: () => [list[0], null, list[1]] }); L.defineScope('bad', { stocks: () => { throw new Error('x'); } });
+  assert.deepStrictEqual([L.scopeStocks('s1').length, L.scopeStocks('bad'), L.scopeStocks('none'), L.getScope('s1').label], [2, [], [], 'L']);
+  const tb = () => []; L.defineToolbar('t', tb); assert.ok(L.getToolbar('t') === tb && L.getToolbar('u') === undefined);
+  L.selKeys('analysis').add('A'); L.selKeys('analysis').add('Z'); L.selKeys('fresh').add('B');
+  assert.deepStrictEqual([L.selectedStocks('analysis').map((s) => s.name), L.selectedStocks('fresh').map((s) => s.name), L.isExternalSelection('analysis')], [['A'], ['B'], false]);
+  const ext = new Set(['C']); L.useExternalSelection('strat', () => ext);
+  assert.deepStrictEqual([L.isExternalSelection('strat'), L.selKeys('strat') === ext, L.selectedStocks('strat').map((s) => s.name)], [true, true, ['C']]);
+}));
+
+test('strategy price set: bars from every stock\'s documents are joined with the recent bars, inactive stocks are left out, and the result is kept until forced', () => alone(async () => {
+  const docs = [{ exists: true, data: () => ({ ticker: 'AAA', interval: '1W', bars: [1], fetchedAt: '2026-11-01' }) }, { exists: true, data: () => ({ ticker: 'AAA', interval: '1M', bars: [2], fetchedAt: '2026-11-05' }) },
+    { exists: true, data: () => ({ ticker: 'AAA', interval: '1W', bars: [1], fetchedAt: '2026-10-01' }) }, { exists: true, data: () => ({ ticker: 'OLD', interval: '1W', bars: [9] }) }, { exists: false }, { exists: true, data: () => null }, { exists: true, data: () => ({ ticker: 'NOBARS', bars: 'x' }) }, { exists: true, data: () => ({ ticker: 'BBB', interval: '1X', bars: [3] }) }];
+  let reads = 0, recent = 0, db = { collection: () => ({ get: async () => { reads++; return { docs }; } }) };
+  TV_VALUES.add('dbCapabilityPromise'); TV_VALUES.add('stockByTickerSymbolAny');
+  const setup = async () => { globalThis.__T = { dbCapabilityPromise: Promise.resolve(db), stockByTickerSymbolAny: new Map([['OLD', { active: false }], ['AAA', { active: true }]]), loadRecentBars: async () => { recent++; }, withRecent: (key, bars, fetched) => ({ bars: { '1W': bars['1W'], '1M': bars['1M'] }, fetched: 'rec-' + fetched }) }; return loadAllStubbed('src/strategies/pricedata.js', '', []); };
+  let P = await setup(); const out = await P.loadPriceSet();
+  assert.deepStrictEqual([[...out.keys()].sort(), out.get('AAA'), out.get('BBB').w], [['AAA', 'BBB'], { w: [1], m: [2], fetchedAt: 'rec-2026-11-05' }, null]);   // the newest fetch time wins; inactive and unreadable documents are dropped
+  assert.ok(await P.loadPriceSet() === out && reads === 1); await P.loadPriceSet(true); assert.strictEqual(reads, 2); assert.strictEqual(recent, 2);
+  db = null; P = await setup(); assert.strictEqual((await P.loadPriceSet()).size, 0);   // no database: nothing
+}));
+
+test('technical score 2 overlay: scores are attached by document id, an older set is removed first, and the detail page and an open Analysis are redrawn', () => withPage('<section id="section-analysis" class="active"></section>', async (win) => {
+  const a = { name: 'A' }, b = { name: 'B' }, redraws = [];
+  globalThis.__T = { refreshAnalysisSoon: () => redraws.push('analysis'), rerenderDetail: () => redraws.push('detail'), stockByDocId: () => new Map([['a', a], ['b', b]]) };
+  const O = await loadAllStubbed('src/overlays/techscore2.js', '', []);
+  O.applyTech2Overlay([{ data: { asof: '2026-11-10', rows: [{ k: 'a', s: 6.5, z: 1.2, w: 'W' }, { k: 'zz', s: 1 }, null, { k: 5 }, { k: 'b', s: 'x', z: null }] } }, { data: null }, { data: { rows: 'bad' } }]);
+  assert.deepStrictEqual([a.technical2, b.technical2, redraws], [{ score: 6.5, z: 1.2, week: 'W', asof: '2026-11-10' }, { score: null, z: null, week: null, asof: '2026-11-10' }, ['detail', 'analysis']]);
+  O.applyTech2Overlay([{ data: { rows: [{ k: 'b', s: 2, z: 0 }] } }]); assert.deepStrictEqual([a.technical2, b.technical2.score, b.technical2.asof], [undefined, 2, null]);   // the older set is cleared first
+  win.document.getElementById('section-analysis').classList.remove('active'); redraws.length = 0; O.applyTech2Overlay([]); assert.deepStrictEqual(redraws, ['detail']);
+}));
+
+test('stock list: inactive stocks are left out of the lists, scores count only reliable information, the best score is first, and the model text is filled in', () => alone(async () => {
+  const mk = (n, score, extra) => Object.assign({ name: n, ticker: n + '·X', score }, extra);
+  const list = [mk('LOW', 3), mk('GONE', 9, { active: false }), mk('TOP', 8, { fundamentals: { scoringBreakdown: {} } }), mk('MID', 5, { fundamentals: { model: 'own', scoringBreakdown: { note: 'own note' } } })];
+  globalThis.__T = { tickerSymbol: (s) => s.name, getBootStocks: () => list, applyFundamentalConfidence: (s) => { s.checked = true; } };
+  const S = await loadAllStubbed('src/core/stocks.js', '', []);
+  assert.deepStrictEqual([S.stocks.map((s) => s.name), S.stockIndex.get(S.stocks[0]), [...S.stockByTickerSymbol.keys()], [...S.stockByTickerSymbolAny.keys()].sort()], [['TOP', 'MID', 'LOW'], 0, ['TOP', 'MID', 'LOW'], ['GONE', 'LOW', 'MID', 'TOP']]);
+  assert.ok(list.every((s) => s.checked));   // every stock, active or not
+  assert.ok(list[2].fundamentals.model.startsWith('9-factor model') && list[2].fundamentals.scoringBreakdown.note.startsWith('9-factor model') && list[3].fundamentals.model === 'own' && list[3].fundamentals.scoringBreakdown.note === 'own note');
+  assert.strictEqual(S.verdictLabel.pending, 'Pending Research');
+}));
