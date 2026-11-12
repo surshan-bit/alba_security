@@ -7783,3 +7783,87 @@ test('page text loading: a section\'s page text is fetched once, inserted, its p
     ok = true; await P.ensurePartial(bad); assert.strictEqual(urls.length, 3);   // tried again after the failure
   } finally { globalThis.fetch = realFetch; }
 }));
+
+// ---- detail/pending, detail/jumpnav, sections/news, main, boot/start
+test('pending research: lists the fundamental factors that are proxies or have gaps, the missing technical parts, what global research is missing, and the age of the price history', () => alone(async () => {
+  TV_VALUES.add('priceHistoryByTicker'); TV_VALUES.add('priceLoaded');
+  const loaded = new Set(['L']); const hist = {};
+  globalThis.__T = { isProxyFactor: (f) => f.proxy === true, fundMissingMetrics: (f) => f.gaps || [], pcTickerKey: (s) => s.k, priceHistoryByTicker: hist, priceLoaded: loaded, renderLiveDataBar: (s) => 'bar:' + s.k };
+  const P = await loadAllStubbed('src/detail/pending.js', '', []);
+  assert.deepStrictEqual(P.fundamentalPendingItems({}), []);
+  assert.deepStrictEqual(P.fundamentalPendingItems({ fundamentals: { factors: [{ key: 'moat', name: 'Moat &amp; Edge', weight: 1, score: 0.5, proxy: true }, { key: 'fin', name: 'Fin', gaps: ['D/E'] }, { key: 'ok', name: 'Fine' }, { key: 'res', name: 'R', gaps: ['x'], research: {} }] } }),
+    [{ key: 'moat', name: 'Moat & Edge', weight: 1, score: 0.5, proxy: true, missing: [] }, { key: 'fin', name: 'Fin', weight: undefined, score: undefined, proxy: false, missing: ['D/E'] }]);   // a researched factor has no gaps to report
+  assert.deepStrictEqual([P.technicalPendingItems({}), P.technicalPendingItems({ technical: {} }), P.technicalPendingItems({ technical: { score: 5, states: { monthMacd: 1, weekMacd: null, monthRsi: undefined, weekRsi: 0 } } })], [{ none: true, keys: [] }, { none: false, keys: ['monthMacd', 'weekMacd', 'monthRsi', 'weekRsi'], noScore: true }, { none: false, keys: ['weekMacd', 'monthRsi'], noScore: false }]);
+  const g = (x) => P.globalPendingInfo({ globalFactors: x });
+  assert.deepStrictEqual([P.globalPendingInfo({}), g({ positive: [], negative: [] }), g({ positive: ['a'], scope: 'sector' }), g({ negative: ['a'], scope: 'company' })], ['not yet researched', 'not yet researched', 'sector-level only, not researched for this company', null]);
+  assert.deepStrictEqual([P.priceHistoryStatus({ k: 'X' }), P.priceHistoryStatus({ k: 'L' })].map((r) => [r.has, r.needed, r.text]), [[false, true, 'loading…'], [false, true, 'none stored yet']]);
+  const nowS = Math.floor(Date.now() / 1000);
+  hist.F = { '1W': [[nowS - 86400 * 2, 1], [nowS - 86400 * 2, 1]], '1M': [[nowS - 86400 * 20, 1]] }; hist.O = { '1W': [[nowS - 86400 * 40, 1]] }; hist.E = { '1W': [] };
+  const fresh = P.priceHistoryStatus({ k: 'F' }), old = P.priceHistoryStatus({ k: 'O' });
+  assert.deepStrictEqual([fresh.has, fresh.needed, fresh.text.startsWith('up to date, last bar'), fresh.delta !== null && fresh.delta.wkN >= 3 && fresh.delta.moN >= 3, old.needed, /last bar .*, 40 days old/.test(old.text), old.delta], [true, false, true, true, true, true, null]);
+  assert.strictEqual(P.priceHistoryStatus({ k: 'E' }).has, false);
+  assert.strictEqual(P.renderStockResearchBar({ k: 'Q' }), 'bar:Q');
+}));
+
+test('detail jump bar: links with a score preview, a bar that follows the page, a name that shows once the top scrolls away, and smooth scrolling to a section', () => withPage('<div class="topbar"></div><div id="root"><div class="detail-top"></div></div><div id="jump-val">v</div><div id="eventsPanel">e</div>', async (win) => {
+  TV_VALUES.add('verdictLabel');
+  globalThis.__T = { verdictLabel: { buy: 'Strong', hold: 'Hold', avoid: 'Avoid' }, escapeHtml: (x) => String(x).replace(/</g, '&lt;'), scoreBand: (v) => (v >= 8 ? 'fs-buy' : v >= 5 ? 'fs-hold' : 'fs-avoid') };
+  const J = await loadAllStubbed('src/detail/jumpnav.js', '', []), doc = win.document;
+  const s = { name: 'Acme <b>', ticker: 'AAA·X', score: 8.5, verdict: 'buy', fundamentals: {}, technical: { score: 5.5 } };
+  const html = J.renderDetailJumpNav(s);
+  assert.ok(html.includes('Acme &lt;b>') && html.includes('data-jump="jump-fund"') && html.includes('<b>8.50</b> &middot; Strong') && html.includes('fs-hold"><b>5.50</b> &middot; Hold') && (html.match(/data-jump=/g) || []).length === 6);
+  assert.ok(J.renderDetailJumpNav({ name: 'N', ticker: 'T', technical: {} }).includes('Insufficient data') && !J.renderDetailJumpNav({ name: 'N', ticker: 'T' }).includes('jump-preview'));
+  assert.ok(J.renderDetailJumpNav({ name: 'N', ticker: 'T', fundamentals: {}, score: 3, verdict: 'zz' }).includes('<b>3.00</b>') && !J.renderDetailJumpNav({ name: 'N', ticker: 'T', fundamentals: {}, score: 3, verdict: 'zz' }).includes('&middot;'));   // an unknown verdict adds no status
+  assert.ok(J.renderDetailJumpNav({ name: 'N', ticker: 'T', fundamentals: {}, score: null }).includes('jump-fund') );
+  const root = doc.getElementById('root'); root.insertAdjacentHTML('afterbegin', J.renderDetailJumpNav({ name: 'N', ticker: 'T' }));
+  const hadWin = Object.getOwnPropertyDescriptor(globalThis, 'window'), hadIO = Object.getOwnPropertyDescriptor(globalThis, 'IntersectionObserver'), listeners = [], removed = [], observed = []; let ioCb = null, disconnects = 0;
+  Object.defineProperty(globalThis, 'window', { value: { addEventListener: (t, f) => listeners.push([t, f]), removeEventListener: (t, f) => removed.push([t, f]) }, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'IntersectionObserver', { value: function(cb){ ioCb = cb; this.observe = (el) => observed.push(el.className); this.disconnect = () => { disconnects++; }; }, configurable: true, writable: true });
+  try {
+    const scrolled = []; doc.getElementById('jump-val').scrollIntoView = (o) => scrolled.push(o); 
+    J.bindDetailJumpNav(root); assert.deepStrictEqual([observed, listeners.length, doc.documentElement.style.getPropertyValue('--jump-top')], [['detail-top'], 1, '0px']);
+    const nav = root.querySelector('.detail-jump'), spy = listeners[0][1];
+    ioCb([{ isIntersecting: false, boundingClientRect: { height: 10, bottom: -5 } }]); assert.ok(nav.classList.contains('show-who'));
+    ioCb([{ isIntersecting: true, boundingClientRect: { height: 10, bottom: 50 } }]); assert.ok(!nav.classList.contains('show-who'));
+    root.querySelector('[data-jump="jump-val"]').click(); root.querySelector('[data-jump="jump-global"]').click(); assert.deepStrictEqual(scrolled, [{ behavior: 'smooth', block: 'start' }]);   // a missing target does nothing
+    doc.getElementById('jump-val').getBoundingClientRect = () => ({ top: 0 }); doc.getElementById('eventsPanel').getBoundingClientRect = () => ({ top: 9999 }); spy();
+    assert.deepStrictEqual([root.querySelector('[data-jump="jump-val"]').classList.contains('is-current'), root.querySelector('.detail-jump-who').classList.contains('is-current')], [true, false]);
+    doc.getElementById('jump-val').getBoundingClientRect = () => ({ top: 9999 }); spy(); assert.strictEqual(root.querySelector('.detail-jump-who').classList.contains('is-current'), true);   // above the first section: the name is current
+    nav.remove(); spy();   // the bar is gone: nothing
+    J.bindDetailJumpNav(doc.createElement('div')); assert.strictEqual(disconnects, 1);   // an old observer is released; an empty root binds nothing
+    J.bindJumpSpy(root); assert.ok(removed.length >= 1);
+    doc.querySelector('.topbar').getBoundingClientRect = () => ({ height: 56 }); J.bindDetailJumpNav(root); assert.strictEqual(doc.documentElement.style.getPropertyValue('--jump-top'), '55px');
+    Object.defineProperty(globalThis, 'IntersectionObserver', { value: undefined, configurable: true, writable: true }); J.bindDetailJumpNav(root);   // no observer support: the rest still works
+  } finally { if(hadWin) Object.defineProperty(globalThis, 'window', hadWin); else delete globalThis.window; if(hadIO) Object.defineProperty(globalThis, 'IntersectionObserver', hadIO); else delete globalThis.IntersectionObserver; }
+}));
+
+test('News section: clicks open a stock, change the strategy, type, range, tab and calendar, refresh the pulse or the stock events, and open groups are remembered', () => withPage('<section id="section-news"><div id="newsBody"></div></section>', async (win) => {
+  const log = [], view = { type: 'all', upto: 30, tab: 'macro', when: 'upcoming', calAll: false, openGroups: new Set() };
+  TV_VALUES.add('view');
+  globalThis.__T = { openStockInline: (sec, label, idx) => log.push(['open', sec.id, label, idx]), newsHtml: () => '<b data-news-open="3" id="o">o</b><i data-news-strategy="q2" id="s"></i><i data-news-strategy="" id="s0"></i><i data-news-type="dividend" id="t"></i><i data-news-upto="7" id="u"></i><i data-news-tab="events" id="tb"></i><i data-news-tab="x" id="tb2"></i><i data-news-when="recent" id="w"></i><i data-news-when="x" id="w2"></i><i data-news-cal-all id="c"></i><i data-news-events-refresh id="er"></i><i data-news-refresh id="r"></i><p id="plain">p</p><details data-news-grp="india" id="g"><summary>g</summary></details><details id="g2"></details>',
+    scopeInfo: () => ({ list: ['L'] }), setPick: (v) => log.push(['pick', v]), view, startNewsSync: (v) => log.push(['sync', v]), refreshPulse: (cb) => { log.push(['pulse']); cb(); }, refreshStockEvents: (list, cb) => { log.push(['events', list]); cb(); }, newsChanged: () => log.push(['changed']), setHtml: (el, h) => { el.innerHTML = h; } };
+  const N = await loadAllStubbed('src/sections/news.js', '', [], { '../news/store.js': ['startNewsSync', 'newsChanged'] }), doc = win.document, click = (id) => doc.getElementById(id).dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+  N.init(); assert.deepStrictEqual(log.splice(0), [['sync', true]]);
+  click('o'); click('s'); click('s0'); click('t'); click('u'); click('tb'); click('w'); click('c');
+  assert.deepStrictEqual([log.splice(0), view.type, view.upto, view.tab, view.when, view.calAll], [[['open', 'section-news', 'News', 3], ['pick', 'q2'], ['pick', 'all']], 'dividend', 7, 'events', 'recent', true]);
+  click('tb2'); click('w2'); click('c'); assert.deepStrictEqual([view.tab, view.when, view.calAll], ['macro', 'upcoming', false]);
+  click('er'); assert.deepStrictEqual(log.splice(0), [['events', ['L']], ['changed']]); click('r'); assert.deepStrictEqual(log.splice(0), [['pulse']]); click('plain'); assert.deepStrictEqual(log, []);
+  const g = doc.getElementById('g'); g.open = true; g.dispatchEvent(new win.Event('toggle')); assert.ok(view.openGroups.has('india')); g.open = false; g.dispatchEvent(new win.Event('toggle')); assert.ok(!view.openGroups.has('india'));
+  doc.getElementById('g2').dispatchEvent(new win.Event('toggle')); assert.strictEqual(view.openGroups.size, 0);   // a details with no group is ignored
+  doc.getElementById('newsBody').remove(); N.render(); N.init();   // no body on the page: nothing happens
+}));
+
+test('start-up wiring: the main module registers the refresh kit and starts every part in order, and the entry point reports a failed boot', () => alone(async () => {
+  const log = []; const rec = (n) => () => { log.push(n); };
+  const names = ['init_joblogs_integrity', 'init_analysis_section', 'init_tv_links', 'init_sync_subscriptions', 'init_overlays_research', 'init_ui_navigation', 'init_ui_phonesheet', 'init_ui_dropmenu', 'init_ui_theme', 'init_ui_claudecontrols', 'init_ui_activity', 'init_ui_errorlog', 'init_ui_restore', 'init_ui_deeplink', 'init_ui_globalsearch', 'init_ui_historyrestore', 'init_live_ticker', 'init_leaderboard_fullscreen', 'init_ui_fullscreen', 'init_ui_linkguard', 'init_ui_pingrid', 'init_app_actions', 'init_boot_autoreload'];
+  globalThis.__T = Object.assign({ setRefreshKit: (k) => log.push('kit:' + k.id), kit: { id: 'K' }, init: rec('kit-init') }, ...names.map((n) => ({ [n]: rec(n) })));
+  await loadAllStubbed('src/main.js', '', []);
+  assert.strictEqual(log[0], 'kit:K'); assert.deepStrictEqual(log.slice(1, 4), ['init_joblogs_integrity', 'init_analysis_section', 'init_tv_links']); assert.ok(log.includes('kit-init') && log.at(-1) === 'init_boot_autoreload' && log.length === names.length + 2);
+  assert.ok(log.indexOf('init_ui_errorlog') < log.indexOf('kit-init') && log.indexOf('kit-init') < log.indexOf('init_ui_restore'));
+  const errs = [], shown = [], realErr = console.error; console.error = (e) => errs.push(String(e));
+  try {
+    globalThis.__T = { boot: () => Promise.reject(new Error('no data')), showBootFailure: (e) => shown.push(e.message) }; await loadAllStubbed('src/boot/start.js', '', []); await new Promise((r) => setImmediate(r));
+    assert.deepStrictEqual([shown, errs.length], [['no data'], 1]);
+    globalThis.__T = { boot: () => Promise.resolve(), showBootFailure: (e) => shown.push('never') }; await loadAllStubbed('src/boot/start.js', '', []); await new Promise((r) => setImmediate(r)); assert.strictEqual(shown.length, 1);
+  } finally { console.error = realErr; }
+}));
