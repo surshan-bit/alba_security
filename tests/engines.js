@@ -18,7 +18,7 @@ const Fe = F.FundEngine;
 let passed = 0; const failures = [];
 const pending = [];   // async tests: awaited before the summary
 function test(name, fn){
-  const bad = e => failures.push(name + ": " + String(e.message || e).split("\n").slice(0, 6).join(" | "));
+  const bad = e => failures.push(name + ": " + String(e.message || e).split("\n").slice(0, +(process.env.ALBA_ERR_LINES || 6)).join(" | "));
   try { const r = fn(); if(r && typeof r.then === 'function') pending.push(r.then(() => { passed++; }, bad)); else passed++; } catch(e){ bad(e); }
 }
 const near = (a, b, d = 1e-9) => assert.ok(Math.abs(a - b) <= d, `${a} is not within ${d} of ${b}`);
@@ -7156,4 +7156,93 @@ test('data completeness: factors with n/a figures or excluded are incomplete, te
   assert.ok(full.includes('class="completeness-badge complete"') && full.includes('9/9 factors'));
   const gaps = C.completenessBadge(c, 'factors');
   assert.ok(gaps.includes('incomplete') && gaps.includes('not scored (not 100% reliable): D, F') && gaps.includes('missing data in: B') && gaps.includes('researched, but the figures are not available') && gaps.includes('1 researched, data unavailable'));
+}));
+
+// ---- research/status, refresh/freshness, strategies/pick, list/rebound, news/upcoming
+const localDay = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+test('research status: the age of a stock\'s research comes from the newer of its two dates, and a trigger is done when what it asked for was saved after it', () => withPage('<section id="section-analysis" class="active"></section>', async () => {
+  const refreshed = [], loaded = [];
+  TV_VALUES.add('priceFetchedAt');
+  globalThis.__T = { refreshAnalysisSoon: () => refreshed.push(1), ensurePriceBars: async (s) => { loaded.push(s.name); }, pcTickerKey: (s) => s.name };
+  const R = await loadAllStubbed('src/research/status.js', '', ['../core/util.js']);
+  const age = (a, b) => R.stockResearchAgeDays({ __researchAsof: a, __updAsof: b });
+  assert.deepStrictEqual([age(localDay(0)), age(localDay(-5)), age(localDay(1)), age('garbage'), age(null), age(localDay(-9), localDay(-2)), age(localDay(-2), localDay(-9)), age(undefined, localDay(-3))], [0, 5, 0, null, null, 2, 2, 3]);
+  assert.strictEqual(R.stockResearchAgeDays(null), null);
+  const st = { name: 'AAA', __researchAsof: localDay(-1) };
+  const t = (days) => new Date(Date.now() - days * 86400000).toISOString();
+  assert.deepStrictEqual([R.researchTriggerDone(st, 'nope', 'full'), R.researchTriggerDone(st, t(3), 'full'), R.researchTriggerDone(st, t(0), 'full'), R.researchTriggerDone(st, t(3), 'price'), R.researchTriggerDone(st, t(3))], [false, true, false, false, true]);
+  R.priceFetchedAt.set('AAA', t(0.1));
+  assert.deepStrictEqual([R.researchTriggerDone({ name: 'AAA' }, t(1), 'price'), R.researchTriggerDone({ name: 'AAA' }, t(1), 'full'), R.researchTriggerDone({ name: 'AAA' }, t(1))], [true, false, true]);
+  assert.strictEqual(R.researchTriggerDone({ name: 'AAA' }, t(0), 'price'), false);   // fetched before the trigger
+  const m = new Map([['x', '2026-11-01']]); R.setResearchTriggers(m); R.setResearchTriggerKinds(new Map([['x', 'price']]));
+  assert.ok(R.getResearchTriggers() === m && R.getResearchTriggerKinds().get('x') === 'price');
+  R.analysisQueuePriceLoad({ name: 'Q' }); R.analysisQueuePriceLoad({ name: 'R' });
+  await new Promise((r) => setTimeout(r, 250));
+  assert.deepStrictEqual([loaded, refreshed.length], [['Q', 'R'], 1]);   // one redraw after the batch
+  document.getElementById('section-analysis').classList.remove('active'); R.analysisQueuePriceLoad({ name: 'S' }); await new Promise((r) => setTimeout(r, 250));
+  assert.strictEqual(refreshed.length, 1);   // not on screen: no redraw
+}));
+
+test('freshness: a stock is pinned, matching a strategy or everything else; its age is fresh, ageing or stale for that tier, and something new makes it need attention', () => alone(async () => {
+  const days = { A: 0, B: 10, C: 40, D: 100, E: null, F: 2 };
+  const mk = (n, extra) => Object.assign({ name: n, tag: n }, extra);
+  const pinned = new Set(), match = new Set(); let throws = false; const stockList = [];
+  TV_VALUES.add('stocks');
+  globalThis.__T = { stocks: stockList, isPinned: (s) => pinned.has(s), publishedStrategies: () => { if(throws) throw new Error('rules broke'); return [{ rules: [] }]; }, qualifyingStocks: () => [...match],
+    stockResearchAgeDays: (s) => (s.age === undefined ? days[s.name] : s.age), daysSinceDate: (d) => (d === 'x' ? null : Number(d)),
+    daysSinceEvent: (s, k) => (s.ev ? s.ev[k] ?? null : null), newsCounts: (s) => s.nc || null };
+  const F = await loadAllStubbed('src/refresh/freshness.js', '', []);
+  const a = mk('A'), b = mk('B'), c = mk('C'), d = mk('D'), e = mk('E'); stockList.push(a, b, c, d, e);
+  pinned.add(a); match.add(b);
+  assert.deepStrictEqual([F.freshness(a).tier, F.freshness(b).tier, F.freshness(c).tier], ['priority', 'match', 'core']);
+  assert.deepStrictEqual([F.freshness(a).fund, F.freshness(b).fund.state, F.freshness(c).fund.state, F.freshness(d).fund.state, F.freshness(e).fund], [{ age: 0, state: 'fresh' }, 'aging', 'aging', 'stale', { age: null, state: 'none' }]);   // the same 10 days is ageing for a matching stock but fresh for the rest (B: 10 days, C: 40 days)
+  const t = (stock) => F.freshness(stock).tech;
+  assert.deepStrictEqual([t(mk('T1', { __livePrice: { asof: '1' }, technical: { asof: '5' } })), t(mk('T2', { technical: { asof: '2' } })), t(mk('T3', { technical: { asof: '9' } })).state, t(mk('T4', { __livePrice: { asof: 'x' } })), t(mk('T5'))], [{ age: 1, state: 'fresh' }, { age: 2, state: 'aging' }, 'stale', { age: null, state: 'none' }, { age: null, state: 'none' }]);
+  const g = mk('G', { age: 5, ev: { earn: 2, corp: 3 }, nc: { neg: 2, pos: 1 }, technical: { raw: { weekPctChange: -12 } } });
+  assert.deepStrictEqual(F.freshness(g).why, ['new results', 'company event', 'negative news', 'big price move']);
+  assert.deepStrictEqual([F.freshness(mk('H', { age: 5, ev: { earn: 9, corp: 9 }, nc: { neg: 2, pos: 2 }, technical: { raw: { monthPctChange: 19 } } })).why, F.freshness(mk('I', { age: 5, technical: { raw: { monthPctChange: -20 } } })).why, F.freshness(mk('J', { age: 0, ev: { earn: 0 } })).why, F.freshness(mk('K', { age: 2, technical: { raw: { weekPctChange: 50 } } })).why], [[], ['big price move'], [], []]);
+  const fresh = mk('L', { age: 0, ev: { earn: 0 } }); fresh.age = 1; fresh.ev = { earn: 0 };
+  assert.strictEqual(F.freshness(Object.assign(mk('M', { age: 1, ev: { earn: 0 } }), {})).fund.state, 'attn');   // fresh, but results came out since
+  assert.deepStrictEqual([F.ago(null), F.ago(0), F.ago(1), F.ago(4)], ['never', 'today', '1 day ago', '4 days ago']);
+  assert.deepStrictEqual([F.needs('fund', a), F.needs('fund', c), F.needs('tech', mk('N', { technical: { asof: '0' } })), F.needs('tech', mk('O'))], [false, true, false, true]);
+  assert.deepStrictEqual(F.counts([a, d, g]), { n: 3, fund: 2, tech: 3, attn: 1 });
+  const order = F.priorityOrder('fund', [c, d, b, a, g, e]).map((s) => s.name);
+  assert.deepStrictEqual(order, ['G', 'A', 'B', 'E', 'D', 'C']);   // something new first, then pinned, matching, the rest; the oldest first within each
+  assert.deepStrictEqual(F.priorityOrder('tech', [c, a]).map((s) => s.name), ['A', 'C']);
+  // the strategy match set is kept for a while, rebuilt when the list changes, and a failure leaves it empty
+  match.add(c); assert.strictEqual(F.freshness(c).tier, 'core');   // cached
+  stockList.push(mk('Z')); throws = true;
+  await quietErrors(async () => { assert.strictEqual(F.freshness(b).tier, 'core'); });   // rebuilt, the rules failed: nothing matches
+}));
+
+test('strategy pick: the stocks of the chosen published strategy, null for none or a deleted one, and a valid id or empty', () => alone(async () => {
+  globalThis.__T = { stocks: [{ n: 1 }, { n: 2 }], publishedStrategies: () => [{ id: 's1', rules: ['r'] }, { id: 's2', rules: [] }], qualifyingStocks: (list, rules) => (rules.length ? [list[1]] : []) };
+  TV_VALUES.add('stocks');
+  const P = await loadAllStubbed('src/strategies/pick.js', '', []);
+  assert.deepStrictEqual([...P.strategyStockSet('s1')], [{ n: 2 }]); assert.strictEqual(P.strategyStockSet('s2').size, 0);
+  assert.deepStrictEqual([P.strategyStockSet(''), P.strategyStockSet('gone')], [null, null]);
+  assert.deepStrictEqual([P.validStrategyId('s1'), P.validStrategyId('gone'), P.validStrategyId('')], ['s1', '', '']);
+}));
+
+test('rebound: up this week after a down last week; no figure for either means it does not qualify', () => alone(async () => {
+  TV_VALUES.add('priceHistoryByTicker');
+  globalThis.__T = { priceHistoryByTicker: { A: { '1W': 'a' }, B: { '1W': 'b' }, C: { '1W': 'c' }, D: {} }, pcTickerKey: (s) => s.name, lastWeekMove: (bars) => ({ a: -3, b: 2, c: null }[bars] ?? null) };
+  const R = await loadAllStubbed('src/list/rebound.js', '', []);
+  const s = (name, wk) => ({ name, technical: wk === undefined ? undefined : { raw: { weekPctChange: wk } } });
+  assert.deepStrictEqual([R.isRebound(s('A', 1)), R.isRebound(s('A', 0)), R.isRebound(s('A', -1)), R.isRebound(s('A')), R.isRebound(s('B', 4)), R.isRebound(s('C', 4)), R.isRebound(s('D', 4)), R.isRebound(s('Z', 4))], [true, false, false, false, false, false, false, false]);
+}));
+
+test('upcoming events mark: a calendar mark with the next four events when something is due within 30 days, escaped, and nothing otherwise', () => alone(async () => {
+  const today = new Date(Date.now() + 19800000).toISOString().slice(0, 10), plus = (n) => new Date(Date.parse(today + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const news = { events: { items: [{ ticker: 'AAA', date: plus(2), type: 'results' }, { ticker: 'AAA', date: plus(5), type: 'dividend' }, { ticker: 'AAA', date: plus(45), type: 'results' }, { ticker: 'BBB', date: plus(60), type: 'results' }] } };
+  TV_VALUES.add('news');
+  globalThis.__T = { news, tickerSymbol: (s) => s.sym, shortDate: (d) => d.slice(5), typeTag: (t) => (t === 'results' ? 'RES<' : 'DIV'), upcomingItems: (items) => items.slice().sort((x, y) => x.date.localeCompare(y.date)) };
+  const U = await loadAllStubbed('src/news/upcoming.js', '', []);
+  assert.strictEqual(U.upcomingFor({ sym: 'AAA' }).length, 3); assert.deepStrictEqual(U.upcomingFor({ sym: 'ZZZ' }), []);
+  const mark = U.eventMark({ sym: 'AAA' });
+  assert.ok(mark.includes('class="ev-mark"') && mark.includes('res&lt;,') && mark.includes('div') && !mark.includes(plus(45).slice(5)), mark);   // the third event is beyond 30 days
+  assert.strictEqual(U.eventMark({ sym: 'BBB' }), ''); assert.strictEqual(U.eventMark({ sym: 'ZZZ' }), '');
+  news.events = { items: [{ ticker: 'ZZZ', date: plus(1), type: 'results' }] }; assert.ok(U.eventMark({ sym: 'ZZZ' }).includes('ev-mark'));   // a new saved list is picked up
+  news.events = null; assert.strictEqual(U.eventMark({ sym: 'ZZZ' }), '');
+  news.events = { items: 'bad' }; assert.deepStrictEqual(U.upcomingFor({ sym: 'AAA' }), []);
 }));
