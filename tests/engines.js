@@ -7335,3 +7335,130 @@ test('strategy results: the table lists the picks in the chosen order, shows mor
   assert.ok(R.whyHtml('cog', [{ field: 'trend', op: 'in', value: ['none'] }]).includes('No reading'));
   assert.ok(R.whyDatalist().startsWith('<datalist id="stratWhyList">') && R.whyDatalist().includes('value="AAA">Acme &lt;b&gt;'));
 }));
+
+// ---- Small wiring modules: core/view, busy, dom, refresh/hook, boot/handoff, boot/start, core/idbkv, ui/theme, restore, filterdock, pingrid, fullscreen, identity/flush, app/actions, refresh/kit, sections/*
+test('small shared state: the saved-screen flag, busy checks, the refresh kit slot and the boot hand-off', async () => {
+  const V = load('src/core/view.js'); assert.strictEqual(V.getUiStateTracking(), false); V.setUiStateTracking(true); assert.strictEqual(V.getUiStateTracking(), true);
+  const B = load('src/core/busy.js'); assert.strictEqual(B.anyBusy(), false);
+  B.registerBusy(() => false); assert.strictEqual(B.anyBusy(), false);
+  B.registerBusy(() => { throw new Error('broken check'); }); assert.strictEqual(B.anyBusy(), false);   // a failing check never blocks
+  B.registerBusy(() => 1); assert.strictEqual(B.anyBusy(), true);
+  const H = load('src/refresh/hook.js'); assert.strictEqual(H.getRefreshKit(), null); const k = {}; H.setRefreshKit(k); assert.strictEqual(H.getRefreshKit(), k);
+  const O = load('src/boot/handoff.js');
+  assert.throws(() => O.getBootStocks(), /not loaded before the app started/);
+  const list = []; O.setBootStocks(list); assert.strictEqual(O.getBootStocks(), list);
+});
+
+test('window hand-off: the debug handle is created once and shared', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { value: {}, configurable: true, writable: true });
+  try { const O = load('src/boot/handoff.js'), h = O.debugHandle(); assert.ok(h === O.debugHandle() && h === globalThis.window.__alba); }
+  finally { if(had) Object.defineProperty(globalThis, 'window', had); else delete globalThis.window; }
+}));
+
+test('detail element: the shared panel is looked up once on the page', () => withPage('<div id="detail"></div>', async (win) => {
+  assert.strictEqual(load('src/core/dom.js').detailEl, win.document.getElementById('detail'));
+}));
+
+test('key-value cache: opens an IndexedDB store, creates it on first use, and answers null when the browser refuses', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB');
+  const make = (mode) => ({ open: () => { const r = {}; setTimeout(() => {
+    if(mode === 'ok'){ r.result = { createObjectStore: (n) => { r.created = n; } }; r.onupgradeneeded(); r.onsuccess(); }
+    if(mode === 'upgradeFails'){ r.result = { createObjectStore: () => { throw new Error('no'); } }; r.onupgradeneeded(); r.onsuccess(); }
+    if(mode === 'error') r.onerror(); if(mode === 'blocked') r.onblocked(); }, 0); return r; } });
+  try {
+    const K = load('src/core/idbkv.js');
+    for(const [mode, expectNull] of [['ok', false], ['upgradeFails', false], ['error', true], ['blocked', true]]){
+      Object.defineProperty(globalThis, 'indexedDB', { value: make(mode), configurable: true, writable: true });
+      assert.strictEqual((await K.openKvDb('db', 'kv')) === null, expectNull, mode);
+    }
+    Object.defineProperty(globalThis, 'indexedDB', { value: { open: () => { throw new Error('private mode'); } }, configurable: true, writable: true });
+    assert.strictEqual(await K.openKvDb('db', 'kv'), null);
+  } finally { if(had) Object.defineProperty(globalThis, 'indexedDB', had); else delete globalThis.indexedDB; }
+}));
+
+test('brand font: the font link is added once', () => withPage('', async (win) => {
+  const T = load('src/ui/theme.js'); T.init_ui_theme(); T.init_ui_theme();
+  const links = win.document.querySelectorAll('link#brandFont'); assert.strictEqual(links.length, 1); assert.ok(links[0].href.startsWith('https://fonts.googleapis.com/css2?family=Quicksand'));
+}));
+
+test('saved screen state: the Analysis columns panel is restored open or closed, and filter panels open from the saved state only on a wide screen', () => alone(async () => {
+  const calls = []; let saved = { aColsOpen: 1 };
+  globalThis.__T = { setAnalysisColumnsPanelOpen: (v) => calls.push(v), uiStateGet: () => saved, uiStateSet: (v, ms) => calls.push([v, ms]) };
+  const R = await loadAllStubbed('src/ui/restore.js', '', []); R.init_ui_restore(); saved = {}; R.init_ui_restore(); assert.deepStrictEqual(calls, [true, false]);
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'window'); calls.length = 0;
+  const win = (phone) => Object.defineProperty(globalThis, 'window', { value: phone === undefined ? {} : { matchMedia: () => ({ matches: phone }) }, configurable: true, writable: true });
+  try {
+    const D = await loadAllStubbed('src/ui/filterdock.js', '', []);
+    saved = { open: true, shut: false };
+    win(false); assert.deepStrictEqual([D.filtersOpenSaved('open'), D.filtersOpenSaved('shut'), D.filtersOpenSaved('none')], [true, false, false]); D.rememberFiltersOpen('open', 1); assert.deepStrictEqual(calls, [[{ open: true }, 400]]);
+    win(true); calls.length = 0; assert.strictEqual(D.filtersOpenSaved('open'), false); D.rememberFiltersOpen('open', true); assert.deepStrictEqual(calls, []);   // a phone keeps the panel closed and remembers nothing
+    win(); assert.strictEqual(D.filtersOpenSaved('open'), true);   // no matchMedia: treated as a wide screen
+  } finally { if(had) Object.defineProperty(globalThis, 'window', had); else delete globalThis.window; }
+}));
+
+test('pin buttons in the strategy tables toggle a pin and update the star, but not in the Analysis leaderboard', () => withPage('<table class="strat-table"><tr><td><button class="pin-btn" data-ticker="AAA">x</button><button class="pin-btn">nodata</button></td></tr></table><div id="analysisLeaderboardBody"><table class="strat-table"><tr><td><button class="pin-btn" id="lb" data-ticker="BBB"></button></td></tr></table></div>', async (win) => {
+  const pins = new Set(), toggles = [];
+  globalThis.__T = { isPinned: (s) => pins.has(s.ticker), togglePin: (t) => { toggles.push(t); pins.has(t) ? pins.delete(t) : pins.add(t); }, closestEl: (e, sel) => (e.target.closest ? e.target.closest(sel) : null) };
+  const P = await loadAllStubbed('src/ui/pingrid.js', '', []); P.init_ui_pingrid();
+  const [btn, nodata] = win.document.querySelectorAll('.pin-btn');
+  btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.deepStrictEqual([toggles, btn.textContent, btn.title, btn.classList.contains('pinned')], [['AAA'], '★', 'Unpin', true]);
+  btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.deepStrictEqual([toggles.length, btn.textContent, btn.title], [2, '☆', 'Pin to top']);
+  nodata.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); win.document.getElementById('lb').dispatchEvent(new win.MouseEvent('click', { bubbles: true })); win.document.body.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.strictEqual(toggles.length, 2);   // no ticker, the leaderboard's own button and a click elsewhere do nothing
+}));
+
+test('full screen: the layout and the browser full screen follow one switch, and Escape or leaving full screen closes every open one', () => withPage('', async (win) => {
+  const F = load('src/ui/fullscreen.js'), log = [];
+  assert.deepStrictEqual([F.fullscreenLabel(true), F.fullscreenLabel(false)], ['Exit full screen', 'Full screen']);
+  const doc = win.document; let fsEl = null; doc.documentElement.requestFullscreen = () => { log.push('enter'); fsEl = doc.documentElement; return Promise.resolve(); };
+  doc.exitFullscreen = () => { log.push('exit'); fsEl = null; return Promise.reject(new Error('x')); };
+  Object.defineProperty(doc, 'fullscreenElement', { get: () => fsEl, configurable: true });
+  F.browserFullscreen(true); F.browserFullscreen(true); F.browserFullscreen(false); F.browserFullscreen(false); assert.deepStrictEqual(log, ['enter', 'exit']);
+  doc.documentElement.requestFullscreen = () => { throw new Error('denied'); }; F.browserFullscreen(true);   // refused: the layout alone is enough
+  let on = true, closed = 0; F.watchFullscreenExit(() => on, () => { closed++; on = false; }); F.watchFullscreenExit(() => false, () => { closed += 100; });
+  F.init_ui_fullscreen();
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a' })); assert.strictEqual(closed, 0);
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.strictEqual(closed, 1);
+  on = true; fsEl = doc.documentElement; doc.dispatchEvent(new win.Event('fullscreenchange')); assert.strictEqual(closed, 1);   // still full screen: nothing closes
+  fsEl = null; doc.dispatchEvent(new win.Event('fullscreenchange')); assert.strictEqual(closed, 2);
+}));
+
+test('saving on leave: pending preferences, screen state and strategies are written when the page is hidden or closed', () => withPage('', async (win) => {
+  const log = [];
+  globalThis.__T = { flushPrefs: () => log.push('prefs'), flushUiState: () => log.push('ui'), flushStrategies: () => log.push('strat') };
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'window'); Object.defineProperty(globalThis, 'window', { value: win, configurable: true, writable: true });
+  try {
+    const F = await loadAllStubbed('src/identity/flush.js', '', []); F.init_identity_flush();
+    win.dispatchEvent(new win.Event('pagehide')); assert.deepStrictEqual(log, ['ui', 'prefs', 'strat']); log.length = 0;
+    Object.defineProperty(win.document, 'visibilityState', { value: 'visible', configurable: true }); win.document.dispatchEvent(new win.Event('visibilitychange')); assert.deepStrictEqual(log, []);
+    Object.defineProperty(win.document, 'visibilityState', { value: 'hidden', configurable: true }); win.document.dispatchEvent(new win.Event('visibilitychange')); assert.strictEqual(log.length, 3);
+  } finally { if(had) Object.defineProperty(globalThis, 'window', had); else delete globalThis.window; }
+}));
+
+test('app actions: the debug handle gets the helpers and saved-screen tracking starts', () => alone(async () => {
+  const handle = {}; let tracking = false;
+  TV_VALUES.add('stocks');
+  globalThis.__T = { stocks: [1], setUiStateTracking: (v) => { tracking = v; }, debugHandle: () => handle };
+  const A = await loadAllStubbed('src/app/actions.js', '', []); A.init_app_actions();
+  assert.strictEqual(tracking, true); assert.deepStrictEqual(Object.keys(handle).sort(), ['applyResearchOverlay', 'applySnapshotOverlay', 'applyUpdatesOverlay', 'renderDetail', 'sanitizeDocId', 'stockResearchAgeDays', 'stocks', 'tickerSymbol']);
+}));
+
+test('page sections: each one starts its parts and draws them, and the refresh kit starts its controls and queue', () => alone(async () => {
+  const log = [];
+  const rec = (n) => () => { log.push(n); };
+  globalThis.__T = { init: rec('biz-init'), show: rec('biz-show'), init_strategies_section: rec('st-init'), renderStrategiesSection: rec('st-render'), init_tradelog_phone: rec('tl-phone'), renderTradeLogPanel: rec('tl-render'), init_tradelog_form: rec('tl-form'),
+    init_ideas: rec('ideas-init'), renderIdeas: rec('ideas-render'), startRockySync: (v) => log.push('rocky-sync:' + v), rockyHtml: () => '<b>r</b>', setHtml: (el, h) => { el.innerHTML = h; },
+    init_import_csv_upload: rec('csv'), init_import_fund_import: rec('fund'), renderWlPicker: rec('wl'), refreshLastFiles: rec('last'), renderAllLastFiles: rec('last-render'), init_joblogs_freshness: rec('fresh'), init_refresh_tvrefresh: rec('tv'), renderWatchlistSyncLogPanel: rec('wl-log'),
+    installControls: rec('controls'), initQueue: async () => { log.push('queue'); } };
+  const B = await loadAllStubbed('src/sections/business.js', 'export const __x = 1;', []); B.init(); B.render();
+  const S = await loadAllStubbed('src/sections/strategies.js', '', []); S.init(); S.render();
+  const T = await loadAllStubbed('src/sections/tradelog.js', '', []); T.init(); T.render();
+  assert.deepStrictEqual(log.splice(0), ['biz-init', 'biz-show', 'st-init', 'st-render', 'tl-form', 'ideas-init', 'tl-phone', 'tl-render', 'ideas-render']);
+  const RF = await loadAllStubbed('src/sections/refreshlog.js', '', [], { __modules: { '../import/csvparse.js': '', '../import/upload-history.js': '', '../import/fund-engine.js': '' } }); RF.init(); RF.render();
+  assert.deepStrictEqual(log.splice(0), ['fresh', 'csv', 'fund', 'last', 'tv', 'wl', 'wl-log', 'last-render']);
+  const win = globalThis.document; globalThis.document = { getElementById: (id) => (id === 'rockyBody' ? (globalThis.__rocky = globalThis.__rocky || {}) : null) };
+  try { const R = await loadAllStubbed('src/sections/rocky.js', '', []); R.init(); assert.deepStrictEqual([log.splice(0), globalThis.__rocky.innerHTML], [['rocky-sync:true'], '<b>r</b>']); globalThis.document = { getElementById: () => null }; R.render(); }   // no body on the page: nothing to draw
+  finally { if(win === undefined) delete globalThis.document; else globalThis.document = win; delete globalThis.__rocky; }
+  const K = await loadAllStubbed('src/refresh/kit.js', '', []); await K.init(); assert.deepStrictEqual(log.splice(0), ['controls', 'queue']); assert.ok(K.kit && typeof K.kit === 'object');
+}));
