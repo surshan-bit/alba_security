@@ -7246,3 +7246,92 @@ test('upcoming events mark: a calendar mark with the next four events when somet
   news.events = null; assert.strictEqual(U.eventMark({ sym: 'ZZZ' }), '');
   news.events = { items: 'bad' }; assert.deepStrictEqual(U.upcomingFor({ sym: 'AAA' }), []);
 }));
+
+// ---- strategies/rules, strategies/state, strategies/results
+const RULE_FIELDS = new Map([
+  ['score', { id: 'score', type: 'num', label: 'Score', dp: 1, unit: '', get: (s) => s.score }],
+  ['mos', { id: 'mos', type: 'num', label: 'MoS', dp: 0, unit: '%', get: (s) => s.mos }],
+  ['trend', { id: 'trend', type: 'enum', label: 'Trend', options: [['up', 'Upward'], ['down', 'Downward']], noneLabel: 'No reading', get: (s) => s.trend }],
+  ['name', { id: 'name', type: 'text', label: 'Name', get: (s) => s.name }]
+]);
+test('strategy rules: numbers, choices and text are tested against a stock, a missing reading fails, an unfinished rule is ignored, and rules read back in words', () => alone(async () => {
+  TV_VALUES.add('FIELD_BY_ID');
+  globalThis.__T = { FIELD_BY_ID: RULE_FIELDS };
+  const R = await loadAllStubbed('src/strategies/rules.js', '', ['./lookup.js']);
+  const s = { score: 7.5, mos: -5, trend: 'up', name: 'Acme Steel' };
+  const t = (rule, stock = s) => { const r = R.testRule(stock, rule); return [r.pass, r.missing]; };
+  assert.deepStrictEqual([t({ field: 'score', op: '>=', value: 7.5 }), t({ field: 'score', op: '>=', value: 8 }), t({ field: 'score', op: '<=', value: 7.5 }), t({ field: 'score', op: '>', value: 7.5 }), t({ field: 'score', op: '<', value: 8 }),
+    t({ field: 'score', op: 'between', value: [9, 7] }), t({ field: 'score', op: 'between', value: [8, 9] }), t({ field: 'trend', op: 'in', value: ['up', 'down'] }), t({ field: 'trend', op: 'in', value: ['down'] }),
+    t({ field: 'name', op: 'contains', value: '  STEEL ' }), t({ field: 'name', op: 'contains', value: 'gold' }), t({ field: 'score', op: '??', value: 1 })],
+    [[true, false], [false, false], [true, false], [false, false], [true, false], [true, false], [false, false], [true, false], [false, false], [true, false], [false, false], [false, false]]);
+  assert.deepStrictEqual([t({ field: 'score', op: '>=', value: 1 }, {}), t({ field: 'trend', op: 'in', value: ['none'] }, {}), t({ field: 'trend', op: 'in', value: ['up'] }, {})], [[false, true], [true, false], [false, true]]);
+  assert.throws(() => R.testRule(s, { field: 'nope', op: '>=', value: 1 }), /Unknown strategy field: nope/);
+  const ready = (rule) => R.ruleReady(rule);
+  assert.deepStrictEqual([ready({ field: 'nope' }), ready({ field: 'trend', op: 'in', value: [] }), ready({ field: 'trend', op: 'in', value: ['up'] }), ready({ field: 'name', op: 'contains', value: ' ' }), ready({ field: 'name', op: 'contains', value: 'a' }),
+    ready({ field: 'score', op: 'between', value: [1, null] }), ready({ field: 'score', op: 'between', value: [1, 2] }), ready({ field: 'score', op: '>=', value: null }), ready({ field: 'score', op: '>=', value: 3 })], [false, false, true, false, true, false, true, false, true]);
+  assert.deepStrictEqual([R.defaultRule('trend'), R.defaultRule('name'), R.defaultRule('score')], [{ field: 'trend', op: 'in', value: [] }, { field: 'name', op: 'contains', value: '' }, { field: 'score', op: '>=', value: null }]);
+  assert.deepStrictEqual([R.withOp({ field: 'score', op: '>=', value: 5 }, 'between').value, R.withOp({ field: 'score', op: '>=', value: 'x' }, 'between').value, R.withOp({ field: 'score', op: 'between', value: [3, 9] }, '>=').value, R.withOp({ field: 'score', op: 'between', value: ['x', 9] }, '>=').value, R.withOp({ field: 'score', op: '>=', value: 4 }, '<=').value], [[5, null], [null, null], 3, null, 4]);
+  const ev = R.evaluateStock(s, [{ field: 'score', op: '>=', value: 7 }, { field: 'trend', op: 'in', value: [] }, { field: 'mos', op: '>=', value: 0 }]);
+  assert.deepStrictEqual([ev.pass, ev.results.length], [false, 2]);   // the unfinished rule is ignored
+  assert.strictEqual(R.evaluateStock(s, []).pass, true);
+  assert.deepStrictEqual(R.qualifyingStocks([s, { score: 3 }, { score: 9, mos: 1 }], [{ field: 'score', op: '>=', value: 7 }]).length, 2);
+  assert.deepStrictEqual([R.formatValue(RULE_FIELDS.get('score'), 7.456), R.formatValue(RULE_FIELDS.get('mos'), 12), R.formatValue(RULE_FIELDS.get('trend'), 'up'), R.formatValue(RULE_FIELDS.get('trend'), 'sideways'), R.formatValue(RULE_FIELDS.get('trend'), 'none'), R.formatValue(RULE_FIELDS.get('score'), null), R.formatValue(RULE_FIELDS.get('name'), 'x')], ['7.5', '12%', 'Upward', 'sideways', 'No reading', '—', 'x']);
+  assert.deepStrictEqual([R.describeRule({ field: 'trend', op: 'in', value: ['up', 'none'] }), R.describeRule({ field: 'name', op: 'contains', value: ' Gold ' }), R.describeRule({ field: 'mos', op: 'between', value: [10, 20] }), R.describeRule({ field: 'score', op: '>=', value: 7 }), R.describeRule({ field: 'mos', op: '<', value: 5 })],
+    ['Trend is Upward or No reading', 'Name contains "Gold"', 'MoS between 10 and 20%', 'Score at least 7', 'MoS below 5%']);
+  assert.ok(R.OPS.num.length === 5 && R.isNum(1) && !R.isNum('1') && !R.isNum(Infinity));
+}));
+
+test('strategies: the first visit gets the starter strategies, saved ones are cleaned, and add, copy, delete and restore keep the list and the selection right', () => withBrowser({ addEventListener(t, f) { this.listeners[t] = f; }, listeners: {} }, async ({ win, events, store }) => {
+  const saves = [], sels = [];
+  TV_VALUES.add('FIELD_BY_ID');
+  globalThis.__T = { FIELD_BY_ID: new Map([['score', {}], ['weekRsi', {}], ['monthRsi', {}], ['weekMacd', {}], ['monthMacd', {}], ['mos', {}]]), uiStateGet: () => ({ stratSel: 'starter-turning-up' }), uiStateSet: (v, ms) => sels.push([v, ms]), strategiesSave: (json) => saves.push(json) };
+  const load1 = () => loadAllStubbed('src/strategies/state.js', '', ['./goal.js']);
+  let S = await load1();
+  assert.deepStrictEqual([S.strategies.length, S.strategies[0].id, S.strategies.every((x) => x.published && x.goal.days === 30)], [5, 'starter-quality-momentum', true]);
+  assert.strictEqual(S.selectedStrategy().id, 'starter-turning-up');   // the saved selection
+  store.setItem('albaDashboard.strategies.v1', JSON.stringify([{ id: 'a', name: 'A', rules: [{ field: 'score', op: '>=', value: 5 }, { field: 'bogus', op: '>=', value: 1 }, null, { field: 'score', op: 7 }, { field: 'mos', op: '<=' }], published: false, goal: { target: 999 }, note: 5 }, { id: 5, name: 'bad' }, null, { id: 'b', name: 'B' }]));
+  S = await load1();
+  assert.deepStrictEqual(S.strategies.map((x) => [x.id, x.published, x.note, x.goal.target, x.rules.length]), [['a', false, '', 100, 2], ['b', true, '', 5, 0]]);   // bad entries and unknown fields dropped; missing values become null
+  assert.deepStrictEqual(S.publishedStrategies().map((x) => x.id), ['b']);
+  assert.strictEqual(S.selectedStrategy().id, 'a');   // the saved selection no longer exists: the first one
+  store.setItem('albaDashboard.strategies.v1', '{"not":"a list"}'); S = await load1(); assert.strictEqual(S.strategies.length, 5);
+  store.setItem('albaDashboard.strategies.v1', 'not json'); S = await load1(); assert.strictEqual(S.strategies.length, 5);
+  S.strategies.length = 0; assert.strictEqual(S.selectedStrategy(), null);
+  const added = S.addStrategy(); assert.deepStrictEqual([added.name, added.published, S.strategies.length, saves.length, sels.at(-1)[1]], ['New strategy', false, 1, 1, 300]);
+  const copy = S.duplicateStrategy(Object.assign(added, { name: 'X', rules: [{ field: 'score', op: '>=', value: 1 }] }));
+  assert.deepStrictEqual([copy.name, copy.published, copy.rules, copy.rules !== added.rules, S.selectedStrategy().id === copy.id], ['X (copy)', false, added.rules, true, true]);
+  S.deleteStrategy(copy); assert.deepStrictEqual([S.strategies.length, S.selectedStrategy().id === added.id], [1, true]);
+  S.deleteStrategy(added); assert.strictEqual(S.strategies.length, 0);   // the last one: an empty list
+  S.addStrategy(); S.restoreStarters(); assert.deepStrictEqual([S.strategies.length, S.strategies[0].id, S.strategies.at(-1).name], [6, 'starter-quality-momentum', 'New strategy']);   // starters back, own strategy kept
+  // a saved copy arriving late replaces the list, unless this page already changed something
+  const synced = (await load1()); store.setItem('albaDashboard.strategies.v1', JSON.stringify([{ id: 'late', name: 'Late' }]));
+  win.listeners['alba-strategies-synced'](); assert.deepStrictEqual([synced.strategies.map((x) => x.id), events.includes('alba-strategies-reloaded')], [['late'], true]);
+  synced.saveStrategies(); events.length = 0; store.setItem('albaDashboard.strategies.v1', JSON.stringify([{ id: 'later', name: 'Later' }]));
+  win.listeners['alba-strategies-synced'](); assert.deepStrictEqual([synced.strategies.map((x) => x.id), events.length], [['late'], 0]);
+}));
+
+test('strategy results: the table lists the picks in the chosen order, shows more on request, says why a stock is in or out, and finds stocks by symbol or name', () => withBrowser({}, async ({ store }) => {
+  const stockList = [{ name: 'Acme <b>', ticker: 'AAA·Steel', score: 6 }, { name: 'Bolt', ticker: 'BBB·Gold', score: 9 }, { name: 'Cog', ticker: 'CCC·Gold' }];
+  TV_VALUES.add('stocks'); TV_VALUES.add('stockIndex'); TV_VALUES.add('FIELD_BY_ID');
+  const rows = [];
+  globalThis.__T = { stocks: stockList, stockIndex: new Map(stockList.map((s, i) => [s, i])), FIELD_BY_ID: RULE_FIELDS, tickerSymbol: (s) => s.ticker.split('·')[0],
+    cleanSort: (col, dir, old, def) => (col ? { col, dir } : old ? { col: old, dir: 'asc' } : def), nextSort: (cur, id) => ({ col: id, dir: cur.col === id ? 'asc' : 'desc' }), sortLabelOf: (so) => so.col + ' ' + so.dir,
+    compareByColumn: (col, dir) => (a, b) => (dir === 'asc' ? 1 : -1) * ((a[col] || 0) - (b[col] || 0)), stockGridColumnIds: () => ['score'], analysisRowContext: (s, i, idx) => ({ i, idx }), analysisLbCell: (id, ctx) => `<td data-i="${ctx.i}">${id}</td>`,
+    columnHeaderHtml: (id) => `<th>${id}</th>`, describeRule: undefined };
+  const R = await loadAllStubbed('src/strategies/results.js', '', ['../core/util.js', './rules.js', './lookup.js']);
+  assert.ok(R.resultsHtml([], new Set()).includes('No stock passes all of these rules'));
+  const html = R.resultsHtml(stockList, new Set(['AAA']));
+  assert.ok(html.indexOf('data-idx="1"') < html.indexOf('data-idx="0"') && html.includes('checked') && html.includes('Select Acme &lt;b&gt;') && !html.includes('Acme <b>') && !html.includes('Showing the first'));   // best score first; escaped
+  assert.deepStrictEqual(R.orderedPicks(stockList).map((s) => s.name), ['Bolt', 'Acme <b>', 'Cog']);
+  const many = Array.from({ length: 250 }, (_, i) => ({ name: 'N' + i, ticker: 'S' + i + '·X', score: i }));
+  stockList.push(...many); many.forEach((s, i) => globalThis.__T.stockIndex.set(s, 3 + i));
+  assert.ok(R.resultsHtml(many, new Set()).includes('Showing the first 100 of 250')); R.showMoreResults();
+  assert.ok(R.resultsHtml(many, new Set()).includes('Showing the first 200 of 250')); R.resetResultsRows(); assert.ok(R.resultsHtml(many, new Set()).includes('first 100 of'));
+  R.sortResultsBy('score'); assert.strictEqual(store.getItem('albaDashboard.strategySort.v1'), JSON.stringify({ col: 'score', dir: 'asc' }));   // the same column again reverses it
+  assert.strictEqual(R.whyHtml('   ', []), ''); assert.ok(R.whyHtml('zzz', []).includes('No stock matches'));
+  assert.ok(R.whyHtml('bbb', []).includes('There are no rules to check yet') && R.whyHtml('bbb', []).includes('qualifies'));
+  const why = R.whyHtml('acme', [{ field: 'score', op: '>=', value: 8 }, { field: 'mos', op: '>=', value: 0 }]);
+  assert.ok(why.includes('class="bad"') && why.includes('no data') && why.includes('Acme &lt;b&gt;') && why.includes('Score at least 8'), why);
+  assert.ok(R.whyHtml('cog', [{ field: 'trend', op: 'in', value: ['none'] }]).includes('No reading'));
+  assert.ok(R.whyDatalist().startsWith('<datalist id="stratWhyList">') && R.whyDatalist().includes('value="AAA">Acme &lt;b&gt;'));
+}));
