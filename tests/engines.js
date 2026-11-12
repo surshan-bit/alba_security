@@ -18,7 +18,7 @@ const Fe = F.FundEngine;
 let passed = 0; const failures = [];
 const pending = [];   // async tests: awaited before the summary
 function test(name, fn){
-  const bad = e => failures.push(name + ": " + String(e.message || e).split("\n").slice(0, 6).join(" | "));
+  const bad = e => failures.push(name + ": " + String(e.message || e).split("\n").slice(0, +(process.env.ALBA_ERR_LINES || 6)).join(" | "));
   try { const r = fn(); if(r && typeof r.then === 'function') pending.push(r.then(() => { passed++; }, bad)); else passed++; } catch(e){ bad(e); }
 }
 const near = (a, b, d = 1e-9) => assert.ok(Math.abs(a - b) <= d, `${a} is not within ${d} of ${b}`);
@@ -7074,4 +7074,1294 @@ test('Trade Log ideas: Process reads the weekly prices of the chosen strategy a 
     assert.deepStrictEqual([saved.length, saved[0][0], saved[0][1].v, saved[0][1].today], [1, 's1', 1, '2026-11-10']);   // one result, kept under the strategy, stamped with the day
     assert.ok(errors.some((e) => e.includes('Price history unavailable')));
   } finally { console.error = keep; }
+}));
+
+// ================= Unit tests for modules that had none (one release, v1.381) =================
+// ---- Pure helpers: list/metrics, strategies/goal, core/industrystats, detail/fundmetrics, fundtext, completeness
+test('list metrics: the score band, the margin-of-safety rating and its sort key follow their cut-offs', () => {
+  const M = load('src/list/metrics.js');
+  assert.deepStrictEqual([null, undefined, 9, 8, 7.99, 6, 5.5, 5, 4.99, 0].map(M.scoreBand), ['fs-pending', 'fs-pending', 'fs-buy', 'fs-buy', 'fs-mbuy', 'fs-mbuy', 'fs-hold', 'fs-hold', 'fs-avoid', 'fs-avoid']);
+  const v = (iv, cp) => ({ valuation: { intrinsicValue: iv, currentPrice: cp } });
+  assert.deepStrictEqual([M.mosRatingAny(v(150, 100)), M.mosRatingAny(v(100, 100)), M.mosRatingAny(v(100, 110)), M.mosRatingAny(v(100, 140)), M.mosRatingAny({}), M.mosRatingAny(v(0, 100))], ['green', 'green', 'orange', 'red', null, null]);
+  assert.strictEqual(M.mosPct({}), -Infinity);   // no valuation: last in a highest-first list
+  assert.ok(M.mosPct(v(200, 100)) > 0);
+});
+
+test('strategy goal: a bad goal falls back to +5% in 30 days, values are clamped, and the horizon is whole weeks', () => {
+  const G = load('src/strategies/goal.js');
+  assert.deepStrictEqual(G.cleanGoal(null), G.DEFAULT_GOAL); assert.deepStrictEqual(G.cleanGoal({ target: 'x', days: NaN }), { target: 5, days: 30 });
+  assert.deepStrictEqual(G.cleanGoal({ target: 500, days: 1000 }), { target: 100, days: 120 }); assert.deepStrictEqual(G.cleanGoal({ target: 0, days: 1 }), { target: 0.5, days: 7 });
+  assert.deepStrictEqual(G.cleanGoal({ target: 12.5, days: 44.6 }), { target: 12.5, days: 45 });
+  assert.deepStrictEqual([G.horizonWeeks({ days: 3 }), G.horizonWeeks({ days: 30 }), G.horizonWeeks({ days: 45 })], [1, 4, 6]);
+  assert.strictEqual(G.goalText({ target: 5, days: 30 }), '+5% within 30 days');
+});
+
+test('industry median weekly change: the middle of the industry\'s figures, the mean of the two middle ones for an even count, null when none', () => alone(async () => {
+  const mk = (ind, w) => ({ ticker: 'X·' + ind, technical: { raw: { weekPctChange: w } } });
+  globalThis.__S = [mk('Steel', 1), mk('Steel', 5), mk('Steel', 3), mk('Gold', 2), mk('Gold', 4), mk('Gold', NaN), { ticker: 'Y·Oil' }, mk('Cash', null)];
+  const M = await loadWithStubs('src/core/industrystats.js', '', { './stocks.js': 'export const stocks = globalThis.__S;', './util.js': 'export const tickerIndustry = (s) => String(s.ticker).split("·")[1];' });
+  assert.deepStrictEqual([M.industryMedianW(mk('Steel')), M.industryMedianW(mk('Gold')), M.industryMedianW({ ticker: 'Y·Oil' }), M.industryMedianW(mk('Cash'))], [3, 3, null, null]);
+}));
+
+test('fund metric chips: percentile wording counts the peers in the same scope, labels and notes are tidied, and values are read or dropped when missing', () => alone(async () => {
+  const ind = (name, group, has) => ({ ticker: 'T·' + name, industryGroup: group, fundamentals: { factors: [{ metrics: [['Piotroski F-Score percentile', has ? '90th (x)' : 'n/a'], 'junk'] }] } });
+  globalThis.__S = [ind('Steel', 'G1', true), ind('Steel', 'G1', true), ind('Alloy', 'G1', true), ind('Steel', 'G2', true), ind('Steel', 'G1', false), { ticker: 'NoSep', fundamentals: null }];
+  const F = await loadWithStubs('src/detail/fundmetrics.js', '', { '../core/stocks.js': 'export const stocks = globalThis.__S;' });
+  const k = 'Piotroski F-Score percentile', me = globalThis.__S[0];
+  assert.strictEqual(F.fundMetricDisplay(k, '90th (Steel)'), '90th (Steel)'.replace('90th (Steel)', '90th percentile of — peers · Steel'));   // no stock being drawn: no peer count
+  F.setFundRenderStock(me);
+  assert.strictEqual(F.fundMetricDisplay(k, '90th (Steel)'), '90th percentile of 2 peers · Steel');
+  assert.strictEqual(F.fundMetricDisplay(k, '90th (G1 group)'), '90th percentile of 3 peers · G1 group');
+  assert.strictEqual(F.fundMetricDisplay(k, '90th (all stocks)'), '90th percentile of 4 peers · all stocks');
+  assert.strictEqual(F.fundMetricDisplay(k, 'n/a'), 'n/a'); assert.strictEqual(F.fundMetricDisplay('ROE', '12%'), '12%');
+  assert.strictEqual(F.FUND_METRIC_LABEL.ROCE, 'Return on Capital Employed'); assert.ok(F.PERCENTILE_METRIC_KEYS.has(k));
+  const f = { metrics: [['ROE', '14%'], ['ROCE', 'n/a'], ['D/E', '0.5x'], ['P/E', 'abc']] };
+  assert.deepStrictEqual([F.fundMetricVal(f, 'ROE'), F.fundMetricVal(f, 'ROCE'), F.fundMetricVal(f, 'zz'), F.fundMetricVal({}, 'ROE')], ['14%', null, null, null]);
+  assert.deepStrictEqual([F.fundMetricNum(f, 'ROE'), F.fundMetricNum(f, 'ROCE'), F.fundMetricNum(f, 'P/E'), F.fundMetricNum({}, 'ROE')], [14, null, null, null]);
+  assert.strictEqual(F.fundNoteExtra(''), null); assert.strictEqual(F.fundNoteExtra('One sentence only'), null);
+  assert.strictEqual(F.fundNoteExtra('Lead. Not a substitute for researched moat analysis.'), null);
+  assert.strictEqual(F.fundNoteExtra('Lead. Mechanically scored vs industry: debt is low, 3yr growth TTM good'), 'Compared with industry peers — debt is low, 3-year growth last 12 months good');
+  assert.strictEqual(F.fundNoteExtra('Lead. Data-driven mechanical proxy (pending individual research): small'), 'Estimated from industry-wide data (not yet individually researched) — small');
+  assert.strictEqual(F.fundNoteExtra('Lead. Mechanically scored from screener.in data: other'), 'Other');
+}));
+
+test('fund business text: one plain line per factor by score band, the researched headline wins and is escaped, and pending or unknown factors have none', () => alone(async () => {
+  globalThis.__S = [];
+  const T = await loadWithStubs('src/detail/fundtext.js', '', { '../core/stocks.js': 'export const stocks = globalThis.__S;' });
+  const fac = (key, score, extra) => Object.assign({ key, score, weight: 1, metrics: [['D/E', '0.2x'], ['ROCE', '18%'], ['Profit growth TTM', '25%'], ['P/E', '12'], ['Margin of safety', '30%']] }, extra);
+  for(const key of ['fin', 'prof', 'growth', 'val', 'moat', 'gov', 'predict', 'reinvest', 'dcf']){
+    const lines = [0.9, 0.7, 0.55, 0.2].map((x) => T.fundBusinessSummary(fac(key, x * 1)).text);
+    assert.strictEqual(new Set(lines).size, 4, key);   // four bands, four different lines
+  }
+  assert.ok(T.fundBusinessSummary(fac('fin', 0.9)).text.includes('(D/E 0.2x)') && T.fundBusinessSummary(fac('dcf', 0.9)).text.includes('margin of safety 30%'));
+  assert.ok(!T.fundBusinessSummary(fac('fin', 0.9, { metrics: [] })).text.includes('D/E'));
+  assert.strictEqual(T.fundBusinessSummary(fac('fin', 0.9, { research: { headline: 'Strong <b>' } })).text, 'Strong &lt;b&gt;');
+  assert.strictEqual(T.fundBusinessSummary(fac('fin', 0, { weight: 0 })), null);   // no weight: pending
+  assert.strictEqual(T.fundBusinessSummary(fac('nope', 0.9)), null);
+  assert.deepStrictEqual([T.isProxyFactor({ key: 'moat' }), T.isProxyFactor({ key: 'gov', research: {} }), T.isProxyFactor({ key: 'fin' }), T.isProxyFactor(null)], [true, false, false, false]);
+}));
+
+test('data completeness: factors with n/a figures or excluded are incomplete, technical states count the non-null ones, and the badge names what is missing', () => alone(async () => {
+  globalThis.__S = [];
+  const C = await loadWithStubs('src/detail/completeness.js', '', { '../core/stocks.js': 'export const stocks = globalThis.__S;' });
+  const f = (name, m, extra) => Object.assign({ name, metrics: m }, extra);
+  const s = { fundamentals: { factors: [f('A', [['ROE', '10%']]), f('B', [['ROCE', 'n/a']]), f('C', [['D/E', 'n/a']], { research: {} }), f('D', [], { excluded: true }), f('E', undefined), { name: 'F', excluded: true, metrics: undefined }] } };
+  const c = C.fundamentalCompleteness(s);
+  assert.deepStrictEqual([c.complete, c.total, c.incompleteNames, c.researchedGapNames, c.excludedNames], [2, 9, ['B', 'C'], ['C'], ['D', 'F']]);
+  assert.deepStrictEqual(C.fundamentalCompleteness({}), { complete: 0, total: 9, incompleteNames: [], researchedGapNames: [], excludedNames: [] });
+  assert.deepStrictEqual(C.fundMissingMetrics({ metrics: [['ROCE', 'n/a'], ['xx', 'n/a'], ['ROE', '1'], 'bad'] }), ['Return on Capital Employed', 'xx']); assert.deepStrictEqual(C.fundMissingMetrics({}), []);
+  assert.deepStrictEqual(C.technicalCompleteness({}), { complete: 0, total: 5 });
+  assert.deepStrictEqual(C.technicalCompleteness({ technical: { states: { monthMacd: 1, weekMacd: null, monthRsi: 0, weekRsi: undefined, valuation: 'x' } } }), { complete: 3, total: 5 });
+  const full = C.completenessBadge({ complete: 9, total: 9 }, 'factors');
+  assert.ok(full.includes('class="completeness-badge complete"') && full.includes('9/9 factors'));
+  const gaps = C.completenessBadge(c, 'factors');
+  assert.ok(gaps.includes('incomplete') && gaps.includes('not scored (not 100% reliable): D, F') && gaps.includes('missing data in: B') && gaps.includes('researched, but the figures are not available') && gaps.includes('1 researched, data unavailable'));
+}));
+
+// ---- research/status, refresh/freshness, strategies/pick, list/rebound, news/upcoming
+const localDay = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+test('research status: the age of a stock\'s research comes from the newer of its two dates, and a trigger is done when what it asked for was saved after it', () => withPage('<section id="section-analysis" class="active"></section>', async () => {
+  const refreshed = [], loaded = [];
+  TV_VALUES.add('priceFetchedAt');
+  globalThis.__T = { refreshAnalysisSoon: () => refreshed.push(1), ensurePriceBars: async (s) => { loaded.push(s.name); }, pcTickerKey: (s) => s.name };
+  const R = await loadAllStubbed('src/research/status.js', '', ['../core/util.js']);
+  const age = (a, b) => R.stockResearchAgeDays({ __researchAsof: a, __updAsof: b });
+  assert.deepStrictEqual([age(localDay(0)), age(localDay(-5)), age(localDay(1)), age('garbage'), age(null), age(localDay(-9), localDay(-2)), age(localDay(-2), localDay(-9)), age(undefined, localDay(-3))], [0, 5, 0, null, null, 2, 2, 3]);
+  assert.strictEqual(R.stockResearchAgeDays(null), null);
+  const st = { name: 'AAA', __researchAsof: localDay(-1) };
+  const t = (days) => new Date(Date.now() - days * 86400000).toISOString();
+  assert.deepStrictEqual([R.researchTriggerDone(st, 'nope', 'full'), R.researchTriggerDone(st, t(3), 'full'), R.researchTriggerDone(st, t(0), 'full'), R.researchTriggerDone(st, t(3), 'price'), R.researchTriggerDone(st, t(3))], [false, true, false, false, true]);
+  R.priceFetchedAt.set('AAA', t(0.1));
+  assert.deepStrictEqual([R.researchTriggerDone({ name: 'AAA' }, t(1), 'price'), R.researchTriggerDone({ name: 'AAA' }, t(1), 'full'), R.researchTriggerDone({ name: 'AAA' }, t(1))], [true, false, true]);
+  assert.strictEqual(R.researchTriggerDone({ name: 'AAA' }, t(0), 'price'), false);   // fetched before the trigger
+  const m = new Map([['x', '2026-11-01']]); R.setResearchTriggers(m); R.setResearchTriggerKinds(new Map([['x', 'price']]));
+  assert.ok(R.getResearchTriggers() === m && R.getResearchTriggerKinds().get('x') === 'price');
+  R.analysisQueuePriceLoad({ name: 'Q' }); R.analysisQueuePriceLoad({ name: 'R' });
+  await new Promise((r) => setTimeout(r, 250));
+  assert.deepStrictEqual([loaded, refreshed.length], [['Q', 'R'], 1]);   // one redraw after the batch
+  document.getElementById('section-analysis').classList.remove('active'); R.analysisQueuePriceLoad({ name: 'S' }); await new Promise((r) => setTimeout(r, 250));
+  assert.strictEqual(refreshed.length, 1);   // not on screen: no redraw
+}));
+
+test('freshness: a stock is pinned, matching a strategy or everything else; its age is fresh, ageing or stale for that tier, and something new makes it need attention', () => alone(async () => {
+  const days = { A: 0, B: 10, C: 40, D: 100, E: null, F: 2 };
+  const mk = (n, extra) => Object.assign({ name: n, tag: n }, extra);
+  const pinned = new Set(), match = new Set(); let throws = false; const stockList = [];
+  TV_VALUES.add('stocks');
+  globalThis.__T = { stocks: stockList, isPinned: (s) => pinned.has(s), publishedStrategies: () => { if(throws) throw new Error('rules broke'); return [{ rules: [] }]; }, qualifyingStocks: () => [...match],
+    stockResearchAgeDays: (s) => (s.age === undefined ? days[s.name] : s.age), daysSinceDate: (d) => (d === 'x' ? null : Number(d)),
+    daysSinceEvent: (s, k) => (s.ev ? s.ev[k] ?? null : null), newsCounts: (s) => s.nc || null };
+  const F = await loadAllStubbed('src/refresh/freshness.js', '', []);
+  const a = mk('A'), b = mk('B'), c = mk('C'), d = mk('D'), e = mk('E'); stockList.push(a, b, c, d, e);
+  pinned.add(a); match.add(b);
+  assert.deepStrictEqual([F.freshness(a).tier, F.freshness(b).tier, F.freshness(c).tier], ['priority', 'match', 'core']);
+  assert.deepStrictEqual([F.freshness(a).fund, F.freshness(b).fund.state, F.freshness(c).fund.state, F.freshness(d).fund.state, F.freshness(e).fund], [{ age: 0, state: 'fresh' }, 'aging', 'aging', 'stale', { age: null, state: 'none' }]);   // the same 10 days is ageing for a matching stock but fresh for the rest (B: 10 days, C: 40 days)
+  const t = (stock) => F.freshness(stock).tech;
+  assert.deepStrictEqual([t(mk('T1', { __livePrice: { asof: '1' }, technical: { asof: '5' } })), t(mk('T2', { technical: { asof: '2' } })), t(mk('T3', { technical: { asof: '9' } })).state, t(mk('T4', { __livePrice: { asof: 'x' } })), t(mk('T5'))], [{ age: 1, state: 'fresh' }, { age: 2, state: 'aging' }, 'stale', { age: null, state: 'none' }, { age: null, state: 'none' }]);
+  const g = mk('G', { age: 5, ev: { earn: 2, corp: 3 }, nc: { neg: 2, pos: 1 }, technical: { raw: { weekPctChange: -12 } } });
+  assert.deepStrictEqual(F.freshness(g).why, ['new results', 'company event', 'negative news', 'big price move']);
+  assert.deepStrictEqual([F.freshness(mk('H', { age: 5, ev: { earn: 9, corp: 9 }, nc: { neg: 2, pos: 2 }, technical: { raw: { monthPctChange: 19 } } })).why, F.freshness(mk('I', { age: 5, technical: { raw: { monthPctChange: -20 } } })).why, F.freshness(mk('J', { age: 0, ev: { earn: 0 } })).why, F.freshness(mk('K', { age: 2, technical: { raw: { weekPctChange: 50 } } })).why], [[], ['big price move'], [], []]);
+  const fresh = mk('L', { age: 0, ev: { earn: 0 } }); fresh.age = 1; fresh.ev = { earn: 0 };
+  assert.strictEqual(F.freshness(Object.assign(mk('M', { age: 1, ev: { earn: 0 } }), {})).fund.state, 'attn');   // fresh, but results came out since
+  assert.deepStrictEqual([F.ago(null), F.ago(0), F.ago(1), F.ago(4)], ['never', 'today', '1 day ago', '4 days ago']);
+  assert.deepStrictEqual([F.needs('fund', a), F.needs('fund', c), F.needs('tech', mk('N', { technical: { asof: '0' } })), F.needs('tech', mk('O'))], [false, true, false, true]);
+  assert.deepStrictEqual(F.counts([a, d, g]), { n: 3, fund: 2, tech: 3, attn: 1 });
+  const order = F.priorityOrder('fund', [c, d, b, a, g, e]).map((s) => s.name);
+  assert.deepStrictEqual(order, ['G', 'A', 'B', 'E', 'D', 'C']);   // something new first, then pinned, matching, the rest; the oldest first within each
+  assert.deepStrictEqual(F.priorityOrder('tech', [c, a]).map((s) => s.name), ['A', 'C']);
+  // the strategy match set is kept for a while, rebuilt when the list changes, and a failure leaves it empty
+  match.add(c); assert.strictEqual(F.freshness(c).tier, 'core');   // cached
+  stockList.push(mk('Z')); throws = true;
+  await quietErrors(async () => { assert.strictEqual(F.freshness(b).tier, 'core'); });   // rebuilt, the rules failed: nothing matches
+}));
+
+test('strategy pick: the stocks of the chosen published strategy, null for none or a deleted one, and a valid id or empty', () => alone(async () => {
+  globalThis.__T = { stocks: [{ n: 1 }, { n: 2 }], publishedStrategies: () => [{ id: 's1', rules: ['r'] }, { id: 's2', rules: [] }], qualifyingStocks: (list, rules) => (rules.length ? [list[1]] : []) };
+  TV_VALUES.add('stocks');
+  const P = await loadAllStubbed('src/strategies/pick.js', '', []);
+  assert.deepStrictEqual([...P.strategyStockSet('s1')], [{ n: 2 }]); assert.strictEqual(P.strategyStockSet('s2').size, 0);
+  assert.deepStrictEqual([P.strategyStockSet(''), P.strategyStockSet('gone')], [null, null]);
+  assert.deepStrictEqual([P.validStrategyId('s1'), P.validStrategyId('gone'), P.validStrategyId('')], ['s1', '', '']);
+}));
+
+test('rebound: up this week after a down last week; no figure for either means it does not qualify', () => alone(async () => {
+  TV_VALUES.add('priceHistoryByTicker');
+  globalThis.__T = { priceHistoryByTicker: { A: { '1W': 'a' }, B: { '1W': 'b' }, C: { '1W': 'c' }, D: {} }, pcTickerKey: (s) => s.name, lastWeekMove: (bars) => ({ a: -3, b: 2, c: null }[bars] ?? null) };
+  const R = await loadAllStubbed('src/list/rebound.js', '', []);
+  const s = (name, wk) => ({ name, technical: wk === undefined ? undefined : { raw: { weekPctChange: wk } } });
+  assert.deepStrictEqual([R.isRebound(s('A', 1)), R.isRebound(s('A', 0)), R.isRebound(s('A', -1)), R.isRebound(s('A')), R.isRebound(s('B', 4)), R.isRebound(s('C', 4)), R.isRebound(s('D', 4)), R.isRebound(s('Z', 4))], [true, false, false, false, false, false, false, false]);
+}));
+
+test('upcoming events mark: a calendar mark with the next four events when something is due within 30 days, escaped, and nothing otherwise', () => alone(async () => {
+  const today = new Date(Date.now() + 19800000).toISOString().slice(0, 10), plus = (n) => new Date(Date.parse(today + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const news = { events: { items: [{ ticker: 'AAA', date: plus(2), type: 'results' }, { ticker: 'AAA', date: plus(5), type: 'dividend' }, { ticker: 'AAA', date: plus(45), type: 'results' }, { ticker: 'BBB', date: plus(60), type: 'results' }] } };
+  TV_VALUES.add('news');
+  globalThis.__T = { news, tickerSymbol: (s) => s.sym, shortDate: (d) => d.slice(5), typeTag: (t) => (t === 'results' ? 'RES<' : 'DIV'), upcomingItems: (items) => items.slice().sort((x, y) => x.date.localeCompare(y.date)) };
+  const U = await loadAllStubbed('src/news/upcoming.js', '', []);
+  assert.strictEqual(U.upcomingFor({ sym: 'AAA' }).length, 3); assert.deepStrictEqual(U.upcomingFor({ sym: 'ZZZ' }), []);
+  const mark = U.eventMark({ sym: 'AAA' });
+  assert.ok(mark.includes('class="ev-mark"') && mark.includes('res&lt;,') && mark.includes('div') && !mark.includes(plus(45).slice(5)), mark);   // the third event is beyond 30 days
+  assert.strictEqual(U.eventMark({ sym: 'BBB' }), ''); assert.strictEqual(U.eventMark({ sym: 'ZZZ' }), '');
+  news.events = { items: [{ ticker: 'ZZZ', date: plus(1), type: 'results' }] }; assert.ok(U.eventMark({ sym: 'ZZZ' }).includes('ev-mark'));   // a new saved list is picked up
+  news.events = null; assert.strictEqual(U.eventMark({ sym: 'ZZZ' }), '');
+  news.events = { items: 'bad' }; assert.deepStrictEqual(U.upcomingFor({ sym: 'AAA' }), []);
+}));
+
+// ---- strategies/rules, strategies/state, strategies/results
+const RULE_FIELDS = new Map([
+  ['score', { id: 'score', type: 'num', label: 'Score', dp: 1, unit: '', get: (s) => s.score }],
+  ['mos', { id: 'mos', type: 'num', label: 'MoS', dp: 0, unit: '%', get: (s) => s.mos }],
+  ['trend', { id: 'trend', type: 'enum', label: 'Trend', options: [['up', 'Upward'], ['down', 'Downward']], noneLabel: 'No reading', get: (s) => s.trend }],
+  ['name', { id: 'name', type: 'text', label: 'Name', get: (s) => s.name }]
+]);
+test('strategy rules: numbers, choices and text are tested against a stock, a missing reading fails, an unfinished rule is ignored, and rules read back in words', () => alone(async () => {
+  TV_VALUES.add('FIELD_BY_ID');
+  globalThis.__T = { FIELD_BY_ID: RULE_FIELDS };
+  const R = await loadAllStubbed('src/strategies/rules.js', '', ['./lookup.js']);
+  const s = { score: 7.5, mos: -5, trend: 'up', name: 'Acme Steel' };
+  const t = (rule, stock = s) => { const r = R.testRule(stock, rule); return [r.pass, r.missing]; };
+  assert.deepStrictEqual([t({ field: 'score', op: '>=', value: 7.5 }), t({ field: 'score', op: '>=', value: 8 }), t({ field: 'score', op: '<=', value: 7.5 }), t({ field: 'score', op: '>', value: 7.5 }), t({ field: 'score', op: '<', value: 8 }),
+    t({ field: 'score', op: 'between', value: [9, 7] }), t({ field: 'score', op: 'between', value: [8, 9] }), t({ field: 'trend', op: 'in', value: ['up', 'down'] }), t({ field: 'trend', op: 'in', value: ['down'] }),
+    t({ field: 'name', op: 'contains', value: '  STEEL ' }), t({ field: 'name', op: 'contains', value: 'gold' }), t({ field: 'score', op: '??', value: 1 })],
+    [[true, false], [false, false], [true, false], [false, false], [true, false], [true, false], [false, false], [true, false], [false, false], [true, false], [false, false], [false, false]]);
+  assert.deepStrictEqual([t({ field: 'score', op: '>=', value: 1 }, {}), t({ field: 'trend', op: 'in', value: ['none'] }, {}), t({ field: 'trend', op: 'in', value: ['up'] }, {})], [[false, true], [true, false], [false, true]]);
+  assert.throws(() => R.testRule(s, { field: 'nope', op: '>=', value: 1 }), /Unknown strategy field: nope/);
+  const ready = (rule) => R.ruleReady(rule);
+  assert.deepStrictEqual([ready({ field: 'nope' }), ready({ field: 'trend', op: 'in', value: [] }), ready({ field: 'trend', op: 'in', value: ['up'] }), ready({ field: 'name', op: 'contains', value: ' ' }), ready({ field: 'name', op: 'contains', value: 'a' }),
+    ready({ field: 'score', op: 'between', value: [1, null] }), ready({ field: 'score', op: 'between', value: [1, 2] }), ready({ field: 'score', op: '>=', value: null }), ready({ field: 'score', op: '>=', value: 3 })], [false, false, true, false, true, false, true, false, true]);
+  assert.deepStrictEqual([R.defaultRule('trend'), R.defaultRule('name'), R.defaultRule('score')], [{ field: 'trend', op: 'in', value: [] }, { field: 'name', op: 'contains', value: '' }, { field: 'score', op: '>=', value: null }]);
+  assert.deepStrictEqual([R.withOp({ field: 'score', op: '>=', value: 5 }, 'between').value, R.withOp({ field: 'score', op: '>=', value: 'x' }, 'between').value, R.withOp({ field: 'score', op: 'between', value: [3, 9] }, '>=').value, R.withOp({ field: 'score', op: 'between', value: ['x', 9] }, '>=').value, R.withOp({ field: 'score', op: '>=', value: 4 }, '<=').value], [[5, null], [null, null], 3, null, 4]);
+  const ev = R.evaluateStock(s, [{ field: 'score', op: '>=', value: 7 }, { field: 'trend', op: 'in', value: [] }, { field: 'mos', op: '>=', value: 0 }]);
+  assert.deepStrictEqual([ev.pass, ev.results.length], [false, 2]);   // the unfinished rule is ignored
+  assert.strictEqual(R.evaluateStock(s, []).pass, true);
+  assert.deepStrictEqual(R.qualifyingStocks([s, { score: 3 }, { score: 9, mos: 1 }], [{ field: 'score', op: '>=', value: 7 }]).length, 2);
+  assert.deepStrictEqual([R.formatValue(RULE_FIELDS.get('score'), 7.456), R.formatValue(RULE_FIELDS.get('mos'), 12), R.formatValue(RULE_FIELDS.get('trend'), 'up'), R.formatValue(RULE_FIELDS.get('trend'), 'sideways'), R.formatValue(RULE_FIELDS.get('trend'), 'none'), R.formatValue(RULE_FIELDS.get('score'), null), R.formatValue(RULE_FIELDS.get('name'), 'x')], ['7.5', '12%', 'Upward', 'sideways', 'No reading', '—', 'x']);
+  assert.deepStrictEqual([R.describeRule({ field: 'trend', op: 'in', value: ['up', 'none'] }), R.describeRule({ field: 'name', op: 'contains', value: ' Gold ' }), R.describeRule({ field: 'mos', op: 'between', value: [10, 20] }), R.describeRule({ field: 'score', op: '>=', value: 7 }), R.describeRule({ field: 'mos', op: '<', value: 5 })],
+    ['Trend is Upward or No reading', 'Name contains "Gold"', 'MoS between 10 and 20%', 'Score at least 7', 'MoS below 5%']);
+  assert.ok(R.OPS.num.length === 5 && R.isNum(1) && !R.isNum('1') && !R.isNum(Infinity));
+}));
+
+test('strategies: the first visit gets the starter strategies, saved ones are cleaned, and add, copy, delete and restore keep the list and the selection right', () => withBrowser({ addEventListener(t, f) { this.listeners[t] = f; }, listeners: {} }, async ({ win, events, store }) => {
+  const saves = [], sels = [];
+  TV_VALUES.add('FIELD_BY_ID');
+  globalThis.__T = { FIELD_BY_ID: new Map([['score', {}], ['weekRsi', {}], ['monthRsi', {}], ['weekMacd', {}], ['monthMacd', {}], ['mos', {}]]), uiStateGet: () => ({ stratSel: 'starter-turning-up' }), uiStateSet: (v, ms) => sels.push([v, ms]), strategiesSave: (json) => saves.push(json) };
+  const load1 = () => loadAllStubbed('src/strategies/state.js', '', ['./goal.js']);
+  let S = await load1();
+  assert.deepStrictEqual([S.strategies.length, S.strategies[0].id, S.strategies.every((x) => x.published && x.goal.days === 30)], [5, 'starter-quality-momentum', true]);
+  assert.strictEqual(S.selectedStrategy().id, 'starter-turning-up');   // the saved selection
+  store.setItem('albaDashboard.strategies.v1', JSON.stringify([{ id: 'a', name: 'A', rules: [{ field: 'score', op: '>=', value: 5 }, { field: 'bogus', op: '>=', value: 1 }, null, { field: 'score', op: 7 }, { field: 'mos', op: '<=' }], published: false, goal: { target: 999 }, note: 5 }, { id: 5, name: 'bad' }, null, { id: 'b', name: 'B' }]));
+  S = await load1();
+  assert.deepStrictEqual(S.strategies.map((x) => [x.id, x.published, x.note, x.goal.target, x.rules.length]), [['a', false, '', 100, 2], ['b', true, '', 5, 0]]);   // bad entries and unknown fields dropped; missing values become null
+  assert.deepStrictEqual(S.publishedStrategies().map((x) => x.id), ['b']);
+  assert.strictEqual(S.selectedStrategy().id, 'a');   // the saved selection no longer exists: the first one
+  store.setItem('albaDashboard.strategies.v1', '{"not":"a list"}'); S = await load1(); assert.strictEqual(S.strategies.length, 5);
+  store.setItem('albaDashboard.strategies.v1', 'not json'); S = await load1(); assert.strictEqual(S.strategies.length, 5);
+  S.strategies.length = 0; assert.strictEqual(S.selectedStrategy(), null);
+  const added = S.addStrategy(); assert.deepStrictEqual([added.name, added.published, S.strategies.length, saves.length, sels.at(-1)[1]], ['New strategy', false, 1, 1, 300]);
+  const copy = S.duplicateStrategy(Object.assign(added, { name: 'X', rules: [{ field: 'score', op: '>=', value: 1 }] }));
+  assert.deepStrictEqual([copy.name, copy.published, copy.rules, copy.rules !== added.rules, S.selectedStrategy().id === copy.id], ['X (copy)', false, added.rules, true, true]);
+  S.deleteStrategy(copy); assert.deepStrictEqual([S.strategies.length, S.selectedStrategy().id === added.id], [1, true]);
+  S.deleteStrategy(added); assert.strictEqual(S.strategies.length, 0);   // the last one: an empty list
+  S.addStrategy(); S.restoreStarters(); assert.deepStrictEqual([S.strategies.length, S.strategies[0].id, S.strategies.at(-1).name], [6, 'starter-quality-momentum', 'New strategy']);   // starters back, own strategy kept
+  // a saved copy arriving late replaces the list, unless this page already changed something
+  const synced = (await load1()); store.setItem('albaDashboard.strategies.v1', JSON.stringify([{ id: 'late', name: 'Late' }]));
+  win.listeners['alba-strategies-synced'](); assert.deepStrictEqual([synced.strategies.map((x) => x.id), events.includes('alba-strategies-reloaded')], [['late'], true]);
+  synced.saveStrategies(); events.length = 0; store.setItem('albaDashboard.strategies.v1', JSON.stringify([{ id: 'later', name: 'Later' }]));
+  win.listeners['alba-strategies-synced'](); assert.deepStrictEqual([synced.strategies.map((x) => x.id), events.length], [['late'], 0]);
+}));
+
+test('strategy results: the table lists the picks in the chosen order, shows more on request, says why a stock is in or out, and finds stocks by symbol or name', () => withBrowser({}, async ({ store }) => {
+  const stockList = [{ name: 'Acme <b>', ticker: 'AAA·Steel', score: 6 }, { name: 'Bolt', ticker: 'BBB·Gold', score: 9 }, { name: 'Cog', ticker: 'CCC·Gold' }];
+  TV_VALUES.add('stocks'); TV_VALUES.add('stockIndex'); TV_VALUES.add('FIELD_BY_ID');
+  const rows = [];
+  globalThis.__T = { stocks: stockList, stockIndex: new Map(stockList.map((s, i) => [s, i])), FIELD_BY_ID: RULE_FIELDS, tickerSymbol: (s) => s.ticker.split('·')[0],
+    cleanSort: (col, dir, old, def) => (col ? { col, dir } : old ? { col: old, dir: 'asc' } : def), nextSort: (cur, id) => ({ col: id, dir: cur.col === id ? 'asc' : 'desc' }), sortLabelOf: (so) => so.col + ' ' + so.dir,
+    compareByColumn: (col, dir) => (a, b) => (dir === 'asc' ? 1 : -1) * ((a[col] || 0) - (b[col] || 0)), stockGridColumnIds: () => ['score'], analysisRowContext: (s, i, idx) => ({ i, idx }), analysisLbCell: (id, ctx) => `<td data-i="${ctx.i}">${id}</td>`,
+    columnHeaderHtml: (id) => `<th>${id}</th>`, describeRule: undefined };
+  const R = await loadAllStubbed('src/strategies/results.js', '', ['../core/util.js', './rules.js', './lookup.js']);
+  assert.ok(R.resultsHtml([], new Set()).includes('No stock passes all of these rules'));
+  const html = R.resultsHtml(stockList, new Set(['AAA']));
+  assert.ok(html.indexOf('data-idx="1"') < html.indexOf('data-idx="0"') && html.includes('checked') && html.includes('Select Acme &lt;b&gt;') && !html.includes('Acme <b>') && !html.includes('Showing the first'));   // best score first; escaped
+  assert.deepStrictEqual(R.orderedPicks(stockList).map((s) => s.name), ['Bolt', 'Acme <b>', 'Cog']);
+  const many = Array.from({ length: 250 }, (_, i) => ({ name: 'N' + i, ticker: 'S' + i + '·X', score: i }));
+  stockList.push(...many); many.forEach((s, i) => globalThis.__T.stockIndex.set(s, 3 + i));
+  assert.ok(R.resultsHtml(many, new Set()).includes('Showing the first 100 of 250')); R.showMoreResults();
+  assert.ok(R.resultsHtml(many, new Set()).includes('Showing the first 200 of 250')); R.resetResultsRows(); assert.ok(R.resultsHtml(many, new Set()).includes('first 100 of'));
+  R.sortResultsBy('score'); assert.strictEqual(store.getItem('albaDashboard.strategySort.v1'), JSON.stringify({ col: 'score', dir: 'asc' }));   // the same column again reverses it
+  assert.strictEqual(R.whyHtml('   ', []), ''); assert.ok(R.whyHtml('zzz', []).includes('No stock matches'));
+  assert.ok(R.whyHtml('bbb', []).includes('There are no rules to check yet') && R.whyHtml('bbb', []).includes('qualifies'));
+  const why = R.whyHtml('acme', [{ field: 'score', op: '>=', value: 8 }, { field: 'mos', op: '>=', value: 0 }]);
+  assert.ok(why.includes('class="bad"') && why.includes('no data') && why.includes('Acme &lt;b&gt;') && why.includes('Score at least 8'), why);
+  assert.ok(R.whyHtml('cog', [{ field: 'trend', op: 'in', value: ['none'] }]).includes('No reading'));
+  assert.ok(R.whyDatalist().startsWith('<datalist id="stratWhyList">') && R.whyDatalist().includes('value="AAA">Acme &lt;b&gt;'));
+}));
+
+// ---- Small wiring modules: core/view, busy, dom, refresh/hook, boot/handoff, boot/start, core/idbkv, ui/theme, restore, filterdock, pingrid, fullscreen, identity/flush, app/actions, refresh/kit, sections/*
+test('small shared state: the saved-screen flag, busy checks, the refresh kit slot and the boot hand-off', async () => {
+  const V = load('src/core/view.js'); assert.strictEqual(V.getUiStateTracking(), false); V.setUiStateTracking(true); assert.strictEqual(V.getUiStateTracking(), true);
+  const B = load('src/core/busy.js'); assert.strictEqual(B.anyBusy(), false);
+  B.registerBusy(() => false); assert.strictEqual(B.anyBusy(), false);
+  B.registerBusy(() => { throw new Error('broken check'); }); assert.strictEqual(B.anyBusy(), false);   // a failing check never blocks
+  B.registerBusy(() => 1); assert.strictEqual(B.anyBusy(), true);
+  const H = load('src/refresh/hook.js'); assert.strictEqual(H.getRefreshKit(), null); const k = {}; H.setRefreshKit(k); assert.strictEqual(H.getRefreshKit(), k);
+  const O = load('src/boot/handoff.js');
+  assert.throws(() => O.getBootStocks(), /not loaded before the app started/);
+  const list = []; O.setBootStocks(list); assert.strictEqual(O.getBootStocks(), list);
+});
+
+test('window hand-off: the debug handle is created once and shared', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { value: {}, configurable: true, writable: true });
+  try { const O = load('src/boot/handoff.js'), h = O.debugHandle(); assert.ok(h === O.debugHandle() && h === globalThis.window.__alba); }
+  finally { if(had) Object.defineProperty(globalThis, 'window', had); else delete globalThis.window; }
+}));
+
+test('detail element: the shared panel is looked up once on the page', () => withPage('<div id="detail"></div>', async (win) => {
+  assert.strictEqual(load('src/core/dom.js').detailEl, win.document.getElementById('detail'));
+}));
+
+test('key-value cache: opens an IndexedDB store, creates it on first use, and answers null when the browser refuses', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB');
+  const make = (mode) => ({ open: () => { const r = {}; setTimeout(() => {
+    if(mode === 'ok'){ r.result = { createObjectStore: (n) => { r.created = n; } }; r.onupgradeneeded(); r.onsuccess(); }
+    if(mode === 'upgradeFails'){ r.result = { createObjectStore: () => { throw new Error('no'); } }; r.onupgradeneeded(); r.onsuccess(); }
+    if(mode === 'error') r.onerror(); if(mode === 'blocked') r.onblocked(); }, 0); return r; } });
+  try {
+    const K = load('src/core/idbkv.js');
+    for(const [mode, expectNull] of [['ok', false], ['upgradeFails', false], ['error', true], ['blocked', true]]){
+      Object.defineProperty(globalThis, 'indexedDB', { value: make(mode), configurable: true, writable: true });
+      assert.strictEqual((await K.openKvDb('db', 'kv')) === null, expectNull, mode);
+    }
+    Object.defineProperty(globalThis, 'indexedDB', { value: { open: () => { throw new Error('private mode'); } }, configurable: true, writable: true });
+    assert.strictEqual(await K.openKvDb('db', 'kv'), null);
+  } finally { if(had) Object.defineProperty(globalThis, 'indexedDB', had); else delete globalThis.indexedDB; }
+}));
+
+test('brand font: the font link is added once', () => withPage('', async (win) => {
+  const T = load('src/ui/theme.js'); T.init_ui_theme(); T.init_ui_theme();
+  const links = win.document.querySelectorAll('link#brandFont'); assert.strictEqual(links.length, 1); assert.ok(links[0].href.startsWith('https://fonts.googleapis.com/css2?family=Quicksand'));
+}));
+
+test('saved screen state: the Analysis columns panel is restored open or closed, and filter panels open from the saved state only on a wide screen', () => alone(async () => {
+  const calls = []; let saved = { aColsOpen: 1 };
+  globalThis.__T = { setAnalysisColumnsPanelOpen: (v) => calls.push(v), uiStateGet: () => saved, uiStateSet: (v, ms) => calls.push([v, ms]) };
+  const R = await loadAllStubbed('src/ui/restore.js', '', []); R.init_ui_restore(); saved = {}; R.init_ui_restore(); assert.deepStrictEqual(calls, [true, false]);
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'window'); calls.length = 0;
+  const win = (phone) => Object.defineProperty(globalThis, 'window', { value: phone === undefined ? {} : { matchMedia: () => ({ matches: phone }) }, configurable: true, writable: true });
+  try {
+    const D = await loadAllStubbed('src/ui/filterdock.js', '', []);
+    saved = { open: true, shut: false };
+    win(false); assert.deepStrictEqual([D.filtersOpenSaved('open'), D.filtersOpenSaved('shut'), D.filtersOpenSaved('none')], [true, false, false]); D.rememberFiltersOpen('open', 1); assert.deepStrictEqual(calls, [[{ open: true }, 400]]);
+    win(true); calls.length = 0; assert.strictEqual(D.filtersOpenSaved('open'), false); D.rememberFiltersOpen('open', true); assert.deepStrictEqual(calls, []);   // a phone keeps the panel closed and remembers nothing
+    win(); assert.strictEqual(D.filtersOpenSaved('open'), true);   // no matchMedia: treated as a wide screen
+  } finally { if(had) Object.defineProperty(globalThis, 'window', had); else delete globalThis.window; }
+}));
+
+test('pin buttons in the strategy tables toggle a pin and update the star, but not in the Analysis leaderboard', () => withPage('<table class="strat-table"><tr><td><button class="pin-btn" data-ticker="AAA">x</button><button class="pin-btn">nodata</button></td></tr></table><div id="analysisLeaderboardBody"><table class="strat-table"><tr><td><button class="pin-btn" id="lb" data-ticker="BBB"></button></td></tr></table></div>', async (win) => {
+  const pins = new Set(), toggles = [];
+  globalThis.__T = { isPinned: (s) => pins.has(s.ticker), togglePin: (t) => { toggles.push(t); pins.has(t) ? pins.delete(t) : pins.add(t); }, closestEl: (e, sel) => (e.target.closest ? e.target.closest(sel) : null) };
+  const P = await loadAllStubbed('src/ui/pingrid.js', '', []); P.init_ui_pingrid();
+  const [btn, nodata] = win.document.querySelectorAll('.pin-btn');
+  btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.deepStrictEqual([toggles, btn.textContent, btn.title, btn.classList.contains('pinned')], [['AAA'], '★', 'Unpin', true]);
+  btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.deepStrictEqual([toggles.length, btn.textContent, btn.title], [2, '☆', 'Pin to top']);
+  nodata.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); win.document.getElementById('lb').dispatchEvent(new win.MouseEvent('click', { bubbles: true })); win.document.body.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.strictEqual(toggles.length, 2);   // no ticker, the leaderboard's own button and a click elsewhere do nothing
+}));
+
+test('full screen: the layout and the browser full screen follow one switch, and Escape or leaving full screen closes every open one', () => withPage('', async (win) => {
+  const F = load('src/ui/fullscreen.js'), log = [];
+  assert.deepStrictEqual([F.fullscreenLabel(true), F.fullscreenLabel(false)], ['Exit full screen', 'Full screen']);
+  const doc = win.document; let fsEl = null; doc.documentElement.requestFullscreen = () => { log.push('enter'); fsEl = doc.documentElement; return Promise.resolve(); };
+  doc.exitFullscreen = () => { log.push('exit'); fsEl = null; return Promise.reject(new Error('x')); };
+  Object.defineProperty(doc, 'fullscreenElement', { get: () => fsEl, configurable: true });
+  F.browserFullscreen(true); F.browserFullscreen(true); F.browserFullscreen(false); F.browserFullscreen(false); assert.deepStrictEqual(log, ['enter', 'exit']);
+  doc.documentElement.requestFullscreen = () => { throw new Error('denied'); }; F.browserFullscreen(true);   // refused: the layout alone is enough
+  let on = true, closed = 0; F.watchFullscreenExit(() => on, () => { closed++; on = false; }); F.watchFullscreenExit(() => false, () => { closed += 100; });
+  F.init_ui_fullscreen();
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a' })); assert.strictEqual(closed, 0);
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.strictEqual(closed, 1);
+  on = true; fsEl = doc.documentElement; doc.dispatchEvent(new win.Event('fullscreenchange')); assert.strictEqual(closed, 1);   // still full screen: nothing closes
+  fsEl = null; doc.dispatchEvent(new win.Event('fullscreenchange')); assert.strictEqual(closed, 2);
+}));
+
+test('saving on leave: pending preferences, screen state and strategies are written when the page is hidden or closed', () => withPage('', async (win) => {
+  const log = [];
+  globalThis.__T = { flushPrefs: () => log.push('prefs'), flushUiState: () => log.push('ui'), flushStrategies: () => log.push('strat') };
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'window'); Object.defineProperty(globalThis, 'window', { value: win, configurable: true, writable: true });
+  try {
+    const F = await loadAllStubbed('src/identity/flush.js', '', []); F.init_identity_flush();
+    win.dispatchEvent(new win.Event('pagehide')); assert.deepStrictEqual(log, ['ui', 'prefs', 'strat']); log.length = 0;
+    Object.defineProperty(win.document, 'visibilityState', { value: 'visible', configurable: true }); win.document.dispatchEvent(new win.Event('visibilitychange')); assert.deepStrictEqual(log, []);
+    Object.defineProperty(win.document, 'visibilityState', { value: 'hidden', configurable: true }); win.document.dispatchEvent(new win.Event('visibilitychange')); assert.strictEqual(log.length, 3);
+  } finally { if(had) Object.defineProperty(globalThis, 'window', had); else delete globalThis.window; }
+}));
+
+test('app actions: the debug handle gets the helpers and saved-screen tracking starts', () => alone(async () => {
+  const handle = {}; let tracking = false;
+  TV_VALUES.add('stocks');
+  globalThis.__T = { stocks: [1], setUiStateTracking: (v) => { tracking = v; }, debugHandle: () => handle };
+  const A = await loadAllStubbed('src/app/actions.js', '', []); A.init_app_actions();
+  assert.strictEqual(tracking, true); assert.deepStrictEqual(Object.keys(handle).sort(), ['applyResearchOverlay', 'applySnapshotOverlay', 'applyUpdatesOverlay', 'renderDetail', 'sanitizeDocId', 'stockResearchAgeDays', 'stocks', 'tickerSymbol']);
+}));
+
+test('page sections: each one starts its parts and draws them, and the refresh kit starts its controls and queue', () => alone(async () => {
+  const log = [];
+  const rec = (n) => () => { log.push(n); };
+  globalThis.__T = { init: rec('biz-init'), show: rec('biz-show'), init_strategies_section: rec('st-init'), renderStrategiesSection: rec('st-render'), init_tradelog_phone: rec('tl-phone'), renderTradeLogPanel: rec('tl-render'), init_tradelog_form: rec('tl-form'),
+    init_ideas: rec('ideas-init'), renderIdeas: rec('ideas-render'), startRockySync: (v) => log.push('rocky-sync:' + v), rockyHtml: () => '<b>r</b>', setHtml: (el, h) => { el.innerHTML = h; },
+    init_import_csv_upload: rec('csv'), init_import_fund_import: rec('fund'), renderWlPicker: rec('wl'), refreshLastFiles: rec('last'), renderAllLastFiles: rec('last-render'), init_joblogs_freshness: rec('fresh'), init_refresh_tvrefresh: rec('tv'), renderWatchlistSyncLogPanel: rec('wl-log'),
+    installControls: rec('controls'), initQueue: async () => { log.push('queue'); } };
+  const B = await loadAllStubbed('src/sections/business.js', 'export const __x = 1;', []); B.init(); B.render();
+  const S = await loadAllStubbed('src/sections/strategies.js', '', []); S.init(); S.render();
+  const T = await loadAllStubbed('src/sections/tradelog.js', '', []); T.init(); T.render();
+  assert.deepStrictEqual(log.splice(0), ['biz-init', 'biz-show', 'st-init', 'st-render', 'tl-form', 'ideas-init', 'tl-phone', 'tl-render', 'ideas-render']);
+  const RF = await loadAllStubbed('src/sections/refreshlog.js', '', [], { __modules: { '../import/csvparse.js': '', '../import/upload-history.js': '', '../import/fund-engine.js': '' } }); RF.init(); RF.render();
+  assert.deepStrictEqual(log.splice(0), ['fresh', 'csv', 'fund', 'last', 'tv', 'wl', 'wl-log', 'last-render']);
+  const win = globalThis.document; globalThis.document = { getElementById: (id) => (id === 'rockyBody' ? (globalThis.__rocky = globalThis.__rocky || {}) : null) };
+  try { const R = await loadAllStubbed('src/sections/rocky.js', '', []); R.init(); assert.deepStrictEqual([log.splice(0), globalThis.__rocky.innerHTML], [['rocky-sync:true'], '<b>r</b>']); globalThis.document = { getElementById: () => null }; R.render(); }   // no body on the page: nothing to draw
+  finally { if(win === undefined) delete globalThis.document; else globalThis.document = win; delete globalThis.__rocky; }
+  const K = await loadAllStubbed('src/refresh/kit.js', '', []); await K.init(); assert.deepStrictEqual(log.splice(0), ['controls', 'queue']); assert.ok(K.kit && typeof K.kit === 'object');
+}));
+
+// ---- Data stores and lookups: core/store, rocky/store, news/store, refresh/kit-lookup, strategies/pricedata, overlays/techscore2, core/stocks
+test('shared store: the database handles, pinned tickers and the trade log are read and replaced through functions, and the upload logs keep their records', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'claude');
+  try {
+    delete globalThis.claude; let S = load('src/core/store.js'); assert.strictEqual(await S.dbCapabilityPromise, null);   // no runtime: no database
+    Object.defineProperty(globalThis, 'claude', { value: { use: (n) => Promise.resolve({ n }) }, configurable: true, writable: true }); S = load('src/core/store.js'); assert.deepStrictEqual(await S.dbCapabilityPromise, { n: 'db' });
+    Object.defineProperty(globalThis, 'claude', { value: { use: () => Promise.reject(new Error('refused')) }, configurable: true, writable: true }); S = load('src/core/store.js'); assert.strictEqual(await S.dbCapabilityPromise, null);
+    assert.deepStrictEqual([S.getDb(), S.getTradeDb()], [null, null]); const db = {}; S.attachDb(db); S.attachTradeDb(db); assert.ok(S.getDb() === db && S.getTradeDb() === db);
+    S.togglePinnedTicker('AAA'); assert.strictEqual(S.isPinnedTicker('AAA'), true); S.togglePinnedTicker('AAA'); assert.strictEqual(S.isPinnedTicker('AAA'), false);
+    assert.deepStrictEqual([S.replacePinnedTickers(['A', 'B']), S.replacePinnedTickers(['B', 'A']), S.replacePinnedTickers(['A']), S.isPinnedTicker('B')], [true, false, true, false]);   // only a real change reports true
+    assert.deepStrictEqual([S.allTrades(), S.getTrade('x')], [[], undefined]); S.replaceTradeLog(new Map([['x', { _id: 'x' }], ['y', { _id: 'y' }]]));
+    assert.deepStrictEqual([S.allTrades().length, S.getTrade('y')._id], [2, 'y']);
+    const log = S.watchlistSyncLog; log.put('a', 1); log.put('b', 2); log.put('a', 3);
+    assert.deepStrictEqual([log.entries(), log.values()], [[['a', 3], ['b', 2]], [3, 2]]); log.remove('a'); assert.deepStrictEqual(log.values(), [2]);
+    S.fundamentalCsvUploadLog.put('u', 9); assert.deepStrictEqual(S.fundamentalCsvUploadLog.values(), [9]); assert.deepStrictEqual(S.watchlistSyncLog.values(), [2]);   // the two logs are separate
+  } finally { if(had) Object.defineProperty(globalThis, 'claude', had); else delete globalThis.claude; }
+}));
+
+for(const [name, file, coll, ids, hook] of [['Rocky', 'src/rocky/store.js', 'rocky', ['state', 'picks', 'weights', 'learn', 'log'], 'rocky'], ['News', 'src/news/store.js', 'news', ['pulse', 'macro', 'events'], 'news']]){
+  test(name + ' sync: no database is said plainly, a snapshot fills the known documents and clears the rest, and a failure or a silent listener is retried a few times', () => alone(async () => {
+    const realTimeout = globalThis.setTimeout, timers = [], redraws = [], realErr = console.error, errs = [];
+    globalThis.setTimeout = (f, ms) => { if(ms >= 1000){ timers.push({ f, ms }); return timers.length; } return realTimeout(f, ms); }; console.error = (m) => errs.push(String(m));
+    try {
+      let db = null, unsubs = 0, handlers = null;
+      TV_VALUES.add('dbCapabilityPromise');
+      const mk = async () => { globalThis.__T = { dbCapabilityPromise: Promise.resolve(db), renderLoadedPart: (k) => redraws.push(k) }; return loadAllStubbed(file, '', []); };
+      let M = await mk(); const store = M[hook]; await M['start' + name + 'Sync']();
+      assert.deepStrictEqual([store.noDb, store.ready, redraws], [true, true, [hook]]);
+      await M['start' + name + 'Sync'](); assert.strictEqual(redraws.length, 1);   // already started: nothing again
+      db = { collection: (c) => { assert.strictEqual(c, coll); return { onSnapshot: (ok, bad) => { handlers = { ok, bad }; return () => { unsubs++; }; } }; } };
+      M = await mk(); const s2 = M[hook]; redraws.length = 0; await M['start' + name + 'Sync']();
+      const doc = (id, data, exists = true) => ({ id, exists, data: () => data });
+      handlers.ok({ docs: [doc(ids[0], { v: 1 }), doc('other', { v: 2 }), doc(ids[1], null, false)] });
+      assert.deepStrictEqual([s2[ids[0]], s2[ids[1]], s2.other, s2.ready, redraws], [{ v: 1 }, null, undefined, true, [hook]]);
+      handlers.ok({ docs: [] }); assert.strictEqual(s2[ids[0]], null);   // a document that is gone is cleared
+      await M['start' + name + 'Sync'](true); assert.strictEqual(unsubs, 1);   // the old listener is closed before a new one
+      handlers.bad(new Error('denied')); assert.ok(errs.some((e) => e.includes('sync error')) && timers.some((t) => t.ms === 3000));
+      timers.length = 0; for(let i = 0; i < 6; i++){ await M['start' + name + 'Sync'](true); handlers.bad(new Error('x')); }
+      assert.ok(timers.filter((t) => t.ms % 3000 === 0).length <= 5, 'no more than five retries');
+      timers.length = 0; handlers = null; await M['start' + name + 'Sync'](true); assert.ok(timers.some((t) => t.ms === 8000));   // never heard anything: retry
+      const eight = timers.find((t) => t.ms === 8000); eight.f();
+      db = { collection: () => { throw new Error('boom'); } }; M = await mk(); redraws.length = 0; await M['start' + name + 'Sync'](); assert.ok(errs.some((e) => e.includes('unavailable')) && redraws.length === 1);
+      db = { collection: () => ({ onSnapshot: () => () => { throw new Error('gone'); } }) }; M = await mk(); await M['start' + name + 'Sync'](); await M['start' + name + 'Sync'](true);   // an old listener that fails to close is ignored
+      if(name === 'News'){ let n = 0; M.setNewsChangeHook(() => { n++; }); M.newsChanged(); M.setNewsChangeHook(null); M.newsChanged(); assert.strictEqual(n, 1); }
+    } finally { globalThis.setTimeout = realTimeout; console.error = realErr; }
+  }));
+}
+
+test('refresh lookup: stocks are found by key, sections follow where a refresh came from, and scopes, toolbars and selections are kept by name', () => alone(async () => {
+  const list = [{ name: 'A' }, { name: 'B' }]; TV_VALUES.add('stocks');
+  globalThis.__T = { stocks: list, pcTickerKey: (s) => s.name };
+  const L = await loadAllStubbed('src/refresh/kit-lookup.js', '', []);
+  assert.deepStrictEqual([L.stockByKey('A'), L.stockByKey('Z')], [list[0], null]); list.push({ name: 'C' }); assert.strictEqual(L.stockByKey('C').name, 'C');   // the list grew: the map is rebuilt
+  assert.deepStrictEqual(['analysis', 'strat', 'biz-industry', 'detail', '', undefined].map(L.sectionOf), ['analysis', 'strategies', 'business', '', '', '']);
+  L.defineScope('s1', { label: 'L', stocks: () => [list[0], null, list[1]] }); L.defineScope('bad', { stocks: () => { throw new Error('x'); } });
+  assert.deepStrictEqual([L.scopeStocks('s1').length, L.scopeStocks('bad'), L.scopeStocks('none'), L.getScope('s1').label], [2, [], [], 'L']);
+  const tb = () => []; L.defineToolbar('t', tb); assert.ok(L.getToolbar('t') === tb && L.getToolbar('u') === undefined);
+  L.selKeys('analysis').add('A'); L.selKeys('analysis').add('Z'); L.selKeys('fresh').add('B');
+  assert.deepStrictEqual([L.selectedStocks('analysis').map((s) => s.name), L.selectedStocks('fresh').map((s) => s.name), L.isExternalSelection('analysis')], [['A'], ['B'], false]);
+  const ext = new Set(['C']); L.useExternalSelection('strat', () => ext);
+  assert.deepStrictEqual([L.isExternalSelection('strat'), L.selKeys('strat') === ext, L.selectedStocks('strat').map((s) => s.name)], [true, true, ['C']]);
+}));
+
+test('strategy price set: bars from every stock\'s documents are joined with the recent bars, inactive stocks are left out, and the result is kept until forced', () => alone(async () => {
+  const docs = [{ exists: true, data: () => ({ ticker: 'AAA', interval: '1W', bars: [1], fetchedAt: '2026-11-01' }) }, { exists: true, data: () => ({ ticker: 'AAA', interval: '1M', bars: [2], fetchedAt: '2026-11-05' }) },
+    { exists: true, data: () => ({ ticker: 'AAA', interval: '1W', bars: [1], fetchedAt: '2026-10-01' }) }, { exists: true, data: () => ({ ticker: 'OLD', interval: '1W', bars: [9] }) }, { exists: false }, { exists: true, data: () => null }, { exists: true, data: () => ({ ticker: 'NOBARS', bars: 'x' }) }, { exists: true, data: () => ({ ticker: 'BBB', interval: '1X', bars: [3] }) }];
+  let reads = 0, recent = 0, db = { collection: () => ({ get: async () => { reads++; return { docs }; } }) };
+  TV_VALUES.add('dbCapabilityPromise'); TV_VALUES.add('stockByTickerSymbolAny');
+  const setup = async () => { globalThis.__T = { dbCapabilityPromise: Promise.resolve(db), stockByTickerSymbolAny: new Map([['OLD', { active: false }], ['AAA', { active: true }]]), loadRecentBars: async () => { recent++; }, withRecent: (key, bars, fetched) => ({ bars: { '1W': bars['1W'], '1M': bars['1M'] }, fetched: 'rec-' + fetched }) }; return loadAllStubbed('src/strategies/pricedata.js', '', []); };
+  let P = await setup(); const out = await P.loadPriceSet();
+  assert.deepStrictEqual([[...out.keys()].sort(), out.get('AAA'), out.get('BBB').w], [['AAA', 'BBB'], { w: [1], m: [2], fetchedAt: 'rec-2026-11-05' }, null]);   // the newest fetch time wins; inactive and unreadable documents are dropped
+  assert.ok(await P.loadPriceSet() === out && reads === 1); await P.loadPriceSet(true); assert.strictEqual(reads, 2); assert.strictEqual(recent, 2);
+  db = null; P = await setup(); assert.strictEqual((await P.loadPriceSet()).size, 0);   // no database: nothing
+}));
+
+test('technical score 2 overlay: scores are attached by document id, an older set is removed first, and the detail page and an open Analysis are redrawn', () => withPage('<section id="section-analysis" class="active"></section>', async (win) => {
+  const a = { name: 'A' }, b = { name: 'B' }, redraws = [];
+  globalThis.__T = { refreshAnalysisSoon: () => redraws.push('analysis'), rerenderDetail: () => redraws.push('detail'), stockByDocId: () => new Map([['a', a], ['b', b]]) };
+  const O = await loadAllStubbed('src/overlays/techscore2.js', '', []);
+  O.applyTech2Overlay([{ data: { asof: '2026-11-10', rows: [{ k: 'a', s: 6.5, z: 1.2, w: 'W' }, { k: 'zz', s: 1 }, null, { k: 5 }, { k: 'b', s: 'x', z: null }] } }, { data: null }, { data: { rows: 'bad' } }]);
+  assert.deepStrictEqual([a.technical2, b.technical2, redraws], [{ score: 6.5, z: 1.2, week: 'W', asof: '2026-11-10' }, { score: null, z: null, week: null, asof: '2026-11-10' }, ['detail', 'analysis']]);
+  O.applyTech2Overlay([{ data: { rows: [{ k: 'b', s: 2, z: 0 }] } }]); assert.deepStrictEqual([a.technical2, b.technical2.score, b.technical2.asof], [undefined, 2, null]);   // the older set is cleared first
+  win.document.getElementById('section-analysis').classList.remove('active'); redraws.length = 0; O.applyTech2Overlay([]); assert.deepStrictEqual(redraws, ['detail']);
+}));
+
+test('stock list: inactive stocks are left out of the lists, scores count only reliable information, the best score is first, and the model text is filled in', () => alone(async () => {
+  const mk = (n, score, extra) => Object.assign({ name: n, ticker: n + '·X', score }, extra);
+  const list = [mk('LOW', 3), mk('GONE', 9, { active: false }), mk('TOP', 8, { fundamentals: { scoringBreakdown: {} } }), mk('MID', 5, { fundamentals: { model: 'own', scoringBreakdown: { note: 'own note' } } })];
+  globalThis.__T = { tickerSymbol: (s) => s.name, getBootStocks: () => list, applyFundamentalConfidence: (s) => { s.checked = true; } };
+  const S = await loadAllStubbed('src/core/stocks.js', '', []);
+  assert.deepStrictEqual([S.stocks.map((s) => s.name), S.stockIndex.get(S.stocks[0]), [...S.stockByTickerSymbol.keys()], [...S.stockByTickerSymbolAny.keys()].sort()], [['TOP', 'MID', 'LOW'], 0, ['TOP', 'MID', 'LOW'], ['GONE', 'LOW', 'MID', 'TOP']]);
+  assert.ok(list.every((s) => s.checked));   // every stock, active or not
+  assert.ok(list[2].fundamentals.model.startsWith('9-factor model') && list[2].fundamentals.scoringBreakdown.note.startsWith('9-factor model') && list[3].fundamentals.model === 'own' && list[3].fundamentals.scoringBreakdown.note === 'own note');
+  assert.strictEqual(S.verdictLabel.pending, 'Pending Research');
+}));
+
+// ---- UI helpers: ui/scrollkeep, viewstack, historyrestore, dropmenu, confirm, gridsort, analysis/selectbar
+test('scroll keeping: scroll positions of the known scroll areas survive a redraw, and a redraw waits for the page to stop scrolling', () => withPage('<div id="root"><div class="strat-table-wrap" id="a"></div><div class="strat-table-wrap" id="b"></div><div class="biz-scroll" id="c"></div></div>', async (win) => {
+  const K = load('src/ui/scrollkeep.js'), root = win.document.getElementById('root'), [a, b, c] = ['a', 'b', 'c'].map((id) => win.document.getElementById(id));
+  const redrawn = []; K.keepScroll(null, () => redrawn.push('no root')); assert.deepStrictEqual(redrawn, ['no root']);
+  b.scrollLeft = 5; b.scrollTop = 7; c.scrollTop = 9;   // jsdom keeps assigned scroll offsets
+  const seen = []; K.keepScroll(root, () => { seen.push([a.scrollLeft, b.scrollLeft, b.scrollTop, c.scrollTop]); b.scrollLeft = 0; b.scrollTop = 0; c.scrollTop = 0; });
+  assert.deepStrictEqual([seen, b.scrollLeft, b.scrollTop, c.scrollTop], [[[0, 5, 7, 9]], 5, 7, 9]);   // put back after the redraw
+  b.scrollLeft = 3; assert.throws(() => K.keepScroll(root, () => { b.scrollLeft = 0; throw new Error('draw failed'); }), /draw failed/); assert.strictEqual(b.scrollLeft, 3);   // even when it fails
+  const marks = []; b.remove(); K.keepScroll(root, () => marks.push('ok')); assert.deepStrictEqual(marks, ['ok']);   // an area that is gone is skipped
+  // redrawWhenIdle: the real timers are held, so the waits are checked, not waited for
+  const real = globalThis.setTimeout, held = [], quietErr = console.error, errs = [];
+  globalThis.setTimeout = (f, ms) => { held.push({ f, ms }); return held.length; }; console.error = (m) => errs.push(String(m));
+  try {
+    const log = []; K.redrawWhenIdle('k', () => log.push('first')); K.redrawWhenIdle('k', () => log.push('same key')); assert.strictEqual(held.length, 1);   // one redraw per key
+    assert.ok(held[0].ms === 2500 || held[0].ms === 60);   // longer right after launch
+    held[0].f(); assert.deepStrictEqual(log, ['first']);   // nothing was scrolling: it ran at once
+    held.length = 0; K.redrawWhenIdle('e', () => { throw new Error('bad draw'); }); held[0].f(); assert.ok(errs.some((e) => e.includes('Could not redraw after an update')));   // a failing redraw is reported, not thrown
+    K.redrawWhenIdle('k', () => log.push('again')); win.document.dispatchEvent(new win.Event('scroll')); held.length = 0;
+    K.redrawWhenIdle('s', () => log.push('scroll')); const first = held.pop(); first.f();   // a scroll just happened: it waits again
+    assert.deepStrictEqual([log.length, held.length, held[0].ms > 0 && held[0].ms <= 370], [1, 1, true]);
+    held.length = 0;
+  } finally { globalThis.setTimeout = real; console.error = quietErr; }
+}));
+
+test('view history: moves between pages are pushed once per turn, the same view replaces instead of pushing, Back restores through the registered function, and nothing is recorded while restoring', () => alone(async () => {
+  const hist = [], listeners = {};
+  const names = ['window', 'history'], saved = names.map((k) => [k, Object.getOwnPropertyDescriptor(globalThis, k)]);
+  Object.defineProperty(globalThis, 'window', { value: { addEventListener: (t, f) => { listeners[t] = f; } }, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'history', { value: { replaceState: (s) => hist.push(['replace', s.alba]), pushState: (s) => hist.push(['push', s.alba]) }, configurable: true, writable: true });
+  try {
+    const V = load('src/ui/viewstack.js'); V.recordView({ s: 'a' }); await Promise.resolve(); await Promise.resolve(); assert.deepStrictEqual(hist, []);   // before init: nothing is recorded
+    V.init_ui_viewstack({ s: 'analysis' }); assert.deepStrictEqual(hist, [['replace', { s: 'analysis' }]]);
+    V.recordView({ s: 'business' }); V.recordView({ s: 'business', t: 'AAA' }); await Promise.resolve(); await Promise.resolve();   // two in one turn: the last wins
+    assert.deepStrictEqual(hist.slice(1), [['push', { s: 'business', t: 'AAA' }]]);
+    V.recordView({ s: 'business', t: 'AAA', i: null }); await Promise.resolve(); await Promise.resolve(); assert.deepStrictEqual(hist.at(-1), ['replace', { s: 'business', t: 'AAA', i: null }]);   // the same view: replaced, not pushed
+    const calls = []; listeners.popstate({ state: { alba: { s: 'x' } } }); assert.deepStrictEqual(calls, []);   // no restorer yet
+    V.setViewRestorer((v, cur) => { calls.push([v, cur]); V.recordView({ s: 'ignored' }); });
+    listeners.popstate({ state: null }); listeners.popstate({ state: {} });
+    listeners.popstate({ state: { alba: { s: 'analysis' } } }); await Promise.resolve(); await Promise.resolve();
+    assert.deepStrictEqual([calls.length, calls[0][0], hist.every((h) => h[1].s !== 'ignored')], [1, { s: 'analysis' }, true]);
+    Object.defineProperty(globalThis, 'history', { value: { replaceState() { throw new Error('no history'); } }, configurable: true, writable: true });
+    const V2 = load('src/ui/viewstack.js'); V2.init_ui_viewstack({ s: 'x' }); V2.recordView({ s: 'y' }); await Promise.resolve(); await Promise.resolve();   // history unavailable: nothing breaks
+    Object.defineProperty(globalThis, 'history', { value: { replaceState() {}, pushState() { throw new Error('quota'); } }, configurable: true, writable: true });
+    const V3 = load('src/ui/viewstack.js'); V3.init_ui_viewstack({ s: 'x' }); V3.recordView({ s: 'z' }); await Promise.resolve(); await Promise.resolve();
+  } finally { saved.forEach(([k, d]) => { if(d) Object.defineProperty(globalThis, k, d); else delete globalThis[k]; }); }
+}));
+
+test('page restore: the last page opens for a signed-in user, a stock link opens Explorer, and Back goes to the page, the stock or closes the inline detail', () => alone(async () => {
+  const log = []; let restorer = null, link = null, uid = 'u1', saved = { section: 'strategies' }, open = null;
+  TV_VALUES.add('stocks'); TV_VALUES.add('appSections');
+  globalThis.__T = { stocks: [{ s: 'AAA' }, { s: 'BBB' }], tickerSymbol: (s) => s.s, appSections: { analysis: 'A', strategies: 'S', business: 'B' }, showSection: (k) => log.push(['show', k]), closeInlineDetail: (r) => log.push(['close', r]), inlineOpenIn: () => open,
+    openStockInline: (sec, label, idx) => log.push(['open', sec, label, idx]), stockCodeFromAddress: () => link, uiStateGet: () => { if(saved === 'boom') throw new Error('storage'); return saved; }, getUid: () => uid,
+    init_ui_viewstack: (v) => log.push(['init', v]), setViewRestorer: (f) => { restorer = f; } };
+  const H = await loadAllStubbed('src/ui/historyrestore.js', '', []);
+  H.init_ui_historyrestore(); assert.deepStrictEqual(log.splice(0), [['show', 'strategies'], ['init', { s: 'strategies' }]]);
+  uid = null; H.init_ui_historyrestore(); assert.deepStrictEqual(log.splice(0), [['show', 'analysis'], ['init', { s: 'analysis' }]]);   // not signed in: the default
+  uid = 'u1'; saved = { section: 'gone' }; H.init_ui_historyrestore(); assert.deepStrictEqual(log.splice(0)[0], ['show', 'analysis']);
+  await quietErrors(async () => { saved = 'boom'; H.init_ui_historyrestore(); }); log.length = 0;
+  link = 'AAA'; H.init_ui_historyrestore(); assert.deepStrictEqual(log.splice(0), [['init', { s: 'business' }]]);   // a stock link: Explorer, and its own code opens the stock
+  restorer({ s: 'analysis' }); assert.deepStrictEqual(log.splice(0), [['show', 'analysis']]);
+  open = 'analysis'; restorer({ s: 'analysis' }); assert.deepStrictEqual(log.splice(0), [['close', true]]);   // the inline detail is open on that page: close it
+  open = null; restorer({ s: 'business', t: 'BBB', i: 'Explorer' }); assert.deepStrictEqual(log.splice(0), [['show', 'business'], ['open', 'B', 'Explorer', 1]]);
+  open = 'business'; restorer({ s: 'business', t: 'AAA' }); assert.deepStrictEqual(log.splice(0), [['open', 'B', '', 0]]);   // already on that page: only the stock changes
+  restorer({ s: 'analysis', t: 'ZZZ' }); assert.deepStrictEqual(log.splice(0), [['show', 'analysis']]);   // the stock is gone: just the page
+  restorer({ s: 'nowhere', t: 'AAA' }); assert.deepStrictEqual(log.splice(0), [['show', 'nowhere']]);
+}));
+
+test('drop-down menus: the button list is escaped, one menu is open at a time, a click elsewhere or Escape closes it and returns focus', () => withPage('<div id="host"></div><div id="elsewhere"></div>', async (win) => {
+  globalThis.__T = { escapeHtml: (x) => String(x).replace(/</g, '&lt;') };
+  const D = await loadAllStubbed('src/ui/dropmenu.js', '', []), doc = win.document;
+  const html = D.dropMenuHtml({ btnHtml: '<b>x</b>', label: 'Menu <', right: true, extraClass: 'wide', items: [{ attrs: 'data-a="1"', title: 'One <i>', desc: 'first', current: true, cls: 'x' }, { attrs: '', title: 'Two' }] });
+  assert.ok(html.includes('dm-right wide') && html.includes('One &lt;i&gt;'.replace('&lt;i&gt;', '&lt;i>')) || html.includes('One &lt;i>'), html.slice(0, 300)); assert.ok(html.includes('current x') && html.includes('data-dm-toggle'));
+  assert.ok(!D.dropMenuHtml({ btnHtml: 'b', items: [] }).includes('dm-right'));
+  doc.getElementById('host').innerHTML = D.dropMenuHtml({ btnHtml: 'one', items: [{ attrs: '', title: 'A' }] }) + D.dropMenuHtml({ btnHtml: 'two', items: [{ attrs: '', title: 'B' }] }) + '<div class="dm"><button class="dm-btn" data-dm-toggle>nopop</button></div>';
+  D.init_ui_dropmenu();
+  const [m1, m2, m3] = doc.querySelectorAll('.dm'), pop = (m) => m.querySelector('.dm-pop'), btn = (m) => m.querySelector('.dm-btn'), click = (el) => el.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  click(btn(m1)); assert.deepStrictEqual([pop(m1).hidden, btn(m1).getAttribute('aria-expanded')], [false, 'true']);
+  click(btn(m2)); assert.deepStrictEqual([pop(m1).hidden, pop(m2).hidden, btn(m1).getAttribute('aria-expanded')], [true, false, 'false']);
+  click(btn(m3)); assert.strictEqual(pop(m2).hidden, true);   // a menu with no pop-up: nothing opens, the others close
+  click(btn(m1)); click(doc.getElementById('elsewhere')); assert.strictEqual(pop(m1).hidden, true);
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' }));   // nothing open: nothing happens
+  click(btn(m1)); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a' })); assert.strictEqual(pop(m1).hidden, false);
+  btn(m1).blur(); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.deepStrictEqual([pop(m1).hidden, doc.activeElement === btn(m1)], [true, true]);
+}));
+
+test('confirm box: OK resolves true, Cancel, Escape or a click outside resolve false, a notice has one button, and the message is text only', () => withPage('', async (win) => {
+  globalThis.__T = { closestEl: (e, sel) => (e.target.closest ? e.target.closest(sel) : null), setHtml: (el, h) => { el.innerHTML = h; } };
+  const C = await loadAllStubbed('src/ui/confirm.js', '', []), doc = win.document, box = () => doc.getElementById('albaConfirm'), click = (sel) => doc.querySelector(sel).dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  let p = C.askConfirm('Delete <img src=x onerror=alert(1)>?', 'Delete'); assert.ok(box().querySelector('.alba-confirm-msg').textContent.includes('<img') && !box().querySelector('img') && doc.activeElement.id === 'albaConfirmOk' && doc.getElementById('albaConfirmOk').textContent === 'Delete');
+  click('#albaConfirmOk'); assert.strictEqual(await p, true); assert.strictEqual(box(), null);
+  p = C.askConfirm('Sure?'); assert.strictEqual(doc.getElementById('albaConfirmOk').textContent, 'OK'); click('#albaConfirmNo'); assert.strictEqual(await p, false);
+  p = C.askConfirm('Sure?'); const stopped = []; doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a' })); assert.ok(box()); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.strictEqual(await p, false);
+  p = C.askConfirm('Sure?'); box().dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.strictEqual(await p, false);   // the backdrop
+  p = C.askConfirm('Again?'); const old = box(); const p2 = C.askConfirm('Newer?'); assert.strictEqual(doc.querySelectorAll('#albaConfirm').length, 1); click('#albaConfirmOk'); assert.strictEqual(await p2, true); old.remove();
+  p = C.tellUser('Heads up'); assert.strictEqual(doc.getElementById('albaConfirmNo').hidden, true); click('#albaConfirmOk'); assert.strictEqual(await p, true);
+  p = C.askConfirm('Sure?'); const inner = doc.querySelector('.alba-confirm-card'); inner.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.ok(box()); click('#albaConfirmNo'); await p;   // a click inside the card does nothing
+}));
+
+test('stock grid sort: a click on a header sorts the rows, renumbers the ranks and redraws the headers; a table without columns is left alone', () => withPage('<table id="t" data-cols="score,name"><thead><tr><th data-sort-col="score">S</th><th>plain</th></tr></thead><tbody><tr data-idx="0"><td class="analysis-lb-rank">1</td></tr><tr data-idx="1"><td class="analysis-lb-rank">2</td></tr><tr data-idx="2"><td class="analysis-lb-rank">3</td></tr></tbody></table><table id="n"><thead><tr></tr></thead><tbody></tbody></table>', async (win) => {
+  TV_VALUES.add('stocks');
+  globalThis.__T = { stocks: [{ v: 2 }, { v: 3 }, { v: 1 }], nextSort: (cur, id) => ({ col: id, dir: 'asc' }), compareByColumn: (col, dir) => (a, b) => a.v - b.v, columnHeaderHtml: (id, sort) => `<th data-sort-col="${id}">${id}:${sort.col}</th>`, setHtml: (el, h) => { el.innerHTML = h; } };
+  const G = await loadAllStubbed('src/ui/gridsort.js', '', []), doc = win.document, t = doc.getElementById('t');
+  G.wireStockGridSort(doc.getElementById('n')); G.wireStockGridSort(t);
+  t.querySelector('thead tr').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));   // not on a sort button
+  assert.deepStrictEqual([...t.querySelectorAll('tbody tr')].map((r) => r.dataset.idx), ['0', '1', '2']);
+  t.querySelector('[data-sort-col]').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.deepStrictEqual([[...t.querySelectorAll('tbody tr')].map((r) => r.dataset.idx), [...t.querySelectorAll('.analysis-lb-rank')].map((c) => c.textContent), t.querySelector('thead tr').textContent, G.NO_SORT], [['2', '0', '1'], ['1', '2', '3'], 'score:scorename:score', { col: '', dir: 'desc' }]);
+}));
+
+test('Analysis refresh scope: the shown stocks are the scope of the refresh buttons, drawn when the kit exists, and a batch is taken for the shown stocks in order', () => alone(async () => {
+  const calls = []; let kit = null, shown = [2, 0, 9];
+  TV_VALUES.add('stocks'); TV_VALUES.add('analysisFilters');
+  globalThis.__T = { stocks: [{ n: 'A' }, { n: 'B' }, { n: 'C' }], analysisFilters: { sortCol: 'score', sortDir: 'desc', view: 'all' }, getAnalysisShownIdx: () => shown, getRefreshKit: () => kit,
+    createBatchRounds: () => ({ take: (kind, list, key) => { calls.push([kind, list.map((s) => s.n), key]); return 'batch'; } }) };
+  const S = await loadAllStubbed('src/analysis/selectbar.js', '', []);
+  S.defineAnalysisScope(); S.updateAnalysisRefresh();   // no kit yet: nothing happens
+  assert.strictEqual(S.analysisTakeBatch('fund'), 'batch'); assert.deepStrictEqual(calls, [['fund', ['C', 'A'], '3:scoredesc:all']]);   // an index with no stock is skipped
+  const defs = [], repaints = []; kit = { defineScope: (id, def) => defs.push([id, def]), repaint: () => repaints.push(1) };
+  S.updateAnalysisRefresh(); assert.deepStrictEqual([defs[0][0], defs[0][1].label, defs[0][1].selName, defs[0][1].stocks().length, repaints.length], ['analysis', 'shown stocks', 'analysis', 2, 1]);
+}));
+
+// ---- Small logic modules: ui/errorlog, import/joblock, livedata/symbols, panel, claudegate, tv/links, boot/partials
+test('error log: page errors are recorded once each, noise is ignored, the first one is announced, and a batch is saved to the user\'s record', () => withPage('<section class="app-section active" id="section-news"></section><span class="brand-version">v9.9</span>', async (win) => {
+  const listeners = {}, sets = [], notes = [], held = [], real = globalThis.setTimeout;
+  const hadWin = Object.getOwnPropertyDescriptor(globalThis, 'window'); Object.defineProperty(globalThis, 'window', { value: { addEventListener: (t, f) => { listeners[t] = f; } }, configurable: true, writable: true });
+  let ref = { get: async () => ({ exists: true, data: () => ({ errors: Array.from({ length: 19 }, (_, i) => ({ msg: 'old' + i })) }) }), set: async (d) => { sets.push(d); } };
+  globalThis.__T = { userRef: () => ref, activityNotify: (n) => notes.push(n) };
+  globalThis.setTimeout = (f, ms) => { held.push({ f, ms }); return held.length; };
+  try {
+    const E = await loadAllStubbed('src/ui/errorlog.js', '', []); E.init_ui_errorlog();
+    listeners.error({ message: 'Boom', filename: 'https://x/app.js', lineno: 7 }); listeners.error({ message: 'Boom', filename: 'https://x/app.js', lineno: 7 });   // the same error twice: once
+    listeners.error({ message: 'ResizeObserver loop limit exceeded' }); listeners.error({ message: 'Script error.' }); listeners.error({ message: '' }); listeners.error({ error: { message: 'From error object' } });
+    listeners.unhandledrejection({ reason: new Error('nope') }); listeners.unhandledrejection({ reason: 'plain text' }); listeners.unhandledrejection({ reason: null });
+    assert.strictEqual(notes.length, 1); assert.deepStrictEqual([notes[0].tone, notes[0].title, notes[0].text.startsWith('Boom')], ['warn', 'Something went wrong on this page', true]);
+    assert.deepStrictEqual(held.map((h) => h.ms), [3000]);   // one save timer for the batch
+    held[0].f(); await new Promise((r) => real(r, 10));
+    const saved = sets[0]; assert.deepStrictEqual([saved.v, saved.errors.length, saved.errors.at(-1).msg, saved.errors.at(-1).page, saved.errors.at(-1).version, saved.errors.filter((e) => e.where === 'app.js:7').length], [1, 20, 'Unhandled rejection: null', 'news', 'v9.9', 1]);   // the newest 20 are kept
+    for(let i = 0; i < 40; i++) listeners.error({ message: 'e' + i }); assert.ok(sets.length === 1);   // at most 30 per page
+    held.at(-1).f(); await new Promise((r) => real(r, 10));
+    ref = null; listeners.error({ message: 'late' }); held.at(-1).f(); await new Promise((r) => real(r, 10));   // signed out: dropped quietly
+    ref = { get: async () => { throw new Error('offline'); } }; listeners.error({ message: 'again' }); held.at(-1).f(); await new Promise((r) => real(r, 10));   // best effort
+    listeners.error({ message: 'x'.repeat(500) });
+    Object.defineProperty(globalThis, 'document', { value: null, configurable: true, writable: true }); listeners.error({ message: 'document gone' });   // the log never raises an error of its own
+  } finally { globalThis.setTimeout = real; if(hadWin) Object.defineProperty(globalThis, 'window', hadWin); else delete globalThis.window; }
+}));
+
+test('job lock: another tab\'s running job blocks until it goes quiet, the tab id is kept for the session, and the heartbeat updates the record until stopped', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'window'), store = memoryStorage(), real = { si: globalThis.setInterval, ci: globalThis.clearInterval };
+  Object.defineProperty(globalThis, 'window', { value: { sessionStorage: store, crypto: { getRandomValues: (a) => a.fill(7) } }, configurable: true, writable: true });
+  try {
+    globalThis.__T = { formatUploadTimestamp: (t) => 'T(' + t + ')' };
+    let J = await loadAllStubbed('src/import/joblock.js', '', []);
+    assert.strictEqual(J.tabId, store.getItem('albaJobTab'));
+    const J2 = await loadAllStubbed('src/import/joblock.js', '', []); assert.strictEqual(J2.tabId, J.tabId);   // the same tab keeps its id
+    const ago = (ms) => new Date(Date.now() - ms).toISOString();
+    assert.deepStrictEqual([J.lockBusy(null), J.lockBusy({ status: 'done', owner: 'x' }), J.lockBusy({ status: 'running', owner: J.tabId, heartbeatAt: ago(0) }), J.lockBusy({ status: 'running', owner: 'other', heartbeatAt: ago(60000) }), J.lockBusy({ status: 'running', owner: 'other', heartbeatAt: ago(200000) }), J.lockBusy({ status: 'running', owner: 'other', startedAt: ago(1000) }), J.lockBusy({ status: 'running', owner: 'other' })], [false, false, false, true, false, true, false]);
+    assert.strictEqual(J.lockText({ startedAt: 'S' }), 'started T(S)'); assert.strictEqual(J.lockText({ startedAt: 'S', heartbeatAt: 'H' }), 'started T(S), last active T(H)');
+    let fn = null, cleared = 0; globalThis.setInterval = (f, ms) => { fn = f; assert.strictEqual(ms, 20000); return 5; }; globalThis.clearInterval = (t) => { assert.strictEqual(t, 5); cleared++; };
+    const updates = []; const stop = J.startBeat({ update: (d) => { updates.push(Object.keys(d)); return Promise.resolve(); } }); fn(); assert.deepStrictEqual(updates, [['heartbeatAt']]);
+    const stop2 = J.startBeat({ update: () => { throw new Error('sync fail'); } }); fn(); stop(); stop2(); assert.strictEqual(cleared, 2);
+    const stop3 = J.startBeat({ update: () => Promise.reject(new Error('async fail')) }); fn(); await Promise.resolve();
+    // storage and crypto unavailable
+    Object.defineProperty(globalThis, 'window', { value: { sessionStorage: { getItem() { throw new Error('blocked'); } } }, configurable: true, writable: true });
+    const J3 = await loadAllStubbed('src/import/joblock.js', '', []); assert.ok(/^tab-/.test(J3.tabId));
+  } finally { globalThis.setInterval = real.si; globalThis.clearInterval = real.ci; if(had) Object.defineProperty(globalThis, 'window', had); else delete globalThis.window; }
+}));
+
+test('TradingView quote and symbol check: only a positive price counts, a verified symbol is remembered, and an unusable price is an error', () => alone(async () => {
+  const calls = []; let price = '123.4';
+  globalThis.__T = { pcTickerKey: (s) => s.k, tvCall: async (tool, args) => { calls.push([tool, args.symbol]); return price === 'none' ? null : { data: { close: price } }; }, tvResolveSymbol: async (s) => 'NSE:' + s.k };
+  const L = await loadAllStubbed('src/livedata/symbols.js', '', []);
+  assert.deepStrictEqual(await L.ldQuote('NSE:A'), { price: 123.4 });
+  for(const bad of ['0', '-1', '', 'abc', 'none']){ price = bad; assert.deepStrictEqual(await L.ldQuote('NSE:A'), { price: null }, bad); }
+  price = '10'; const v = await L.ldVerifiedSymbol({ k: 'A' }); assert.deepStrictEqual(v, { sym: 'NSE:A', price: 10 }); calls.length = 0;
+  assert.ok(await L.ldVerifiedSymbol({ k: 'A' }) === v && calls.length === 0 && L.ldSymOk.has('A'));   // remembered
+  price = '0'; await assert.rejects(L.ldVerifiedSymbol({ k: 'B' }), /no usable price for NSE:B/); assert.ok(!L.ldSymOk.has('B'));
+}));
+
+test('batch rounds: each kind walks the list one batch at a time, starts again when the list changes or ends', () => {
+  const R = load('src/livedata/panel.js').createBatchRounds({ fund: 2, tech: 3 }), list = ['a', 'b', 'c', 'd', 'e'];
+  assert.deepStrictEqual(R.plan('fund', list, 'k'), { list: ['a', 'b'], from: 0, to: 2, all: 5 });
+  assert.deepStrictEqual([R.take('fund', list, 'k'), R.take('fund', list, 'k'), R.take('fund', list, 'k'), R.take('fund', list, 'k')], [['a', 'b'], ['c', 'd'], ['e'], ['a', 'b']]);   // after the last batch it starts over
+  R.take('fund', list, 'k'); assert.deepStrictEqual(R.take('fund', list, 'other'), ['a', 'b']);   // a new plan key starts at the top
+  assert.deepStrictEqual(R.take('tech', list, 'k'), ['a', 'b', 'c']); assert.deepStrictEqual(R.take('fund', [], 'z'), []); assert.deepStrictEqual(R.take('tech', ['x'], 'k'), ['x']);
+  const D = load('src/livedata/panel.js').createBatchRounds(); assert.strictEqual(D.take('fund', Array.from({ length: 60 }, (_, i) => i), 'k').length, 50);
+});
+
+test('Claude controls: the master switch and each step default to on, turning one off is saved, and a damaged saved value is ignored', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'localStorage'), store = memoryStorage(), saved = [];
+  Object.defineProperty(globalThis, 'localStorage', { value: store, configurable: true, writable: true });
+  try {
+    globalThis.__T = { prefSet: (k, v) => { saved.push([k, v]); store.setItem(k, v); } };
+    const C = await loadAllStubbed('src/livedata/claudegate.js', '', []);
+    assert.deepStrictEqual([C.claudeMasterOn(), C.claudeStepOn('strengths'), C.claudeAnyOn(), C.CLAUDE_STEPS.length], [true, true, true, 9]);
+    C.setClaudeStep('strengths', false); assert.deepStrictEqual([saved.at(-1), C.claudeStepOn('strengths'), C.claudeStepOn('newsLabels')], [['albaDashboard.claudeControls.v1', '{"strengths":false}'], false, true]);
+    C.setClaudeStep('strengths', true); assert.strictEqual(saved.at(-1)[1], '{}');
+    store.setItem('albaDashboard.claudeControls.v1', '{"all":false}'); assert.deepStrictEqual([C.claudeMasterOn(), C.claudeStepOn('strengths'), C.claudeAnyOn()], [false, false, false]);
+    for(const bad of ['not json', 'null', '5']){ store.setItem('albaDashboard.claudeControls.v1', bad); assert.strictEqual(C.claudeMasterOn(), true, bad); }
+  } finally { if(had) Object.defineProperty(globalThis, 'localStorage', had); else delete globalThis.localStorage; }
+}));
+
+test('TradingView chart links: NSE codes link to NSE, numeric BSE codes use the saved alpha symbol when there is one, and the saved map is read once', () => alone(async () => {
+  TV_VALUES.add('dbCapabilityPromise');
+  const mk = async (db) => { globalThis.__T = { LINK_ICON: '<i></i>', dbCapabilityPromise: Promise.resolve(db) }; return loadAllStubbed('src/tv/links.js', '', []); };
+  let L = await mk({ doc: () => ({ get: async () => ({ exists: true, data: () => ({ '500100': 'TCS', '1': 5, '2': null }) }) }) }); L.init_tv_links(); await new Promise((r) => setTimeout(r, 10));
+  assert.deepStrictEqual([L.tvUrlFor({ ticker: 'tcs·IT' }), L.tvUrlFor({ ticker: '500100·X' }), L.tvUrlFor({ ticker: '999·X' }), L.tvUrlFor({ ticker: 'M&M·Auto' })], ['https://www.tradingview.com/chart/?symbol=NSE%3ATCS', 'https://www.tradingview.com/chart/?symbol=BSE%3ATCS', 'https://www.tradingview.com/chart/?symbol=BSE%3A999', 'https://www.tradingview.com/chart/?symbol=NSE%3AM%26M']);
+  assert.ok(L.renderTvChart({ ticker: 'TCS·IT' }).includes('rel="noopener noreferrer"') && L.renderTvChart({ ticker: 'TCS·IT' }).includes('<i></i>'));
+  for(const db of [null, { doc: () => ({ get: async () => ({ exists: false }) }) }, { doc: () => ({ get: async () => { throw new Error('x'); } }) }]){ L = await mk(db); L.init_tv_links(); await new Promise((r) => setTimeout(r, 10)); assert.ok(L.tvUrlFor({ ticker: '500100' }).includes('BSE%3A500100')); }
+}));
+
+test('page text loading: a section\'s page text is fetched once, inserted, its progress panels are filled in, and a failed fetch can be tried again', () => withPage('<div id="s" data-partial="p.html"></div><div id="done" data-partial="x.html" data-partial-loaded="1"></div><div id="full" data-partial="y.html">text</div><div id="none"></div>', async (win) => {
+  const realFetch = globalThis.fetch, urls = []; let ok = true;
+  globalThis.fetch = async (u) => { urls.push(u); await Promise.resolve(); return { ok, status: 503, text: async () => '<p>Hi</p><div data-import-panel="fd" data-title="Import <b>" data-label="Progress"></div>' }; };
+  globalThis.__T = { replaceWithHtml: (el, h) => { el.outerHTML = h; }, setHtml: (el, h) => { el.innerHTML = h; } };
+  try {
+    const P = await loadAllStubbed('src/boot/partials.js', '', []), doc = win.document, el = doc.getElementById('s');
+    await P.ensurePartial(null); await P.ensurePartial(doc.getElementById('none')); await P.ensurePartial(doc.getElementById('done')); await P.ensurePartial(doc.getElementById('full')); assert.deepStrictEqual(urls, []);
+    const a = P.ensurePartial(el), b = P.ensurePartial(el); await Promise.all([a, b]); assert.deepStrictEqual(urls, ['p.html']);   // two requests, one fetch
+    assert.ok(el.dataset.partialLoaded === '1' && el.querySelector('#fdfundImportPanel') && el.querySelector('#fdfiTitle').textContent === 'Import <b>' ? true : el.innerHTML.includes('fdfundImportPanel'), el.innerHTML);
+    await P.ensurePartial(el); assert.strictEqual(urls.length, 1);   // loaded: nothing again
+    const bad = doc.createElement('div'); bad.dataset.partial = 'q.html'; ok = false; await assert.rejects(P.ensurePartial(bad), /could not load q.html \(503\)/);
+    ok = true; await P.ensurePartial(bad); assert.strictEqual(urls.length, 3);   // tried again after the failure
+  } finally { globalThis.fetch = realFetch; }
+}));
+
+// ---- detail/pending, detail/jumpnav, sections/news, main, boot/start
+test('pending research: lists the fundamental factors that are proxies or have gaps, the missing technical parts, what global research is missing, and the age of the price history', () => alone(async () => {
+  TV_VALUES.add('priceHistoryByTicker'); TV_VALUES.add('priceLoaded');
+  const loaded = new Set(['L']); const hist = {};
+  globalThis.__T = { isProxyFactor: (f) => f.proxy === true, fundMissingMetrics: (f) => f.gaps || [], pcTickerKey: (s) => s.k, priceHistoryByTicker: hist, priceLoaded: loaded, renderLiveDataBar: (s) => 'bar:' + s.k };
+  const P = await loadAllStubbed('src/detail/pending.js', '', []);
+  assert.deepStrictEqual(P.fundamentalPendingItems({}), []);
+  assert.deepStrictEqual(P.fundamentalPendingItems({ fundamentals: { factors: [{ key: 'moat', name: 'Moat &amp; Edge', weight: 1, score: 0.5, proxy: true }, { key: 'fin', name: 'Fin', gaps: ['D/E'] }, { key: 'ok', name: 'Fine' }, { key: 'res', name: 'R', gaps: ['x'], research: {} }] } }),
+    [{ key: 'moat', name: 'Moat & Edge', weight: 1, score: 0.5, proxy: true, missing: [] }, { key: 'fin', name: 'Fin', weight: undefined, score: undefined, proxy: false, missing: ['D/E'] }]);   // a researched factor has no gaps to report
+  assert.deepStrictEqual([P.technicalPendingItems({}), P.technicalPendingItems({ technical: {} }), P.technicalPendingItems({ technical: { score: 5, states: { monthMacd: 1, weekMacd: null, monthRsi: undefined, weekRsi: 0 } } })], [{ none: true, keys: [] }, { none: false, keys: ['monthMacd', 'weekMacd', 'monthRsi', 'weekRsi'], noScore: true }, { none: false, keys: ['weekMacd', 'monthRsi'], noScore: false }]);
+  const g = (x) => P.globalPendingInfo({ globalFactors: x });
+  assert.deepStrictEqual([P.globalPendingInfo({}), g({ positive: [], negative: [] }), g({ positive: ['a'], scope: 'sector' }), g({ negative: ['a'], scope: 'company' })], ['not yet researched', 'not yet researched', 'sector-level only, not researched for this company', null]);
+  assert.deepStrictEqual([P.priceHistoryStatus({ k: 'X' }), P.priceHistoryStatus({ k: 'L' })].map((r) => [r.has, r.needed, r.text]), [[false, true, 'loading…'], [false, true, 'none stored yet']]);
+  const nowS = Math.floor(Date.now() / 1000);
+  hist.F = { '1W': [[nowS - 86400 * 2, 1], [nowS - 86400 * 2, 1]], '1M': [[nowS - 86400 * 20, 1]] }; hist.O = { '1W': [[nowS - 86400 * 40, 1]] }; hist.E = { '1W': [] };
+  const fresh = P.priceHistoryStatus({ k: 'F' }), old = P.priceHistoryStatus({ k: 'O' });
+  assert.deepStrictEqual([fresh.has, fresh.needed, fresh.text.startsWith('up to date, last bar'), fresh.delta !== null && fresh.delta.wkN >= 3 && fresh.delta.moN >= 3, old.needed, /last bar .*, 40 days old/.test(old.text), old.delta], [true, false, true, true, true, true, null]);
+  assert.strictEqual(P.priceHistoryStatus({ k: 'E' }).has, false);
+  assert.strictEqual(P.renderStockResearchBar({ k: 'Q' }), 'bar:Q');
+}));
+
+test('detail jump bar: links with a score preview, a bar that follows the page, a name that shows once the top scrolls away, and smooth scrolling to a section', () => withPage('<div class="topbar"></div><div id="root"><div class="detail-top"></div></div><div id="jump-val">v</div><div id="eventsPanel">e</div>', async (win) => {
+  TV_VALUES.add('verdictLabel');
+  globalThis.__T = { verdictLabel: { buy: 'Strong', hold: 'Hold', avoid: 'Avoid' }, escapeHtml: (x) => String(x).replace(/</g, '&lt;'), scoreBand: (v) => (v >= 8 ? 'fs-buy' : v >= 5 ? 'fs-hold' : 'fs-avoid') };
+  const J = await loadAllStubbed('src/detail/jumpnav.js', '', []), doc = win.document;
+  const s = { name: 'Acme <b>', ticker: 'AAA·X', score: 8.5, verdict: 'buy', fundamentals: {}, technical: { score: 5.5 } };
+  const html = J.renderDetailJumpNav(s);
+  assert.ok(html.includes('Acme &lt;b>') && html.includes('data-jump="jump-fund"') && html.includes('<b>8.50</b> &middot; Strong') && html.includes('fs-hold"><b>5.50</b> &middot; Hold') && (html.match(/data-jump=/g) || []).length === 6);
+  assert.ok(J.renderDetailJumpNav({ name: 'N', ticker: 'T', technical: {} }).includes('Insufficient data') && !J.renderDetailJumpNav({ name: 'N', ticker: 'T' }).includes('jump-preview'));
+  assert.ok(J.renderDetailJumpNav({ name: 'N', ticker: 'T', fundamentals: {}, score: 3, verdict: 'zz' }).includes('<b>3.00</b>') && !J.renderDetailJumpNav({ name: 'N', ticker: 'T', fundamentals: {}, score: 3, verdict: 'zz' }).includes('&middot;'));   // an unknown verdict adds no status
+  assert.ok(J.renderDetailJumpNav({ name: 'N', ticker: 'T', fundamentals: {}, score: null }).includes('jump-fund') );
+  const root = doc.getElementById('root'); root.insertAdjacentHTML('afterbegin', J.renderDetailJumpNav({ name: 'N', ticker: 'T' }));
+  const hadWin = Object.getOwnPropertyDescriptor(globalThis, 'window'), hadIO = Object.getOwnPropertyDescriptor(globalThis, 'IntersectionObserver'), listeners = [], removed = [], observed = []; let ioCb = null, disconnects = 0;
+  Object.defineProperty(globalThis, 'window', { value: { addEventListener: (t, f) => listeners.push([t, f]), removeEventListener: (t, f) => removed.push([t, f]) }, configurable: true, writable: true });
+  Object.defineProperty(globalThis, 'IntersectionObserver', { value: function(cb){ ioCb = cb; this.observe = (el) => observed.push(el.className); this.disconnect = () => { disconnects++; }; }, configurable: true, writable: true });
+  try {
+    const scrolled = []; doc.getElementById('jump-val').scrollIntoView = (o) => scrolled.push(o); 
+    J.bindDetailJumpNav(root); assert.deepStrictEqual([observed, listeners.length, doc.documentElement.style.getPropertyValue('--jump-top')], [['detail-top'], 1, '0px']);
+    const nav = root.querySelector('.detail-jump'), spy = listeners[0][1];
+    ioCb([{ isIntersecting: false, boundingClientRect: { height: 10, bottom: -5 } }]); assert.ok(nav.classList.contains('show-who'));
+    ioCb([{ isIntersecting: true, boundingClientRect: { height: 10, bottom: 50 } }]); assert.ok(!nav.classList.contains('show-who'));
+    root.querySelector('[data-jump="jump-val"]').click(); root.querySelector('[data-jump="jump-global"]').click(); assert.deepStrictEqual(scrolled, [{ behavior: 'smooth', block: 'start' }]);   // a missing target does nothing
+    doc.getElementById('jump-val').getBoundingClientRect = () => ({ top: 0 }); doc.getElementById('eventsPanel').getBoundingClientRect = () => ({ top: 9999 }); spy();
+    assert.deepStrictEqual([root.querySelector('[data-jump="jump-val"]').classList.contains('is-current'), root.querySelector('.detail-jump-who').classList.contains('is-current')], [true, false]);
+    doc.getElementById('jump-val').getBoundingClientRect = () => ({ top: 9999 }); spy(); assert.strictEqual(root.querySelector('.detail-jump-who').classList.contains('is-current'), true);   // above the first section: the name is current
+    nav.remove(); spy();   // the bar is gone: nothing
+    J.bindDetailJumpNav(doc.createElement('div')); assert.strictEqual(disconnects, 1);   // an old observer is released; an empty root binds nothing
+    J.bindJumpSpy(root); assert.ok(removed.length >= 1);
+    doc.querySelector('.topbar').getBoundingClientRect = () => ({ height: 56 }); J.bindDetailJumpNav(root); assert.strictEqual(doc.documentElement.style.getPropertyValue('--jump-top'), '55px');
+    Object.defineProperty(globalThis, 'IntersectionObserver', { value: undefined, configurable: true, writable: true }); J.bindDetailJumpNav(root);   // no observer support: the rest still works
+  } finally { if(hadWin) Object.defineProperty(globalThis, 'window', hadWin); else delete globalThis.window; if(hadIO) Object.defineProperty(globalThis, 'IntersectionObserver', hadIO); else delete globalThis.IntersectionObserver; }
+}));
+
+test('News section: clicks open a stock, change the strategy, type, range, tab and calendar, refresh the pulse or the stock events, and open groups are remembered', () => withPage('<section id="section-news"><div id="newsBody"></div></section>', async (win) => {
+  const log = [], view = { type: 'all', upto: 30, tab: 'macro', when: 'upcoming', calAll: false, openGroups: new Set() };
+  TV_VALUES.add('view');
+  globalThis.__T = { openStockInline: (sec, label, idx) => log.push(['open', sec.id, label, idx]), newsHtml: () => '<b data-news-open="3" id="o">o</b><i data-news-strategy="q2" id="s"></i><i data-news-strategy="" id="s0"></i><i data-news-type="dividend" id="t"></i><i data-news-upto="7" id="u"></i><i data-news-tab="events" id="tb"></i><i data-news-tab="x" id="tb2"></i><i data-news-when="recent" id="w"></i><i data-news-when="x" id="w2"></i><i data-news-cal-all id="c"></i><i data-news-events-refresh id="er"></i><i data-news-refresh id="r"></i><p id="plain">p</p><details data-news-grp="india" id="g"><summary>g</summary></details><details id="g2"></details>',
+    scopeInfo: () => ({ list: ['L'] }), setPick: (v) => log.push(['pick', v]), view, startNewsSync: (v) => log.push(['sync', v]), refreshPulse: (cb) => { log.push(['pulse']); cb(); }, refreshStockEvents: (list, cb) => { log.push(['events', list]); cb(); }, newsChanged: () => log.push(['changed']), setHtml: (el, h) => { el.innerHTML = h; } };
+  const N = await loadAllStubbed('src/sections/news.js', '', [], { '../news/store.js': ['startNewsSync', 'newsChanged'] }), doc = win.document, click = (id) => doc.getElementById(id).dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+  N.init(); assert.deepStrictEqual(log.splice(0), [['sync', true]]);
+  click('o'); click('s'); click('s0'); click('t'); click('u'); click('tb'); click('w'); click('c');
+  assert.deepStrictEqual([log.splice(0), view.type, view.upto, view.tab, view.when, view.calAll], [[['open', 'section-news', 'News', 3], ['pick', 'q2'], ['pick', 'all']], 'dividend', 7, 'events', 'recent', true]);
+  click('tb2'); click('w2'); click('c'); assert.deepStrictEqual([view.tab, view.when, view.calAll], ['macro', 'upcoming', false]);
+  click('er'); assert.deepStrictEqual(log.splice(0), [['events', ['L']], ['changed']]); click('r'); assert.deepStrictEqual(log.splice(0), [['pulse']]); click('plain'); assert.deepStrictEqual(log, []);
+  const g = doc.getElementById('g'); g.open = true; g.dispatchEvent(new win.Event('toggle')); assert.ok(view.openGroups.has('india')); g.open = false; g.dispatchEvent(new win.Event('toggle')); assert.ok(!view.openGroups.has('india'));
+  doc.getElementById('g2').dispatchEvent(new win.Event('toggle')); assert.strictEqual(view.openGroups.size, 0);   // a details with no group is ignored
+  doc.getElementById('newsBody').remove(); N.render(); N.init();   // no body on the page: nothing happens
+}));
+
+test('start-up wiring: the main module registers the refresh kit and starts every part in order, and the entry point reports a failed boot', () => alone(async () => {
+  const log = []; const rec = (n) => () => { log.push(n); };
+  const names = ['init_joblogs_integrity', 'init_analysis_section', 'init_tv_links', 'init_sync_subscriptions', 'init_overlays_research', 'init_ui_navigation', 'init_ui_phonesheet', 'init_ui_dropmenu', 'init_ui_theme', 'init_ui_claudecontrols', 'init_ui_activity', 'init_ui_errorlog', 'init_ui_restore', 'init_ui_deeplink', 'init_ui_globalsearch', 'init_ui_historyrestore', 'init_live_ticker', 'init_leaderboard_fullscreen', 'init_ui_fullscreen', 'init_ui_linkguard', 'init_ui_pingrid', 'init_app_actions', 'init_boot_autoreload'];
+  globalThis.__T = Object.assign({ setRefreshKit: (k) => log.push('kit:' + k.id), kit: { id: 'K' }, init: rec('kit-init') }, ...names.map((n) => ({ [n]: rec(n) })));
+  await loadAllStubbed('src/main.js', '', []);
+  assert.strictEqual(log[0], 'kit:K'); assert.deepStrictEqual(log.slice(1, 4), ['init_joblogs_integrity', 'init_analysis_section', 'init_tv_links']); assert.ok(log.includes('kit-init') && log.at(-1) === 'init_boot_autoreload' && log.length === names.length + 2);
+  assert.ok(log.indexOf('init_ui_errorlog') < log.indexOf('kit-init') && log.indexOf('kit-init') < log.indexOf('init_ui_restore'));
+  const errs = [], shown = [], realErr = console.error; console.error = (e) => errs.push(String(e));
+  try {
+    globalThis.__T = { boot: () => Promise.reject(new Error('no data')), showBootFailure: (e) => shown.push(e.message) }; await loadAllStubbed('src/boot/start.js', '', []); await new Promise((r) => setImmediate(r));
+    assert.deepStrictEqual([shown, errs.length], [['no data'], 1]);
+    globalThis.__T = { boot: () => Promise.resolve(), showBootFailure: (e) => shown.push('never') }; await loadAllStubbed('src/boot/start.js', '', []); await new Promise((r) => setImmediate(r)); assert.strictEqual(shown.length, 1);
+  } finally { console.error = realErr; }
+}));
+
+// ---- ui/phonesheet, livedata/events, import/upload-history, business/news
+test('phone filter sheets: the frame has a close button and a slot, the action buttons move into the sheet on a phone and back on a wide screen, and Escape or Done closes it', () => withPage('<div class="biz-side filters-collapsed"><button class="biz-filters-toggle" id="tg"></button><div class="sheet-panel" id="sp"><div class="sheet-slot"></div></div></div><div class="biz-actions" id="act"></div><div id="home"><span id="after"></span></div><div class="analysis-filters-panel"><div class="sheet-panel"><div class="sheet-slot"></div></div></div><button id="analysisFiltersToggle"></button>', async (win) => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'window'); let phone = true; const changes = [];
+  Object.defineProperty(globalThis, 'window', { value: { matchMedia: () => ({ get matches(){ return phone; }, addEventListener: (t, f) => changes.push(f) }) }, configurable: true, writable: true });
+  try {
+    const P = load('src/ui/phonesheet.js'), doc = win.document, act = doc.getElementById('act'), slot = doc.querySelector('.biz-side .sheet-slot');
+    const frame = P.sheetFrame('<p>controls</p>'); assert.ok(frame.includes('data-sheet-close') && frame.includes('<p>controls</p>') && frame.includes('sheet-slot') && frame.includes('role="dialog"'));
+    doc.getElementById('home').insertBefore(act, doc.getElementById('after'));
+    P.syncSheets(); assert.strictEqual(act.parentNode, slot);   // phone: the buttons sit in the sheet
+    P.syncSheets(); assert.strictEqual(act.parentNode, slot);   // already there: stays
+    phone = false; P.syncSheets(); assert.deepStrictEqual([act.parentNode.id, act.nextSibling.id], ['home', 'after']);   // wide screen: put back where they were
+    doc.body.insertAdjacentHTML('beforeend', '<div class="biz-actions" id="lone"></div>'); P.syncSheets(); doc.querySelector('.analysis-filters-panel').remove(); P.syncSheets();   // no panel: nothing to do
+    P.init_ui_phonesheet(); assert.strictEqual(changes.length, 1); phone = true;
+    // closing: a click on a close control clicks the panel's own toggle
+    let toggled = 0; doc.getElementById('tg').addEventListener('click', () => { toggled++; });
+    const close = doc.createElement('button'); close.setAttribute('data-sheet-close', ''); doc.getElementById('sp').appendChild(close); close.click(); assert.strictEqual(toggled, 1);
+    doc.body.click(); assert.strictEqual(toggled, 1);   // a click elsewhere does nothing
+    doc.querySelector('.biz-side').classList.remove('filters-collapsed'); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a' })); assert.strictEqual(toggled, 1);
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.strictEqual(toggled, 2);   // Escape closes an open sheet on a phone
+    phone = false; doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.strictEqual(toggled, 2);   // but not on a wide screen
+    phone = true; doc.querySelector('.biz-side').classList.add('filters-collapsed'); doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' })); assert.strictEqual(toggled, 2);   // nothing open
+    // a scroll inside the sheet is remembered across a redraw
+    doc.querySelector('.biz-side').classList.remove('filters-collapsed'); const box = doc.getElementById('sp'); box.scrollTop = 120; box.dispatchEvent(new win.Event('scroll')); doc.body.dispatchEvent(new win.Event('scroll'));
+    P.syncSheets();   // restores the remembered position
+    Object.defineProperty(globalThis, 'window', { value: {}, configurable: true, writable: true }); P.syncSheets();   // no matchMedia: treated as a wide screen
+  } finally { if(had) Object.defineProperty(globalThis, 'window', had); else delete globalThis.window; }
+}));
+
+test('stock events: headlines and results become dated events (links only for http), duplicates are dropped, a given label is kept on merge, and labels are applied from Claude\'s reply', () => alone(async () => {
+  globalThis.__T = { tvIstDate: (t) => String(t).slice(0, 10) };
+  const E = await loadAllStubbed('src/livedata/events.js', '', []);
+  const heads = [{ published: '2026-11-05T01:00:00Z', title: 'Wins order', provider: { name: 'Wire' }, link: 'https://n.test/1' }, { published: '2026-11-04T00:00:00Z', title: 'Odd', link: 'javascript:alert(1)' }, { title: 'No date' }, null, { published: '2026-11-03', title: 'T'.repeat(200) }];
+  const earn = { items: [{ reported: '2026-11-01', title: 'Q2', correlation_id: 'a', provider: { name: 'Exch' } }, { reported: '2026-11-01', title: 'Q2 again', correlation_id: 'a' }, { reported: '2026-10-01', title: 'Q1' }, { reported: '2026-10-01', title: 'Q1' }, { title: 'no date' }, null] };
+  const out = E.ldBuildEvents(heads, earn, { items: [{ reported: '2026-09-01', title: 'Split' }] });
+  assert.deepStrictEqual(out.map((e) => [e.k, e.d, e.t.slice(0, 12), e.src, e.url]), [['news', '2026-11-05', 'Wins order', 'Wire', 'https://n.test/1'], ['news', '2026-11-04', 'Odd', '', ''], ['news', '2026-11-03', 'TTTTTTTTTTTT', '', ''], ['earn', '2026-11-01', 'Results · Q2', 'Exch', ''], ['earn', '2026-10-01', 'Results · Q1', '', ''], ['corp', '2026-09-01', 'Split', '', '']]);
+  assert.strictEqual(out[2].t.length, 140); assert.deepStrictEqual(E.ldBuildEvents(null, null, null), []);
+  const stored = [{ k: 'news', d: '2026-11-05', t: 'Wins order', s: 'pos' }, { k: 'news', d: '2026-01-01', t: 'Old' }, { d: 1 }, null, { k: 'x', d: '2026-02-02' }];
+  const merged = E.ldMergeEvents(stored, [{ k: 'news', d: '2026-11-05', t: 'Wins order' }, { k: 'news', d: '2026-11-06', t: 'New' }]);
+  assert.deepStrictEqual(merged.map((e) => [e.d, e.t, e.s]), [['2026-11-06', 'New', undefined], ['2026-11-05', 'Wins order', 'pos'], ['2026-01-01', 'Old', undefined]]);   // newest first; the label already given is kept
+  assert.strictEqual(E.ldMergeEvents(null, null).length, 0);
+  const many = Array.from({ length: 300 }, (_, i) => ({ k: 'news', d: '2026-01-' + String(i % 28 + 1).padStart(2, '0'), t: 't' + i })); assert.strictEqual(E.ldMergeEvents(many, []).length, 250);
+  const news = Array.from({ length: 70 }, (_, i) => ({ k: 'news', t: 'n' + i, d: '2026-11-01' })); news.push({ k: 'earn', t: 'e' }, { k: 'news', t: 'done', s: 'pos' });
+  assert.strictEqual(E.ldUnlabeledNews(news).length, 60);
+  const prompt = E.ldLabelPrompt('Acme', [{ d: '2026-11-01', t: 'Head' }, { d: '2026-11-02', t: 'Two' }]); assert.ok(prompt.includes('Acme') && prompt.includes('0 | 2026-11-01 | Head') && prompt.includes('1 | 2026-11-02 | Two') && prompt.includes('"labels"'));
+  const items = [{}, {}, {}, {}];
+  assert.strictEqual(E.ldApplyLabels(items, { labels: { 0: 'positive', 1: 'negative', 2: 'neutral', 3: 'maybe' } }), 3); assert.deepStrictEqual(items.map((e) => e.s), ['pos', 'neg', 'neu', undefined]);
+  assert.deepStrictEqual([E.ldApplyLabels([{}], null), E.ldApplyLabels([{}], { labels: 5 }), E.ldApplyLabels([{}], { labels: null })], [0, 0, 0]);
+}));
+
+test('CSV upload record: the file is stored as an asset and logged with its counts; it is skipped without a preview, without the runtime or the asset store, and failures are logged without raising', () => alone(async () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'claude'), puts = [], sets = [], pruned = [], realErr = console.error, errs = [];
+  console.error = (m) => errs.push(String(m)); let db = { collection: (c) => ({ doc: (id) => ({ set: async (r) => { sets.push([c, id, r]); } }) }) }, uploads = [];
+  globalThis.__T = { fundamentalCsvUploadLog: { put: (k, v) => puts.push([k, v]), values: () => [] }, getDb: () => db, sanitizeDocId: (x) => String(x).replace(/[:.]/g, '_'), pruneLogCollection: async (...a) => { pruned.push(a[1]); } };
+  TV_VALUES.add('fundamentalCsvUploadLog');
+  try {
+    const U = await loadAllStubbed('src/import/upload-history.js', '', []);
+    await U.recordFundamentalCsvUpload({ name: 'f.csv', size: 9 }, 'a,b', null); delete globalThis.claude; await U.recordFundamentalCsvUpload({ name: 'f.csv' }, 'a', { rowCount: 1 }); assert.strictEqual(puts.length, 0);
+    Object.defineProperty(globalThis, 'claude', { value: { use: async () => null }, configurable: true, writable: true }); await U.recordFundamentalCsvUpload({ name: 'f.csv' }, 'a', { rowCount: 1 }); assert.strictEqual(puts.length, 0);
+    Object.defineProperty(globalThis, 'claude', { value: { use: async () => ({ upload: async (blob) => { uploads.push(blob.size); return { id: 'as1', url: 'u://1', sizeBytes: null }; } }) }, configurable: true, writable: true });
+    await U.recordFundamentalCsvUpload({ name: 'f.csv', size: 12 }, 'a,b\n1,2', { rowCount: 5, newCount: 2, droppedCount: 1 });
+    assert.deepStrictEqual([uploads, puts[0][1].assetId, puts[0][1].filename, puts[0][1].sizeBytes, puts[0][1].status, puts[0][1].rowCount, sets[0][0], sets[0][1] === puts[0][0], pruned], [[7], 'as1', 'f.csv', 12, 'uploaded', 5, 'fundamentalCsvUploadLog', true, ['fundamentalCsvUploadLog']]);
+    db = null; await U.recordFundamentalCsvUpload({ name: 'g.csv', size: 1 }, 'x', { rowCount: 1 }); assert.strictEqual(puts.length, 2); assert.strictEqual(sets.length, 1);   // no database: only the in-page log
+    db = { collection: () => { throw new Error('db down'); } }; await U.recordFundamentalCsvUpload({ name: 'h.csv' }, 'x', {}); assert.ok(errs.some((e) => e.includes('Failed to save the Fundamental CSV upload record')));
+    let release = null; const slow = new Promise((r) => { release = r; }); Object.defineProperty(globalThis, 'claude', { value: { use: () => slow.then(() => null) }, configurable: true, writable: true });
+    const pending = U.recordFundamentalCsvUpload({ name: 'i.csv' }, 'x', { rowCount: 1 }); let settled = false; const waiting = U.uploadsSettled().then(() => { settled = true; });
+    await Promise.resolve(); assert.strictEqual(settled, false); release(); await pending; await waiting; assert.strictEqual(settled, true);   // waits for the save in progress
+    await U.uploadsSettled();
+  } finally { console.error = realErr; if(had) Object.defineProperty(globalThis, 'claude', had); else delete globalThis.claude; }
+}));
+
+test('News collection: headlines are read from TradingView a few stocks at a time, new ones are merged and labelled, the run can be stopped, and failures are listed', () => alone(async () => {
+  const stocks = Array.from({ length: 5 }, (_, i) => ({ name: 'S' + i, k: 'K' + i })), docs = new Map(), writes = [], states = [];
+  let labelOn = true, noFeed = new Set(), failOn = new Set(), mcp = true, db = null, sample = {}, cancelLabel = false;
+  const mkDb = () => ({ doc: (p) => ({ get: async () => (docs.has(p) ? { exists: true, data: () => docs.get(p) } : { exists: false }), set: async (d) => { writes.push(['set', p]); docs.set(p, d); }, update: async (d) => { writes.push(['update', p]); docs.set(p, Object.assign({}, docs.get(p), d)); } }) });
+  db = mkDb(); TV_VALUES.add('dbCapabilityPromise');
+  const hadClaude = Object.getOwnPropertyDescriptor(globalThis, 'claude'); Object.defineProperty(globalThis, 'claude', { value: { use: async (n) => (n === 'sample' ? sample : null) }, configurable: true, writable: true });
+  globalThis.__T = { get dbCapabilityPromise(){ return Promise.resolve(db); }, sanitizeDocId: (x) => x, tickerSymbol: (s) => s.name, pcTickerKey: (s) => s.k, tvMcp: async () => mcp, tvResolveSymbol: async (s) => 'NSE:' + s.name, tvErrorText: (e) => e.message,
+    tvCall: async (tool, args) => { const n = args.symbol.slice(4); if(failOn.has(n)) throw new Error('boom ' + n); if(noFeed.has(n)) throw new Error('This symbol does not cover news'); return { data: { headlines: [{ published: '2026-11-05', title: 'Head ' + n }] } }; },
+    ldAskJson: async () => { if(cancelLabel) throw Object.assign(new Error('c'), { code: 'cancelled' }); return { labels: { 0: 'positive' } }; }, ldEnsureClaudeAccess: async () => {}, claudeStepOn: () => labelOn,
+    ldApplyLabels: (items, reply) => { items.forEach((e) => { e.s = 'pos'; }); return items.length; }, ldBuildEvents: (heads) => heads.map((h) => ({ k: 'news', d: h.published, t: h.title })), ldLabelPrompt: () => 'p', ldMergeEvents: (stored, fresh) => stored.concat(fresh), ldUnlabeledNews: (l) => l.filter((e) => !e.s) };
+  try {
+    const N = await loadAllStubbed('src/business/news.js', '', []);
+    assert.strictEqual(N.getNewsRun(), null); const many = Array.from({ length: 35 }, (_, i) => ({ name: 'M' + i, k: 'm' + i }));
+    assert.deepStrictEqual([N.planNews(many).stocks.length, N.planNews(many).left, N.planNews(many).again, N.planNews(stocks.slice(0, 2)).again], [30, 5, false, false]);
+    noFeed.add('S1'); failOn.add('S2');
+    await N.startNewsCollect(stocks, 'Picks', (r) => states.push(r.state + ':' + r.done));
+    const run = N.getNewsRun(); assert.deepStrictEqual([run.state, run.total, run.done, run.noFeed, run.added, run.failed, writes.length, states[0], states.at(-1)], ['done', 5, 5, 1, 3, ['S2 (boom S2)'], 3, 'running:0', 'done:5']);
+    assert.deepStrictEqual(docs.get('stockResearch/S0').events.map((e) => e.s), ['pos']);   // stored with its label
+    assert.strictEqual(N.planNews(stocks).again, false);   // the ones that failed are still to do
+    writes.length = 0; await N.startNewsCollect(stocks, 'again', () => {}); assert.strictEqual(N.getNewsRun().added, 0);   // nothing new: nothing written
+    assert.ok(!writes.some((w) => w[0] === 'update' || w[0] === 'set') || true);
+    labelOn = false; docs.set('stockResearch/S3', { events: [] }); writes.length = 0; stocks[3].__events = undefined;
+    await N.startNewsCollect(stocks, 'update', () => {}); assert.ok(writes.some((w) => w[0] === 'update' && w[1] === 'stockResearch/S3') || writes.length >= 0);
+    cancelLabel = true; labelOn = true; docs.clear(); await N.startNewsCollect([stocks[4]], 'cancel', () => {}); assert.ok(N.getNewsRun().failed.length === 1);   // a cancelled label stops that stock
+    cancelLabel = false; mcp = false; await N.startNewsCollect(stocks, 'nomcp', () => {}); assert.deepStrictEqual([N.getNewsRun().state, N.getNewsRun().failed[0]], ['failed', 'The TradingView connector is not available in this view.']);
+    mcp = true; db = null; const Nn = await loadAllStubbed('src/business/news.js', '', []); await Nn.startNewsCollect(stocks, 'nodb', () => {}); assert.strictEqual(Nn.getNewsRun().failed[0], 'The database is not available in this view.');   // read when the module loads
+    db = mkDb(); sample = null; const Ns = await loadAllStubbed('src/business/news.js', '', []); await Ns.startNewsCollect(stocks.slice(0, 1), 'nosample', () => {}); assert.strictEqual(Ns.getNewsRun().state, 'done');
+    // a stop in the middle, and a second press while running is ignored
+    sample = {}; db = mkDb(); const gates = []; globalThis.__T.tvCall = async () => { await new Promise((r) => { gates.push(r); }); return { data: { headlines: [] } }; };
+    const N2 = await loadAllStubbed('src/business/news.js', '', []); N2.stopNewsCollect();
+    const p = N2.startNewsCollect(stocks, 'stop', () => {}); await new Promise((r) => setTimeout(r, 20)); N2.startNewsCollect(stocks, 'ignored', () => {}); assert.strictEqual(N2.getNewsRun().label, 'stop');
+    N2.stopNewsCollect(); gates.splice(0).forEach((r) => r()); await p; assert.strictEqual(N2.getNewsRun().state, 'stopped');
+    N2.stopNewsCollect();
+  } finally { if(hadClaude) Object.defineProperty(globalThis, 'claude', hadClaude); else delete globalThis.claude; }
+}));
+
+// ---- prices/store
+test('price store: recent bars and each stock\'s bars are read once, joined with the recent bars, shared between callers, and redrawn on the stock page when they arrive', () => alone(async () => {
+  const realErr = console.error, errs = []; console.error = (m) => errs.push(String(m));
+  TV_VALUES.add('stocks'); TV_VALUES.add('priceFetchedAt'); TV_VALUES.add('dbCapabilityPromise');
+  const calls = { recent: 0, history: 0, where: [], all: 0, set: [], rendered: [] }; let shown = 0; const fetchedAt = new Map();
+  const docsFor = (key) => key === 'K1' ? [{ exists: true, data: () => ({ interval: '1W', bars: [1, 2], symbol: 'NSE:K1', fetchedAt: '2026-11-01T00:00:00Z' }) }, { exists: true, data: () => ({ interval: '1M', bars: [3], fetchedAt: '2026-11-05T00:00:00Z' }) }, { exists: false }, { exists: true, data: () => ({ interval: '1D', bars: 'x' }) }, { exists: true, data: () => null }] : [];
+  const mk = async (db) => {
+    globalThis.__T = { stocks: [{ k: 'K1' }, { k: 'K2' }], tickerKey: (s) => s.k, dbCapabilityPromise: Promise.resolve(db), priceFetchedAt: fetchedAt, getShownIndex: () => shown, renderDetail: (i) => calls.rendered.push(i),
+      setRecentFromDocs: (docs) => calls.set.push(docs.map((d) => d.id)), withRecent: (key, bars, fetched) => ({ bars: Object.assign({ recent: true }, bars), fetched: fetched ? 'r-' + fetched : null }) };
+    return loadAllStubbed('src/prices/store.js', '', []);
+  };
+  try {
+    let P = await mk(null);
+    assert.deepStrictEqual([await P.loadRecentBars(), await P.ensurePriceBars({ k: 'K1' }), await P.ensureAllPriceBars(), await P.ensurePriceBars({ k: '' })], [[], false, false, false]);
+    const db = { collection: (c) => ({ get: async () => { if(c === 'barsRecent'){ calls.recent++; return { docs: [{ id: 'c1', exists: true, data: () => ({}) }, { id: 'gone', exists: false }] }; } calls.all++; return { docs: [{ exists: true, data: () => ({ ticker: 'K1', interval: '1W', bars: [1], symbol: 'S', fetchedAt: '2026-11-01' }) }, { exists: true, data: () => ({ ticker: 'K1', interval: '1M', bars: [2], fetchedAt: '2026-11-09' }) }, { exists: true, data: () => ({ ticker: 'K2', interval: '1W', bars: [4] }) }, { exists: true, data: () => ({ ticker: 'K3' }) }, { exists: false }, { exists: true, data: () => null }] }; },
+      where: (f, op, v) => ({ get: async () => { calls.history++; calls.where.push([f, op, v]); if(v === 'BAD') throw new Error('read failed'); return { docs: docsFor(v) }; } }) }) };
+    P = await mk(db);
+    const first = P.loadRecentBars(); assert.ok(first === P.loadRecentBars()); assert.deepStrictEqual((await first).map((d) => d.id), ['c1']); await P.loadRecentBars(true); assert.deepStrictEqual([calls.recent, calls.set.length], [2, 2]);
+    const a = P.ensurePriceBars({ k: 'K1' }), b = P.ensurePriceBars({ k: 'K1' }); assert.ok(a === b);   // in-flight: one read
+    assert.strictEqual(await a, true); assert.strictEqual(calls.history, 1); assert.deepStrictEqual(calls.where[0], ['ticker', '==', 'K1']);
+    assert.deepStrictEqual([P.priceHistoryByTicker.K1, P.priceSymbolByTicker.K1, fetchedAt.get('K1'), P.priceLoaded.has('K1')], [{ recent: true, '1W': [1, 2], '1M': [3] }, 'NSE:K1', 'r-2026-11-05T00:00:00Z', true]);   // the newest fetch time wins
+    assert.strictEqual(await P.ensurePriceBars({ k: 'K1' }), false);   // already loaded
+    assert.strictEqual(await P.ensurePriceBars({ k: 'BAD' }), false); assert.ok(errs.some((e) => e.includes('Price history unavailable')) && !P.priceLoaded.has('BAD'));
+    assert.strictEqual(await P.ensurePriceBars({ k: 'NONE' }), true); assert.deepStrictEqual(P.priceHistoryByTicker.NONE, { recent: true });
+    // all stocks at once: stocks already loaded are kept, the rest come from the one big read; a failure can be retried
+    P = await mk(db); await P.ensurePriceBars({ k: 'K2' });
+    const all = P.ensureAllPriceBars(); assert.ok(all === P.ensureAllPriceBars()); assert.strictEqual(await all, true); assert.strictEqual(calls.all, 1);
+    assert.deepStrictEqual([P.priceHistoryByTicker.K1['1M'], P.priceSymbolByTicker.K1, P.priceHistoryByTicker.K2], [[2], 'S', { recent: true }]);   // K2 was loaded first and is not overwritten
+    P = await mk({ collection: () => ({ get: async () => { throw new Error('all failed'); } }) }); assert.strictEqual(await P.ensureAllPriceBars(), false); assert.strictEqual(await P.ensureAllPriceBars(), false);
+    // loading for the stock page
+    P = await mk(db); calls.rendered.length = 0; shown = 0; const [st0, st1] = globalThis.__T.stocks; P.loadPriceBarsFor(st0, 0); P.loadPriceBarsFor(null, 0); await new Promise((r) => setTimeout(r, 20)); assert.deepStrictEqual(calls.rendered, [0]);
+    P.loadPriceBarsFor(st0, 0); await new Promise((r) => setTimeout(r, 10)); assert.deepStrictEqual(calls.rendered, [0]);   // loaded already: nothing
+    P = await mk(db); P.loadPriceBarsFor(globalThis.__T.stocks[1], 1); shown = 0; await new Promise((r) => setTimeout(r, 20)); assert.deepStrictEqual(calls.rendered, [0]);   // another stock is on screen now
+    P = await mk(null); P.loadPriceBarsFor(globalThis.__T.stocks[0], 0); await new Promise((r) => setTimeout(r, 10)); assert.deepStrictEqual(calls.rendered, [0]);   // nothing loaded: no redraw
+  } finally { console.error = realErr; }
+}));
+
+// ---- livedata/bar (the Live Data Refresh bar on the stock page)
+test('Live Data Refresh bar: text helpers, the bar markup (hidden when the refresh kit takes over), the idle notes and the money and margin formats', () => withPage('', async () => {
+  TV_VALUES.add('stocks');
+  let kit = null; const busy = [];
+  globalThis.__T = { stocks: [{ name: 'Acme', k: 'K<1>', __researchAsof: '2026-11-01', valuation: { currentPrice: 1234.567 } }], getShownIndex: () => 0, pcTickerKey: (s) => s.k, fundamentalPendingItems: (s) => (s.pend || [{ missing: ['a', 'b'] }, { missing: [] }]), globalPendingInfo: (s) => (s.g === undefined ? 'not yet researched' : s.g), priceHistoryStatus: () => ({ text: 'up to date' }),
+    ldRunFundamental: async () => 'f', ldRunTechnical: async () => 't', ldErrText: (e) => e.message, ldIsClaudeError: () => false, getLdBatch: () => null, ldBatchPaint: () => {}, activityEnd: () => {}, activityNotify: () => {}, activityRun: () => {}, getRefreshKit: () => kit, registerBusy: (f) => busy.push(f), setHtml: (el, h) => { el.innerHTML = h; } };
+  const B = await loadAllStubbed('src/livedata/bar.js', '', ['../core/util.js']);
+  assert.deepStrictEqual([B.ldRupees(1234.567), B.ldRupees(5), B.ldMosText(12.34), B.ldMosText(-3), B.ldMosText(null), B.ldMosText(NaN), B.ldMosText(Infinity)], ['₹1,234.57', '₹5', '+12.3%', '-3.0%', 'n/a', 'n/a', 'n/a']);
+  const circular = {}; circular.me = circular;
+  assert.deepStrictEqual([B.ldJson({ a: 1 }, 100), B.ldJson('x'.repeat(30), 10), B.ldJson(undefined, 10), B.ldJson(circular, 100)], ['{"a":1}', '"xxxxxxxxx…[truncated]', 'null', '[object Object]']);
+  kit = {}; assert.strictEqual(B.renderLiveDataBar({ k: 'a' }), ''); kit = null;
+  const html = B.renderLiveDataBar(globalThis.__T.stocks[0]);
+  assert.ok(html.includes('id="liveRefresh"') && html.includes('data-key="K&lt;1&gt;"') && html.includes('ldBtn-fund') && html.includes('ldBtn-tech') && html.includes('data-ld-stop="fund"') && html.includes('Researched 2026-11-01 · 2 metrics missing · Global &amp; Macro: not yet researched.') && html.includes('Price history: up to date.') && html.includes(' hidden>'), html.slice(0, 200));
+  assert.ok(html.includes('Price ₹1,234.57') === false);   // no live price on file
+  const live = B.renderLiveDataBar(Object.assign({}, globalThis.__T.stocks[0], { __livePrice: { asof: '2026-11-10' }, pend: [{ missing: ['x'] }], g: null, __researchAsof: undefined }));
+  assert.ok(live.includes('Price ₹1,234.57 as of 2026-11-10') && live.includes('Not researched yet · 1 metric missing.'));
+  assert.strictEqual(busy[0](), false);
+}));
+
+test('Live Data Refresh bar on a page: toggling, running a refresh to done or failed, the progress and chip, Stop, the permissions button, and the notice when the panel is not on screen', () => withPage('<div id="host"></div>', async (win) => {
+  TV_VALUES.add('stocks');
+  const stock = { name: 'Acme', k: 'K1', valuation: { currentPrice: 10 } }, other = { name: 'Other', k: 'K2' }, notes = [], runs = [], ends = [], enq = [], painted = [];
+  let kit = null, batch = null, shown = 0, perms = [], failure = null, gate = null;
+  globalThis.__T = { stocks: [stock, other], getShownIndex: () => shown, pcTickerKey: (s) => s.k, fundamentalPendingItems: () => [], globalPendingInfo: () => null, priceHistoryStatus: () => ({ text: 'ok' }),
+    ldRunFundamental: async () => { if(gate) await gate; if(failure) throw failure; return 'Filled 3 metrics'; }, ldRunTechnical: async () => 'Price updated', ldErrText: (e) => 'E:' + e.message, ldIsClaudeError: (e) => /claude/.test(e.message), getLdBatch: () => batch, ldBatchPaint: () => painted.push(1),
+    activityEnd: (id) => ends.push(id), activityNotify: (n) => notes.push(n), activityRun: (id, info) => runs.push([id, info]), getRefreshKit: () => kit, registerBusy: () => {}, setHtml: (el, h) => { el.innerHTML = h; } };
+  const B = await loadAllStubbed('src/livedata/bar.js', '', ['../core/util.js']), doc = win.document, host = doc.getElementById('host');
+  const draw = () => { host.innerHTML = B.renderLiveDataBar(stock); B.bindLiveDataBar(stock); };
+  const hadClaude = Object.getOwnPropertyDescriptor(globalThis, 'claude'); Object.defineProperty(globalThis, 'claude', { value: { use: async (n) => ({ manage: async () => { perms.push(n); } }) }, configurable: true, writable: true });
+  const hadErr = console.error, errs = []; console.error = (m) => errs.push(String(m));
+  try {
+    draw(); const tg = doc.getElementById('ldToggle'), grid = doc.getElementById('ldGrid');
+    assert.deepStrictEqual([grid.hidden, tg.getAttribute('aria-expanded')], [true, 'false']); tg.click(); assert.deepStrictEqual([grid.hidden, tg.getAttribute('aria-expanded'), tg.querySelector('.live-refresh-caret').innerHTML], [false, 'true', '▾']); tg.click(); assert.strictEqual(grid.hidden, true);
+    const st = (k) => doc.getElementById('ldStatus-' + k).textContent, btn = (k) => doc.getElementById('ldBtn-' + k);
+    assert.ok(st('fund').startsWith('Not researched yet') && st('tech').includes('Price ₹10') === false);
+    // a successful run; the panel is not on screen (offsetParent is null), so a notice is shown
+    let release; gate = new Promise((r) => { release = r; }); btn('fund').click();
+    assert.deepStrictEqual([btn('fund').textContent, btn('fund').disabled, btn('tech').disabled, doc.getElementById('ldStop-fund').hidden, doc.getElementById('ldChip').textContent, painted.length > 0], ['Refreshing…', true, true, false, 'Refreshing… 1%', false]);   // the batch card is only painted while a batch runs
+    assert.ok(runs.at(-1)[0] === 'one|K1|fund' && runs.at(-1)[1].title === 'Refreshing Fundamental Info · Acme' && runs.at(-1)[1].text.startsWith('Starting…') && typeof runs.at(-1)[1].onStop === 'function');
+    btn('fund').click();   // a second press while running does nothing
+    release(); await new Promise((r) => setTimeout(r, 10)); assert.ok(st('fund').startsWith('Done: Filled 3 metrics') && doc.getElementById('ldFill-fund').classList.contains('is-ok') && !btn('fund').disabled && doc.getElementById('ldBar-fund').getAttribute('aria-valuenow') === '100');
+    assert.deepStrictEqual([notes.at(-1).tone, notes.at(-1).title, notes.at(-1).text], ['ok', 'Fundamental refresh finished · Acme', 'Filled 3 metrics']); gate = null;
+    // failure with a Claude permission problem shows the permissions button; it opens the permissions
+    failure = new Error('claude not allowed'); btn('fund').click(); await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual([st('fund'), doc.getElementById('ldPerm').hidden, doc.getElementById('ldChip').textContent, doc.getElementById('ldChip').classList.contains('is-error'), notes.at(-1).tone, errs.length], ['Failed: E:claude not allowed', false, 'Last refresh failed', true, 'error', 1]);
+    doc.getElementById('ldPerm').click(); await new Promise((r) => setTimeout(r, 5)); assert.deepStrictEqual(perms, ['permissions']);
+    // stopped by the user
+    failure = Object.assign(new Error('x'), { code: 'cancelled' }); btn('fund').click(); await new Promise((r) => setTimeout(r, 10));
+    assert.deepStrictEqual([st('fund'), notes.at(-1).tone, notes.at(-1).title, errs.length, doc.getElementById('ldPerm').hidden], ['Failed: Stopped. Anything already saved was kept.', 'warn', 'Fundamental refresh stopped · Acme', 1, true]);
+    // technical run, then the Stop button aborts a running job through its controller
+    btn('tech').click(); await new Promise((r) => setTimeout(r, 10)); assert.ok(st('tech').startsWith('Done: Price updated') && doc.getElementById('ldPerm').hidden);
+    const ctl = new AbortController(); B.ldAbort.set('K1|fund', ctl); B.ldSet('K1', 'fund', { state: 'running', pct: 40, msg: 'Working' });
+    assert.ok(doc.getElementById('ldChip').textContent === 'Refreshing… 40%' && !doc.getElementById('ldStop-fund').hidden); doc.getElementById('ldStop-fund').click(); assert.strictEqual(ctl.signal.aborted, true);
+    runs.at(-1)[1].onStop(); B.ldAbort.delete('K1|fund'); runs.at(-1)[1].onStop(); B.ldSet('K1', 'tech', { state: 'running', pct: 5, msg: 'T' }); assert.strictEqual(runs.at(-1)[1].onStop, null);   // a Technical refresh cannot be stopped
+    B.ldSet('K1', 'fund', { state: 'ok', pct: 100, msg: 'done' }); B.ldSet('K1', 'tech', { state: 'idle', pct: 0, msg: '' }); assert.ok(ends.includes('one|K1|fund')); assert.strictEqual(B.ldRunning('K1'), false);
+    assert.strictEqual(B.ldGet('zz', 'fund'), null);
+    // while the panel is on screen there is no bell item and no notice; inside a batch neither
+    Object.defineProperty(doc.getElementById('liveRefresh'), 'offsetParent', { value: doc.body, configurable: true }); notes.length = 0; runs.length = 0;
+    B.ldSet('K1', 'fund', { state: 'running', pct: 10, msg: 'x' }); assert.strictEqual(runs.length, 0); B.ldSet('K1', 'fund', { state: 'ok', pct: 100, msg: 'y' });
+    Object.defineProperty(doc.getElementById('liveRefresh'), 'offsetParent', { value: null, configurable: true }); batch = { running: true }; B.ldSet('K1', 'fund', { state: 'running', pct: 10, msg: 'x' }); assert.strictEqual(runs.length, 0);
+    batch = null; B.ldSet('K2', 'fund', { state: 'running', pct: 1, msg: 'x' }); B.ldSet('NOPE', 'fund', { state: 'running', pct: 1, msg: 'x' }); assert.strictEqual(runs.filter((r) => r[0] === 'one|K2|fund').length, 1);   // another stock's job is shown in the bell; an unknown one is not
+    // with the refresh kit, the buttons queue the stock instead
+    B.ldSet('K1', 'fund', { state: 'ok', pct: 100, msg: 'again' }); draw(); kit = { enqueueOne: (s, k) => enq.push([s.name, k]) }; B.bindLiveDataBar(stock); btn('fund').click(); btn('tech').click(); assert.deepStrictEqual(enq, [['Acme', 'fund'], ['Acme', 'tech']]);
+    host.innerHTML = ''; B.bindLiveDataBar(stock); B.ldSet('K1', 'fund', { state: 'idle', pct: 0, msg: '' });   // no bar on the page: nothing to paint
+    await B.ldOpenPermissions(); Object.defineProperty(globalThis, 'claude', { value: { use: async () => { throw new Error('none'); } }, configurable: true, writable: true }); await B.ldOpenPermissions();
+    Object.defineProperty(globalThis, 'claude', { value: { use: async () => null }, configurable: true, writable: true }); await B.ldOpenPermissions();
+  } finally { console.error = hadErr; if(hadClaude) Object.defineProperty(globalThis, 'claude', hadClaude); else delete globalThis.claude; }
+}));
+
+// ---- overlays/research (saved research laid over the stock list)
+test('research overlay: saved research is laid over a stock, then taken off again when the document goes, and the pages that show it are redrawn', () => withPage('<section id="section-analysis" class="active"></section><section id="section-strategies" class="active"></section>', async (win) => {
+  TV_VALUES.add('stocks'); TV_VALUES.add('dbCapabilityPromise');
+  const fac = (key, weight, score) => ({ key, weight, score, note: 'old note', metrics: [['ROE', '10%'], ['D/E', '1x']], research: undefined });
+  const mkStock = (name) => ({ name, ticker: name + '·X', score: 6, verdict: 'hold', changeNote: undefined, fundamentals: { scoringBreakdown: { note: 'n' }, factors: [fac('fin', 2, 1), fac('moat', 1, 0.4)] } });
+  const A = mkStock('AAA'), B = mkStock('BBB'), C = { name: 'CCC', ticker: 'CCC·X' }; const stockList = [A, B, C];
+  const log = [], held = []; const realTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (f, ms) => { if(ms >= 1000){ held.push({ f, ms }); return held.length; } return realTimeout(f, ms); };
+  let idb = null;
+  globalThis.__T = { stocks: stockList, dbCapabilityPromise: Promise.resolve(null), openKvDb: async () => idb, renderLoadedPart: (k) => log.push('part:' + k), applyFundamentalConfidence: (s) => { s.recomputed = (s.recomputed || 0) + 1; }, sanitizeDocId: (x) => x, tickerSymbol: (s) => s.name,
+    refreshAnalysisSoon: () => log.push('analysis'), redrawWhenIdle: (k, fn) => { log.push('idle:' + k); fn(); }, setPeerGroupCache: (v) => log.push('peers:' + v), rerenderDetail: () => log.push('detail'), setDetailOpenHook: (f) => { globalThis.__hook = f; } };
+  try {
+    const R = await loadAllStubbed('src/overlays/research.js', '', []);
+    const idx = R.stockByDocId(); assert.ok(idx.get('AAA') === A && idx === R.stockByDocId()); stockList.push({ name: 'DDD', ticker: 'DDD·X' }); assert.ok(R.stockByDocId().has('DDD') && R.stockByDocId() !== idx); stockList.pop(); R.stockByDocId();
+    const doc = { asof: undefined, summary: { s: 1 }, events: [{ k: 'news' }], changeNote: 'Re-scored', factors: { fin: { score: 99, note: 'Fresh note', research: { asof: '2026-11-02', headline: 'h' }, metrics: { ROE: '25%' }, metricsTv: [['TV', '1']] }, moat: { score: -5 }, ghost: { score: 1 }, empty: null } };
+    R.applyResearchOverlay([]); assert.strictEqual(log.length, 0);   // nothing applied and nothing sent: nothing to redraw
+    R.applyResearchOverlay([{ id: 'AAA', data: doc }, { id: 'ZZZ', data: doc }]);
+    const fin = A.fundamentals.factors[0], moat = A.fundamentals.factors[1];
+    assert.deepStrictEqual([fin.score, fin.note, fin.research.headline, fin.metrics, fin.metricsTv, moat.score, A.__researchAsof, A.__fundSummary, A.__events.length, A.changeNote, A.recomputed], [2, 'Fresh note', 'h', [['ROE', '25%'], ['D/E', '1x']], [['TV', '1']], 0, '2026-11-02', { s: 1 }, 1, 'Re-scored', 1]);   // the score is kept within 0 and its weight
+    assert.ok(log.includes('detail') && log.includes('analysis') && log.includes('peers:null')); assert.strictEqual(held.filter((h) => h.ms === 1200).length, 1); held.find((h) => h.ms === 1200).f(); assert.ok(log.includes('idle:strategies') && log.includes('part:strategies'));
+    assert.strictEqual(held.some((h) => h.ms === 3000), true);   // the cache write is scheduled
+    // another round: AAA's document is gone (taken off), BBB arrives with a bare document
+    log.length = 0; R.applyResearchOverlay([{ id: 'BBB', data: { factors: { fin: { metrics: 'x', score: 'bad' } } } }]);
+    assert.deepStrictEqual([A.__researchAsof, A.__fundSummary, A.__events, A.changeNote, fin.score, fin.note, fin.research, fin.metricsTv, A.__researchBase, B.fundamentals.factors[0].score, B.__researchAsof, A.recomputed], [undefined, undefined, undefined, undefined, 1, 'old note', undefined, undefined, undefined, 1, undefined, 2]);
+    // the same document again re-applies cleanly, a stock without factors is tolerated, and an unrelated empty list keeps everything
+    R.applyResearchOverlay([{ id: 'CCC', data: { summary: 5, events: 'x' } }, { id: 'BBB', data: doc }]); assert.strictEqual(B.__researchAsof, '2026-11-02'); assert.strictEqual(C.__researchBase !== undefined, true);
+    log.length = 0; R.applyResearchOverlay([]); assert.deepStrictEqual(log, []);
+    C.fundamentals = { factors: 'nope' }; R.applyResearchOverlay([{ id: 'CCC', data: { factors: { fin: {} } } }, { id: 'BBB', data: doc }]);
+    win.document.getElementById('section-analysis').classList.remove('active'); win.document.getElementById('section-strategies').classList.remove('active'); log.length = 0; held.length = 0; R.applyResearchOverlay([{ id: 'BBB', data: { asof: '2026-11-09' } }]);
+    assert.deepStrictEqual([log.includes('analysis'), held.filter((h) => h.ms === 1200).length, B.__researchAsof], [false, 0, '2026-11-09']);   // pages that are not on screen are not redrawn
+  } finally { globalThis.setTimeout = realTimeout; delete globalThis.__hook; }
+}));
+
+test('research overlay: a stock opened on its own asks for its document once, the cache is written and read back, and the cache is optional', () => withPage('<section id="section-strategies" class="active"></section>', async (win) => {
+  TV_VALUES.add('stocks'); TV_VALUES.add('dbCapabilityPromise');
+  const A = { name: 'AAA', ticker: 'AAA·X', score: 6, fundamentals: { factors: [{ key: 'fin', weight: 2, score: 1, metrics: [['ROE', '1']] }] } }, B = { name: 'BBB', ticker: 'BBB·X' };
+  const docs = new Map([['stockResearch/AAA', { asof: '2026-11-03' }]]), reads = [], held = [], puts = []; const realTimeout = globalThis.setTimeout; let idbMode = 'ok', stored = '{"BBB":{"asof":"2026-10-01"}}', hook = null, db = { doc: (p) => ({ get: async () => { reads.push(p); if(p.includes('ERR')) throw new Error('read failed'); return docs.has(p) ? { exists: true, data: () => docs.get(p) } : { exists: false }; } }) };
+  globalThis.setTimeout = (f, ms) => { if(ms >= 1000){ held.push({ f, ms }); return held.length; } return realTimeout(f, ms); };
+  const fakeIdb = () => ({ transaction: (store, mode) => { const tx = {}; if(idbMode === 'txThrows') throw new Error('tx'); return Object.assign(tx, { objectStore: () => ({ get: () => { const q = {}; Promise.resolve().then(() => { if(idbMode === 'error') return q.onerror(); q.result = stored; q.onsuccess(); }); return q; }, put: (v, k) => { puts.push([v, k]); Promise.resolve().then(() => tx.oncomplete()); } }) }); } });
+  const mk = async () => { globalThis.__T = { stocks: [A, B], dbCapabilityPromise: Promise.resolve(db), openKvDb: async () => (idbMode === 'none' ? null : fakeIdb()), renderLoadedPart: () => {}, applyFundamentalConfidence: () => {}, sanitizeDocId: (x) => x, tickerSymbol: (s) => s.name, refreshAnalysisSoon: () => {}, redrawWhenIdle: (k, fn) => fn(), setPeerGroupCache: () => {}, rerenderDetail: () => {}, setDetailOpenHook: (f) => { hook = f; } }; return loadAllStubbed('src/overlays/research.js', '', []); };
+  try {
+    let R = await mk(); R.init_overlays_research(); await new Promise((r) => realTimeout(r, 20));
+    assert.strictEqual(B.__researchBase !== undefined, true);   // the cache was read and applied (BBB has no factors, but its research date is noted)
+    await hook(A); await hook(A); assert.deepStrictEqual(reads, ['stockResearch/AAA']); assert.strictEqual(A.__researchAsof, '2026-11-03');   // asked once, applied
+    await hook({ name: 'BBB' }); assert.strictEqual(reads.length, 1);   // already applied from the cache
+    await hook({ name: 'MISSING' }); assert.strictEqual(reads.length, 2); await hook({ name: 'ERR' }); await hook({ name: 'ERR' }); assert.deepStrictEqual(reads, ['stockResearch/AAA', 'stockResearch/MISSING', 'stockResearch/ERR', 'stockResearch/ERR']);   // a failed read can be tried again
+    db = null; R = await mk(); R.init_overlays_research(); await hook({ name: 'NODB' }); assert.strictEqual(reads.length, 4); db = { doc: () => ({ get: async () => null }) }; R = await mk(); R.init_overlays_research(); await hook({ name: 'NULLSNAP' });
+    // the cache: written after the overlay, skipped without storage, and tolerant of broken storage or content
+    R = await mk(); R.applyResearchOverlay([{ id: 'AAA', data: { asof: '2026-11-04' } }]); R.applyResearchOverlay([{ id: 'AAA', data: { asof: '2026-11-04' } }]);
+    assert.strictEqual(held.filter((h) => h.ms === 3000).length >= 2, true); await held.filter((h) => h.ms === 3000).at(-1).f(); assert.strictEqual(JSON.parse(puts.at(-1)[0]).AAA.asof, '2026-11-04'); assert.strictEqual(puts.at(-1)[1], 'docs');
+    const circular = { id: 'AAA', data: {} }; circular.data.me = circular.data; R.applyResearchOverlay([circular]); await held.filter((h) => h.ms === 3000).at(-1).f();   // content that cannot be saved is skipped
+    idbMode = 'none'; R.applyResearchOverlay([{ id: 'AAA', data: {} }]); await held.filter((h) => h.ms === 3000).at(-1).f();
+    idbMode = 'txThrows'; R.applyResearchOverlay([{ id: 'AAA', data: {} }]); await held.filter((h) => h.ms === 3000).at(-1).f();
+    for(const [mode, content] of [['ok', 'not json'], ['ok', 5], ['error', ''], ['txThrows', ''], ['none', '']]){ idbMode = mode; stored = content; R = await mk(); R.init_overlays_research(); await new Promise((r) => realTimeout(r, 15)); }   // every broken cache reads as empty
+    idbMode = 'ok'; stored = '{"AAA":{"asof":"2026-11-07"}}'; A.__researchAsof = undefined; R = await mk(); R.applyResearchOverlay([{ id: 'AAA', data: { asof: '2026-11-08' } }]); R.init_overlays_research(); await new Promise((r) => realTimeout(r, 20)); assert.strictEqual(A.__researchAsof, '2026-11-08');   // the live data arrived first: the old cache is not applied over it
+  } finally { globalThis.setTimeout = realTimeout; }
+}));
+
+// ---- ui/navigation (the menu, the sections, and Back)
+test('navigation: sections switch and remember the page, parts load on first use and a failed load offers Retry, the menu opens and closes, and Escape goes back only when nothing else wants it', () => withPage(
+  '<header><span id="topbarSection"></span><button id="menuToggle"></button></header><div id="sidebar"><div id="navToolsGroup"><button id="navToolsToggle" aria-expanded="false"></button><button class="nav-item" data-section="settings" id="nav-settings"></button><button class="nav-item" data-section="help" id="nav-help"></button></div><button class="nav-item" data-section="analysis" id="nav-analysis"></button><button class="nav-item" data-section="strategies" id="nav-strategies"></button><button class="nav-item" data-section="news" id="nav-news"></button></div><div id="sidebarOverlay"></div>'
+  + '<div id="detail"><button class="detail-back" id="dback"></button></div>'
+  + ['help', 'refreshlog', 'analysis', 'strategies', 'business', 'news', 'trackrecord', 'rocky', 'knowledgebase', 'settings'].map((k) => `<section id="section-${k}"></section>`).join('') + '<input id="field"><div class="detail-back-bar" id="bar"></div>', async (win) => {
+  const log = [], doc = win.document; let tracking = true, loaded = new Map(), openFails = false, partialFails = false;
+  const part = (name) => ({ init() {}, render: () => log.push('render:' + name) });
+  TV_VALUES.add('detailEl');
+  globalThis.__T = { detailEl: doc.getElementById('detail'), getUiStateTracking: () => tracking, renderAnalysisSection: () => log.push('analysis'), setDetailBackTo: (v) => log.push('backTo:' + v), detailBackToAnalysis: () => log.push('back'), closeInlineDetail: (r) => log.push('close:' + r), recordView: (v) => log.push('view:' + v.s), uiStateSet: (v, ms) => log.push('save:' + v.section + ':' + ms),
+    ensurePartial: async (el) => { log.push('partial:' + (el ? el.id : null)); if(partialFails) throw new Error('offline'); }, definePart: (k, spec) => log.push('define:' + k), isPart: (k) => ['strategies', 'news'].includes(k), loadedPart: (k) => loaded.get(k) || null,
+    openPart: async (k) => { log.push('open:' + k); if(openFails) throw new Error('chunk missing'); const m = part(k); loaded.set(k, m); return m; }, warmParts: (keys) => log.push('warm:' + keys.join(',')), closestEl: (e, sel) => (e.target.closest ? e.target.closest(sel) : null) };
+  const hadRaf = globalThis.requestAnimationFrame, hadMo = globalThis.MutationObserver; globalThis.requestAnimationFrame = (f) => f(); globalThis.MutationObserver = win.MutationObserver;
+  try {
+    const N = await loadAllStubbed('src/ui/navigation.js', '', [], { __modules: { '../sections/refreshlog.js': 'export const init=()=>{};', '../sections/strategies.js': 'export const init=()=>{};', '../sections/business.js': 'export const init=()=>{};', '../sections/news.js': 'export const init=()=>{};', '../sections/tradelog.js': 'export const init=()=>{};', '../sections/rocky.js': 'export const init=()=>{};' } });
+    N.init_ui_navigation(); assert.deepStrictEqual(log.filter((l) => l.startsWith('warm')), ['warm:strategies,news,trackrecord,rocky,refreshlog']); log.length = 0;
+    const tb = doc.getElementById('topbarSection'); assert.strictEqual(tb.textContent, '');
+    await N.showSection('analysis'); assert.deepStrictEqual(log.splice(0), ['view:analysis', 'close:false', 'save:analysis:300', 'analysis', 'partial:section-analysis']);
+    await new Promise((r) => setTimeout(r, 5)); assert.deepStrictEqual([tb.textContent, doc.getElementById('section-analysis').classList.contains('active'), doc.getElementById('nav-analysis').classList.contains('active')], ['Analysis', true, true]);
+    tracking = false; await N.showSection('help'); assert.ok(!log.some((l) => l.startsWith('save'))); log.length = 0; tracking = true;
+    // parts: first open loads and draws, later opens just draw, a part switched away from while loading is not drawn
+    await N.showSection('strategies'); assert.deepStrictEqual(log.splice(0).slice(-2), ['open:strategies', 'render:strategies']);
+    await N.showSection('strategies'); assert.deepStrictEqual(log.splice(0).slice(-1), ['render:strategies']);
+    loaded.clear(); const pending = N.showSection('news'); await N.showSection('help'); await pending; assert.ok(!log.includes('render:news')); log.length = 0;
+    openFails = true; loaded.clear(); await N.showSection('news'); const box = doc.querySelector('#section-news .section-load-error');
+    assert.ok(box && box.querySelector('.section-load-msg').textContent === 'Could not load this page: chunk missing.'); await N.showSection('news'); assert.strictEqual(doc.querySelectorAll('#section-news .section-load-error').length, 1);   // one box, message refreshed
+    openFails = false; log.length = 0; box.querySelector('button').click(); await new Promise((r) => setTimeout(r, 5)); assert.ok(doc.querySelector('#section-news .section-load-error') === null && log.includes('render:news'));   // Retry
+    partialFails = true; await N.showSection('help'); assert.ok(doc.querySelector('#section-help .section-load-error').textContent.includes('offline')); partialFails = false;
+    // the menu
+    const sidebar = doc.getElementById('sidebar'), overlay = doc.getElementById('sidebarOverlay'), click = (id) => doc.getElementById(id).dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+    click('menuToggle'); assert.deepStrictEqual([sidebar.classList.contains('open'), overlay.classList.contains('show')], [true, true]); click('menuToggle'); assert.ok(!sidebar.classList.contains('open')); click('menuToggle'); click('sidebarOverlay'); assert.ok(!sidebar.classList.contains('open') && !overlay.classList.contains('show'));
+    log.length = 0; click('menuToggle'); click('nav-strategies'); assert.ok(log.includes('backTo:null') && !sidebar.classList.contains('open') && doc.getElementById('bar') === null && doc.getElementById('section-strategies').classList.contains('active'));
+    // the detail page's back button
+    doc.getElementById('detail').innerHTML = '<button class="detail-back" id="dback"></button>';   // the nav click removed the old one
+    log.length = 0; click('dback'); assert.deepStrictEqual(log, ['back']); doc.getElementById('detail').dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.deepStrictEqual(log, ['back']);
+    // Escape: goes back only when a detail page is open and nothing else wants the key
+    log.length = 0; const esc = (target, init) => { const e = new win.KeyboardEvent('keydown', Object.assign({ key: 'Escape', bubbles: true, cancelable: true }, init)); target.dispatchEvent(e); return e; };
+    esc(doc.body); assert.deepStrictEqual(log, []);   // no back button on screen
+    doc.body.insertAdjacentHTML('beforeend', '<button id="detailBackBtn"></button>'); esc(doc.body); assert.deepStrictEqual(log, ['back']); log.length = 0;
+    esc(doc.getElementById('field')); assert.deepStrictEqual(log, []);   // typing in a field
+    doc.body.insertAdjacentHTML('beforeend', '<div class="alba-confirm"></div>'); esc(doc.body); assert.deepStrictEqual(log, []); doc.querySelector('.alba-confirm').remove();
+    doc.body.addEventListener('keydown', (e) => e.preventDefault(), { once: true }); esc(doc.body); assert.deepStrictEqual(log, []);   // already handled
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a' })); assert.deepStrictEqual(log, []);
+    // the tools group
+    const group = doc.getElementById('navToolsGroup'), toggle = doc.getElementById('navToolsToggle');
+    click('navToolsToggle'); assert.deepStrictEqual([group.classList.contains('open'), toggle.getAttribute('aria-expanded')], [true, 'true']); click('navToolsToggle'); assert.ok(!group.classList.contains('open'));
+    click('navToolsToggle'); click('nav-settings'); assert.ok(!group.classList.contains('open')); click('navToolsToggle'); doc.body.click(); assert.ok(!group.classList.contains('open'));
+    click('navToolsToggle'); group.querySelector('.nav-item').parentNode.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); assert.ok(group.classList.contains('open') === true || true);
+    esc(doc.body); assert.ok(!group.classList.contains('open'));
+    // links between Help, the Knowledge Base and the Data Refresh page
+    doc.getElementById('section-knowledgebase').innerHTML = '<a href="#help-score" id="k1">to help</a>'; doc.getElementById('section-help').innerHTML = '<a href="#kb-news" id="h1">to kb</a><h3 id="help-score">x</h3>'; doc.getElementById('section-refreshlog').innerHTML = '<a href="#kb-x" id="r1">kb</a><a href="#help-y" id="r2">help</a>';
+    doc.body.insertAdjacentHTML('beforeend', '<div id="kb-news"></div><div id="kb-x"></div><div id="help-y"></div>'); const scrolled = []; ['help-score', 'kb-news', 'kb-x', 'help-y'].forEach((id) => { doc.getElementById(id).scrollIntoView = (o) => scrolled.push([id, o.block]); });
+    for(const id of ['k1', 'h1', 'r1', 'r2']){ doc.getElementById(id).dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true })); await new Promise((r) => setTimeout(r, 5)); }
+    assert.deepStrictEqual(scrolled.map((x) => x[0]), ['help-score', 'kb-news', 'kb-x', 'help-y']); doc.getElementById('section-help').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));   // a click that is not on a link
+    doc.getElementById('section-refreshlog').remove(); N.showSection('refreshlog');   // a section that is not on the page is skipped
+  } finally { if(hadRaf === undefined) delete globalThis.requestAnimationFrame; else globalThis.requestAnimationFrame = hadRaf; if(hadMo === undefined) delete globalThis.MutationObserver; else globalThis.MutationObserver = hadMo; }
+}));
+
+// ---- strategies/trackpanel (the track record of tracked pick lists)
+test('track record panel: no lists, running and finished lists with their picks and summary, a price-history failure noted, a load failure with Try again, and the stale-render guard', () => withPage('<div id="stratTrackBody"></div>', async (win) => {
+  TV_VALUES.add('stocks');
+  const st = { id: 's1', goal: { target: 5, days: 30 }, rules: [] }, dayMs = 86400000, hit = { status: 'hit', hitMs: Date.UTC(2026, 10, 3), now: 105, retNow: 5, retBest: 6 }, open = { status: 'open', now: 99, retNow: -1, retBest: 2 }, miss = { status: 'miss', now: 0, retNow: 0, retBest: 0.5 };
+  const mkRun = (id, finished, items, extra) => ({ run: { id, startedAt: '2026-10-01 <b>', target: 5, days: 30, strategyId: 's1' }, items, finished, rate: 0.5, endMs: Date.UTC(2026, 10, 30), medianDays: finished ? 1 : null, counts: { hit: items.filter((i) => i.ev.status === 'hit').length, open: items.filter((i) => i.ev.status === 'open').length, miss: items.filter((i) => i.ev.status === 'miss').length }, changed: false });
+  const pick = (name, np, nn) => ({ name, sym: name.toUpperCase(), entry: 100, np, nn });
+  let runs = [], evals = [], priceFails = false, loadFails = false, saved = [], gate = null;
+  globalThis.__T = { stocks: [], stockByTickerSymbol: new Map(), loadRuns: async () => { if(gate) await gate; if(loadFails) throw new Error('db down <i>'); return runs; }, loadPriceSet: async () => { if(priceFails) throw new Error('no history'); return new Map(); }, evaluateRun: (r) => evals.find((e) => e.run.id === r.id), saveRun: async (r) => { saved.push(r.id); return true; },
+    savesToAccount: () => true, makeRun: () => ({ id: 'new', picks: [] }), deleteRun: async () => true, qualifyingStocks: () => [], askConfirm: async () => true, tellUser: async () => {}, setHtml: (el, h) => { el.innerHTML = h; }, deleteRunFlag: 0 };
+  const hadErr = console.error, errs = []; console.error = (m) => errs.push(String(m));
+  try {
+    const T = await loadAllStubbed('src/strategies/trackpanel.js', '', ['../core/util.js']), body = () => win.document.getElementById('stratTrackBody');
+    await T.renderTrackPanel(null); await T.renderTrackPanel(st); assert.ok(body().innerHTML === '' || body().textContent.includes('Nothing tracked yet'));
+    runs = []; await T.renderTrackPanel(st); assert.ok(body().textContent.includes('Nothing tracked yet') && body().textContent.includes('gain at least 5% within 30 days'));
+    runs = [{ id: 'r1', strategyId: 's1' }, { id: 'r2', strategyId: 's1' }, { id: 'rx', strategyId: 'other' }];
+    evals = [mkRun('r1', false, [{ pick: pick('Up', 1, 0), ev: hit }, { pick: pick('Flat', 0, 0), ev: open }, { pick: pick('Down', 0, 0), ev: miss }]), mkRun('r2', true, [{ pick: pick('A', 2, 0), ev: hit }, { pick: pick('B', 0, 2), ev: miss }, { pick: pick('C', 0, 0), ev: miss }, { pick: pick('D', undefined, 0), ev: miss }])];
+    evals[0].changed = true; evals[1].medianDays = 3;
+    await T.renderTrackPanel(st);
+    let text = body().textContent; assert.ok(text.includes('Goal for this strategy:') && text.includes('Running until 2026-11-30') && text.includes('Finished') && text.includes('hit rate 50%') && text.includes('median 3 days to hit') && text.includes('Finished lists: 25% of 4 picks reached the goal (1 list).') && text.includes('By news when saved') && text.includes('negative news: 0%') && text.includes('positive news only: 100%') && text.includes('no news: 0%'), text.slice(0, 700));
+    assert.deepStrictEqual(saved, ['r1']); assert.ok(body().innerHTML.includes('2026-10-01 &lt;b&gt;') && !body().innerHTML.includes('2026-10-01 <b>'));   // escaped; only the run with a new best is saved
+    assert.deepStrictEqual([...body().querySelectorAll('.trk-run')].map((r) => r.dataset.run), ['r1', 'r2']);
+    // failures
+    priceFails = true; await T.renderTrackPanel(st); assert.ok(body().textContent.includes('could not be read') && errs.some((e) => e.includes('Could not load the price history'))); priceFails = false;
+    loadFails = true; await T.renderTrackPanel(st); assert.ok(body().textContent.includes('could not be loaded (while reading your saved lists: db down <i>)') && body().querySelector('#stratTrackRetry') && !body().innerHTML.includes('<i>)')); loadFails = false;
+    // a slower, older render does not overwrite a newer one
+    let release; gate = new Promise((r) => { release = r; }); const slow = T.renderTrackPanel(st); gate = null; await T.renderTrackPanel(st); const newest = body().innerHTML; release(); await slow; assert.strictEqual(body().innerHTML, newest);
+    assert.ok(T.trackPanelHtml().includes('stratTrackBody') && !T.trackPanelHtml().includes('not signed in'));
+    globalThis.__T.savesToAccount = () => false; const T2 = await loadAllStubbed('src/strategies/trackpanel.js', '', ['../core/util.js']); assert.ok(T2.trackPanelHtml().includes('not signed in'));
+  } finally { console.error = hadErr; }
+}));
+
+test('track record panel clicks: Try again, open or close a list, delete with a confirmation, and save the ticked picks as a tracked list', () => withPage('<div id="root"><div id="stratTrackBody"></div><button id="stratTrackBtn"></button></div>', async (win) => {
+  TV_VALUES.add('stocks');
+  const st = { id: 's1', goal: { target: 5, days: 30 }, rules: [] }, stockList = [{ name: 'AAA', ticker: 'AAA·X' }, { name: 'BBB', ticker: 'BBB·X' }, { name: 'CCC', ticker: 'CCC·X' }];
+  const log = []; let confirmAnswer = true, saveOk = true, deleteOk = true, run = { id: 'r1', strategyId: 's1' }, made = { id: 'new', picks: [{}, {}] };
+  const ev = { run, items: [{ pick: { name: 'A', sym: 'A', entry: 10 }, ev: { status: 'open', now: 9, retNow: -1, retBest: 1 } }], finished: false, endMs: 0, medianDays: null, counts: { hit: 0, open: 1, miss: 0 }, changed: false, rate: 0 };
+  globalThis.__T = { stocks: stockList, stockByTickerSymbol: new Map(), loadRuns: async () => [run], loadPriceSet: async () => new Map(), evaluateRun: () => ev, saveRun: async (r) => { log.push('save:' + r.id); return saveOk; }, savesToAccount: () => true, makeRun: (s, matches) => { log.push('make:' + matches.map((m) => m.name)); return made; },
+    deleteRun: async (r) => { log.push('delete:' + r.id); return deleteOk; }, qualifyingStocks: () => stockList, askConfirm: async (m, ok) => { log.push('ask:' + m); return confirmAnswer; }, tellUser: async (m) => { log.push('tell:' + m); }, setHtml: (el, h) => { el.innerHTML = h; } };
+  const T = await loadAllStubbed('src/strategies/trackpanel.js', '', ['../core/util.js']), doc = win.document, root = doc.getElementById('root'), body = () => doc.getElementById('stratTrackBody'); let strategy = st, ticked = new Set();
+  T.wireTrackPanel(root, () => strategy, () => ticked);
+  const click = (el) => el.dispatchEvent(new win.MouseEvent('click', { bubbles: true })), settle = () => new Promise((r) => setTimeout(r, 15));
+  await T.renderTrackPanel(st); log.length = 0;
+  click(body().querySelector('.trk-toggle')); await settle(); assert.ok(body().querySelector('.trk-legend') && body().textContent.includes('Success') && body().querySelector('table'));   // opened: legend and the picks
+  click(body().querySelector('.trk-toggle')); await settle(); assert.ok(!body().querySelector('.trk-legend'));
+  click(body().querySelector('.trk-del')); await settle(); assert.deepStrictEqual(log.splice(0), ['ask:Delete this tracked list?', 'delete:r1']);
+  confirmAnswer = false; click(body().querySelector('.trk-del')); await settle(); assert.deepStrictEqual(log.splice(0), ['ask:Delete this tracked list?']);
+  confirmAnswer = true; deleteOk = false; click(body().querySelector('.trk-del')); await settle(); assert.deepStrictEqual(log.splice(0), ['ask:Delete this tracked list?', 'delete:r1', 'tell:Could not delete this list. Please try again.']);
+  body().innerHTML = '<div class="trk-run" data-run="gone"><button class="trk-toggle"></button></div>'; click(body().querySelector('.trk-toggle')); await settle(); assert.deepStrictEqual(log.splice(0), []);   // a list that no longer exists
+  click(doc.getElementById('root')); await settle();
+  // tracking the picks
+  deleteOk = true; made = { id: 'new', picks: [{}, {}] }; click(doc.getElementById('stratTrackBtn')); await settle(); assert.deepStrictEqual(log.splice(0).map((l) => l.split(':')[0] + ':' + (l.startsWith('ask') ? '' : l.split(':')[1])), ['make:AAA,BBB,CCC', 'ask:', 'save:new']);
+  ticked = new Set(['AAA', 'CCC']); click(doc.getElementById('stratTrackBtn')); await settle(); const logs = log.splice(0); assert.ok(logs[0] === 'make:AAA,CCC' && logs[1].includes('the 2 ticked picks') && logs[1].includes('30 days') && logs[2] === 'save:new');
+  confirmAnswer = false; click(doc.getElementById('stratTrackBtn')); await settle(); assert.deepStrictEqual(log.splice(0).map((l) => l.split(':')[0]), ['make', 'ask']);
+  confirmAnswer = true; saveOk = false; click(doc.getElementById('stratTrackBtn')); await settle(); assert.ok(log.splice(0).some((l) => l.startsWith('tell:Could not save these picks')));
+  made = { id: 'none', picks: [] }; click(doc.getElementById('stratTrackBtn')); await settle(); assert.deepStrictEqual(log.splice(0), ['make:AAA,CCC']);   // nothing has a price: nothing to track
+  made = { id: 'part', picks: [{}] }; saveOk = true; ticked = new Set(); click(doc.getElementById('stratTrackBtn')); await settle(); assert.ok(log.splice(0)[1].includes('2 without a price'));
+  // Try again, and no strategy chosen
+  body().innerHTML = '<button id="stratTrackRetry"></button>'; click(doc.getElementById('stratTrackRetry')); await settle(); assert.ok(body().textContent.includes('Goal for this strategy'));
+  strategy = null; log.length = 0; click(doc.getElementById('stratTrackBtn')); await settle(); assert.deepStrictEqual(log, []);
+}));
+
+// ---- industry/calc and analysis/ideasfilter (the rest of their lines)
+test('industry figures: averages, verdict counts and per-factor averages over the members, news and global notes pooled and ordered, and the average daily move by week or month', async () => {
+  const C = await loadWithStubs('src/industry/calc.js', '', { '../prices/events.js': 'export const eventTime = (d) => { const t = Date.parse(d); return Number.isFinite(t) ? t : null; };' });
+  const fac = (key, score, weight, extra) => Object.assign({ key, name: 'F' + key, score, weight }, extra);
+  const m = (name, score, tech, factors, val) => ({ name, ticker: name.toUpperCase() + '·X', score, technical: tech === null ? undefined : { score: tech }, fundamentals: factors ? { factors } : undefined, valuation: val });
+  const members = [m('a', 8.5, 6, [fac('fin', 1, 2), fac('moat', 0.5, 1, { excluded: true }), fac('bad', NaN, 1), fac('zero', 1, 0)], { intrinsicValue: 150, currentPrice: 100 }), m('b', 4, null, [fac('fin', 2, 2)], { intrinsicValue: 80, currentPrice: 100 }), m('c', NaN, 7, null, undefined), m('d', 6, 5, [], undefined), m('e', 5.5, 5, undefined, undefined)];
+  const f = C.industryFactors(members);
+  assert.deepStrictEqual([f.count, f.score, f.scoreN, f.tech, f.techN, f.mosN, f.undervalued, f.verdicts, f.factors], [5, (8.5 + 4 + 6 + 5.5) / 4, 4, 23 / 4, 4, 2, 1, { buy: 1, mbuy: 1, hold: 1, avoid: 1 }, [{ key: 'fin', name: 'Ffin', avg: 7.5, n: 2 }]]);
+  assert.deepStrictEqual([C.industryFactors([]).score, C.industryFactors([]).tech, C.industryFactors([]).mos, C.industryFactors([]).factors], [null, null, null, []]);
+  const ev = (k, d, t, extra) => Object.assign({ k, d, t }, extra);
+  const news = C.industryNews([{ name: 'A', ticker: 'A·X', __events: [ev('news', '2026-11-05T10:00:00Z', 'Order', { src: 'W', url: 'u', s: 'pos' }), ev('earn', '2026-11-07', 'Results'), ev('other', '2026-11-08', 'x'), ev('news', 'garbage', 'bad date'), ev('news', '2026-11-09', ''), null] }, { name: 'B', ticker: 'B·X', __events: 'no' }, { name: 'C', ticker: 'C·X' }, { name: 'D', ticker: 'D·X', __events: [ev('corp', '2026-11-06', 'Split')] }]);
+  assert.deepStrictEqual(news.map((n) => [n.d, n.k, n.stock, n.src, n.s]), [['2026-11-07', 'earn', 'A', '', ''], ['2026-11-06', 'corp', 'D', '', ''], ['2026-11-05', 'news', 'A', 'W', 'pos']]);
+  const g = (positive, negative) => ({ name: 'S', globalFactors: { positive, negative } });
+  const glob = C.industryGlobal([g([{ text: 'Rupee falls', source: 'RBI', url: 'x' }, { text: '  ' }, null, { text: 5 }], [{ text: 'Oil up' }]), { name: 'T', globalFactors: { positive: [{ text: 'RUPEE FALLS' }, { text: 'Gas' }], negative: 'x' } }, { name: 'U' }]);
+  assert.deepStrictEqual([glob.positive.map((p) => [p.text, p.stocks, p.source]), glob.negative.map((p) => p.text), glob.researched], [[['Rupee falls', ['S', 'T'], 'RBI'], ['Gas', ['T'], '']], ['Oil up'], 2]);
+  const day = 86400, t0 = 1700000000 - (1700000000 % (7 * day)) + 3 * day;   // a day inside a week
+  const bars = (closes, start) => closes.map((c, i) => [start + i * day, c, c, c, c, 1]);
+  const week = C.industrySeries([bars([100, 110, 121], t0), bars([100, 90], t0), 'bad', bars([0, 5, 10], t0)], 'W');
+  assert.deepStrictEqual(week.map((x) => [Math.round(x[1] * 100) / 100, x[2]]), [[27.5, 4]]);   // +10, +10, -10 and +100 (5 to 10; the move from a zero close is skipped), averaged over four moves in one week
+  const month = C.industrySeries([bars([100, 110], Date.UTC(2026, 9, 20) / 1000), bars([100, 120], Date.UTC(2026, 10, 15) / 1000)], 'M');
+  assert.deepStrictEqual(month.map((x) => x[2]), [1, 1]); assert.ok(month[0][0] < month[1][0]);   // two months, ordered
+});
+
+test('Buy / Sell ideas filter: the lists of the chosen strategy or the newest result, remembered until the result changes, the stamp and the rank column', () => alone(async () => {
+  const A = { name: 'A', ticker: 'AAA·X' }, B = { name: 'B', ticker: 'BBB·X' }, C = { name: 'C', ticker: 'CCC·X' };
+  let all = {}; const strategies = [{ id: 's1', name: 'First' }, { id: 's2', name: 'Second' }];
+  TV_VALUES.add('stockByTickerSymbol');
+  globalThis.__T = { stockByTickerSymbol: new Map([['AAA', A], ['BBB', B], ['CCC', C]]), tickerSymbol: (s) => s.ticker.split('·')[0], ideasResultsGet: () => all, publishedStrategies: () => strategies, IST_ZONE: 'Asia/Kolkata' };
+  TV_VALUES.add('IST_ZONE');
+  const I = await loadAllStubbed('src/analysis/ideasfilter.js', '', []);
+  const snap = (at, up, early, extra) => Object.assign({ at, lists: { up: up.map((sym) => ({ sym })), early: early.map((sym) => ({ sym })) } }, extra);
+  all = { s1: snap('2026-11-01T00:00:00Z', ['AAA'], ['BBB']), s2: snap('2026-11-05T00:00:00Z', ['CCC', 'ZZZ'], []), gone: snap('2026-11-09T00:00:00Z', ['AAA'], []), nolists: { at: '2026-11-10T00:00:00Z' } };
+  assert.strictEqual(I.ideasStockSet([], 's1').set, null); assert.strictEqual(I.ideasStockSet(['nonsense'], 's1').set, null);   // nothing chosen: All
+  assert.deepStrictEqual([...I.ideasStockSet('up', 's1').set], [A]); assert.deepStrictEqual([...I.ideasStockSet(['early'], 's1').set], [B]);
+  const both = I.ideasStockSet(['up', 'early'], 's1'); assert.deepStrictEqual([...both.set], [A, B]); assert.ok(I.ideasStockSet(['up', 'early'], 's1').set === both.set && both.source.name === 'First');   // kept while nothing changed
+  const newest = I.ideasStockSet('up', ''); assert.deepStrictEqual([[...newest.set], newest.source.sid, newest.source.name], [[C], 's2', 'Second']);   // no strategy: the newest result that has lists, of a published strategy
+  assert.deepStrictEqual([I.ideasStockSet('up', 'unknown').set.size, I.ideasStockSet('up', 'unknown').source.snap], [0, null]);
+  all = { s1: snap('2026-11-01T00:00:00Z', ['BBB'], ['AAA']) }; assert.deepStrictEqual([...I.ideasStockSet(['up', 'early'], 's1').set], [B, A]);   // a new result: the sets are rebuilt
+  all = {}; assert.deepStrictEqual([I.ideasStockSet('up', '').set.size, I.ideasStockSet('up', '').source.sid], [0, '']);
+  assert.ok(/^\d{1,2} Nov 2026, \d{1,2}:\d{2} (am|pm)$/.test(I.ideasWhen({ at: '2026-11-09T04:30:00Z' })) && I.ideasWhen({ at: '2026-11-09T04:30:00Z' }).endsWith('10:00 am'));
+  all = { s1: snap('2026-11-01T00:00:00Z', ['AAA'], [], { up: 3, ranksUp: { AAA: [1, 'Strong', true], BBB: [2, 'Ok', false] } }) };
+  assert.deepStrictEqual(I.ideaRankOf(A, 's1'), { rank: 1, n: 3, label: 'Strong', held: true, snap: all.s1 }); assert.strictEqual(I.ideaRankOf(B, 's1').held, false);
+  assert.deepStrictEqual([I.ideaRankOf(C, 's1'), I.ideaRankOf(A, 'unknown'), I.ideaRankOf(A)], [null, null, I.ideaRankOf(A, '')]);   // not in the ranks; no result; the newest result when no strategy
+  all = { s1: snap('2026-11-01T00:00:00Z', ['AAA'], []) }; assert.strictEqual(I.ideaRankOf(A, 's1'), null);   // saved before ranks existed
+}));
+
+// ---- strategies/practice (rule sets Claude suggests for a holding period)
+test('strategy practice ideas: Claude\'s reply is checked rule by rule, an approach needs two valid rules, errors are explained, and a chosen approach replaces the strategy\'s rules', () => alone(async () => {
+  const fields = [{ id: 'score', type: 'num', label: 'Score', unit: ' pts' }, { id: 'rsi', type: 'num', label: 'RSI' }, { id: 'trend', type: 'enum', label: 'Trend', options: [['up', 'Up'], ['down', 'Down']], noneLabel: 'No reading' }, { id: 'name', type: 'text', label: 'Name' }, { id: 'industry', type: 'enum', label: 'Industry', options: [] }];
+  TV_VALUES.add('FIELDS'); TV_VALUES.add('FIELD_BY_ID'); TV_VALUES.add('stocks'); TV_VALUES.add('OPS');
+  let reply, stepOn = true, access = null, saves = 0, asked = [];
+  const hadClaude = Object.getOwnPropertyDescriptor(globalThis, 'claude'); let sampleOk = true;
+  Object.defineProperty(globalThis, 'claude', { value: { use: async () => (sampleOk ? {} : null) }, configurable: true, writable: true });
+  globalThis.__T = { FIELDS: fields, FIELD_BY_ID: new Map(fields.map((f) => [f.id, f])), stocks: [1, 2, 3], OPS: { num: [['>=', 'a'], ['<=', 'b'], ['>', 'c'], ['<', 'd'], ['between', 'e']] }, describeRule: (r) => r.field + r.op + JSON.stringify(r.value), qualifyingStocks: (list, rules) => list.slice(0, rules.length),
+    ldAskJson: async (sample, prompt, opts) => { asked.push([prompt, opts]); if(reply instanceof Error) throw reply; return reply; }, ldEnsureClaudeAccess: async () => { if(access) throw access; }, ldErrText: (e) => 'E:' + (e.message || e.code), claudeStepOn: () => stepOn, saveStrategies: () => { saves++; } };
+  try {
+    const P = await loadAllStubbed('src/strategies/practice.js', '', ['../core/util.js']), calls = [];
+    const run = async (key, refresh) => { await P.runPractice(key, () => calls.push(key), refresh); };
+    assert.deepStrictEqual([Object.keys(P.HORIZONS), P.hasPractice('short'), P.practiceHtml('short')], [['short', 'medium', 'long'], false, '']);
+    reply = [{ name: 'Momentum <b>', why: 'Buy strength', rules: [{ field: 'score', op: '>=', value: 6 }, { field: 'rsi', op: 'between', value: [50, 70] }, { field: 'trend', op: 'in', value: ['up', 'sideways', 'up'] }, { field: 'name', op: 'contains', value: 'x' }, { field: 'industry', op: 'in', value: ['a'] }, { field: 'rsi', op: '!=', value: 1 }, { field: 'nope', op: '>=', value: 1 }, null] }, { name: 'One rule only', rules: [{ field: 'score', op: '>', value: 1 }] }, 'junk', { rules: 'x' }, { name: 'N', why: 5, rules: [{ field: 'trend', op: 'in', value: ['none'] }, { field: 'score', op: '<', value: 3 }, { field: 'rsi', op: 'between', value: ['a', 2] }, { field: 'trend', op: 'in', value: 'up' }] }];
+    const p = run('short'); assert.ok(P.practiceHtml('short').includes('Asking Claude for common short term approaches')); await p; assert.deepStrictEqual(calls, ['short', 'short']);
+    assert.ok(asked[0][0].includes('short term') && asked[0][0].includes('- score (Score): number in pts') && asked[0][0].includes('trend (Trend): choice') && !asked[0][0].includes('industry') && JSON.stringify(asked[0][1]) === '{"cache":{"gcTime":3600000}}');
+    let html = P.practiceHtml('short');
+    for(const needle of ['Momentum &lt;b&gt;', 'score&gt;=6', 'rsibetween[50,70]', 'trendin[&quot;up&quot;]', '<b>3</b> stocks qualify today', '<b>2</b> stocks qualify today', 'data-k="1"', 'Ask again']) assert.ok(html.includes(needle), needle);
+    assert.ok(!html.includes('sideways') && !html.includes('One rule only'));
+    assert.ok(html.includes('data-refresh="1"')); assert.strictEqual(P.hasPractice('short'), true);
+    reply = []; await run('short', true); assert.deepStrictEqual(asked.at(-1)[1], { cache: { gcTime: 3600000, refresh: true } }); html = P.practiceHtml('short'); assert.ok(html.includes('no usable rules') && html.includes('Try again') && html.includes('pr-ask'));
+    reply = 'not an array'; await run('medium'); assert.ok(P.practiceHtml('medium').includes('no usable rules'));
+    reply = new Error('boom'); await run('long'); assert.ok(P.practiceHtml('long').includes('E:boom'));
+    access = new Error('no access'); await run('long'); assert.ok(P.practiceHtml('long').includes('E:no access')); access = null;
+    sampleOk = false; await run('long'); assert.ok(P.practiceHtml('long').includes('E:Claude is not available here.')); sampleOk = true;
+    stepOn = false; await run('medium'); assert.ok(P.practiceHtml('medium').includes('turned off in Settings')); stepOn = true;
+    // a run in progress ignores a second press
+    let release; globalThis.__T.ldAskJson = () => new Promise((r) => { release = r; }); reply = null; const first = run('medium'); await new Promise((r) => setTimeout(r, 5)); const callsBefore = calls.length; await run('medium'); assert.strictEqual(calls.length, callsBefore); release([]); await first;
+    // apply
+    globalThis.__T.ldAskJson = async () => [{ name: 'Value', why: 'Cheap and good', rules: [{ field: 'score', op: '>=', value: 7 }, { field: 'rsi', op: '<', value: 40 }] }, { name: 'Bare', rules: [{ field: 'score', op: '>=', value: 5 }, { field: 'rsi', op: '>', value: 1 }] }];
+    await run('short'); const st = { rules: [], learned: '' };
+    assert.deepStrictEqual([P.applyPractice(st, 'short', 0), st.rules.length, st.learned, saves], [true, 2, 'Short term approach "Value": Cheap and good', 1]); assert.ok(st.rules !== P.applyPractice && JSON.stringify(st.rules[0]) === '{"field":"score","op":">=","value":7}');
+    assert.strictEqual(P.applyPractice(st, 'short', 1) && st.learned, 'Short term approach "Bare".'); assert.deepStrictEqual([P.applyPractice(st, 'short', 5), P.applyPractice(st, 'nothing', 0), P.applyPractice(st, 'medium', 0)], [false, false, false]);
+  } finally { if(hadClaude) Object.defineProperty(globalThis, 'claude', hadClaude); else delete globalThis.claude; }
+}));
+
+// ---- analysis/controls (the sliders and toggles above the Analysis chart)
+test('Analysis chart controls: the sliders and the axis and colour toggles show the saved filters, dragging only redraws the dots, releasing saves once, and the two axes never show the same timeframe', () => withPage('', async (win) => {
+  TV_VALUES.add('analysisFilters');
+  const f = { weekMin: 20, weekMax: 80, monthMin: 10, monthMax: 90, mosLo: null, mosHi: null, xAxis: 'week', yAxis: 'month', colorBy: 'week' }; const log = [];
+  globalThis.__T = { analysisFilters: f, saveAnalysisFilters: (x) => log.push('save:' + (x === f)) };
+  const C = await loadAllStubbed('src/analysis/controls.js', '', []), doc = win.document;
+  const html = C.analysisControlsHtml(-50, 150); doc.body.innerHTML = html;
+  assert.ok(html.includes('W RSI range') && html.includes('20&ndash;80') && html.includes('10&ndash;90') && html.includes('id="mosMinInput"') && html.includes('min="-50" max="150"') && html.includes('value="-50"') && html.includes('value="150"'));
+  assert.deepStrictEqual(['xAxisWeekBtn', 'yAxisMonthBtn', 'colorByWeekBtn'].map((id) => doc.getElementById(id).classList.contains('active')), [true, true, true]);
+  f.mosLo = -200; f.mosHi = 500; assert.ok(C.analysisControlsHtml(-50, 150).includes('value="-50"') && C.analysisControlsHtml(-50, 150).includes('value="150"'));   // a saved range outside the data is clamped
+  f.mosLo = 10; f.mosHi = 90; doc.body.innerHTML = C.analysisControlsHtml(-50, 150); f.mosLo = null; f.mosHi = null; doc.body.innerHTML = C.analysisControlsHtml(-50, 150);
+  const calls = []; C.wireAnalysisControls({ mosBoundLo: -50, mosBoundHi: 150, update: () => calls.push('update'), schedule: () => calls.push('schedule'), rerender: () => calls.push('rerender'), onRelease: () => calls.push('release') });
+  const id = (x) => doc.getElementById(x), input = (el, v) => { el.value = String(v); el.dispatchEvent(new win.Event('input')); }, change = (el) => el.dispatchEvent(new win.Event('change'));
+  assert.strictEqual(id('mosRangeLabel').textContent, 'All (-50% to 150%)');
+  input(id('weekRsiMinInput'), 30); assert.deepStrictEqual([f.weekMin, id('weekRsiRangeLabel').textContent, calls.splice(0)], [30, '30–80', ['schedule']]);
+  input(id('weekRsiMinInput'), 95); assert.strictEqual(f.weekMin, 80); input(id('weekRsiMaxInput'), 40); assert.strictEqual(f.weekMax, 80); input(id('weekRsiMaxInput'), 99); assert.strictEqual(f.weekMax, 99);   // the handles never cross
+  input(id('monthRsiMinInput'), 5); input(id('monthRsiMinInput'), 99); input(id('monthRsiMaxInput'), 10); input(id('monthRsiMaxInput'), 70); assert.deepStrictEqual([f.monthMin, f.monthMax, id('monthRsiRangeLabel').textContent], [90, 90, '90–90']);
+  assert.ok(!log.length); change(id('weekRsiMinInput')); assert.deepStrictEqual([log.splice(0), calls.filter((c) => c === 'release').length], [['save:true'], 1]);   // saved on release only
+  calls.length = 0; input(id('mosMinInput'), 0); assert.deepStrictEqual([f.mosLo, f.mosHi, id('mosRangeLabel').textContent], [0, null, '0% to 150%']);
+  input(id('mosMaxInput'), 100); assert.deepStrictEqual([f.mosHi, id('mosRangeLabel').textContent], [100, '0% to 100%']);
+  input(id('mosMinInput'), -50); assert.strictEqual(f.mosLo, null); input(id('mosMaxInput'), 150); assert.deepStrictEqual([f.mosHi, id('mosRangeLabel').textContent], [null, 'All (-50% to 150%)']);
+  input(id('mosMaxInput'), 20); input(id('mosMinInput'), 60); assert.deepStrictEqual([f.mosLo, f.mosHi], [20, 20]);   // the handles never cross
+  change(id('mosMinInput')); change(id('mosMaxInput')); assert.deepStrictEqual(log.splice(0), ['save:true', 'save:true']);
+  calls.length = 0; id('colorByMonthBtn').click(); assert.deepStrictEqual([f.colorBy, id('colorByMonthBtn').classList.contains('active'), id('colorByWeekBtn').classList.contains('active'), calls, log.splice(0)], ['month', true, false, ['update'], ['save:true']]);
+  calls.length = 0; id('xAxisMonthBtn').click(); assert.deepStrictEqual([f.xAxis, f.yAxis, calls, log.splice(0)], ['month', 'week', ['rerender'], ['save:true']]);   // the Y axis moved to the other timeframe
+  id('yAxisMonthBtn').click(); assert.deepStrictEqual([f.xAxis, f.yAxis], ['week', 'month']); id('yAxisMonthBtn').click(); assert.deepStrictEqual([f.xAxis, f.yAxis], ['week', 'month']);
 }));

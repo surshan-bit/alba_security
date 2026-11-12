@@ -266,6 +266,11 @@
         <li>The sidebar badge tracks product milestones (v1.0, v1.1, ...).</li>
         <li>It is much coarser than the Artifact tool's own publish count, which bumps on every change.</li>
       </ul>
+            <h3>v1.381 &middot; 2026-11-12</h3>
+            <ul>
+              <li><strong>Automatic tests for the rest of the app:</strong> 68 parts of the dashboard that had no tests of their own now have them, including the page menu and Back button, the price store, the Live Data Refresh bar, the research overlay, the track-record panel, the News collection, Rocky and News sync, and the Analysis chart controls. Together they cover 97.6% of the code lines (up from 79.4%), and the checks will not let that number fall.</li>
+              <li><strong>Nothing changes in the app:</strong> no screen, number or behaviour is different; this release only adds tests.</li>
+            </ul>
             <h3>v1.380 &middot; 2026-11-12</h3>
             <ul>
               <li><strong>Refresh queue tested:</strong> the part that runs your queued refreshes (finishing a job, stopping, halting on a usage limit, retrying a refused batch, resuming after a reload, and taking over a run that went quiet) and the Buy / Sell &ldquo;Process&rdquo; step now have tests. Unit coverage rose from 78.3% to 79.4% of lines.</li>
