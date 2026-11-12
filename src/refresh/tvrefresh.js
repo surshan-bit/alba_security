@@ -36,6 +36,7 @@ import { fiEl, fiReset, fiSet, fiShowResult, setFiPfx } from '../import/panel.js
 import { registerBusy } from '../core/busy.js';
 import { duration, paintLastRuns, saveRunLog } from './runlog.js';
 
+const QUOTA_RETRY_MS = 8000;   // TradingView refused a call (quota): the call is tried once more after this pause
 const BATCH = 50;                 // symbols per TradingView call (the tool's limit)
 const SKIP_RETRY_DAYS = 14;       // a stock whose history download failed is not tried again for this long
 const FULL_WORKERS = 2;           // stocks whose full history is downloaded at the same time (a big download each)
@@ -99,7 +100,7 @@ async function rsPrepare(run){
   fiSet('prepare', 'running', 'Checking TradingView…', 0.1);
   try { await tvCall('mcp-tv-get-symbol-data', { symbol: 'NSE:TCS', columns: ['close'] }); }
   catch(e){
-    if(tvIsQuota(e) && !stopAsked){ fiSet('prepare', 'running', 'TradingView refused the call; trying once more in 8 seconds…', 0.1); await sleep(8000); await tvCall('mcp-tv-get-symbol-data', { symbol: 'NSE:TCS', columns: ['close'] }); }
+    if(tvIsQuota(e) && !stopAsked){ fiSet('prepare', 'running', 'TradingView refused the call; trying once more in ' + QUOTA_RETRY_MS / 1000 + ' seconds…', 0.1); await sleep(QUOTA_RETRY_MS); await tvCall('mcp-tv-get-symbol-data', { symbol: 'NSE:TCS', columns: ['close'] }); }
     else throw e;
   }
   fiSet('prepare', 'running', 'Reading the saved updates…', 0.3);
